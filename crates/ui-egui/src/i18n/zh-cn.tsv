@@ -3592,3 +3592,13 @@
 	Open a sequence to search its graphics	打开序列以搜索其中的图形
 	No text graphics in this sequence. Add text with the Type tool.	此序列中没有文本图形。请用文字工具添加文本。
 	No matching text.	没有匹配的文本。
+# WaltCut drawing layers
+	Brush Tool	画笔工具
+	New Drawing	新建绘图
+	Drawing	绘图
+	Draw Stroke	绘制笔画
+	New Cel	新建赛璐珞帧
+	Clear Cel	清除赛璐珞帧
+	Delete Cel	删除赛璐珞帧
+	In-between to Next Cel	补间到下一赛璐珞帧
+	AI Restyle…	AI 重新风格化…

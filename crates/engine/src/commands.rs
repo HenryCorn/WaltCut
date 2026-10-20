@@ -3425,6 +3425,8 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::essential_sound::commands());
     v.extend(crate::color::commands());
     v.extend(crate::graphics::commands());
+    v.extend(crate::drawing::commands());
+    v.extend(crate::ai::commands());
     v.extend(crate::graphic_templates::commands());
     v.extend(crate::shortcuts::commands());
     v.extend(crate::relink::commands());

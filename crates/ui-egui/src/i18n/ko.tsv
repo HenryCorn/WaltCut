@@ -3603,3 +3603,13 @@
 	Open a sequence to search its graphics	그래픽을 검색하려면 시퀀스를 여세요
 	No text graphics in this sequence. Add text with the Type tool.	이 시퀀스에는 텍스트 그래픽이 없습니다. 문자 도구로 텍스트를 추가하세요.
 	No matching text.	일치하는 텍스트가 없습니다.
+# WaltCut drawing layers
+	Brush Tool	브러시 도구
+	New Drawing	새 드로잉
+	Drawing	드로잉
+	Draw Stroke	획 그리기
+	New Cel	새 셀
+	Clear Cel	셀 지우기
+	Delete Cel	셀 삭제
+	In-between to Next Cel	다음 셀까지 중간 프레임
+	AI Restyle…	AI 리스타일…

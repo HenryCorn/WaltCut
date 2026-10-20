@@ -128,6 +128,9 @@ pub struct HostHooks {
     pub pick_files: Option<Box<dyn FnMut(&[&str]) -> Vec<String>>>,
     /// The cursor in physical screen pixels. Where the windowing layer reports no pointer while files are dragged in from the OS (Windows), a drop is placed where this says it landed.
     pub cursor_screen_position: Option<Box<dyn Fn() -> Option<(i32, i32)>>>,
+    /// Drawing-tablet pen pressure (0..1) while the pointer is a pen, for the Brush tool. `None`
+    /// from the hook (a mouse) or no hook: strokes are drawn at full pressure.
+    pub pen_pressure: Option<Box<dyn Fn() -> Option<f32>>>,
     pub pick_save: Option<Box<dyn FnMut(&str) -> Option<String>>>,
     pub pick_open_project: Option<Box<dyn FnMut() -> Option<String>>>,
     /// Save dialog with a filter: (filter name, extensions, suggested file name) → path. The
@@ -1838,6 +1841,7 @@ impl FilmcraftApp {
         self.scrub_audio(&ctx);
         // Text to Speech: a selected narration clip loads into the panel
         panels::tts::follow_selection(self);
+        panels::ai::window(self, &ctx);
         if self.ui.tts.pending.is_some() || self.ui.tts.download_job.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }

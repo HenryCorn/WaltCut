@@ -10,6 +10,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
 pub mod caption;
+pub mod drawing;
 pub mod effect;
 pub mod essential;
 pub mod find;
@@ -290,6 +291,9 @@ pub enum ItemKind {
         height: u32,
         rate: FrameRate,
     },
+    /// Frame-by-frame 2D animation: cels of pen strokes on a transparent canvas (see [`drawing`]).
+    /// Shared like sequences so undo snapshots don't deep-copy every stroke.
+    Drawing(std::sync::Arc<drawing::Drawing>),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -329,6 +333,18 @@ impl ProjectItem {
             _ => None,
         }
     }
+    pub fn as_drawing(&self) -> Option<&drawing::Drawing> {
+        match &self.kind {
+            ItemKind::Drawing(d) => Some(d),
+            _ => None,
+        }
+    }
+    pub fn as_drawing_mut(&mut self) -> Option<&mut drawing::Drawing> {
+        match &mut self.kind {
+            ItemKind::Drawing(d) => Some(std::sync::Arc::make_mut(d)),
+            _ => None,
+        }
+    }
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
         match &mut self.kind {
             ItemKind::Sequence(s) => Some(std::sync::Arc::make_mut(s)),
@@ -338,7 +354,7 @@ impl ProjectItem {
     pub fn has_video(&self) -> bool {
         match &self.kind {
             ItemKind::Media(m) => m.info.has_video(),
-            ItemKind::Sequence(_) | ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } => true,
+            ItemKind::Sequence(_) | ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } | ItemKind::Drawing(_) => true,
             ItemKind::Subclip { .. } => true,
         }
     }
@@ -355,7 +371,7 @@ impl ProjectItem {
             ItemKind::Sequence(s) => s.duration(),
             ItemKind::Subclip { range, .. } => range.duration,
             ItemKind::AdjustmentLayer { duration, .. } => *duration,
-            ItemKind::Graphic { .. } => Tick(3600 * TICKS_PER_SECOND),
+            ItemKind::Graphic { .. } | ItemKind::Drawing(_) => Tick(3600 * TICKS_PER_SECOND),
         }
     }
     pub fn frame_rate(&self) -> FrameRate {
@@ -363,6 +379,7 @@ impl ProjectItem {
             ItemKind::Media(m) => m.frame_rate(),
             ItemKind::Sequence(s) => s.settings.frame_rate,
             ItemKind::AdjustmentLayer { rate, .. } | ItemKind::Graphic { rate, .. } => *rate,
+            ItemKind::Drawing(d) => d.rate,
             ItemKind::Subclip { .. } => FrameRate::default(),
         }
     }
@@ -382,6 +399,7 @@ impl ProjectItem {
             ItemKind::Subclip { .. } => "Subclip",
             ItemKind::AdjustmentLayer { .. } => "Adjustment Layer",
             ItemKind::Graphic { .. } => "Graphic",
+            ItemKind::Drawing(_) => "Drawing",
         }
     }
 }
@@ -1715,6 +1733,7 @@ impl Project {
                 ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
                 ItemKind::Sequence(q) => Some((q.settings.width, q.settings.height)),
                 ItemKind::AdjustmentLayer { width, height, .. } | ItemKind::Graphic { width, height, .. } => Some((*width, *height)),
+                ItemKind::Drawing(d) => Some((d.width, d.height)),
                 ItemKind::Subclip { parent, .. } => {
                     id = *parent;
                     continue;
@@ -1735,7 +1754,7 @@ impl Project {
             return match &self.item(id)?.kind {
                 ItemKind::Media(m) => Some(m.pixel_aspect()),
                 ItemKind::Sequence(q) => Some(sane_par(q.settings.par)),
-                ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } => None,
+                ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } | ItemKind::Drawing(_) => None,
                 ItemKind::Subclip { parent, .. } => {
                     id = *parent;
                     continue;

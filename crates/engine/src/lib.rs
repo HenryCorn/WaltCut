@@ -11,6 +11,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
 pub mod aaf_omf;
+pub mod ai;
 pub mod autosave;
 pub mod captions;
 pub mod clip_ops;
@@ -18,6 +19,7 @@ pub mod color;
 pub mod commands;
 pub mod demo;
 pub mod doc_path;
+pub mod drawing;
 pub mod essential_sound;
 pub mod export_tools;
 pub mod graphic_templates;
@@ -422,6 +424,10 @@ pub struct Session {
     pub offline: relink::OfflineState,
     /// Proxy / ingest / project-manager jobs whose results still have to be applied to the project.
     pub media_jobs: Vec<proxies::PendingJob>,
+    /// AI re-style jobs whose frames still have to be placed ([`ai::poll`]).
+    pub ai_jobs: Vec<ai::PendingRestyle>,
+    /// Tests and embedders: use this backend instead of the configured provider.
+    pub restyler_override: Option<Arc<dyn filmcraft_genai::Restyler>>,
     /// Mask tracking jobs whose keyframes are still being written.
     pub mask_jobs: Vec<masks::PendingTrack>,
     /// Scene Edit Detection jobs whose results are applied when they finish.
@@ -528,6 +534,8 @@ impl Session {
             shortcuts: shortcuts::Shortcuts::new(),
             offline: Default::default(),
             media_jobs: Vec::new(),
+            ai_jobs: Vec::new(),
+            restyler_override: None,
             mask_jobs: Vec::new(),
             scene_jobs: Vec::new(),
             presets: Default::default(),
@@ -623,6 +631,7 @@ impl Session {
     /// results of finished proxy / ingest jobs.
     pub fn poll_persistence(&mut self) {
         proxies::poll(self);
+        ai::poll(self);
         masks::poll(self);
         scene_detect::poll(self);
         export_tools::pump_queue(self, false);
@@ -1199,7 +1208,7 @@ pub fn media_duration(p: &Project, _pool: &MediaPool, id: ItemId) -> Option<Tick
                 id = *parent;
                 continue;
             }
-            filmcraft_project::ItemKind::AdjustmentLayer { .. } | filmcraft_project::ItemKind::Graphic { .. } => None,
+            filmcraft_project::ItemKind::AdjustmentLayer { .. } | filmcraft_project::ItemKind::Graphic { .. } | filmcraft_project::ItemKind::Drawing(_) => None,
         };
     }
     None
@@ -1210,6 +1219,8 @@ const MAX_SUBCLIP_CHAIN: usize = 16;
 
 #[cfg(test)]
 mod aaf_omf_tests;
+#[cfg(test)]
+mod ai_tests;
 #[cfg(test)]
 mod animated_image_tests;
 #[cfg(test)]
@@ -1224,6 +1235,8 @@ mod avi_import_tests;
 mod clip_ops_tests;
 #[cfg(test)]
 mod color_tests;
+#[cfg(test)]
+mod drawing_tests;
 #[cfg(test)]
 mod essential_sound_tests;
 #[cfg(test)]

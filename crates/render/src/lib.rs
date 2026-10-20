@@ -14,6 +14,7 @@ pub mod audio_fx;
 pub mod blend;
 pub mod color_match;
 pub mod colorman;
+pub mod drawing;
 pub mod effects;
 pub mod flow;
 pub mod gpufx;
@@ -480,6 +481,18 @@ pub(crate) fn item_layer_ex(
         let (op, bl) = opacity_blend(item, mt);
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
+    if let ItemKind::Drawing(d) = &pi.kind
+        && !(item.has_opacity_masks() || opts.effects && item.has_standard_effects())
+    {
+        // strokes straight to the output, like graphics
+        let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
+        let mut canvas = Image::new(w, h);
+        if let Some(cel) = d.cel_at(d.frame_at(item.source_time_at(t))) {
+            drawing::render_strokes(&cel.strokes, &m, &mut canvas);
+        }
+        let (op, bl) = opacity_blend(item, mt);
+        return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
+    }
     // plain media: nothing but the frame itself reaches the output
     let plain_media = matches!(pi.kind, ItemKind::Media(_) | ItemKind::Subclip { .. })
         && !(opts.effects && item.has_standard_effects())
@@ -632,6 +645,14 @@ pub(crate) fn base_layer(
             let (gw, gh) = (((src_size.0 as f32 * want).ceil() as usize).max(1), ((src_size.1 as f32 * want).ceil() as usize).max(1));
             let mut img = Image::new(gw, gh);
             graphic_clip::render_graphic(item, mt, src_size, &Affine::scale(want as f64, want as f64), &mut img);
+            img
+        }
+        ItemKind::Drawing(d) => {
+            let (gw, gh) = (((src_size.0 as f32 * want).ceil() as usize).max(1), ((src_size.1 as f32 * want).ceil() as usize).max(1));
+            let mut img = Image::new(gw, gh);
+            if let Some(cel) = d.cel_at(d.frame_at(ft)) {
+                drawing::render_strokes(&cel.strokes, &Affine::scale(want as f64, want as f64), &mut img);
+            }
             img
         }
     })

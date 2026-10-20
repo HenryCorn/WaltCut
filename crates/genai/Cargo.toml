@@ -1,0 +1,24 @@
+[package]
+name = "filmcraft-genai"
+description = "Generative image AI for WaltCut: the Restyler trait (re-style a frame from a prompt), the fal.ai cloud backend, and the provider settings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# The fal.ai backend over HTTPS (pure-Rust TLS: rustls + RustCrypto, OS certificate verification).
+cloud = ["dep:ureq", "dep:rustls", "dep:rustls-rustcrypto"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = "0.22"
+ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier"], optional = true }
+rustls = { version = "0.23", default-features = false, optional = true }
+rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }

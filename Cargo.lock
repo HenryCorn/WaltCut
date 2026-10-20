@@ -1917,6 +1917,7 @@ dependencies = [
  "filmcraft-export",
  "filmcraft-format",
  "filmcraft-frame",
+ "filmcraft-genai",
  "filmcraft-geom",
  "filmcraft-interchange",
  "filmcraft-isobmff",
@@ -1999,6 +2000,19 @@ dependencies = [
  "filmcraft-time",
  "rayon",
  "serde",
+]
+
+[[package]]
+name = "filmcraft-genai"
+version = "0.10.0"
+dependencies = [
+ "base64 0.22.1",
+ "rustls",
+ "rustls-rustcrypto",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "ureq",
 ]
 
 [[package]]
@@ -2178,6 +2192,7 @@ dependencies = [
 name = "filmcraft-platform"
 version = "0.10.0"
 dependencies = [
+ "block2 0.6.2",
  "filmcraft-bitstream",
  "filmcraft-codecs",
  "filmcraft-color",
@@ -2193,6 +2208,7 @@ dependencies = [
  "filmcraft-time",
  "libloading",
  "log",
+ "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
  "objc2-core-media",
  "objc2-core-video",

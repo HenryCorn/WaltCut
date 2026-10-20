@@ -3584,3 +3584,13 @@
 	Open a sequence to search its graphics	Ouvrez une séquence pour rechercher dans ses graphiques
 	No text graphics in this sequence. Add text with the Type tool.	Aucun graphique avec du texte dans cette séquence. Ajoutez du texte avec l'outil Texte.
 	No matching text.	Aucun texte ne correspond.
+# WaltCut drawing layers
+	Brush Tool	Outil Pinceau
+	New Drawing	Nouveau dessin
+	Drawing	Dessin
+	Draw Stroke	Tracer un trait
+	New Cel	Nouveau cellulo
+	Clear Cel	Effacer le cellulo
+	Delete Cel	Supprimer le cellulo
+	In-between to Next Cel	Intervalles jusqu’au cellulo suivant
+	AI Restyle…	Restylisation IA…

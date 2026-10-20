@@ -300,6 +300,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         // them (the selected clip's transform handles cover it, #1023)
         if app.ui.eyedropper.is_some() {
             eyedropper(app, ui, &pic_resp, pic, target, rate, time);
+        } else if app.ui.tool == crate::state::Tool::Brush {
+            crate::panels::drawing::monitor_overlay(app, ui, pic, frame_size);
         } else {
             crate::panels::graphics::monitor_overlay(app, ui, pic, frame_size);
             crate::panels::masks::monitor_overlay(app, ui, pic, frame_size);

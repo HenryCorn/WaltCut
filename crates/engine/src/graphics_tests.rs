@@ -322,7 +322,15 @@ fn new_layer_menu_items_make_shapes_and_vertical_text() {
     let ids: Vec<&str> = crate::command_specs().iter().filter(|c| c.menu == ["Graphics and Titles", "New Layer"]).map(|c| c.id).collect();
     assert_eq!(
         ids,
-        ["graphics.newText", "graphics.newVerticalText", "graphics.newRectangle", "graphics.newEllipse", "graphics.newPolygon", "graphics.newFromFile"]
+        [
+            "graphics.newText",
+            "graphics.newVerticalText",
+            "graphics.newRectangle",
+            "graphics.newEllipse",
+            "graphics.newPolygon",
+            "graphics.newFromFile",
+            "drawing.new"
+        ]
     );
 }
 

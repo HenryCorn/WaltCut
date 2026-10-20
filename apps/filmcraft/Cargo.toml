@@ -11,7 +11,9 @@ build = "build.rs"
 workspace = true
 
 [features]
-default = []
+default = ["ai-cloud"]
+# AI re-style through cloud providers (fal.ai).
+ai-cloud = ["filmcraft-engine/ai-cloud"]
 # Speech-to-text (Text panel ▸ Transcribe) with Whisper on the CPU, and model downloads.
 whisper = ["filmcraft-engine/whisper", "filmcraft-engine/speech-download"]
 # Natural Text to Speech voices (Kokoro-82M on the CPU, downloaded on first use).

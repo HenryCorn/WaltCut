@@ -3617,3 +3617,13 @@
 	Open a sequence to search its graphics	Abre una secuencia para buscar en sus gráficos
 	No text graphics in this sequence. Add text with the Type tool.	Esta secuencia no tiene gráficos con texto. Añade texto con la herramienta Texto.
 	No matching text.	Ningún texto coincide.
+# WaltCut drawing layers
+	Brush Tool	Herramienta Pincel
+	New Drawing	Nuevo dibujo
+	Drawing	Dibujo
+	Draw Stroke	Dibujar trazo
+	New Cel	Nuevo fotograma de dibujo
+	Clear Cel	Borrar fotograma de dibujo
+	Delete Cel	Eliminar fotograma de dibujo
+	In-between to Next Cel	Intercalar hasta el siguiente fotograma de dibujo
+	AI Restyle…	Reestilizar con IA…

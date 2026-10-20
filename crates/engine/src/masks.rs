@@ -164,6 +164,7 @@ fn source_size(s: &Session, clip: ClipId) -> (f64, f64) {
         filmcraft_project::ItemKind::AdjustmentLayer { width, height, .. } | filmcraft_project::ItemKind::Graphic { width, height, .. } => {
             Some((*width, *height))
         }
+        filmcraft_project::ItemKind::Drawing(d) => Some((d.width, d.height)),
         filmcraft_project::ItemKind::Subclip { parent, .. } => {
             s.project.item(*parent).and_then(|pp| pp.as_media()).and_then(|m| m.info.video.as_ref()).map(|v| (v.width, v.height))
         }

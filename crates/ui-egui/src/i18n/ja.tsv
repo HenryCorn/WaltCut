@@ -3616,3 +3616,13 @@
 	Open a sequence to search its graphics	シーケンスを開くとグラフィックスを検索できます
 	No text graphics in this sequence. Add text with the Type tool.	このシーケンスにはテキストのグラフィックスがありません。文字ツールでテキストを追加してください。
 	No matching text.	一致するテキストはありません。
+# WaltCut drawing layers
+	Brush Tool	ブラシツール
+	New Drawing	新規ドローイング
+	Drawing	ドローイング
+	Draw Stroke	ストロークを描画
+	New Cel	新規セル
+	Clear Cel	セルを消去
+	Delete Cel	セルを削除
+	In-between to Next Cel	次のセルまで中割り
+	AI Restyle…	AI リスタイル…

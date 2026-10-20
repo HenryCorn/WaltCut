@@ -3585,3 +3585,13 @@
 	Open a sequence to search its graphics	Abra uma sequência para pesquisar nos gráficos dela
 	No text graphics in this sequence. Add text with the Type tool.	Esta sequência não tem gráficos com texto. Adicione texto com a ferramenta Texto.
 	No matching text.	Nenhum texto corresponde.
+# WaltCut drawing layers
+	Brush Tool	Ferramenta Pincel
+	New Drawing	Novo desenho
+	Drawing	Desenho
+	Draw Stroke	Desenhar traço
+	New Cel	Novo quadro de desenho
+	Clear Cel	Limpar quadro de desenho
+	Delete Cel	Excluir quadro de desenho
+	In-between to Next Cel	Intercalar até o próximo quadro de desenho
+	AI Restyle…	Reestilizar com IA…

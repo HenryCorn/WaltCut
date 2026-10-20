@@ -26,10 +26,12 @@ pub enum Tool {
     Zoom,
     Type,
     VerticalType,
+    /// Frame-by-frame drawing on drawing clips (`panels::drawing`).
+    Brush,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 17] = [
+    pub const ALL: [Tool; 18] = [
         Tool::Selection,
         Tool::TrackSelectForward,
         Tool::TrackSelectBackward,
@@ -47,6 +49,7 @@ impl Tool {
         Tool::Zoom,
         Tool::Type,
         Tool::VerticalType,
+        Tool::Brush,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -67,6 +70,7 @@ impl Tool {
             Tool::Zoom => "Zoom Tool",
             Tool::Type => "Type Tool",
             Tool::VerticalType => "Vertical Type Tool",
+            Tool::Brush => "Brush Tool",
         }
     }
     pub fn shortcut(self) -> &'static str {
@@ -87,6 +91,7 @@ impl Tool {
             Tool::Zoom => "Z",
             Tool::Type => "T",
             Tool::VerticalType => "",
+            Tool::Brush => "Shift+P",
         }
     }
     pub fn icon(self) -> Icon {
@@ -101,7 +106,7 @@ impl Tool {
             Tool::Razor => Icon::Razor,
             Tool::Slip => Icon::Slip,
             Tool::Slide => Icon::Slide,
-            Tool::Pen => Icon::Pen,
+            Tool::Pen | Tool::Brush => Icon::Pen,
             Tool::Rectangle => Icon::Rectangle,
             Tool::Ellipse => Icon::Ellipse,
             Tool::Hand => Icon::Hand,
@@ -127,6 +132,7 @@ impl Tool {
             vec![Tool::Pen, Tool::Rectangle, Tool::Ellipse],
             vec![Tool::Hand, Tool::Zoom],
             vec![Tool::Type, Tool::VerticalType],
+            vec![Tool::Brush],
         ]
     }
 }
@@ -431,6 +437,12 @@ pub struct UiState {
     #[serde(default)]
     pub language: crate::i18n::Language,
     pub tool: Tool,
+    /// Brush tool options.
+    #[serde(default)]
+    pub brush: crate::panels::drawing::BrushSettings,
+    /// AI Restyle window.
+    #[serde(default)]
+    pub ai: crate::panels::ai::AiWindow,
     pub mode: Mode,
     pub workspace: String,
     pub dock: DockNode,
@@ -961,6 +973,8 @@ impl Default for UiState {
         Self {
             language: crate::i18n::Language::default(),
             tool: Tool::Selection,
+            brush: Default::default(),
+            ai: Default::default(),
             mode: Mode::Edit,
             workspace: "Editing".into(),
             floating: vec![],

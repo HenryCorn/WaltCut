@@ -50,6 +50,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("playback.playAround", "Play Around", [], None),
     uic!("playback.inToOut", "Play In to Out", [], Some("Alt+K")),
     uic!("playback.loop", "Loop", [], None),
+    uic!("ai.restyleWindow", "AI Restyle…", ["Graphics and Titles"], None),
     uic!("view.zoomIn", "Zoom In", ["View"], Some("=")),
     uic!("view.zoomOut", "Zoom Out", ["View"], Some("-")),
     uic!("view.zoomToSequence", "Zoom to Sequence", ["View"], Some("\\")),
@@ -413,6 +414,10 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             let ph = app.session.playhead().seconds();
             crate::panels::timeline::zoom_about(&mut app.ui.timeline, f, ph, app.last_timeline_width);
             return Ok(Value::Null);
+        }
+        "ai.restyleWindow" => {
+            app.ui.ai.open = !app.ui.ai.open;
+            return Ok(json!({"open": app.ui.ai.open}));
         }
         "view.zoomToSequence" => {
             app.ui.timeline.fit_pending = true;
