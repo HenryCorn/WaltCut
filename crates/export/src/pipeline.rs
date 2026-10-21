@@ -236,7 +236,7 @@ impl Pipeline {
         let pool = self.renderer.as_ref().filter(|_| !waltcut_render::plan::is_cpu_frame(&self.project, self.seq, t));
         let gpu = match pool {
             Some(pool) => {
-                let asked = web_time::Instant::now();
+                let asked = std::time::Instant::now();
                 pool.with(|r| {
                     crate::note_lock_wait(asked.elapsed());
                     r.render(&self.project, self.seq, t, self.opts, sources)

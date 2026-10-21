@@ -54,11 +54,10 @@ pub fn take_last() -> Option<String> {
 /// The crash log file for today, if logging to disk.
 pub fn log_path() -> Option<std::path::PathBuf> {
     let dir = LOG_DIR.lock().unwrap_or_else(|e| e.into_inner()).clone()?;
-    let secs = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     Some(dir.join(format!("crash-{}.log", secs / 86_400)))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn write_log(summary: &str) {
     use std::io::Write;
     let Some(path) = log_path() else { return };
@@ -66,14 +65,11 @@ fn write_log(summary: &str) {
         let _ = std::fs::create_dir_all(d);
     }
     let bt = std::backtrace::Backtrace::force_capture();
-    let secs = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(f, "=== {} FilmCraft {} (unix {secs})\n{summary}\n{bt}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     }
 }
-
-#[cfg(target_arch = "wasm32")]
-fn write_log(_summary: &str) {}
 
 #[cfg(test)]
 mod tests {

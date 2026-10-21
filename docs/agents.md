@@ -43,14 +43,10 @@ The release packages ship `filmcraft-cli` alongside the desktop app, so no build
 
 | Install | CLI |
 |---|---|
-| Windows (MSI) | `C:\Program Files\FilmCraft\filmcraft-cli.exe` by default (wherever you installed it otherwise), not on `PATH` |
-| Linux (deb, rpm) | `/usr/bin/filmcraft-cli` |
 | macOS | the separate `filmcraft-cli-<version>-macos-<arch>.zip` release asset (the `.app` holds only the desktop app) |
 
 ```sh
-# Windows, default install folder
-claude mcp add filmcraft -- "C:\Program Files\FilmCraft\filmcraft-cli.exe" mcp
-# Linux, or macOS with the CLI unzipped onto PATH
+# macOS, with the CLI unzipped onto PATH
 claude mcp add filmcraft -- filmcraft-cli mcp
 ```
 
@@ -278,7 +274,7 @@ everything you need to contribute is in the public docs above. Ask a maintainer 
 
 1. **Orient.** Pick the next task: the next unchecked task in the maintainer status file, or an open
    [gaps.md](gaps.md) entry. Prefer those gaps (stability, `.prproj`, camera media, measurement,
-   hardware, Windows/Linux) over adding more checklist items. Read the relevant
+   hardware) over adding more checklist items. Read the relevant
    architecture section and crate README.
 2. **Plan tests first.** Write down the acceptance test before writing code.
 3. **Implement and test.**

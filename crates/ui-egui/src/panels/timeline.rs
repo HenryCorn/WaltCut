@@ -1095,10 +1095,7 @@ fn request_sequence_peaks(app: &mut FilmcraftApp, item: ItemId) -> Option<Arc<Ve
         }
         pending.lock().unwrap_or_else(|e| e.into_inner()).retain(|i| *i != pkey);
     };
-    #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(run);
-    #[cfg(target_arch = "wasm32")]
-    run();
     have
 }
 
@@ -1152,10 +1149,7 @@ pub(crate) fn request_peaks(app: &mut FilmcraftApp, item: ItemId, stream: usize)
         peaks.lock().unwrap_or_else(|e| e.into_inner()).insert(pkey, Arc::new(out));
         pending.lock().unwrap_or_else(|e| e.into_inner()).retain(|i| *i != pkey);
     };
-    #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(run);
-    #[cfg(target_arch = "wasm32")]
-    run();
     None
 }
 

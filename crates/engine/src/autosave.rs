@@ -26,9 +26,9 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use waltcut_format::autosave as names;
 use waltcut_project::Project;
-use web_time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::settings;
 
@@ -503,13 +503,7 @@ pub fn default_data_dir() -> Option<PathBuf> {
     if let Some(d) = std::env::current_exe().ok().and_then(|exe| exe.parent().and_then(portable_data_dir)) {
         return Some(d);
     }
-    if cfg!(target_os = "macos") {
-        return env("HOME").map(|h| h.join("Library/Application Support/FilmCraft"));
-    }
-    if cfg!(windows) {
-        return env("APPDATA").map(|h| h.join("FilmCraft"));
-    }
-    env("XDG_DATA_HOME").map(|d| d.join("filmcraft")).or_else(|| env("HOME").map(|h| h.join(".local/share/filmcraft")))
+    env("HOME").map(|h| h.join("Library/Application Support/FilmCraft"))
 }
 
 pub fn unix_now() -> i64 {

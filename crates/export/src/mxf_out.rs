@@ -105,7 +105,7 @@ impl MxfMux {
         let settings = s.settings;
         let atom = settings.format == Format::MxfOpAtom;
         let rate = Rational::new(s.rate.num as i32, s.rate.den as i32);
-        let now = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
         let seed = format!("{}|{now}", settings.path);
         let ids = PackageIds::from_seed(&seed, &s.name);
         // integers only: `ExportSettings::validate` refuses float PCM in MXF

@@ -172,13 +172,8 @@ fn isolation_preserves_close_and_screenshot_delivery_without_claiming_os_focus()
         fn path(&self) -> &std::path::Path {
             std::path::Path::new("/unrelated-input.txt")
         }
-        #[cfg(not(target_arch = "wasm32"))]
         fn bytes(&self) -> Result<Vec<u8>, String> {
             Err("must not read unrelated native input".into())
-        }
-        #[cfg(target_arch = "wasm32")]
-        fn bytes_async(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<u8>, String>> + '_>> {
-            Box::pin(async { Err("must not read unrelated native input".into()) })
         }
     }
     raw.dropped_files.push(Arc::new(UnrelatedFile));

@@ -62,10 +62,9 @@ pub use waltcut_project as project;
 pub use waltcut_render as render;
 pub use waltcut_time as time;
 
-/// The OS temp folder; `/tmp` on wasm32, where `std::env::temp_dir()` panics ("no filesystem on
-/// this platform"). Use this instead of `std::env::temp_dir()` in any code the web build runs.
+/// The OS temp folder.
 pub fn temp_dir() -> std::path::PathBuf {
-    if cfg!(target_arch = "wasm32") { std::path::PathBuf::from("/tmp") } else { std::env::temp_dir() }
+    std::env::temp_dir()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -126,11 +125,9 @@ pub trait Services: Send + Sync {
     }
 }
 
-/// The desktop user's home directory. Windows prefers `USERPROFILE`: shells like Git Bash set
-/// `HOME` to a Unix-style path (`/c/Users/…`) that native file APIs cannot open.
+/// The user's home directory.
 pub fn std_home_dir() -> Option<String> {
-    let vars = if cfg!(windows) { ["USERPROFILE", "HOME"] } else { ["HOME", "USERPROFILE"] };
-    vars.iter().find_map(|v| std::env::var(v).ok().filter(|h| !h.is_empty()))
+    std::env::var("HOME").ok().filter(|h| !h.is_empty())
 }
 
 /// Native filesystem services.
@@ -155,7 +152,6 @@ impl Services for FsServices {
         Some(std::sync::Arc::new(|p: &str| std::fs::read(p)))
     }
     /// Media are read in place from the open file: a clip costs its index, not its size.
-    #[cfg(any(unix, windows))]
     fn reader(&self, path: &str) -> Option<std::io::Result<waltcut_media::SharedReader>> {
         Some(waltcut_media::reader::FileReader::open(std::path::Path::new(path)).map(|r| std::sync::Arc::new(r) as waltcut_media::SharedReader))
     }
@@ -387,8 +383,6 @@ pub struct Session {
     pub export_presets: export_tools::ExportPresetLibrary,
     /// The export queue (session state, not saved with the project).
     pub export_queue: export_tools::ExportQueue,
-    /// Exports run a batch at a time by [`Session::pump_jobs`] (hosts without threads: web).
-    pub stepped: Vec<SteppedJob>,
     /// The Events panel log: failed commands, job results, auto-save errors, messages.
     pub log: panels::EventLog,
     /// Nesting depth of [`Session::execute`] (commands that run other commands).
@@ -398,15 +392,6 @@ pub struct Session {
     pub media_stamps: std::collections::HashMap<String, media_watch::Stamp>,
     /// The stamps being taken on a worker thread ([`Session::start_media_scan`]).
     pub media_scan: Option<media_watch::MediaScan>,
-}
-
-/// An export advanced a batch at a time on the host's thread ([`Session::pump_jobs`]).
-pub struct SteppedJob {
-    pub job: u64,
-    pub exporter: waltcut_export::Exporter,
-    pub provider: media_pool::PoolProvider,
-    pub progress: Arc<waltcut_export::Progress>,
-    pub result: Arc<std::sync::Mutex<Option<std::result::Result<waltcut_export::Report, String>>>>,
 }
 
 /// A background job with shared progress.
@@ -479,40 +464,11 @@ impl Session {
             presets: Default::default(),
             export_presets: Default::default(),
             export_queue: Default::default(),
-            stepped: Vec::new(),
             log: Default::default(),
             exec_depth: 0,
             media_stamps: Default::default(),
             media_scan: None,
         }
-    }
-
-    /// Advance stepped jobs ([`SteppedJob`]) for up to `budget` (at least one step). Returns
-    /// whether jobs remain. A job whose media is still loading waits for the next call.
-    pub fn pump_jobs(&mut self, budget: std::time::Duration) -> bool {
-        export_tools::pump_queue(self, false);
-        let t0 = web_time::Instant::now();
-        while let Some(j) = self.stepped.first_mut() {
-            match j.exporter.step(&j.provider, &j.progress) {
-                Ok(waltcut_export::Step::Progress) => {}
-                Ok(waltcut_export::Step::Pending) => return true,
-                Ok(waltcut_export::Step::Done(r)) => {
-                    *j.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(Ok(r));
-                    self.stepped.remove(0);
-                }
-                Err(e) => {
-                    let e = e.to_string();
-                    *j.progress.error.lock().unwrap_or_else(|x| x.into_inner()) = Some(e.clone());
-                    j.progress.finished.store(true, std::sync::atomic::Ordering::Relaxed);
-                    *j.result.lock().unwrap_or_else(|x| x.into_inner()) = Some(Err(e));
-                    self.stepped.remove(0);
-                }
-            }
-            if t0.elapsed() >= budget {
-                break;
-            }
-        }
-        !self.stepped.is_empty() || self.export_queue.is_active()
     }
 
     /// Start auto-save and the crash-recovery journal (native frontends). Loads preferences from
@@ -605,9 +561,7 @@ impl Session {
 
     /// Keep render previews next to the saved project (moves an unsaved project's previews).
     pub fn previews_follow_path(&mut self) {
-        if let Some(p) = &self.path
-            && !cfg!(target_arch = "wasm32")
-        {
+        if let Some(p) = &self.path {
             self.previews.move_to(project_tools::previews_dir(self).unwrap_or_else(|| previews::dir_for_project(p)));
         }
     }
@@ -1260,5 +1214,3 @@ mod source_placement_tests;
 
 #[cfg(test)]
 mod frame_export_tests;
-#[cfg(test)]
-mod wasm_clock_tests;

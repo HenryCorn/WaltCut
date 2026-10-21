@@ -4208,7 +4208,7 @@ fn name_project(p: &mut waltcut_project::Project, name: String) {
 }
 
 fn write_project(s: &mut Session, path: &str, adopt: bool) -> Result<Value> {
-    let t0 = web_time::Instant::now();
+    let t0 = std::time::Instant::now();
     // Save As renames the project after its new file (not an edit: no undo step, not dirty).
     if adopt
         && let Some(name) = project_name_for(path)
@@ -4241,9 +4241,7 @@ fn install_project(s: &mut Session, proj: waltcut_project::Project, path: Option
     s.state = crate::Session::default().state;
     s.state.active_sequence = first;
     s.state.open_sequences = first.into_iter().collect();
-    if let Some(p) = &path
-        && !cfg!(target_arch = "wasm32")
-    {
+    if let Some(p) = &path {
         s.previews.set_dir(Some(crate::project_tools::previews_dir_for(&s.project, p, &s.prefs.auto_save.scratch_folders)));
     }
     s.path = path;

@@ -319,9 +319,7 @@ fn project_captured_folder_outside_the_project_is_not_used() {
     let mut s = demo();
     s.execute("file.saveAs", json!({"path": proj})).unwrap();
     let mut named = vec![d.join("elsewhere").to_string_lossy().to_string(), r"\\192.0.2.1\share\cap".to_string(), "file://192.0.2.1/s/cap".to_string()];
-    if cfg!(unix) {
-        named.push(format!("/{}", show.join("Captured").display()));
-    }
+    named.push(format!("/{}", show.join("Captured").display()));
     let beside = show.to_string_lossy().to_string();
     for dir in &named {
         s.edit("scratch", |p, _| {

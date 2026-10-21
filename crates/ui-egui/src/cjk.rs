@@ -38,12 +38,9 @@ fn korean_font() -> Option<Arc<FontData>> {
     FONT.get_or_init(|| find_system_font(KOREAN_SAMPLE, KOREAN_PREFERRED)).clone()
 }
 
-/// A font collection's face index matters: Windows CJK UI fonts commonly live in TTC files.
+/// A font collection's face index matters: CJK UI fonts commonly live in TTC files.
 /// Keep the owned bytes behind an Arc so theme reinstalls do not reread or leak a font file.
 fn find_system_font(sample: &str, preferred: &[&str]) -> Option<Arc<FontData>> {
-    if cfg!(target_arch = "wasm32") {
-        return None;
-    }
     waltcut_text::fonts::scan_system();
     let faces: Vec<_> = waltcut_text::fonts::all_faces().into_iter().filter(|f| f.info.origin == "system" && !f.info.italic).collect();
     let covers = |f: &waltcut_text::fonts::Face| f.covers_text(sample);

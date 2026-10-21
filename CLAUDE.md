@@ -1,6 +1,6 @@
 # FilmCraft — instructions for agents
 
-FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor targeting Adobe Premiere Pro parity (and beyond). Native on macOS, Windows, Linux; web via WASM. Sibling of `../photocraft` (Photoshop), `../pdfcraft` (Acrobat) and `../vectorcraft` (Illustrator; formerly DrawCraft), with the same conventions.
+FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor targeting Adobe Premiere Pro parity (and beyond). Native on macOS (Apple silicon). Sibling of `../photocraft` (Photoshop), `../pdfcraft` (Acrobat) and `../vectorcraft` (Illustrator; formerly DrawCraft), with the same conventions.
 
 ## Start every session here
 `plan/` is maintainer-local (gitignored, not in the repo). Each step names the public equivalent to use if you don't have it.
@@ -18,7 +18,7 @@ FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor target
 - **Exact time:** all time is `waltcut_time::Tick` (254 016 000 000/s). Never use f64 seconds for edit math.
 - **Everything is a command** (`crates/engine`): id, label, menu path, shortcut, params, enabled(), run(). UI, CLI, control channel and MCP all dispatch by id.
 - **Everything is agent-drivable:** every interactive widget registers an automation id; UI state is serde so the control channel can read/set it.
-- **Quality gates** before every commit: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo xtask layers`, `cargo xtask assets`, `cargo xtask wasm` (checks L0–L4 crates). `cargo xtask ci` runs them all.
+- **Quality gates** before every commit: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo xtask layers`, `cargo xtask assets`. `cargo xtask ci` runs them all.
 - **Disk:** `target/debug` grows to ~100 GB over a session and has filled the disk. After each task run `cargo xtask tidy --apply --if-over 30` (dry run without `--apply`; `--fixtures` also removes generated media). Build with `CARGO_INCREMENTAL=0` when space is tight.
 - **Commits:** one task id per commit (`M2.4: CABAC residual decoding`). Only green states. End messages with the attribution line required by the environment.
 

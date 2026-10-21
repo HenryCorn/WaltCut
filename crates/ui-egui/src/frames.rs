@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use web_time::Instant;
+use std::time::Instant;
 
 use waltcut_engine::previews::PreviewStore;
 use waltcut_engine::{MediaPool, Services};
@@ -180,35 +180,17 @@ pub struct JobRecord {
 
 /// CPU time consumed by the calling thread (None where the platform has no thread clock).
 pub fn thread_cpu_time() -> Option<Duration> {
-    #[cfg(all(unix, not(target_arch = "wasm32")))]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
         Some(Duration::new(t.tv_sec as u64, t.tv_nsec as u32))
-    }
-    #[cfg(windows)]
-    {
-        cpu_time::ThreadTime::try_now().ok().map(|t| t.as_duration())
-    }
-    #[cfg(not(any(windows, all(unix, not(target_arch = "wasm32")))))]
-    {
-        None
     }
 }
 
 /// CPU time consumed by the whole process, all threads (None where unsupported).
 pub fn process_cpu_time() -> Option<Duration> {
-    #[cfg(all(unix, not(target_arch = "wasm32")))]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ProcessCPUTime);
         Some(Duration::new(t.tv_sec as u64, t.tv_nsec as u32))
-    }
-    #[cfg(windows)]
-    {
-        cpu_time::ProcessTime::try_now().ok().map(|t| t.as_duration())
-    }
-    #[cfg(not(any(windows, all(unix, not(target_arch = "wasm32")))))]
-    {
-        None
     }
 }
 
@@ -419,7 +401,6 @@ impl FrameServer {
             stats: Mutex::new(FrameStats::default()),
         });
         let repaint: Arc<Mutex<Option<Box<dyn Fn() + Send + Sync>>>> = Arc::new(Mutex::new(None));
-        #[cfg(not(target_arch = "wasm32"))]
         for i in 0..workers.max(1) {
             let sh = shared.clone();
             let pool = pool.clone();
@@ -428,8 +409,6 @@ impl FrameServer {
             let pv = previews.clone();
             std::thread::Builder::new().name(format!("filmcraft-frames-{i}")).spawn(move || worker(sh, pool, services, pv, rp)).ok();
         }
-        #[cfg(target_arch = "wasm32")]
-        let _ = workers;
         Self { shared, pool, services, previews, repaint }
     }
 
@@ -644,48 +623,6 @@ impl FrameServer {
         }
         None
     }
-
-    /// Without worker threads (wasm32): run queued jobs on the calling (UI) thread, highest
-    /// priority first, until `budget` has passed (at least one job). Jobs whose media is still
-    /// loading go back to the queue. Returns the number of jobs finished. A no-op with workers.
-    pub fn pump(&self, budget: Duration) -> usize {
-        if cfg!(not(target_arch = "wasm32")) {
-            return 0;
-        }
-        let t0 = Instant::now();
-        let mut done = 0;
-        let mut retry = Vec::new();
-        loop {
-            let job = {
-                let mut q = self.shared.queue.lock().unwrap_or_else(|e| e.into_inner());
-                if q.is_empty() {
-                    break;
-                }
-                let best = q.iter().enumerate().min_by_key(|(i, j)| (j.prio, *i)).map(|(i, _)| i).unwrap_or(0);
-                match q.remove(best) {
-                    Some(job) => job,
-                    None => break,
-                }
-            };
-            if run_job(&self.shared, &job, &self.pool, &self.services, &self.previews) {
-                done += 1;
-            } else {
-                retry.push(job);
-            }
-            if t0.elapsed() >= budget {
-                break;
-            }
-        }
-        if !retry.is_empty() {
-            let mut q = self.shared.queue.lock().unwrap_or_else(|e| e.into_inner());
-            for j in retry.into_iter().rev() {
-                if !q.iter().any(|x| x.key == j.key) {
-                    q.push_front(j);
-                }
-            }
-        }
-        done
-    }
 }
 
 /// Counts shown and dropped frames while playing.
@@ -758,7 +695,6 @@ impl PlaybackMeter {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn worker(
     sh: Arc<Shared>,
     pool: Arc<MediaPool>,

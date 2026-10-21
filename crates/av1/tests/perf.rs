@@ -11,14 +11,9 @@ use std::time::Instant;
 use waltcut_av1::{DecodeStats, Decoder, Stage};
 
 fn thread_cpu_secs() -> Option<f64> {
-    #[cfg(unix)]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
         Some(t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9)
-    }
-    #[cfg(not(unix))]
-    {
-        None
     }
 }
 

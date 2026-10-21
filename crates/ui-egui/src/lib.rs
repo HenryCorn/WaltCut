@@ -52,7 +52,6 @@ pub mod menus;
 pub mod native_dialogs;
 pub mod panels;
 pub mod perf;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod play_ahead;
 pub mod scrub;
 mod shuttle;
@@ -125,8 +124,6 @@ pub struct AudioDevices {
 #[derive(Default)]
 pub struct HostHooks {
     pub pick_files: Option<Box<dyn FnMut(&[&str]) -> Vec<String>>>,
-    /// The cursor in physical screen pixels. Where the windowing layer reports no pointer while files are dragged in from the OS (Windows), a drop is placed where this says it landed.
-    pub cursor_screen_position: Option<Box<dyn Fn() -> Option<(i32, i32)>>>,
     /// Drawing-tablet pen pressure (0..1) while the pointer is a pen, for the Brush tool. `None`
     /// from the hook (a mouse) or no hook: strokes are drawn at full pressure.
     pub pen_pressure: Option<Box<dyn Fn() -> Option<f32>>>,
@@ -235,7 +232,6 @@ pub struct Playback {
     /// consuming samples hands the clock back to the wall clock (see [`AUDIO_STALL_S`]).
     audio_seen: (u64, f64),
     /// Audio underruns for the current (or last) play (desktop: sound is mixed ahead).
-    #[cfg(not(target_arch = "wasm32"))]
     pub audio_stats: std::sync::Arc<play_ahead::AudioStats>,
     /// Shown / dropped frame accounting for the current (or last) play.
     pub meter: frames::PlaybackMeter,
@@ -503,7 +499,7 @@ impl FilmcraftApp {
             self.disable_gpu("frame larger than the GPU's maximum texture size");
             return None;
         }
-        let t0 = web_time::Instant::now();
+        let t0 = std::time::Instant::now();
         let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let (view, size) = g.compositor.composite_prepared(&plan.plan, Some(&plan.prepared));
             (view.clone(), size)
@@ -1038,16 +1034,7 @@ impl FilmcraftApp {
         // the old stream stops before the new mixer resets the underrun counters
         a.stop();
         // Desktop: mix ahead on a thread so the device callback never waits on decoding.
-        #[cfg(not(target_arch = "wasm32"))]
         let fill = play_ahead::spawn(mix, cursor, sr, a.channels(), self.playback.audio_stats.clone());
-        #[cfg(target_arch = "wasm32")]
-        let fill = {
-            let (mut mix, mut cursor) = (mix, cursor);
-            Box::new(move |buf: &mut [f32], ch: usize| {
-                mix(cursor, buf, ch);
-                cursor += (buf.len() / ch.max(1)) as i64;
-            })
-        };
         match a.start(fill) {
             Ok(_) => {
                 self.playback.audio_clock = true;
@@ -1404,16 +1391,9 @@ impl FilmcraftApp {
         }
     }
 
-    /// Where files dragged in from the OS are over the window. The OS reports no cursor motion during such a drag
-    /// (winit, Windows), so ask it through the host hook, else use the last pointer position egui saw.
+    /// Where files dragged in from the OS are over the window: the last pointer position egui saw.
     fn drop_pointer(&self, ctx: &egui::Context) -> Option<egui::Pos2> {
-        let os_pointer = self
-            .hooks
-            .cursor_screen_position
-            .as_ref()
-            .and_then(|f| f())
-            .and_then(|px| ctx.input(|i| i.viewport().inner_rect.map(|r| screen_px_to_ui(px, i.pixels_per_point, r.min))));
-        os_pointer.or_else(|| ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos())))
+        ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos()))
     }
 
     // ---------------------------------------------------------------- input
@@ -1674,7 +1654,6 @@ impl FilmcraftApp {
     /// seconds, and as soon as the window comes back to the front (after a render in another app),
     /// stamp the project's media files on a worker thread and read the changed ones again
     /// ([`waltcut_engine::media_watch`]).
-    #[cfg(not(target_arch = "wasm32"))]
     fn tick_media_refresh(&mut self, ctx: &egui::Context) {
         if let Some(r) = self.session.poll_media_scan() {
             match r {
@@ -1722,7 +1701,6 @@ impl FilmcraftApp {
         }
         self.sync_pool();
         self.apply_prefs(&ctx);
-        #[cfg(not(target_arch = "wasm32"))]
         self.tick_media_refresh(&ctx);
         for ev in self.session.drain_events() {
             match ev {
@@ -1987,7 +1965,6 @@ fn synthesize_mac_ctrl_click(armed: &mut bool, raw_input: &mut egui::RawInput) {
 impl eframe::App for FilmcraftApp {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         self.native_window_focused = Some(raw_input.focused);
-        #[cfg(target_os = "macos")]
         if !self.control_input_only {
             synthesize_mac_ctrl_click(&mut self.mac_ctrl_click_armed, raw_input);
         }
@@ -2091,9 +2068,6 @@ impl eframe::App for FilmcraftApp {
             ui.ctx().request_repaint();
             return;
         }
-        // No frame worker threads on the web: render queued frames here, within a time budget
-        // that leaves room for the UI pass (a no-op where workers run).
-        self.frames.pump(std::time::Duration::from_millis(if self.playback.playing { 24 } else { 40 }));
         // A panic in one panel must not close the app (losing unsaved work) or leave a blank
         // window: catch it, keep the session, and say what happened.
         if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.frame(ui))).is_err() {
@@ -2730,34 +2704,6 @@ mod voiceover_playback_tests {
         assert!(app.session.playhead() > from, "{:?} <= {from:?}", app.session.playhead());
         app.session.execute("audio.voiceover.stop", json!({"discard": true})).unwrap();
         app.stop();
-    }
-}
-
-/// A physical-pixel screen position as a point in the window's UI space, given the window's content origin in points.
-///
-/// Assumes the whole virtual screen uses the window's `pixels_per_point`: with monitors of mixed
-/// DPI the point can be off when the cursor and the window's origin are on different monitors.
-fn screen_px_to_ui(px: (i32, i32), pixels_per_point: f32, content_min: egui::Pos2) -> egui::Pos2 {
-    let ppp = if pixels_per_point.is_finite() && pixels_per_point > 0.0 { pixels_per_point } else { 1.0 };
-    egui::pos2(px.0 as f32 / ppp - content_min.x, px.1 as f32 / ppp - content_min.y)
-}
-
-#[cfg(test)]
-mod screen_px_tests {
-    use super::screen_px_to_ui;
-
-    #[test]
-    fn maps_screen_pixels_into_the_window() {
-        let p = screen_px_to_ui((1300, 900), 2.0, egui::pos2(100.0, 50.0));
-        assert_eq!((p.x, p.y), (550.0, 400.0));
-    }
-
-    #[test]
-    fn a_hostile_scale_does_not_divide_by_zero() {
-        for ppp in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            let p = screen_px_to_ui((10, 20), ppp, egui::pos2(0.0, 0.0));
-            assert!(p.x.is_finite() && p.y.is_finite());
-        }
     }
 }
 

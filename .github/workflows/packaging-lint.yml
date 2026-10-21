@@ -1,5 +1,5 @@
 # Quick static checks for the release pipeline (seconds, no Rust build): workflow syntax,
-# packaging shell/PowerShell scripts, and the Linux desktop/AppStream/Flatpak metadata.
+# and the packaging shell scripts.
 name: Packaging lint
 
 on:

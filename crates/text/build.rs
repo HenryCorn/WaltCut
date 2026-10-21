@@ -7,8 +7,6 @@
 //! empty and nothing else changes. A `CRAFT_FONTS_DIR` that is not a checkout is a warning, or an
 //! error with `CRAFT_FONTS_REQUIRED=1` (release builds).
 //!
-//! Native builds embed every font. The web (wasm32) build embeds only the UI font (BIZ UDPGothic
-//! Regular, ~4.5 MB) to stay under the web size budget (Cloudflare serves files up to 25 MiB).
 //! Only the local directory is read: no network.
 
 use std::fmt::Write as _;
@@ -40,16 +38,12 @@ fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
     let manifest = dir.join("fonts/manifest.txt");
     println!("cargo::rerun-if-changed={}", manifest.display());
     let text = std::fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
-    let wasm = std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("wasm32");
     let mut out = String::new();
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let f: Vec<&str> = line.split(" | ").map(str::trim).collect();
         let [family, style, file, scripts, ..] = f.as_slice() else {
             return Err(format!("malformed manifest line: {line}"));
         };
-        if wasm && !(*family == "BIZ UDPGothic" && *style == "Regular") {
-            continue;
-        }
         let path = dir.join(file).canonicalize().map_err(|e| format!("{file}: {e}"))?;
         println!("cargo::rerun-if-changed={}", path.display());
         let scripts: Vec<String> = scripts.split(',').map(|s| format!("{:?}", s.trim())).collect();

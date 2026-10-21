@@ -39,7 +39,7 @@ fn glyph(p: &egui::Painter, c: egui::Pos2, l: Level) {
 }
 
 fn ago(ms: u64) -> String {
-    let now = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(ms);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(ms);
     let s = now.saturating_sub(ms) / 1000;
     match s {
         0..=4 => tl!("just now").into(),
