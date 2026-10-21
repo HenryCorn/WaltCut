@@ -199,6 +199,26 @@ fn scan_keeps_snapshot_when_session_metadata_is_unreadable() {
 }
 
 #[test]
+fn recovery_ignores_snapshots_of_an_earlier_schema_and_keeps_them() {
+    let d = temp_dir("recover-old-schema");
+    let root = autosave::recovery_root(&d);
+    let (old, current) = (root.join("100-1"), root.join("200-1"));
+    for dir in [&old, &current] {
+        std::fs::create_dir_all(dir).unwrap();
+    }
+    let bytes = filmcraft_format::encode(&filmcraft_project::Project::default(), false);
+    let earlier =
+        String::from_utf8(bytes.clone()).unwrap().replacen(&format!("\"schema_version\":{}", filmcraft_format::SCHEMA_VERSION), "\"schema_version\":15", 1);
+    assert_ne!(earlier.as_bytes(), bytes.as_slice(), "the snapshot was rewritten as schema 15");
+    std::fs::write(old.join("snapshot.fcproj"), &earlier).unwrap();
+    std::fs::write(current.join("snapshot.fcproj"), &bytes).unwrap();
+    let found = autosave::scan_candidates(&d, None);
+    assert_eq!(found.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(), ["200-1"], "only the snapshot this build can open is offered");
+    assert_eq!(std::fs::read(old.join("snapshot.fcproj")).unwrap(), earlier.as_bytes(), "the earlier one is left as it was");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
 fn portable_marker_keeps_data_next_to_the_executable() {
     // #139: a portable install must not write to %APPDATA%.
     let d = temp_dir("portable");

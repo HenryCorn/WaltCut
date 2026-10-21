@@ -1,6 +1,6 @@
-//! Old project files keep opening: hand-made fixtures of every past schema are upgraded on load.
+//! Project files of the current schema open and round-trip; every earlier one is refused untouched.
 
-use filmcraft_format::{FormatError, SCHEMA_VERSION, decode, encode};
+use filmcraft_format::{FormatError, LEGACY_RELEASE, SCHEMA_VERSION, decode, encode};
 use filmcraft_project::{ClipId, ItemId, ItemKind, Project};
 use filmcraft_time::Tick;
 
@@ -8,66 +8,96 @@ fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)).unwrap()
 }
 
-#[test]
-fn v1_minimal_loads() {
-    let l = decode(&fixture("v1-minimal.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 1);
-    assert!(l.migrated());
-    assert_eq!(l.project.name, "Legacy Minimal");
-    assert!(l.project.items.is_empty());
-    assert_eq!(l.project.next_id, 1);
-}
-
-/// Main briefly wrote bare projects with `"version": 2` (caption tracks) before the envelope landed.
-#[test]
-fn bare_version_2_loads_as_schema_v1() {
-    let mut v: serde_json::Value = serde_json::from_slice(&fixture("v1-edit.fcproj")).unwrap();
-    v["version"] = 2.into();
-    let l = decode(&serde_json::to_vec(&v).unwrap()).unwrap();
-    assert_eq!(l.schema_version, 1);
-    assert!(l.migrated());
-    assert_eq!(l.project.name, decode(&fixture("v1-edit.fcproj")).unwrap().project.name);
+/// The golden file: a project written by this schema, with media, a sequence, markers and effects.
+fn golden() -> Project {
+    decode(&fixture("v16-edit.fcproj")).unwrap().project
 }
 
 #[test]
-fn v1_edit_loads_with_defaults_for_later_fields() {
-    let l = decode(&fixture("v1-edit.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 1);
+fn golden_project_opens_and_round_trips_without_loss() {
+    let bytes = fixture("v16-edit.fcproj");
+    let l = decode(&bytes).unwrap();
+    assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
     assert_eq!(p.name, "Legacy Edit");
     assert_eq!(p.next_id, 48);
     let media = p.item(ItemId(5)).unwrap();
     assert_eq!(media.name, "Ocean_Sunset.mp4");
-    assert!(media.metadata.is_empty());
     let seq = p.sequence(ItemId(21)).unwrap();
-    assert_eq!(seq.video_tracks.len(), 1);
-    assert_eq!(seq.audio_tracks.len(), 1);
-    assert_eq!(seq.markers.len(), 1);
+    assert_eq!((seq.video_tracks.len(), seq.audio_tracks.len(), seq.markers.len()), (1, 1, 1));
     let clip = &seq.video_tracks[0].items[0];
     assert_eq!(clip.id, ClipId(29));
     assert_eq!(clip.source_in, Tick(243_675_432_000));
-    assert!(!clip.reverse && clip.link.is_none() && clip.gain_db == 0.0 && !clip.scale_to_frame);
     assert_eq!(clip.effects.len(), 3);
-    assert!(seq.audio_tracks[0].effects.is_empty());
     seq.check().unwrap();
+    // saved again it is the same document: nothing added, nothing lost (the writer's name aside)
+    let again = encode(p, true);
+    let (old, new): (serde_json::Value, serde_json::Value) = (serde_json::from_slice(&bytes).unwrap(), serde_json::from_slice(&again).unwrap());
+    assert_eq!(new["project"], old["project"]);
+    assert_eq!((new["format"].clone(), new["schema_version"].clone()), (old["format"].clone(), old["schema_version"].clone()));
+    assert_eq!(decode(&again).unwrap().project, *p);
+    assert_eq!(encode(&decode(&again).unwrap().project, true), again, "stable on repeated saves");
+}
+
+/// A project written by the build before the reduction fails with the actionable error, and
+/// reading it changes nothing: the bytes are hashed before and after, on disk.
+#[test]
+fn pre_reduction_project_is_refused_and_left_untouched() {
+    let dir = std::env::temp_dir().join(format!("filmcraft-old-project-{}", std::process::id()));
+    let autosave = dir.join(filmcraft_format::autosave::AUTO_SAVE_DIR);
+    std::fs::create_dir_all(&autosave).unwrap();
+    let files = [dir.join("old.fcproj"), autosave.join("old-2026-10-01_10-00-00.fcproj"), dir.join("old (schema v1 backup).fcproj")];
+    for f in &files {
+        std::fs::write(f, fixture("v15-edit.fcproj")).unwrap();
+    }
+    let hash = |p: &std::path::Path| {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        std::fs::read(p).unwrap().hash(&mut h);
+        (h.finish(), std::fs::metadata(p).unwrap().modified().unwrap())
+    };
+    let before: Vec<_> = files.iter().map(|f| hash(f)).collect();
+    let e = decode(&std::fs::read(&files[0]).unwrap()).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 15, supported } if supported == SCHEMA_VERSION), "{e}");
+    let text = e.to_string();
+    assert!(text.contains("earlier FilmCraft or WaltCut build") && text.contains(LEGACY_RELEASE) && text.contains("schema v15"), "{text}");
+    // its auto-save sibling is not offered for recovery, and not pruned either
+    assert!(filmcraft_format::autosave::list_auto_saves(&autosave, "old").is_empty());
+    filmcraft_format::autosave::rotate(&autosave, "old", 1).unwrap();
+    assert_eq!(files.iter().map(|f| hash(f)).collect::<Vec<_>>(), before);
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
-fn legacy_audio_field_becomes_primary_stream_and_clip_defaults_to_zero() {
-    let p = decode(&fixture("v1-edit.fcproj")).unwrap().project;
+fn bare_pre_envelope_project_is_refused() {
+    let e = decode(&fixture("v1-minimal.fcproj")).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 1, .. }), "{e}");
+}
+
+#[test]
+fn future_schema_is_refused_with_a_clear_error() {
+    let mut v: serde_json::Value = serde_json::from_slice(&fixture("v1-minimal.fcproj")).unwrap();
+    // A bare v1-shaped project claiming a future `version` is refused too.
+    v["version"] = 99.into();
+    let e = decode(&serde_json::to_vec(&v).unwrap()).unwrap_err();
+    assert!(matches!(e, FormatError::TooNew { found: 99, .. }), "{e}");
+    assert!(e.to_string().contains("Update FilmCraft"));
+}
+
+#[test]
+fn golden_audio_field_is_the_primary_stream_and_clips_default_to_zero() {
+    let p = golden();
     let media = p.item(ItemId(5)).unwrap().as_media().unwrap();
     assert_eq!(media.info.audio_streams.len(), 1);
     assert!(media.info.has_audio());
     let clip = &p.sequence(ItemId(21)).unwrap().audio_tracks[0].items[0];
     assert_eq!(clip.audio_stream, 0);
-    let again = decode(&encode(&p, false)).unwrap();
-    assert_eq!(again.project.item(ItemId(5)).unwrap().as_media().unwrap().info.audio_streams, media.info.audio_streams);
 }
 
 /// Out-of-range audio stream data is repaired on load, never a reason to refuse the project.
 #[test]
 fn hostile_audio_stream_counts_and_indices_are_repaired_not_rejected() {
-    let mut p = decode(&fixture("v1-edit.fcproj")).unwrap().project;
+    let mut p = golden();
     let seq = ItemId(21);
     for bad in [filmcraft_media::MAX_AUDIO_STREAMS, usize::MAX] {
         p.sequence_mut(seq).unwrap().audio_tracks[0].items[0].audio_stream = bad;
@@ -84,50 +114,9 @@ fn hostile_audio_stream_counts_and_indices_are_repaired_not_rejected() {
     assert_eq!(loaded.item(ItemId(5)).unwrap().as_media().unwrap().info.audio_streams.len(), filmcraft_media::MAX_AUDIO_STREAMS);
 }
 
-/// Schema 8 (before M3.10): no time interpolation / Hold Filters / Field Options / source channels
-/// on clips, no audio channel map, subclips without Restrict Trims.
-#[test]
-fn v8_subclip_loads_with_m3_10_defaults() {
-    let l = decode(&fixture("v8-subclip.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 8);
-    assert!(l.migrated());
-    let p = &l.project;
-    assert_eq!(p.name, "Schema 8 Edit");
-    let ItemKind::Subclip { parent, range, restrict_trims } = &p.item(ItemId(48)).unwrap().kind else { panic!("not a subclip") };
-    assert_eq!((*parent, range.duration.0 > 0, *restrict_trims), (ItemId(5), true, false));
-    assert!(p.item(ItemId(5)).unwrap().as_media().unwrap().interpret.audio_channels.is_none());
-    let clip = &p.sequence(ItemId(21)).unwrap().video_tracks[0].items[0];
-    assert!(clip.time_interpolation.is_default() && !clip.hold_filters && clip.field_options.is_none() && clip.source_channels.is_empty());
-    // resaved in the current schema, losslessly
-    let again = decode(&encode(p, true)).unwrap();
-    assert_eq!(again.schema_version, SCHEMA_VERSION);
-    assert_eq!(&again.project, p);
-}
-
-#[test]
-fn upgraded_file_resaves_in_current_schema_losslessly() {
-    let old = decode(&fixture("v1-edit.fcproj")).unwrap().project;
-    let bytes = encode(&old, true);
-    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(v["schema_version"], SCHEMA_VERSION);
-    let again = decode(&bytes).unwrap();
-    assert!(!again.migrated());
-    assert_eq!(again.project, old);
-}
-
-#[test]
-fn future_schema_is_refused_with_a_clear_error() {
-    let mut v: serde_json::Value = serde_json::from_slice(&fixture("v1-minimal.fcproj")).unwrap();
-    // A bare v1-shaped project claiming a future `version` is refused too.
-    v["version"] = 99.into();
-    let e = decode(&serde_json::to_vec(&v).unwrap()).unwrap_err();
-    assert!(matches!(e, FormatError::TooNew { found: 99, .. }), "{e}");
-    assert!(e.to_string().contains("Update FilmCraft"));
-}
-
 /// Build a project with `n` clips (half video, half linked audio) on 4+4 tracks.
 pub fn big_project(n: usize) -> Project {
-    let mut p = decode(&fixture("v1-edit.fcproj")).unwrap().project;
+    let mut p = golden();
     let seq_id = ItemId(21);
     let mut next = 1_000_000u64;
     let seq = match &mut p.items.get_mut(&seq_id).unwrap().kind {
@@ -204,58 +193,4 @@ fn large_project_roundtrip_and_timing() {
         pretty.len() as f64 / 1024.0,
         compact.len() as f64 / 1024.0
     );
-}
-
-#[test]
-fn v8_loads_without_transcripts_and_v9_roundtrips_them() {
-    let l = decode(&fixture("v8-minimal.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 8);
-    assert!(l.migrated());
-    assert!(l.project.transcripts.is_empty());
-    let mut p = l.project;
-    let mut t = filmcraft_project::Transcript { language: "en".into(), source: "manual".into(), ..Default::default() };
-    t.words.push(filmcraft_project::Word::new("Hello", Tick(0), Tick(1000)));
-    t.words[0].speaker = Some(0);
-    t.normalize();
-    p.transcripts.insert(ItemId(7), std::sync::Arc::new(t));
-    let again = decode(&encode(&p, true)).unwrap();
-    assert!(!again.migrated());
-    assert_eq!(again.project, p);
-    assert_eq!(again.project.transcripts[&ItemId(7)].speakers[0].name, "Speaker 1");
-}
-
-/// Schema 11 (before M10.7): no source graphics; graphic clips without template / roll /
-/// responsive data and layers without style runs or pins load with those empty.
-#[test]
-fn v11_minimal_loads_without_graphics_design_data() {
-    let l = decode(&fixture("v11-minimal.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 11);
-    assert!(l.migrated());
-    let p = &l.project;
-    assert_eq!(p.name, "Before Graphics Templates");
-    assert!(p.source_graphics.is_empty());
-    assert!(p.root.find_bin(filmcraft_project::BinId(1)).is_some());
-    let again = decode(&encode(p, true)).unwrap();
-    assert_eq!(again.schema_version, SCHEMA_VERSION);
-    const { assert!(SCHEMA_VERSION >= 12) };
-    assert_eq!(&again.project, p);
-}
-
-/// Schema 10 (before M3.11): no search bins, no safe areas / capture format / scratch disks in
-/// the project settings.
-#[test]
-fn v10_minimal_loads_with_m3_11_defaults() {
-    let l = decode(&fixture("v10-minimal.fcproj")).unwrap();
-    assert_eq!(l.schema_version, 10);
-    assert!(l.migrated());
-    let p = &l.project;
-    assert_eq!(p.name, "Before Search Bins");
-    assert!(p.search_bins.is_empty());
-    assert_eq!((p.settings.title_safe, p.settings.action_safe), ((20.0, 20.0), (10.0, 10.0)));
-    assert_eq!(p.settings.capture_format, "DV");
-    assert_eq!(p.settings.scratch, Default::default());
-    assert!(p.root.find_bin(filmcraft_project::BinId(1)).is_some());
-    let again = decode(&encode(p, true)).unwrap();
-    assert_eq!(again.schema_version, SCHEMA_VERSION);
-    assert_eq!(&again.project, p);
 }

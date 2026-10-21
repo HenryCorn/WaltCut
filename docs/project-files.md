@@ -8,7 +8,7 @@ writing them is `crates/format` (`filmcraft-format`); the engine's `file.*` comm
 ```json
 {
   "format": "filmcraft.project",
-  "schema_version": 13,
+  "schema_version": 16,
   "generator": "FilmCraft 0.1.0",
   "project": { "name": "…", "settings": { … }, "root": { … }, "items": { … }, "next_id": 48 },
   "view": { "open_sequences": [21, 50], "active_sequence": 50, "sequences": { "21": { "pps": 40.0, "scroll": 0.0, … } } }
@@ -16,7 +16,7 @@ writing them is `crates/format` (`filmcraft-format`); the engine's `file.*` comm
 ```
 
 - `schema_version` is the version of the whole document. This build writes
-  `filmcraft_format::SCHEMA_VERSION` and reads every version from 1 up to it.
+  `filmcraft_format::SCHEMA_VERSION` and reads only that version.
 - `project` is the serialized `filmcraft_project::Project` (bins, media clips, sequences, tracks,
   clips, effects, keyframes, markers). Media is referenced by path, never embedded.
 - Files are written compact (no indentation). A 2,000-clip project is about 1.4 MB.
@@ -36,52 +36,42 @@ writing them is `crates/format` (`filmcraft-format`); the engine's `file.*` comm
   and with it the real picture size; a file that merely comes back at its old path does not
   change it. `null` anywhere else is a damaged file.
 
-### Schema history
+### One schema, no migrations
 
-| Version | Since | Shape |
-|---|---|---|
-| 1 | M0 | the bare `Project` object with a `"version": 1` field |
-| 2 | M11.1 | the envelope above; the project's own `version` field is gone |
-| 3 | M10.2 | graphic clips (`ItemKind::Graphic` with text/shape layers); a no-op step for older data |
-| 4 | M7.4 | Essential Sound: clip audio types and settings; no-op step |
-| 5 | M8.8 | colour management: working space, Interpret Footage colour space, LUT library; no-op step |
-| 6 | M11.7/M11.9 | media identity fingerprints, ingest settings; no-op step |
-| 7 | M5.5 | effect masks: `masks` on effect instances with keyframable Bézier `Path` values; no-op step |
-| 8 | M12 | multi-camera source sequences and clips, merged clips; no-op step |
-| 9 | M10.5 | transcripts of media items (`project.transcripts`); no-op step |
-| 10 | M3.10 | clip time interpolation, Hold Filters, Field Options, audio source channels, Modify ▸ Audio Channels map, subclip Restrict Trims; no-op step |
-| 11 | M3.11 | search bins (`project.search_bins`), Flash Cue markers, Project Settings safe areas, capture format and scratch disks; no-op step |
-| 12 | M10.7 | graphics design data: `TrackItem::graphic` (roll / crawl, responsive time, template link), `EffectInstance::layer` (layer uid, per-character styles, responsive pins), `project.source_graphics`; no-op step |
-| 13 | Multi-stream audio | `MediaInfo::audio_streams` and `TrackItem::audio_stream`; older `audio` objects load as stream zero, missing clip indices default to zero; no-op step |
+The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 16, the
+baseline of the reduced app, and there is no migration code: a project written before it does not
+open. Earlier versions (1–15) are the FilmCraft and first WaltCut builds, up to the
+[`v0.0.1-legacy`](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy) release.
 
-### Migrations
+Opening an older file returns one error and does nothing else:
 
-Older files are upgraded on load, in memory, by a chain of single-step functions
-(`filmcraft_format::MIGRATIONS`, where entry *i* upgrades v*i+1* to v*i+2*). Each step rewrites the JSON
-document; after the last one the result is deserialized into the current model. To change the schema:
+> this project was created by an earlier FilmCraft or WaltCut build (project schema v15); this
+> build only opens schema v16. Open it with the v0.0.1-legacy release
+> (https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy). The file has not been changed.
 
-1. add a function `vN_to_vN1(doc: Value) -> Result<Value, String>` and append it to `MIGRATIONS`
-   (`SCHEMA_VERSION` follows automatically);
-2. add a small hand-made fixture of the old shape to `crates/format/tests/fixtures/` and a test that it
-   loads;
-3. never edit a migration that has shipped.
+- **Never modified.** Reading a project never writes: the file, its `Auto-Save` siblings and its
+  backups stay byte for byte as they were. There is no "upgrade on open" and no backup on first save.
+- **Auto-saves.** `autosave::list_auto_saves` (and with it rotation) only see files of the current
+  schema, and recovery (`scan_candidates`) offers only snapshots of the current schema. Older ones
+  are not listed, not offered and **not deleted**.
+- **No silent loss.** A field the model does not know is an error (`FormatError::UnknownField`
+  with its path, for example `project.items.21.removed_feature`), not data that disappears on the
+  next save. The check re-serializes the loaded project and compares keys; it covers every nested
+  type, including enum variants and `flatten`. `view` is outside the schema and is not checked.
+- Truncated, malformed, not-a-project, older-schema and newer-schema files all return `Err`
+  (`crates/format`, `tests::hostile_documents_return_errors` and the fixtures tests).
 
-Fields added with `#[serde(default)]` don't need a migration: missing values take their defaults.
-But when new data would make the file unreadable to an older build (a new enum variant such as
-`ItemKind::Graphic`, a new required shape), bump the schema with a no-op step so older builds refuse
-the file with the message below instead of failing with a parse error. Do the same when an older
-build would load the file but silently drop new fields on its next save.
-
-When you open an older file FilmCraft says so ("Upgraded project from schema v1 to v2"). The file
-on disk is unchanged until you save. The **first save over it** keeps the original next to it as
-`<name> (schema v1 backup).fcproj`, so an older FilmCraft can still open your work.
+To change the schema from here: bump `SCHEMA_VERSION`, add a fixture of the new shape under
+`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v16-edit.fcproj`) passing.
+A change that older builds would load but then silently drop on save needs the bump too. Whether
+to write a migration for a later schema is decided when that happens; none exists today.
 
 ### Newer files
 
 A file with a `schema_version` newer than the build supports is **refused**, not half-read:
 
-> this project was saved by a newer version of FilmCraft (project schema v12); this build reads up to
-> v11. Update FilmCraft to open it.
+> this project was saved by a newer version of FilmCraft (project schema v17); this build reads up to
+> v16. Update FilmCraft to open it.
 
 Reading it partially and saving it back would silently drop whatever the newer version added.
 
@@ -106,7 +96,7 @@ one. If a step fails, the temp file is removed and the old file is untouched.
 | `file.saveAs {path}` | File ▸ Save As… (⇧⌘S) | write and adopt the new path |
 | `file.saveCopy {path}` | File ▸ Save a Copy… (⌥⌘S) | write a copy; the project keeps its path and unsaved state |
 | `file.revert` | File ▸ Revert | reload the last saved version, discarding changes |
-| `file.open {path}` | File ▸ Open Project… (⌘O) | returns `{schemaVersion, migrated}` |
+| `file.open {path}` | File ▸ Open Project… (⌘O) | returns `{schemaVersion, path, missingMedia}`; an earlier or newer schema is an error |
 
 In the UI, Save / Save As / Save a Copy without a `path` show a file dialog.
 

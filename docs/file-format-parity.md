@@ -14,7 +14,7 @@ only). "Tested" names the evidence.
 | Format | Premiere | Read | Write | Tested | % |
 |---|---|---|---|---|---|
 | **Premiere project `.prproj`** | native | **no** | **no** | — | **0%** ([G2](gaps.md#g2-premieres-prproj-cannot-be-opened)) |
-| Our project `.fcproj` | — | yes, schema migrations | yes, atomic, auto-save, recovery journal | migration tests | — |
+| Our project `.fcproj` | — | yes, one schema (older files refused, never modified) | yes, atomic, auto-save, recovery journal | round-trip and refusal tests | — |
 | FCP7 XML (`xmeml`) | read + write | yes | yes | round-trip tests; Premiere-exported XML slow (#461) | 75% |
 | FCPXML | read (via XtoCC) | yes | yes | round-trip tests | 80% |
 | AAF (Edit Protocol) | read + write | yes | yes (embedded / linked / consolidated) | own CFB; **never opened in Media Composer / Pro Tools** | 55% |

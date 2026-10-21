@@ -593,6 +593,11 @@ pub fn scan_candidates(data_dir: &Path, skip: Option<&Path>) -> Vec<RecoveryCand
             let _ = fs::remove_dir_all(&dir);
             continue;
         }
+        // A snapshot from another schema (an earlier build left it behind) cannot be opened here:
+        // it is not offered, and not deleted either, so the build that wrote it can still recover it.
+        if !filmcraft_format::is_current_file(&snap) {
+            continue;
+        }
         // Keep the snapshot even when session.json is missing or unreadable: the project
         // is still recoverable. Meta fields fall back to defaults.
         let meta = fs::read(dir.join(META)).ok().and_then(|b| serde_json::from_slice::<JournalMeta>(&b).ok()).unwrap_or_default();

@@ -175,9 +175,9 @@ fn project_notes_are_saved_and_typing_is_one_undo_step() {
 
     let loaded = filmcraft_format::decode(&filmcraft_format::encode(&s.project, false)).unwrap();
     assert_eq!(loaded.project.notes, "To do: fix the logo at 00:01:02:03");
-    // an older file without notes still loads, with none
+    // a file without notes still loads, with none
     let mut doc: Value = serde_json::from_slice(&filmcraft_format::encode(&filmcraft_project::Project::new("old"), false)).unwrap();
-    doc["schema_version"] = json!(14);
+    doc["project"].as_object_mut().unwrap().remove("notes");
     assert_eq!(filmcraft_format::decode(&serde_json::to_vec(&doc).unwrap()).unwrap().project.notes, "");
 
     s.execute("edit.undo", json!({})).unwrap();
