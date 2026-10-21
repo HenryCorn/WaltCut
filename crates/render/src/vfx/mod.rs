@@ -124,7 +124,7 @@ impl FxEnv for ItemEnv<'_> {
         if index >= self.seq.video_tracks.len() {
             return None;
         }
-        let o = RenderOptions { captions: false, working_output: true, depth: self.opts.depth + 1, ..self.opts };
+        let o = RenderOptions { working_output: true, depth: self.opts.depth + 1, ..self.opts };
         Some(crate::render_seq_tracks(self.project, self.seq, self.t, o, self.sources, Some(index)))
     }
     fn layer_to_output(&self) -> Affine {

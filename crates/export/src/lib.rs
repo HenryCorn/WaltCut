@@ -9,7 +9,7 @@
 //! Targa / DPX / OpenEXR sequences, GIF, WAV and AIFF.
 //!
 //! [`ExportSettings`] carries every Export-mode setting (frame size, rate, bitrate encoding, audio
-//! format, multiplexer, captions, effects, metadata) as serde data; [`presets`] defines the
+//! format, multiplexer, effects, metadata) as serde data; [`presets`] defines the
 //! built-in presets.
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
@@ -318,9 +318,6 @@ pub struct ExportSettings {
     pub quality: u8,
     /// Target video bitrate (kbps) for bitrate-driven encoders.
     pub bitrate_kbps: u32,
-    /// Burn the visible caption tracks into the picture (Export ▸ Captions ▸ Burn Captions Into
-    /// Video).
-    pub burn_captions: bool,
     /// This export is one part of a larger job (render previews): the caller owns
     /// `progress.total`, `finished` and the final status; this call only adds to `done`.
     #[serde(default)]
@@ -392,8 +389,6 @@ pub struct ExportSettings {
     pub max_render_quality: bool,
     pub audio: AudioSettings,
     pub multiplexer: Multiplexer,
-    /// Captions ▸ Create Sidecar File: `srt` or `vtt` next to the output (written by the engine).
-    pub caption_sidecar: Option<String>,
     pub effects: ExportEffects,
     pub metadata: ExportMetadata,
     /// Two-pass state (set by the exporter).
@@ -555,7 +550,6 @@ impl Default for ExportSettings {
             include_audio: true,
             quality: 90,
             bitrate_kbps: 20_000,
-            burn_captions: false,
             part_of_batch: false,
             prores_profile: String::new(),
             dnx_profile: String::new(),
@@ -582,7 +576,6 @@ impl Default for ExportSettings {
             max_render_quality: false,
             audio: AudioSettings::default(),
             multiplexer: Multiplexer::Mp4,
-            caption_sidecar: None,
             effects: ExportEffects::default(),
             metadata: ExportMetadata::default(),
             h264_pass: H264Pass::Single,

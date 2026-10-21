@@ -23,7 +23,6 @@
 
 	About FilmCraft	Tentang FilmCraft
 	Add Audio Submix Track	Tambah Trek Submix Audio
-	Add Caption at Playhead	Tambah Takarir di Kepala Putar
 	Add Chapter Marker…	Tambah Penanda Bab…
 	Add Edit	Tambah Titik Edit
 	Add Edit to All Tracks	Tambah Titik Edit ke Semua Trek
@@ -31,7 +30,6 @@
 	Add Frame Hold	Tambah Tahan Bingkai
 	Add Guide…	Tambah Garis Bantu…
 	Add Marker	Tambah Penanda
-	Add New Caption Track…	Tambah Trek Takarir Baru…
 	Add Range Marker	Tambah Penanda Rentang
 	Add Range Marker to In and Out	Tambah Penanda Rentang dari Masuk ke Keluar
 	Add Tracks…	Tambah Trek…
@@ -72,9 +70,7 @@
 	Bring Forward	Bawa Maju
 	Bring to Front	Bawa ke Depan
 	Brown	Cokelat
-	Captions	Takarir
 	Captions and Graphics	Takarir dan Grafis
-	Captions…	Takarir…
 	Caribbean	Karibia
 	Center Horizontally	Tengahkan Secara Horizontal
 	Center Vertically	Tengahkan Secara Vertikal
@@ -98,7 +94,6 @@
 	Consolidate Duplicates	Gabungkan Duplikat
 	Copy	Salin
 	Copy Paste Includes Sequence Markers	Salin Tempel Menyertakan Penanda Sekuens
-	Create Captions from Transcript…	Buat Takarir dari Transkrip…
 	Create Multi-Camera Source Sequence…	Buat Sekuens Sumber Multi-Kamera…
 	Create Proxies…	Buat Proksi…
 	Cut	Potong
@@ -106,7 +101,6 @@
 	Delete Render Files	Hapus Berkas Render
 	Delete Render Files In to Out	Hapus Berkas Render dari Masuk ke Keluar
 	Delete Tracks…	Hapus Trek…
-	Delete Transcript	Hapus Transkrip
 	Demo Footage	Rekaman Demo
 	Demo Project	Proyek Demo
 	Deselect All	Batalkan Semua Pilihan
@@ -161,10 +155,8 @@
 	Get Media File Properties for	Dapatkan Properti Berkas Media untuk
 	Go to Gap	Ke Celah
 	Go to In	Ke Masuk
-	Go to Next Caption Segment	Ke Segmen Takarir Berikutnya
 	Go to Next Marker	Ke Penanda Berikutnya
 	Go to Out	Ke Keluar
-	Go to Previous Caption Segment	Ke Segmen Takarir Sebelumnya
 	Go to Previous Marker	Ke Penanda Sebelumnya
 	Go to Split	Ke Split
 	Graphics and Titles	Grafis dan Judul
@@ -173,7 +165,6 @@
 	Group	Grupkan
 	Guide Templates	Templat Garis Bantu
 	Help	Bantuan
-	Hide All Caption Tracks	Sembunyikan Semua Trek Takarir
 	High Quality Playback	Pemutaran Kualitas Tinggi
 	History	Riwayat
 	Import From	Impor Dari
@@ -216,7 +207,6 @@
 	Mark Split	Tandai Split
 	Markers	Penanda
 	Match Frame	Cocokkan Bingkai
-	Media Analysis & Transcription…	Analisis Media & Transkripsi…
 	Media Browser	Peramban Media
 	Media Cache…	Cache Media…
 	Media…	Media…
@@ -270,8 +260,6 @@
 	Remix	Remix
 	Remix Properties…	Properti Remix…
 	Remove Attributes…	Hapus Atribut…
-	Remove Filler Words	Hapus Kata Pengisi
-	Remove Pauses	Hapus Jeda
 	Remove Unused	Hapus yang Tidak Dipakai
 	Rename…	Ganti Nama…
 	Render Audio	Render Audio
@@ -284,7 +272,6 @@
 	Reset All Parameters	Atur Ulang Semua Parameter
 	Reset Duration	Atur Ulang Durasi
 	Reset to Saved Layout	Kembalikan ke Tata Letak Tersimpan
-	Restore Captions from Source Clip	Pulihkan Takarir dari Klip Sumber
 	Reveal Log Files…	Tampilkan Berkas Log…
 	Reverse Match Frame	Cocokkan Bingkai Terbalik
 	Revert	Kembalikan
@@ -323,8 +310,6 @@
 	Sequence From Clip	Sekuens dari Klip
 	Sequence Settings…	Pengaturan Sekuens…
 	Sequence…	Sekuens…
-	Show Active Caption Tracks Only	Tampilkan Hanya Trek Takarir Aktif
-	Show All Caption Tracks	Tampilkan Semua Trek Takarir
 	Show All Marker Colors	Tampilkan Semua Warna Penanda
 	Show Guides	Tampilkan Garis Bantu
 	Show Rulers	Tampilkan Penggaris
@@ -348,9 +333,6 @@
 	Toggle Proxies	Alihkan Proksi
 	Tools	Alat
 	Top	Atas
-	Transcribe Sequence…	Transkripsikan Sekuens…
-	Transcribe…	Transkripsikan…
-	Transcript	Transkrip
 	Transparent Video…	Video Transparan…
 	Trim Edit	Edit Pangkas
 	Trim…	Pangkas…
@@ -358,7 +340,6 @@
 	Ungroup	Pisahkan Grup
 	Universal Counting Leader…	Leader Hitung Mundur Universal…
 	Update Metadata…	Perbarui Metadata…
-	Upgrade Caption to Graphic	Tingkatkan Takarir menjadi Grafis
 	Upgrade to Source Graphic	Tingkatkan menjadi Grafis Sumber
 	Vertical Text	Teks Vertikal
 	Video In	Video Masuk
@@ -419,10 +400,6 @@
 	Delete Video Tracks	Hapus Trek Video
 	Delete Audio Tracks	Hapus Trek Audio
 	All Empty Tracks	Semua Trek Kosong
-	Caption Tracks	Trek Takarir
-	Delete Caption Tracks	Hapus Trek Takarir
-	Delete Caption Track	Hapus Trek Takarir
-	Delete Empty Caption Tracks	Hapus Trek Takarir Kosong
 	Version {version}	Versi {version}
 	A clean-room, pure-Rust non-linear video editor. Part of the ArtCraft family.	Editor video non-linear clean-room berbahasa Rust murni. Bagian dari keluarga ArtCraft.
 	Join the ArtCraft Discord	Gabung ke Discord ArtCraft
@@ -573,28 +550,10 @@
 	Restore	Pulihkan
 	Overwrite with Current View	Timpa dengan Tampilan Saat Ini
 	Graphics text search arrives with M10.1–M10.2	Pencarian teks grafis hadir pada M10.1–M10.2
-	Open a sequence to work with captions	Buka sekuens untuk bekerja dengan takarir
-	Add captions	Tambah takarir
-	Create a caption track or import a caption file.	Buat trek takarir atau impor berkas takarir.
-	Create new caption track	Buat trek takarir baru
-	Import captions file…	Impor berkas takarir…
 	New {format} track	Trek {format} baru
-	Add caption at playhead	Tambah takarir di kepala putar
-	Split caption at playhead	Pisahkan takarir di kepala putar
-	Merge selected captions	Gabungkan takarir terpilih
-	Delete selected captions	Hapus takarir terpilih
-	No captions on this track. Press + to add one at the playhead.	Tidak ada takarir di trek ini. Tekan + untuk menambahkan di kepala putar.
-	No matching captions.	Tidak ada takarir yang cocok.
-	Open a sequence to see its transcript	Buka sekuens untuk melihat transkripnya
-	Transcribe sequence	Transkripsikan sekuens
-	Speech-to-text turns the dialogue into editable text.	Ucapan-ke-teks mengubah dialog menjadi teks yang dapat diedit.
-	This build has no speech-to-text; import a transcript with transcript.set.	Build ini tidak memiliki ucapan-ke-teks; impor transkrip dengan transcript.set.
-	Transcribe	Transkripsikan
 	Extract selected text	Ekstrak teks terpilih
 	Lift selected text	Angkat teks terpilih
 	Remove filler words	Hapus kata pengisi
-	Create captions	Buat takarir
-	Speaker	Pembicara
 	Box	Kotak
 	Align	Ratakan
 	Align left	Rata kiri
@@ -1231,7 +1190,6 @@
 	Open Demo Project	Buka Proyek Demo
 	Insert and overwrite sequences as nests or individual clips	Sisipkan dan timpa sekuens sebagai sarang atau klip individual
 	Snap in Timeline (S)	Snap di Linimasa (S)
-	Caption track options	Opsi trek takarir
 	Timeline Display Settings	Pengaturan Tampilan Linimasa
 	Show Video Thumbnails	Tampilkan Gambar Mini Video
 	Head	Awal
@@ -1294,7 +1252,6 @@
 	Alpha Blurriness	Keburaman Alfa
 	Alpha Channel	Kanal Alfa
 	Alpha Glow	Pendar Alfa
-	Always import embedded CEA-708 closed captions with wide aspect.	Selalu impor takarir tertutup CEA-708 tersemat dengan aspek lebar.
 	Always override audio tags	Selalu timpa tag audio
 	Ambience	Ambiens
 	Ambience Intensity	Intensitas Ambiens
@@ -1339,8 +1296,6 @@
 	Auto Save	Simpan Otomatis
 	Auto Save also saves the current project(s)	Simpan Otomatis juga menyimpan proyek saat ini
 	Auto-tag audio types in the timeline	Tandai otomatis jenis audio di linimasa
-	Auto-transcribe all imported clips	Transkripsikan otomatis semua klip yang diimpor
-	Auto-transcribe only clips in sequences	Transkripsikan otomatis hanya klip di sekuens
 	Automatch Time	Waktu Pencocokan Otomatis
 	Automatic Click Remover	Penghapus Klik Otomatis
 	Automatically Hide Dependent Clips	Sembunyikan Otomatis Klip Dependen
@@ -1350,7 +1305,6 @@
 	Automatically refresh growing files	Segarkan otomatis berkas yang sedang bertambah
 	Automatically resume playback for growing files in Source Monitor	Lanjutkan otomatis pemutaran berkas yang sedang bertambah di Monitor Sumber
 	Automatically save projects	Simpan proyek secara otomatis
-	Automatically transcribe clips	Transkripsikan klip secara otomatis
 	Automation Keyframe Optimization	Optimasi Bingkai Kunci Otomasi
 	Background Color	Warna Latar Belakang
 	Background Corner Radius	Radius Sudut Latar Belakang
@@ -1495,7 +1449,6 @@
 	Clock Wipe (Legacy)	Sapuan Jam (Lama)
 	Clockwise	Searah Jarum Jam
 	Clone	Klon
-	Closed Captions	Takarir Tertutup
 	Color & Alpha	Warna & Alfa
 	Color 1	Warna 1
 	Color 2	Warna 2
@@ -1585,7 +1538,6 @@
 	Default Emoji font	Font Emoji bawaan
 	Default Media Scaling	Penskalaan Media Bawaan
 	Default Output	Output Bawaan
-	Default closed caption font	Font takarir tertutup bawaan
 	Default language	Bahasa bawaan
 	Default paragraph direction	Arah paragraf bawaan
 	Default subtitle and text font	Font subtitel dan teks bawaan
@@ -1636,7 +1588,6 @@
 	Distortion Type	Jenis Distorsi
 	Divide	Bagi
 	Do not delete cache files automatically	Jangan hapus berkas cache secara otomatis
-	Don't label speakers	Jangan beri label pembicara
 	Double-click	Klik ganda
 	Draft decoding at reduced playback resolution (H.264: faster, some frames less filtered)	Dekode draf pada resolusi pemutaran rendah (H.264: lebih cepat, beberapa bingkai kurang tersaring)
 	Drive	Drive
@@ -1883,7 +1834,6 @@
 	In the Media Cache	Di Cache Media
 	In the project	Di proyek
 	In/Out Duration	Durasi Masuk/Keluar
-	Include captions on import	Sertakan takarir saat impor
 	Incoming	Masuk
 	Indeterminate Media Timebase	Basis Waktu Media Tak Tentu
 	Initial Delay	Delay Awal
@@ -1930,7 +1880,6 @@
 	Keying	Keying
 	Korean	Korea
 	Label Defaults	Label Bawaan
-	Label speakers	Beri label pembicara
 	Labels	Label
 	Large Hall	Aula Besar
 	Large Trim Offset	Offset Pangkas Besar
@@ -2043,7 +1992,6 @@
 	Maximum Scale	Skala Maksimum
 	Media	Media
 	Media Analysis	Analisis Media
-	Media Analysis & Transcription	Analisis Media & Transkripsi
 	Media Cache	Cache Media
 	Media Cache Database	Basis Data Cache Media
 	Media Cache Files	Berkas Cache Media
@@ -2053,7 +2001,6 @@
 	Media Time	Waktu Media
 	Media Timecode	Kode Waktu Media
 	Media Type	Jenis Media
-	Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.	Analisis media dan transkripsi akan disimpan di folder Cache Media. Analisis ulang tidak diperlukan jika media diimpor ke proyek lain di komputer ini.
 	Median	Median
 	Medium Room	Ruangan Sedang
 	Memory	Memori
@@ -2435,10 +2382,8 @@
 	Spacer	Pengatur Jarak
 	Spanish	Spanyol
 	Speaker Angle	Sudut Speaker
-	Speaker Labeling	Pelabelan Pembicara
 	Special	Khusus
 	Special Effects	Efek Khusus
-	Speech model	Model ucapan
 	Speed	Kecepatan
 	Spherize	Bulatkan
 	Spiky	Berduri
@@ -2561,8 +2506,6 @@
 	Top Right	Kanan Atas
 	Touch	Touch
 	Track Matte Key	Key Matte Trek
-	Transcription	Transkripsi
-	Transcription preferences	Preferensi transkripsi
 	Transform	Transformasi
 	Transformers	Trafo
 	Transience	Transien
@@ -2687,9 +2630,6 @@
 	When Opening a Project	Saat Membuka Proyek
 	Whip	Cambuk
 	Whip (Legacy)	Cambuk (Lama)
-	Whisper base (balanced)	Whisper base (seimbang)
-	Whisper small (most accurate)	Whisper small (paling akurat)
-	Whisper tiny (fastest)	Whisper tiny (tercepat)
 	White	Putih
 	White Input Level	Level Input Putih
 	White Is High	Putih Berarti Tinggi
@@ -2746,7 +2686,6 @@
 	Normalize Mix Track	Normalisasi Trek Mix
 	Simplify Sequence	Sederhanakan Sekuens
 	Simplify	Sederhanakan
-	Transcribe Sequence	Transkripsikan Sekuens
 	Save as Template	Simpan sebagai Templat
 	Flash Cue Marker	Penanda Isyarat Flash
 	System Compatibility Report	Laporan Kompatibilitas Sistem
@@ -2824,7 +2763,7 @@
 	Gaps	Celah
 	Video effects	Efek video
 	Audio effects	Efek audio
-	Text (graphics and captions)	Teks (grafis dan takarir)
+	Text (graphics)	Teks (grafis dan takarir)
 	Clips	Klip
 	Move clips to the lowest track possible	Pindahkan klip ke trek serendah mungkin
 	Keep:	Pertahankan:
@@ -2834,7 +2773,6 @@
 	Language:	Bahasa:
 	Audio on track {t}	Audio di trek {t}
 	Audio analysis:	Analisis audio:
-	Recognize when different speakers are talking	Kenali saat pembicara yang berbeda sedang berbicara
 	Template Name:	Nama Templat:
 	Comments:	Komentar:
 	 (unavailable)	 (tidak tersedia)
@@ -2898,12 +2836,9 @@
 	Preset	Preset
 	More presets…	Preset lainnya…
 	Multiplexer	Multiplexer
-	The sequence has no caption track.	Sekuens tidak memiliki trek takarir.
 	Export Options	Opsi Ekspor
-	Burn Captions Into Video	Tanamkan Takarir ke Video
 	Create Sidecar File	Buat Berkas Pendamping
 	File Format	Format Berkas
-	SubRip Subtitle (.srt)	Subtitel SubRip (.srt)
 	WebVTT (.vtt)	WebVTT (.vtt)
 	Title	Judul
 	Creator	Pembuat
@@ -3063,15 +2998,12 @@
 	Decrease Leading by Five Units	Kurangi Spasi Baris Lima Satuan
 	Decrease Leading by One Unit	Kurangi Spasi Baris Satu Satuan
 	Decrease Video Tracks Height	Kurangi Tinggi Trek Video
-	Delete Captions	Hapus Takarir
 	Delete Graphic Layer	Hapus Lapisan Grafis
 	Delete Guide Template	Hapus Templat Garis Bantu
 	Delete Media Cache Files	Hapus Berkas Cache Media
 	Discard Unsaved Changes	Buang Perubahan yang Belum Disimpan
 	Does Not Contain	Tidak Berisi
-	Download Speech Model	Unduh Model Ucapan
 	Dynamic Trim Stop	Hentikan Pangkas Dinamis
-	Edit Caption Text	Edit Teks Takarir
 	Ellipse Tool	Alat Elips
 	Ends With	Diakhiri Dengan
 	Entire Source	Seluruh Sumber
@@ -3148,7 +3080,6 @@
 	Media Browser Settings	Pengaturan Peramban Media
 	MediaBrowser	MediaBrowser
 	MediaCache	MediaCache
-	Merge Captions	Gabungkan Takarir
 	Mixer	Mixer
 	Mosaic In	Mozaik Masuk
 	Move All Audio Targets Down	Pindahkan Semua Target Audio ke Bawah
@@ -3274,7 +3205,6 @@
 	Set Project Panel View	Atur Tampilan Panel Proyek
 	Show Next Screen	Tampilkan Layar Berikutnya
 	Show Previous Screen	Tampilkan Layar Sebelumnya
-	Show Program Transcript	Tampilkan Transkrip Program
 	Shuttle Left	Shuttle ke Kiri
 	Shuttle Right	Shuttle ke Kanan
 	Shuttle Slow Left	Shuttle Lambat ke Kiri
@@ -3293,7 +3223,6 @@
 	Social Vertical 1080×1920	Sosial Vertikal 1080×1920
 	Soft Vignette	Vinyet Lembut
 	Source In/Out	Masuk/Keluar Sumber
-	Split Caption	Pisahkan Takarir
 	Square Pixels (1.0)	Piksel Persegi (1.0)
 	Stack Clips	Tumpuk Klip
 	Start Export Queue	Mulai Antrean Ekspor
@@ -3564,8 +3493,6 @@
 	Solid	Solid
 	GPU Rendering	Rendering GPU
 	Composite on the GPU when available	Komposit di GPU bila tersedia
-	Text to Speech	Teks ke Ucapan
-	Edit Narration	Edit Narasi
 	Project Notes	Catatan Proyek
 	Get Project Notes	Ambil Catatan Proyek
 	Edit Project Notes	Edit Catatan Proyek

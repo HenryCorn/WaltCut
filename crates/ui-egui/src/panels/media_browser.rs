@@ -400,7 +400,7 @@ fn entry_interactions(app: &mut FilmcraftApp, ui: &egui::Ui, resp: &egui::Respon
         if e.is_dir {
             exec(app, &ctx, "mediaBrowser.navigate", json!({"path": e.path}));
             refresh(&ctx);
-        } else if matches!(e.kind, "project" | "caption") {
+        } else if e.kind == "project" {
             exec(app, &ctx, "mediaBrowser.import", json!({"paths": [e.path]}));
         } else {
             exec(app, &ctx, "mediaBrowser.openInSource", json!({"path": e.path}));
@@ -550,7 +550,6 @@ fn list(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, entries: &[Entry], c
                         "audio" => Icon::Audio,
                         "image" => Icon::Image,
                         "video" => Icon::Film,
-                        "caption" => Icon::Captions,
                         _ => Icon::Sequence,
                     };
                     let col = if e.is_dir { Color32::from_rgb(237, 150, 58) } else { t.icon };
@@ -685,7 +684,6 @@ fn thumbnails(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, entries: &[Ent
                         let icon = match e.kind {
                             "audio" => Icon::Audio,
                             "image" => Icon::Image,
-                            "caption" => Icon::Captions,
                             "project" => Icon::Sequence,
                             _ => Icon::Film,
                         };

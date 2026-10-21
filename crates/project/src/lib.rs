@@ -9,7 +9,6 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-pub mod caption;
 pub mod drawing;
 pub mod effect;
 pub mod essential;
@@ -21,8 +20,6 @@ pub mod keyframe;
 pub mod mask;
 pub mod mixer;
 pub mod multicam;
-pub mod narration;
-pub mod transcript;
 pub mod vtransition;
 
 use std::collections::BTreeMap;
@@ -32,7 +29,6 @@ use waltcut_geom::Vec2;
 use waltcut_media::{Generator, MediaInfo};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
-pub use caption::{Caption, CaptionAlign, CaptionAnchor, CaptionFormat, CaptionStyle, CaptionTrack, plain_text};
 pub use effect::{EffectDef, EffectInstance, EffectKind, ParamDef, ParamKind, effect_defs, find_effect};
 pub use essential::{AudioType, EssentialSound};
 pub use find::{FindOp, FindQuery, FindRow, SearchBin};
@@ -41,8 +37,6 @@ pub use keyframe::{Interpolation, Keyframe, Param, ParamValue};
 pub use mask::{Mask, MaskMode, MaskPath, MaskVertex, TrackMethod};
 pub use mixer::{AutomationMode, InputMap, MixerStrip, TrackSend};
 pub use multicam::{Camera, MergedClip, MulticamAudio, MulticamSel, MulticamSource};
-pub use narration::{Narration, VocalPitch};
-pub use transcript::{Speaker, Transcript, Word};
 
 macro_rules! id_type {
     ($name:ident) => {
@@ -1008,9 +1002,6 @@ pub struct Sequence {
     /// or to a submix after them.
     #[serde(default)]
     pub submix_tracks: Vec<Track>,
-    /// Caption tracks (drawn above the video tracks; first = top). Older files have none (serde default).
-    #[serde(default)]
-    pub caption_tracks: Vec<CaptionTrack>,
     /// Set on multi-camera source sequences (cameras, audio mode).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multicam: Option<MulticamSource>,
@@ -1054,18 +1045,7 @@ impl SplitMarks {
 
 impl Sequence {
     pub fn duration(&self) -> Tick {
-        let media = self.video_tracks.iter().chain(&self.audio_tracks).map(Track::end).max().unwrap_or(Tick::ZERO);
-        media.max(self.caption_tracks.iter().map(CaptionTrack::end).max().unwrap_or(Tick::ZERO))
-    }
-    pub fn caption_track(&self, id: TrackId) -> Option<&CaptionTrack> {
-        self.caption_tracks.iter().find(|t| t.id == id)
-    }
-    pub fn caption_track_mut(&mut self, id: TrackId) -> Option<&mut CaptionTrack> {
-        self.caption_tracks.iter_mut().find(|t| t.id == id)
-    }
-    /// Find a caption anywhere: (caption track id, caption).
-    pub fn find_caption(&self, id: ClipId) -> Option<(TrackId, &Caption)> {
-        self.caption_tracks.iter().find_map(|t| t.caption(id).map(|c| (t.id, c)))
+        self.video_tracks.iter().chain(&self.audio_tracks).map(Track::end).max().unwrap_or(Tick::ZERO)
     }
     pub fn tracks(&self, kind: TrackKind) -> &Vec<Track> {
         match kind {
@@ -1116,9 +1096,6 @@ impl Sequence {
         for t in self.all_tracks() {
             t.check()?;
         }
-        for t in &self.caption_tracks {
-            t.check()?;
-        }
         Ok(())
     }
     /// The hostile-value bounds alone (settings, marks and every time range), without the
@@ -1134,17 +1111,14 @@ impl Sequence {
         for t in self.all_tracks() {
             t.check_bounds()?;
         }
-        for t in &self.caption_tracks {
-            t.check_bounds()?;
-        }
         Ok(())
     }
 }
 
 /// Bound persisted timeline arithmetic before any start + duration operation: start, duration and
 /// end all stay within `Tick::MIN..=Tick::MAX`, leaving headroom for later edit math. Negative
-/// positions remain supported; the sign of the duration is a structural rule (track items and
-/// captions require a positive one in their own invariant checks), not a bound.
+/// positions remain supported; the sign of the duration is a structural rule (track items
+/// require a positive one in their own invariant checks), not a bound.
 pub(crate) fn bounded_time_range(start: Tick, duration: Tick) -> bool {
     let within = |t: i64| (Tick::MIN.0..=Tick::MAX.0).contains(&t);
     within(start.0) && within(duration.0) && start.0.checked_add(duration.0).is_some_and(within)
@@ -1259,10 +1233,6 @@ pub struct Project {
     /// embedded, so projects render without the original files.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub luts: Vec<ProjectLut>,
-    /// Transcripts of media items (Text panel ▸ Transcript), keyed by the media item; word times
-    /// are media time. Shared (`Arc`) so undo snapshots don't copy them.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub transcripts: BTreeMap<ItemId, std::sync::Arc<Transcript>>,
     /// Search bins (File ▸ New ▸ Search Bin): saved Find queries listed in the Project panel.
     /// Schema v11.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1271,10 +1241,6 @@ pub struct Project {
     /// project item. Schema v12.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub source_graphics: BTreeMap<ItemId, SourceGraphic>,
-    /// Narrations (Text to Speech): the script and voice settings each generated WAV item was
-    /// made from, keyed by that item. Schema v14.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub narrations: BTreeMap<ItemId, Narration>,
     /// Project notes (Window ▸ Project Notes): free plain text kept with the project, for to-dos,
     /// instructions for whoever opens it next, frame numbers and the like. Schema v15.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -1370,10 +1336,8 @@ impl Project {
             items: BTreeMap::new(),
             next_id: 1,
             luts: Vec::new(),
-            transcripts: BTreeMap::new(),
             search_bins: Vec::new(),
             source_graphics: BTreeMap::new(),
-            narrations: BTreeMap::new(),
             notes: String::new(),
         }
     }
@@ -1540,7 +1504,6 @@ impl Project {
             master_effects: Vec::new(),
             master_mixer: MixerStrip::default(),
             submix_tracks: Vec::new(),
-            caption_tracks: Vec::new(),
             multicam: None,
             merged: None,
             split: SplitMarks::default(),
@@ -2007,41 +1970,6 @@ mod tests {
         assert_eq!(t.item_at(rate.tick_of(10)).unwrap().id, a.id);
         assert!(t.item_at(rate.tick_of(48)).is_none());
         assert_eq!(a.source_time_at(rate.tick_of(10)), Tick(1000) + rate.tick_of(20));
-    }
-
-    #[test]
-    fn projects_without_caption_tracks_load() {
-        let (p, _, seq) = demo_project();
-        let mut v: serde_json::Value = serde_json::from_str(&p.to_json()).unwrap();
-        // a v1 file has no `caption_tracks` key
-        let items = v["items"].as_object_mut().unwrap();
-        for it in items.values_mut() {
-            if let Some(s) = it["kind"].get_mut("Sequence") {
-                s.as_object_mut().unwrap().remove("caption_tracks");
-            }
-        }
-        let q = Project::from_json(&v.to_string()).unwrap();
-        assert!(q.sequence(seq).unwrap().caption_tracks.is_empty());
-    }
-
-    #[test]
-    fn caption_tracks_roundtrip() {
-        let (mut p, _, seq) = demo_project();
-        let id = TrackId(p.alloc_id());
-        let mut ct = CaptionTrack::new(id, "Subtitle".into(), CaptionFormat::Cea608);
-        ct.captions.push(Caption {
-            id: ClipId(p.alloc_id()),
-            start: Tick(10),
-            duration: Tick(TICKS_PER_SECOND),
-            text: "Hello\n<i>world</i>".into(),
-            speaker: Some("Ann".into()),
-            cue_id: Some("1".into()),
-            settings: "line:90%".into(),
-        });
-        p.sequence_mut(seq).unwrap().caption_tracks.push(ct);
-        let q = Project::from_json(&p.to_json()).unwrap();
-        assert_eq!(p, q);
-        assert_eq!(q.sequence(seq).unwrap().duration(), Tick(10 + TICKS_PER_SECOND));
     }
 
     #[test]

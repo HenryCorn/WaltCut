@@ -132,7 +132,6 @@ fn select_clip_at_playhead(s: &mut Session) -> Result<Value> {
     let ids: Vec<ClipId> = seq.all_tracks().filter(|tr| tg.contains(&tr.id)).filter_map(|tr| tr.item_at(t).map(|i| i.id)).collect();
     s.state.selection = with_links(s, &ids);
     s.state.edit_points.clear();
-    s.state.caption_selection.clear();
     Ok(json!({"selection": s.state.selection.iter().map(|c| c.0).collect::<Vec<_>>()}))
 }
 
@@ -645,7 +644,7 @@ fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
     let img = if target.source {
         waltcut_render::render_item(&s.project, target.item, target.time, 1.0, &provider)
     } else {
-        let opts = waltcut_render::RenderOptions { scale: 1.0, captions: true, ..Default::default() };
+        let opts = waltcut_render::RenderOptions { scale: 1.0, ..Default::default() };
         Some(waltcut_render::render_sequence(&s.project, target.item, target.time, opts, &provider))
     };
     if waltcut_media::pending::take() {

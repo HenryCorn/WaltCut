@@ -10,7 +10,7 @@
 //! - **Responsive design:** `graphics.setRoll` (roll / crawl options), `graphics.setResponsiveTime`
 //!   (protected intro / outro), `graphics.pin` (pin a layer's edges to another layer or the frame).
 //! - **Per-character styles:** `graphics.setCharStyle` styles a range of characters.
-//! - **Upgrade Caption to Graphic**, **Upgrade to Source Graphic** (one set of layers shared by
+//! - **Upgrade to Source Graphic** (one set of layers shared by
 //!   every clip of a project item; editing one instance updates the others) and **Replace Fonts
 //!   in Projects**.
 
@@ -18,9 +18,9 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use serde_json::{Value, json};
-use waltcut_geom::{Affine, Vec2};
+use waltcut_geom::Affine;
 use waltcut_project::graphic::{self, layer_display_name, layer_indices};
-use waltcut_project::graphic_design::{CharStyle, GraphicMeta, LayerExtra, Pin, PinTarget, RollMode, SourceGraphic, apply_char_style, clear_char_style};
+use waltcut_project::graphic_design::{CharStyle, GraphicMeta, Pin, PinTarget, RollMode, SourceGraphic, apply_char_style, clear_char_style};
 use waltcut_project::gtemplate::{
     self, ControlKind, FontResource, GraphicsTemplate, TEMPLATE_EXTENSION, TemplateControl, base64_decode, base64_encode, builtin_templates, ensure_uids,
     layer_uid,
@@ -48,11 +48,6 @@ const G: &[&str] = &["Graphics and Titles"];
 fn has_graphic(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
     target_clip(s, &Value::Null).map(|_| ()).ok_or_else(|| "select a graphic clip".into())
-}
-
-fn has_captions(s: &Session) -> std::result::Result<(), String> {
-    has_seq(s)?;
-    if s.active_sequence().is_some_and(|q| q.caption_tracks.iter().any(|t| !t.captions.is_empty())) { Ok(()) } else { Err("there are no captions".into()) }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -804,132 +799,8 @@ fn set_char_style(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Upgrade Caption to Graphic / Upgrade to Source Graphic
+// Upgrade to Source Graphic
 // ------------------------------------------------------------------------------------------------
-
-/// Caption text with `<i>`/`<b>`/`<u>` → plain text and character style runs.
-fn caption_runs(text: &str) -> (String, Vec<waltcut_project::StyleRun>) {
-    let mut out = String::new();
-    let mut runs: Vec<waltcut_project::StyleRun> = Vec::new();
-    let (mut it, mut bo, mut ul) = (false, false, false);
-    let mut rest = text;
-    let mut n = 0usize;
-    while let Some(ch) = rest.chars().next() {
-        if ch == '<'
-            && let Some(end) = rest.find('>')
-        {
-            match rest[1..end].trim().to_ascii_lowercase().as_str() {
-                "i" => it = true,
-                "/i" => it = false,
-                "b" => bo = true,
-                "/b" => bo = false,
-                "u" => ul = true,
-                "/u" => ul = false,
-                _ => {}
-            }
-            rest = &rest[end + 1..];
-            continue;
-        }
-        let decoded = match ch {
-            '&' if rest.starts_with("&amp;") => ('&', 5),
-            '&' if rest.starts_with("&lt;") => ('<', 4),
-            '&' if rest.starts_with("&gt;") => ('>', 4),
-            c => (c, c.len_utf8()),
-        };
-        out.push(decoded.0);
-        if it || bo || ul {
-            let st = CharStyle { faux_italic: it.then_some(true), faux_bold: bo.then_some(true), underline: ul.then_some(true), ..Default::default() };
-            runs = apply_char_style(&runs, n + 1, n, n + 1, &st);
-        }
-        n += 1;
-        rest = &rest[decoded.1..];
-    }
-    (out, runs)
-}
-
-fn upgrade_caption(s: &mut Session, p: &Value) -> Result<Value> {
-    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
-    let (w, h) = (seq.settings.width, seq.settings.height);
-    let ids: Vec<ClipId> = match p.get("captions").and_then(Value::as_array) {
-        Some(a) => a.iter().filter_map(Value::as_u64).map(ClipId).collect(),
-        None if !s.state.caption_selection.is_empty() => s.state.caption_selection.clone(),
-        None => {
-            let t = s.playhead();
-            seq.caption_tracks.iter().find_map(|tr| tr.caption_at(t).map(|c| c.id)).into_iter().collect()
-        }
-    };
-    if ids.is_empty() {
-        return Err(bad("graphics.upgradeCaption", "select captions to upgrade"));
-    }
-    let mut jobs = Vec::new();
-    for tr in &seq.caption_tracks {
-        for c in tr.captions.iter().filter(|c| ids.contains(&c.id)) {
-            jobs.push((c.clone(), tr.style.clone()));
-        }
-    }
-    if jobs.is_empty() {
-        return Err(bad("graphics.upgradeCaption", "no such captions"));
-    }
-    let before = s.history.undo.len();
-    let mut clips = Vec::new();
-    for (c, st) in &jobs {
-        let k = h as f64 / 1080.0;
-        let size = st.size as f64 * k;
-        let (text, runs) = caption_runs(&c.text);
-        let lines = text.lines().count().max(1) as f64;
-        let line_h = size * st.line_spacing as f64;
-        let x = match st.align {
-            waltcut_project::CaptionAlign::Left => w as f64 * 0.1,
-            waltcut_project::CaptionAlign::Center => w as f64 / 2.0,
-            waltcut_project::CaptionAlign::Right => w as f64 * 0.9,
-        };
-        let margin = st.margin as f64 * h as f64;
-        let first_baseline = match st.anchor {
-            waltcut_project::CaptionAnchor::Bottom => h as f64 - margin - (lines - 1.0) * line_h - size * 0.25,
-            waltcut_project::CaptionAnchor::Top => margin + size,
-            waltcut_project::CaptionAnchor::Middle => h as f64 / 2.0 - (lines - 1.0) * line_h / 2.0 + size * 0.35,
-        };
-        let mut layer = graphic::new_text_layer(&text, Vec2::new(x, first_baseline), size);
-        let set = |e: &mut EffectInstance, k: &str, v: ParamValue| {
-            e.params.insert(k.into(), waltcut_project::Param::new(v));
-        };
-        let col = |c: [u8; 4]| [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
-        set(&mut layer, "font", ParamValue::Text(st.font.clone()));
-        set(&mut layer, "font_style", ParamValue::Text("SemiBold".into()));
-        set(&mut layer, "align", ParamValue::Choice(st.align as u32));
-        set(&mut layer, "fill_color", ParamValue::Color(col(st.color)));
-        set(&mut layer, "leading", ParamValue::Float(line_h - size * 1.21));
-        if st.background {
-            set(&mut layer, "background", ParamValue::Bool(true));
-            set(&mut layer, "background_color", ParamValue::Color(col(st.background_color)));
-            set(&mut layer, "background_opacity", ParamValue::Float(st.background_color[3] as f64 / 2.55));
-            set(&mut layer, "background_size", ParamValue::Float(size * 0.2));
-        }
-        if st.outline > 0.0 {
-            set(&mut layer, "stroke", ParamValue::Bool(true));
-            set(&mut layer, "stroke_color", ParamValue::Color(col(st.outline_color)));
-            set(&mut layer, "stroke_width", ParamValue::Float(st.outline as f64 * k));
-        }
-        if !runs.is_empty() {
-            layer.layer = Some(Box::new(LayerExtra { runs, ..Default::default() }));
-        }
-        let name = text.lines().next().unwrap_or("Caption").chars().take(40).collect::<String>();
-        let dur = c.duration;
-        let q = json!({"time": c.start.0});
-        let clip = place_video_clip(s, "graphics.upgradeCaption", &name, &q, "Upgrade Caption to Graphic", vec![layer], move |pr, (w, h, rate)| {
-            (crate::graphics::graphic_source(pr, w, h, rate), dur)
-        })?;
-        clips.push(clip.0);
-    }
-    let del: Vec<ClipId> = jobs.iter().map(|j| j.0.id).collect();
-    s.edit_sequence("Upgrade Caption to Graphic", move |q, _, st| {
-        waltcut_edit::captions::delete_captions(q, &del, false)?;
-        st.caption_selection.clear();
-        Ok(())
-    })?;
-    fold_undo(s, before, "Upgrade Caption to Graphic");
-    Ok(json!({"clips": clips, "upgraded": jobs.len()}))
-}
 
 fn upgrade_to_source(s: &mut Session, p: &Value) -> Result<Value> {
     let clip = target_clip(s, p).ok_or_else(|| bad("graphics.upgradeToSourceGraphic", "select a graphic clip"))?;
@@ -1032,7 +903,7 @@ fn text_of(e: &EffectInstance, k: &str) -> String {
     }
 }
 
-/// Fonts used by graphics (layers and character styles) and caption tracks.
+/// Fonts used by graphics (layers and character styles).
 pub fn fonts_used(s: &Session) -> Vec<(String, String, usize)> {
     let mut v: Vec<(String, String, usize)> = Vec::new();
     let mut add = |fam: String, st: String| match v.iter_mut().find(|x| x.0.eq_ignore_ascii_case(&fam) && x.1.eq_ignore_ascii_case(&st)) {
@@ -1049,13 +920,6 @@ pub fn fonts_used(s: &Session) -> Vec<(String, String, usize)> {
             }
         }
     });
-    for q in s.project.sequences() {
-        if let ItemKind::Sequence(sq) = &q.kind {
-            for t in &sq.caption_tracks {
-                add(t.style.font.clone(), "SemiBold".into());
-            }
-        }
-    }
     v.sort();
     v
 }
@@ -1104,17 +968,6 @@ fn replace_fonts(s: &mut Session, p: &Value) -> Result<Value> {
                 }
             }
         });
-        let ids: Vec<ItemId> = pr.sequences().map(|q| q.id).collect();
-        for id in ids {
-            if let Some(sq) = pr.sequence_mut(id) {
-                for t in &mut sq.caption_tracks {
-                    if t.style.font.eq_ignore_ascii_case(&from) && from_style.is_none() {
-                        t.style.font = to.clone();
-                        n += 1;
-                    }
-                }
-            }
-        }
         Ok(n)
     })?;
     Ok(json!({"replaced": n}))
@@ -1225,14 +1078,6 @@ pub fn commands() -> Vec<CommandSpec> {
             r##"{"clip":id?,"layer":n|name?,"start":char=0,"end":char=len,"style":{"font":str,"fontStyle":str,"size":px,"color":"#rrggbb","bold":bool,"italic":bool,"underline":bool,"tracking":n,"baselineShift":px,"caps":"normal|all caps|small caps"},"clear":bool? (remove styles from the range),"merge":bool?,"begin":bool? (start a new undo gesture)}"##,
             has_graphic,
             set_char_style,
-        ),
-        spec(
-            "graphics.upgradeCaption",
-            "Upgrade Caption to Graphic",
-            G,
-            r#"{"captions":[id]? (default: the selected captions, else the one under the playhead)}"#,
-            has_captions,
-            upgrade_caption,
         ),
         spec("graphics.upgradeToSourceGraphic", "Upgrade to Source Graphic", G, r#"{"clip":id?}"#, has_graphic, upgrade_to_source),
         spec(

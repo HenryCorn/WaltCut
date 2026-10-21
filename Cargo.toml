@@ -47,11 +47,7 @@ waltcut-project = { path = "crates/project" }
 waltcut-edit = { path = "crates/edit" }
 waltcut-interchange = { path = "crates/interchange" }
 waltcut-text = { path = "crates/text" }
-waltcut-captions = { path = "crates/captions" }
-waltcut-speech = { path = "crates/speech" }
 waltcut-genai = { path = "crates/genai" }
-waltcut-tts = { path = "crates/tts" }
-waltcut-tts-text = { path = "crates/tts-text" }
 waltcut-render = { path = "crates/render" }
 waltcut-gpu = { path = "crates/gpu" }
 waltcut-scopes = { path = "crates/scopes" }

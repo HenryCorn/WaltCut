@@ -159,8 +159,8 @@ adds the saved still as one undoable edit. Failed writes retain the settings and
 
 The monitor, item and frame time are captured when the settings open. Export uses the original
 full-resolution media, even with proxies or reduced preview resolution enabled. Source exports
-the source picture at its media playhead; Program exports the sequence composite, effects and
-captions at its timeline playhead. Audio-only Source clips have no picture to export.
+the source picture at its media playhead; Program exports the sequence composite and effects at its
+timeline playhead. Audio-only Source clips have no picture to export.
 
 The shared `file.exportFrame` command accepts `target: "source" | "program"` (Program by default),
 `format: "png" | "jpeg" | "tiff" | "bmp"`, `depth: 8 | 16` (default 8),

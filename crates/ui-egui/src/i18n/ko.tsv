@@ -91,9 +91,6 @@
 	Add Audio Submix Track	오디오 서브믹스 트랙 추가
 	Add audio submix tracks	오디오 서브믹스 트랙 추가
 	Add audio tracks	오디오 트랙 추가
-	Add Caption at Playhead	재생 헤드 위치에 자막 추가
-	Add caption at playhead	재생 헤드에 자막 추가
-	Add captions	자막 추가
 	Add Chapter Marker…	챕터 마커 추가…
 	Add Edit	편집점 추가
 	Add Edit to All Tracks	모든 트랙에 편집점 추가
@@ -106,7 +103,6 @@
 	Add Marker	마커 추가
 	Add Marker (M)	마커 추가(M)
 	Add media to your project. Drop files anywhere in the window, or choose a source below.	프로젝트에 미디어를 추가합니다. 창 아무 곳에나 파일을 놓거나 아래에서 소스를 선택하세요.
-	Add New Caption Track…	새 자막 트랙 추가…
 	Add Property…	속성 추가…
 	Add Range Marker	범위 마커 추가
 	Add Range Marker to In and Out	시작/끝에 범위 마커 추가
@@ -168,7 +164,6 @@
 	Alpha Channel	알파 채널
 	Alpha Glow	알파 광선
 	Always Deinterlace	항상 디인터레이스
-	Always import embedded CEA-708 closed captions with wide aspect.	내장 CEA-708 자막을 항상 와이드 비율로 가져오기
 	Always override audio tags	항상 오디오 태그 재정의
 	Ambience	앰비언스
 	Ambience Intensity	앰비언스 강도
@@ -306,8 +301,6 @@
 	Auto-Match Loudness	라우드니스 자동 일치
 	Auto-saves go to: {dir}	자동 저장 위치: {dir}
 	Auto-tag audio types in the timeline	타임라인의 오디오 유형 자동 태그
-	Auto-transcribe all imported clips	가져온 모든 클립 자동 전사
-	Auto-transcribe only clips in sequences	시퀀스 내 클립만 자동 전사
 	Automatch Time	자동 일치 시간
 	Automate To Sequence	시퀀스로 자동화
 	Automate to Sequence	시퀀스로 자동화
@@ -321,7 +314,6 @@
 	Automatically resume playback for growing files in Source Monitor	소스 모니터에서 증가 중인 파일 재생 자동 재개
 	Automatically Save Every	자동 저장 간격
 	Automatically save projects	프로젝트 자동 저장
-	Automatically transcribe clips	클립 자동 전사
 	Automation Keyframe Optimization	자동화 키프레임 최적화
 	AV1	AV1
 	Average Data Rate	평균 데이터 속도
@@ -462,7 +454,6 @@
 	Bulge Smoother	돌출 부드럽게
 	Bump Height	돌출 높이
 	Burn Alpha	알파 번
-	Burn Captions Into Video	자막을 비디오에 번인
 	Burn Chroma	채도 번
 	Burn Color	색상 번
 	Butt cap	버트 캡
@@ -488,11 +479,7 @@
 	Cancelled	취소됨
 	Cannot open {dir}: {e}	{dir}을(를) 열 수 없음: {e}
 	Capitalisation	대소문자
-	Caption track options	자막 트랙 옵션
-	Caption Tracks	자막 트랙
-	Captions	자막
 	Captions and Graphics	자막 및 그래픽
-	Captions…	자막…
 	Capture	캡처
 	Capture Format:	캡처 형식:
 	Captured and Generated:	캡처 및 생성:
@@ -618,7 +605,6 @@
 	Close Panel	패널 닫기
 	Close Project	프로젝트 닫기
 	Close Sequence	시퀀스 닫기
-	Closed Captions	폐쇄 자막
 	Codec:	코덱:
 	Codec: {codec}	코덱: {codec}
 	Cold Mono	차가운 흑백
@@ -719,16 +705,12 @@
 	Crawl Right	오른쪽으로 크롤
 	Create 4-point polygon mask	4점 다각형 마스크 만들기
 	Create a bin of subclips from each detected cut point	감지된 각 컷 지점으로 하위 클립 빈 만들기
-	Create a caption track or import a caption file.	자막 트랙을 만들거나 자막 파일을 가져옵니다.
 	Create a clip marker at each detected cut point	감지된 각 컷 지점에 클립 마커 만들기
-	Create captions	자막 만들기
-	Create Captions from Transcript…	대본에서 자막 만들기…
 	Create ellipse mask	타원 마스크 만들기
 	Create Folder For Imported Projects	가져온 프로젝트용 폴더 만들기
 	Create folder for imported projects	가져온 프로젝트용 폴더 만들기
 	Create Multi-Camera Source Sequence	멀티 카메라 소스 시퀀스 만들기
 	Create Multi-Camera Source Sequence…	멀티 카메라 소스 시퀀스 만들기…
-	Create new caption track	새 자막 트랙 만들기
 	Create new graphic	새 그래픽 만들기
 	Create Proxies	프록시 만들기
 	Create Proxies…	프록시 만들기…
@@ -811,7 +793,6 @@
 	Default	기본값
 	Default Audio Tracks	기본 오디오 트랙
 	Default clip size:	기본 클립 크기:
-	Default closed caption font	기본 폐쇄 자막 글꼴
 	Default Emoji font	기본 이모지 글꼴
 	Default Input	기본 입력
 	Default language	기본 언어
@@ -831,10 +812,6 @@
 	Delete	삭제
 	Delete Arrangement	배열 삭제
 	Delete Audio Tracks	오디오 트랙 삭제
-	Delete Caption Track	자막 트랙 삭제
-	Delete Caption Tracks	자막 트랙 삭제
-	Delete Captions	자막 삭제
-	Delete Empty Caption Tracks	빈 자막 트랙 삭제
 	Delete files older than	다음보다 오래된 파일 삭제
 	Delete Graphic Layer	그래픽 레이어 삭제
 	Delete Guide Template	안내선 템플릿 삭제
@@ -846,11 +823,9 @@
 	Delete Render Files	렌더 파일 삭제
 	Delete Render Files In to Out	시작~끝 렌더 파일 삭제
 	Delete Search Bin	검색 빈 삭제
-	Delete selected captions	선택한 자막 삭제
 	Delete this preset	이 사전 설정 삭제
 	Delete Tracks	트랙 삭제
 	Delete Tracks…	트랙 삭제…
-	Delete Transcript	대본 삭제
 	Delete Video Tracks	비디오 트랙 삭제
 	Deleted preset “{active}”	사전 설정 “{active}” 삭제됨
 	Deleted {n} file(s), {size}.	파일 {n}개 삭제됨, {size}.
@@ -928,13 +903,11 @@
 	Dock Panel	패널 도킹
 	Docking Action	도킹 동작
 	Does Not Contain	포함 안 함
-	Don't label speakers	화자 레이블 안 함
 	Don't Save	저장 안 함
 	Done	완료
 	Dot Color	점 색상
 	Double-click	더블클릭
 	Double-click a sequence in the Project panel to open it here.	프로젝트 패널에서 시퀀스를 더블클릭해 여기에 여세요.
-	Download Speech Model	음성 모델 다운로드
 	DPX	DPX
 	DPX Sequence	DPX 시퀀스
 	Draft decoding at reduced playback resolution (H.264: faster, some frames less filtered)	낮은 재생 해상도에서 드래프트 디코딩(H.264: 빠름, 일부 프레임 필터 감소)
@@ -993,10 +966,8 @@
 	Edit	편집
 	Edit Cameras	카메라 편집
 	Edit Cameras…	카메라 편집…
-	Edit Caption Text	자막 텍스트 편집
 	Edit Columns	열 편집
 	Edit Columns…	열 편집…
-	Edit Narration	내레이션 편집
 	Edit Offline File	오프라인 파일 편집
 	Edit Offline…	오프라인 편집…
 	Edit Original	원본 편집
@@ -1311,7 +1282,6 @@
 	Go to In	시작 표시로 이동
 	Go to In (Shift+I)	시작으로 이동(Shift+I)
 	Go to In Point	시작 표시(In)로 이동
-	Go to Next Caption Segment	다음 자막 세그먼트로 이동
 	Go to Next Edit Point	다음 편집 지점으로 이동
 	Go to Next Edit Point on Any Track	모든 트랙의 다음 편집 지점으로 이동
 	Go to next keyframe	다음 키프레임으로 이동
@@ -1319,7 +1289,6 @@
 	Go to Out	끝 표시로 이동
 	Go to Out (Shift+O)	끝으로 이동(Shift+O)
 	Go to Out Point	끝 표시(Out)로 이동
-	Go to Previous Caption Segment	이전 자막 세그먼트로 이동
 	Go to Previous Edit Point	이전 편집 지점으로 이동
 	Go to Previous Edit Point on Any Track	모든 트랙의 이전 편집 지점으로 이동
 	Go to previous keyframe	이전 키프레임으로 이동
@@ -1415,7 +1384,6 @@
 	Height:	높이:
 	Help	도움말
 	Hexagon	육각형
-	Hide All Caption Tracks	모든 자막 트랙 숨기기
 	Hide Back Face	뒷면 숨기기
 	High	높음
 	High contrast with held highlights and deep shadows	밝은 영역은 유지하고 그림자는 깊은 고대비
@@ -1487,7 +1455,6 @@
 	Import	가져오기
 	Import a preset file…	사전 설정 파일 가져오기…
 	Import as Image Sequence	이미지 시퀀스로 가져오기
-	Import captions file…	자막 파일 가져오기…
 	Import From	가져오기 위치
 	Import from Media Browser	미디어 브라우저에서 가져오기
 	Import Image Sequence…	이미지 시퀀스 가져오기…
@@ -1508,7 +1475,6 @@
 	In/Out Duration	시작/끝 지속 시간
 	In: {name}	시작: {name}
 	Include Alpha Channel	알파 채널 포함
-	Include captions on import	가져올 때 자막 포함
 	Include Handles:	핸들 포함:
 	Include Preview Files	미리보기 파일 포함
 	Include Proxies	프록시 포함
@@ -1601,7 +1567,6 @@
 	Label Color Presets	레이블 색상 사전 설정
 	Label Colors	레이블 색상
 	Label Defaults	레이블 기본값
-	Label speakers	화자 레이블 지정
 	Labels	레이블
 	Labels…	레이블…
 	Language	언어
@@ -1832,9 +1797,6 @@
 	MB	MB
 	Media	미디어
 	Media Analysis	미디어 분석
-	Media Analysis & Transcription	미디어 분석 및 전사
-	Media Analysis & Transcription…	미디어 분석 및 받아쓰기…
-	Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.	미디어 분석과 전사는 미디어 캐시 폴더에 캐시됩니다. 이 컴퓨터의 다른 프로젝트로 가져와도 재분석이 필요 없습니다.
 	Media Browser	미디어 브라우저
 	Media Browser Settings	미디어 브라우저 설정
 	Media Cache	미디어 캐시
@@ -1864,10 +1826,8 @@
 	Medium Room	중형 룸
 	Memory	메모리
 	Memory…	메모리…
-	Merge Captions	자막 병합
 	Merge Clips	클립 병합
 	Merge Clips…	클립 병합…
-	Merge selected captions	선택한 자막 병합
 	Merged clip created	병합 클립 생성됨
 	Merged PRs	병합된 PR
 	Metadata	메타데이터
@@ -2043,7 +2003,6 @@
 	No	아니요
 	No background jobs.	백그라운드 작업 없음
 	No candidates yet — Search a folder or Locate the file.	후보 없음 — 폴더를 검색하거나 파일을 찾으세요.
-	No captions on this track. Press + to add one at the playhead.	이 트랙에 자막 없음. +를 눌러 재생 헤드에 추가합니다.
 	no Chinese font is installed on this system; the interface stays in English	중국어 글꼴이 설치되어 있지 않아 인터페이스가 영어로 유지됩니다
 	no Korean font is installed on this system; the interface stays in English	한국어 글꼴이 설치되어 있지 않아 인터페이스가 영어로 유지됩니다
 	No contributor data was built into this copy.	이 사본에 기여자 데이터가 포함되지 않았습니다.
@@ -2054,7 +2013,6 @@
 	no GPU adapter: the CPU compositor is used	GPU 어댑터 없음: CPU 합성기 사용
 	no Japanese font is installed on this system; the interface stays in English	일본어 글꼴이 설치되어 있지 않아 인터페이스가 영어로 유지됩니다
 	No markers. Press M to add one.	마커 없음. M을 눌러 추가합니다.
-	No matching captions.	일치하는 자막 없음.
 	No matching commands	일치하는 명령 없음
 	No model credits were built into this copy.	이 사본에 모델 크레딧이 포함되지 않았습니다.
 	No Motion	모션 없음
@@ -2147,8 +2105,6 @@
 	Opacity 100 → 0 % over the last second	마지막 1초 동안 불투명도 100 → 0 %
 	Open	열기
 	Open a sequence to export	내보낼 시퀀스를 여세요
-	Open a sequence to see its transcript	기록을 보려면 시퀀스를 여세요
-	Open a sequence to work with captions	자막 작업을 하려면 시퀀스를 여세요
 	Open Air	야외
 	Open Bin	빈 열기
 	Open Demo Project	데모 프로젝트 열기
@@ -2435,7 +2391,6 @@
 	Rec. 601	Rec. 601
 	Rec. 709	Rec. 709
 	Recent Directories	최근 디렉터리
-	Recognize when different speakers are talking	화자 구분
 	Reconnect Full Resolution Media…	전체 해상도 미디어 다시 연결…
 	Record	녹화
 	Record (voice-over on the record-enabled track)	녹음(녹음 활성 트랙에 내레이션)
@@ -2501,14 +2456,12 @@
 	Remove Attributes…	특성 제거…
 	Remove Audio from AV Clip	AV 클립에서 오디오 제거
 	Remove Effect	효과 제거
-	Remove Filler Words	군더더기 말 제거
 	Remove filler words	군말 제거
 	Remove Fringe	가장자리 색 번짐 제거
 	Remove from Favorites	즐겨찾기에서 제거
 	Remove from favorites	즐겨찾기에서 제거
 	Remove keyframe	키프레임 제거
 	Remove Media Cache Files	미디어 캐시 파일 제거
-	Remove Pauses	일시 정지 구간 제거
 	Remove Row	행 제거
 	Remove Send	전송 제거
 	Remove Unused	사용하지 않는 항목 제거
@@ -2550,7 +2503,6 @@
 	Responsive Design - Time	반응형 디자인 - 시간
 	Restore	복원
 	Restore Arrangement	배열 복원
-	Restore Captions from Source Clip	소스 클립에서 자막 복원
 	Restore Frame	프레임 복원
 	Restore open sequences when opening projects	프로젝트 열 때 열린 시퀀스 복원
 	Restore Original	원래대로 복원
@@ -2813,9 +2765,7 @@
 	Shot/Take:	샷/테이크:
 	Show	표시
 	Show "Project:" and "Bin:" in Project panel tab	프로젝트 패널 탭에 "프로젝트:" 및 "빈:" 표시
-	Show Active Caption Tracks Only	활성 자막 트랙만 표시
 	Show All	모두 표시
-	Show All Caption Tracks	모든 자막 트랙 표시
 	Show All Marker Colors	모든 마커 색상 표시
 	Show Audio Waveform	오디오 파형 표시
 	Show Clip Mismatch Warning dialog	클립 불일치 경고 대화 상자 표시
@@ -2838,7 +2788,6 @@
 	Show Open Dialog	열기 대화 상자 표시
 	Show or hide {color} markers	{color} 마커 표시/숨기기
 	Show Previous Screen	이전 화면 표시
-	Show Program Transcript	프로그램 대본 표시
 	Show Project Load Error Dialog	프로젝트 로드 오류 대화 상자 표시
 	Show Rich Tool Tips	상세 도구 설명 표시
 	Show Role	직함 표시
@@ -2948,13 +2897,9 @@
 	Source:	소스:
 	Spacer	스페이서
 	Spanish	스페인어
-	Speaker	화자
 	Speaker Angle	스피커 각도
-	Speaker Labeling	화자 레이블 지정
 	Special	특수
 	Special Effects	특수 효과
-	Speech model	음성 모델
-	Speech-to-text turns the dialogue into editable text.	음성 인식으로 대화를 편집 가능한 텍스트로 변환합니다.
 	Speed	속도
 	Speed {n}%	속도 {n}%
 	Speed/Duration…	속도/지속 시간…
@@ -2968,8 +2913,6 @@
 	Spin Motion	회전 동작
 	Split	분할
 	Split (Legacy)	분할(레거시)
-	Split Caption	자막 분할
-	Split caption at playhead	재생 헤드에서 자막 분할
 	Spotlight	스포트라이트
 	Spread	확산
 	Spring Motion	스프링 동작
@@ -3069,7 +3012,6 @@
 	Subclip End	하위 클립 끝
 	Subclip Start	하위 클립 시작
 	Subclip: {name}	하위 클립: {name}
-	SubRip Subtitle (.srt)	SubRip 자막(.srt)
 	Subspace Warp	하위 공간 왜곡
 	Subtitle	부제
 	Subtract	빼기
@@ -3120,7 +3062,7 @@
 	Template Properties	템플릿 속성
 	Temporal Interpolation	시간 보간
 	Text	텍스트
-	Text (graphics and captions)	텍스트(그래픽 및 자막)
+	Text (graphics)	텍스트(그래픽 및 자막)
 	Text Animator	텍스트 애니메이터
 	Text Box Height	텍스트 상자 높이
 	Text Box Width	텍스트 상자 너비
@@ -3128,16 +3070,13 @@
 	Text Layer Type	텍스트 레이어 유형
 	Text Properties	텍스트 속성
 	Text Styling	텍스트 스타일
-	Text to Speech	텍스트 음성 변환
 	TextPanel	텍스트 패널
 	The default graphics are used from the next start.	다음 시작부터 기본 그래픽을 사용합니다.
 	The language changed but could not be saved: {e}	언어가 변경되었으나 저장하지 못했습니다: {e}
 	The media cache holds render previews of unsaved projects and other files FilmCraft can recreate. Deleting them is always safe; FilmCraft rebuilds them as needed.	미디어 캐시에는 저장되지 않은 프로젝트의 렌더 미리 보기 등 FilmCraft가 다시 만들 수 있는 파일이 있습니다. 삭제해도 안전하며 필요 시 FilmCraft가 다시 생성합니다.
 	The project had not been saved yet.	프로젝트가 아직 저장되지 않았습니다.
 	The selected clips have different audio types. Assign one type to edit them together.	선택한 클립의 오디오 유형이 다릅니다. 함께 편집하려면 한 유형을 지정하세요.
-	The sequence has no caption track.	시퀀스에 자막 트랙이 없습니다.
 	Thickness	두께
-	This build has no speech-to-text; import a transcript with transcript.set.	이 빌드에는 음성 인식이 없습니다. transcript.set으로 기록을 가져오세요.
 	Thr	임계
 	Threshold	임계값
 	Thumbnail controls for all pointing devices	모든 포인팅 장치용 썸네일 컨트롤
@@ -3234,14 +3173,6 @@
 	Tracks	트랙
 	tracks	트랙
 	Transcode	트랜스코딩
-	Transcribe	기록
-	Transcribe Sequence	시퀀스 텍스트 변환
-	Transcribe sequence	시퀀스 기록
-	Transcribe Sequence…	시퀀스 받아쓰기…
-	Transcribe…	받아쓰기…
-	Transcript	대본
-	Transcription	트랜스크립션
-	Transcription preferences	트랜스크립션 설정
 	Transform	변형
 	Transformers	트랜스포머
 	Transience	트랜지언스
@@ -3318,7 +3249,6 @@
 	Update Metadata	메타데이터 업데이트
 	Update Metadata…	메타데이터 업데이트…
 	Update timeline dynamically during ripple edits.	리플 편집 중 타임라인 동적 업데이트.
-	Upgrade Caption to Graphic	자막을 그래픽으로 변환
 	Upgrade to Source Graphic	소스 그래픽으로 변환
 	Upper First	위쪽 필드 먼저
 	Upper Frequency	상한 주파수
@@ -3480,9 +3410,6 @@
 	When Opening a Project	프로젝트 열 때
 	Whip	휩
 	Whip (Legacy)	휩(레거시)
-	Whisper base (balanced)	Whisper base(균형)
-	Whisper small (most accurate)	Whisper small(가장 정확)
-	Whisper tiny (fastest)	Whisper tiny(가장 빠름)
 	White	흰색
 	White Input Level	흰색 입력 레벨
 	White Is High	흰색이 높음

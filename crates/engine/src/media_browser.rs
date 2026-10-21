@@ -59,14 +59,8 @@ pub struct Volume {
 }
 
 /// File types shown (the "File Types Displayed" menu).
-pub const FILE_TYPES: [(&str, &str); 6] = [
-    ("all", "All Supported Files"),
-    ("video", "Video Files"),
-    ("audio", "Audio Files"),
-    ("image", "Still Images"),
-    ("project", "Projects and Interchange"),
-    ("caption", "Captions"),
-];
+pub const FILE_TYPES: [(&str, &str); 5] =
+    [("all", "All Supported Files"), ("video", "Video Files"), ("audio", "Audio Files"), ("image", "Still Images"), ("project", "Projects and Interchange")];
 
 /// Columns the list view can show (Edit Columns…), in default order.
 pub const ALL_COLUMNS: [&str; 10] =
@@ -76,7 +70,6 @@ pub const DEFAULT_COLUMNS: [&str; 5] = ["Name", "Frame Rate", "Media Duration", 
 /// Project and interchange files the browser can import. Avid Log Exchange (`.ale`) is left out:
 /// FilmCraft writes it (File ▸ Export) but, like Premiere, does not read it (#1292).
 const PROJECT_EXTENSIONS: [&str; 5] = ["fcproj", "edl", "xml", "fcpxml", "otio"];
-const CAPTION_EXTENSIONS: [&str; 3] = ["srt", "vtt", "scc"];
 const RECENT_MAX: usize = 10;
 
 /// Preferences of the Media Browser (`Preferences::media_browser`).
@@ -135,7 +128,7 @@ pub struct Entry {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
-    /// `folder` | `video` | `audio` | `image` | `project` | `caption`.
+    /// `folder` | `video` | `audio` | `image` | `project`.
     pub kind: &'static str,
     pub size: Option<u64>,
     pub modified: Option<u64>,
@@ -158,8 +151,6 @@ pub fn kind_of(name: &str) -> Option<&'static str> {
         Some("image")
     } else if PROJECT_EXTENSIONS.contains(&e.as_str()) {
         Some("project")
-    } else if CAPTION_EXTENSIONS.contains(&e.as_str()) {
-        Some("caption")
     } else {
         None
     }
@@ -169,7 +160,7 @@ pub fn kind_of(name: &str) -> Option<&'static str> {
 pub fn passes(filter: &str, kind: &str, name: &str) -> bool {
     match filter {
         "" | "all" => true,
-        "video" | "audio" | "image" | "project" | "caption" => kind == filter,
+        "video" | "audio" | "image" | "project" => kind == filter,
         ext => ext_of(name) == ext.trim_start_matches('.').to_ascii_lowercase(),
     }
 }
@@ -181,7 +172,6 @@ pub fn extensions() -> Vec<&'static str> {
         .chain(waltcut_media::AUDIO_EXTENSIONS)
         .chain(waltcut_media::STILL_EXTENSIONS)
         .chain(&PROJECT_EXTENSIONS)
-        .chain(&CAPTION_EXTENSIONS)
         .copied()
         .collect()
 }
@@ -674,7 +664,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
         c(
             "mediaBrowser.settings",
             "Media Browser Settings",
-            r#"{"fileTypes":"all|video|audio|image|project|caption|<ext>"?,"view":"list|thumbnails"?,"columns":[str]?,"importAsImageSequence":bool?,"hoverScrub":bool?,"thumbnailSize":f32?}"#,
+            r#"{"fileTypes":"all|video|audio|image|project|<ext>"?,"view":"list|thumbnails"?,"columns":[str]?,"importAsImageSequence":bool?,"hoverScrub":bool?,"thumbnailSize":f32?}"#,
             settings,
         ),
         c("mediaBrowser.import", "Import", r#"{"paths":[str]?,"bin":binId?,"imageSequence":bool?}"#, import),

@@ -41,9 +41,7 @@ fn frame_export_selects_the_correct_monitor_time_and_original_media() {
     let preview = waltcut_render::render_item(&s.project, item, s.state.source_playhead, 1.0, &preview_provider).unwrap().to_rgba8();
     assert_ne!(preview, expected_source, "the preview really uses the red proxy");
     let seq = s.state.active_sequence.unwrap();
-    let expected_program =
-        waltcut_render::render_sequence(&s.project, seq, s.playhead(), waltcut_render::RenderOptions { captions: true, ..Default::default() }, &provider)
-            .to_rgba8();
+    let expected_program = waltcut_render::render_sequence(&s.project, seq, s.playhead(), waltcut_render::RenderOptions::default(), &provider).to_rgba8();
     assert_ne!(expected_source, expected_program);
     for (target, time, expected) in [("source", s.state.source_playhead, expected_source), ("program", s.playhead(), expected_program)] {
         let path = dir.join(format!("{target}.png"));

@@ -20,7 +20,7 @@ pub fn scope_signal(s: &Session, t: Tick, scale: f32, hdr: bool) -> Option<Signa
         let img = waltcut_render::render_sequence(&s.project, seq, t, opts, &provider);
         return Some(Signal::from_rgba_f32_with(img.w, img.h, &img.px, scopes::MAX_W, scopes::MAX_H, scopes::linear_to_pq));
     }
-    let opts = waltcut_render::RenderOptions { scale, captions: true, ..Default::default() };
+    let opts = waltcut_render::RenderOptions { scale, ..Default::default() };
     let img = waltcut_render::render_sequence(&s.project, seq, t, opts, &provider);
     Some(Signal::from_rgba8(img.w, img.h, &img.over_black_rgba8()))
 }

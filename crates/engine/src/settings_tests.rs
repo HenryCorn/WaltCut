@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use serde_json::{Value, json};
-use waltcut_project::{ItemId, ItemKind, Label, ParamValue};
+use waltcut_project::{ItemId, Label, ParamValue};
 use waltcut_time::{FrameRate, Tick};
 
 use crate::Session;
@@ -95,7 +95,6 @@ fn categories_follow_premiere_order() {
             "graphics",
             "labels",
             "media",
-            "mediaAnalysis",
             "mediaCache",
             "memory",
             "playback",
@@ -111,7 +110,7 @@ fn every_schema_key_exists_with_a_valid_default() {
     let p = Preferences::default();
     let keys = p.keys();
     let fields = settings::fields();
-    assert!(fields.len() > 140, "{} fields", fields.len());
+    assert!(fields.len() > 120, "{} fields", fields.len());
     let mut seen = std::collections::HashSet::new();
     for (cat, f) in fields {
         assert!(seen.insert(f.key), "duplicate {}", f.key);
@@ -515,64 +514,6 @@ fn graphics_text_uses_the_text_settings() {
 }
 
 #[test]
-fn auto_transcribe_on_import_and_transcription_defaults() {
-    use waltcut_project::{Transcript, Word};
-    let dir = tmp_dir("prefs-transcribe");
-    let mov = dir.join("talk.mov");
-    crate::media_test_util::make_movie(&mov, waltcut_media::DemoScene::OceanSunset, 64, 36, 24);
-    let mut s = Session::default();
-    let mut t = Transcript { language: "en".into(), ..Default::default() };
-    t.words.push(Word::new("hello", Tick::ZERO, Tick::from_seconds_f64(0.4)));
-    s.transcriber = Some(std::sync::Arc::new(waltcut_speech::FixedTranscriber { transcript: t, id: "fixed".into() }));
-    // off by default
-    let r = s.execute("file.import", json!({"paths": [mov.to_string_lossy()]})).unwrap();
-    let a = ItemId(r["items"][0].as_u64().unwrap());
-    assert!(!s.project.transcripts.contains_key(&a));
-    // on, but only for clips in sequences (Premiere's default scope): still nothing on import
-    set(&mut s, "mediaAnalysis.autoTranscribe", json!(true));
-    let r = s.execute("file.import", json!({"paths": [mov.to_string_lossy()]})).unwrap();
-    assert!(!s.project.transcripts.contains_key(&ItemId(r["items"][0].as_u64().unwrap())));
-    set(&mut s, "mediaAnalysis.autoTranscribeScope", json!("allImported"));
-    let r = s.execute("file.import", json!({"paths": [mov.to_string_lossy()]})).unwrap();
-    let c = ItemId(r["items"][0].as_u64().unwrap());
-    assert_eq!(s.project.transcripts[&c].words[0].text, "hello");
-    assert!(matches!(s.project.item(c).unwrap().kind, ItemKind::Media(_)));
-    // the model setting is validated against the catalogue
-    assert!(s.execute("prefs.set", json!({"key": "mediaAnalysis.whisperModel", "value": "whisper-huge"})).is_err());
-    set(&mut s, "mediaAnalysis.whisperModel", json!("whisper-tiny"));
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-/// In a build without speech-to-text (the release builds), the transcript commands that can't
-/// run say so through `enabled` (#97, #98), and an import with auto-transcribe on reports why it
-/// made no transcript instead of saying nothing (#89).
-#[test]
-fn transcription_without_speech_to_text_says_so() {
-    let mut s = Session::default();
-    assert_eq!(s.is_enabled("transcript.generate"), crate::transcript::speech_available());
-    assert_eq!(s.is_enabled("transcript.downloadModel"), cfg!(feature = "speech-download"));
-    if crate::transcript::speech_available() {
-        return;
-    }
-    let dir = tmp_dir("prefs-no-speech");
-    let mov = dir.join("talk.mov");
-    crate::media_test_util::make_movie(&mov, waltcut_media::DemoScene::OceanSunset, 64, 36, 24);
-    // off: an import reports nothing
-    let r = s.execute("file.import", json!({"paths": [mov.to_string_lossy()]})).unwrap();
-    assert_eq!(r["errors"], json!([]));
-    set(&mut s, "mediaAnalysis.autoTranscribe", json!(true));
-    set(&mut s, "mediaAnalysis.autoTranscribeScope", json!("allImported"));
-    let r = s.execute("file.import", json!({"paths": [mov.to_string_lossy()]})).unwrap();
-    let errors = r["errors"].as_array().unwrap();
-    assert!(errors.iter().any(|e| e.as_str().is_some_and(|e| e.starts_with("transcription:") && e.contains("not available in this build"))), "{errors:?}");
-    assert!(!s.project.transcripts.contains_key(&ItemId(r["items"][0].as_u64().unwrap())));
-    // with a transcriber installed (a host's), the command is enabled again
-    s.transcriber = Some(std::sync::Arc::new(waltcut_speech::FixedTranscriber { transcript: Default::default(), id: "fixed".into() }));
-    assert!(s.is_enabled("transcript.generate"));
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn hardware_decoding_setting_drives_the_decoder_switch() {
     let mut s = Session::default();
     assert_eq!(s.prefs.playback.hardware_decoding, "auto", "Auto by default");
@@ -844,7 +785,6 @@ fn builtin_label_presets_are_complete_and_distinct() {
         (d.sequence, "Sequence"),
         (d.dynamic_link, "Visual Effects"),
         (d.bin, "Bin"),
-        (d.captions, "Bin"),
     ];
     for (label, role) in named {
         assert_eq!(labels.name(label), role);

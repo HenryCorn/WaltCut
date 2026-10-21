@@ -65,7 +65,6 @@ fn meta(command: &str) -> Option<(&'static str, &'static str, &'static str)> {
         "clip.sceneEditDetection" => (tl!("Scene Edit Detection"), "sceneDetect", tl!("Analyze")),
         "sequence.normalizeMixTrack" => (tl!("Normalize Mix Track"), "normalizeMix", tl!("OK")),
         "sequence.simplify" => (tl!("Simplify Sequence"), "simplify", tl!("Simplify")),
-        "sequence.transcribe" => (tl!("Transcribe Sequence"), "transcribe", tl!("Transcribe")),
         "file.saveAsTemplate" => (tl!("Save as Template"), "saveTemplate", tl!("Save")),
         "markers.addFlashCue" => (tl!("Flash Cue Marker"), "flashCue", tl!("OK")),
         "help.systemCompatibilityReport" => (tl!("System Compatibility Report"), "systemReport", tl!("Close")),
@@ -89,7 +88,6 @@ fn dialog_command(id: &str) -> Option<&'static str> {
         "clip.sceneEditDetection" => "clip.sceneEditDetection",
         "sequence.normalizeMixTrack" => "sequence.normalizeMixTrack",
         "sequence.simplify" => "sequence.simplify",
-        "sequence.transcribe" => "sequence.transcribe",
         "file.saveAsTemplate" => "file.saveAsTemplate",
         "markers.addFlashCue" => "markers.addFlashCue",
         "file.newColorMatte" => "file.newColorMatte",
@@ -338,10 +336,6 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
                 json!({"name": name, "removeDisabled": true, "removeEmptyTracks": true, "closeGaps": false, "moveClipsDown": false, "removeVideoEffects": false, "removeAudioEffects": false, "removeText": false, "keep": "both"}),
                 Value::Null,
             )
-        }
-        "sequence.transcribe" => {
-            let tracks: Vec<String> = s.active_sequence().map(|q| (1..=q.audio_tracks.len()).map(|i| format!("A{i}")).collect()).unwrap_or_default();
-            (json!({"language": "auto", "track": "mix", "diarize": true}), json!({"tracks": tracks}))
         }
         "file.saveAsTemplate" => (json!({"name": s.project.name}), Value::Null),
         "markers.addFlashCue" => (json!({"name": "", "comment": ""}), Value::Null),
@@ -733,7 +727,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 check(ui, &mut elems, pre, p, "closeGaps", tl!("Gaps"));
                 check(ui, &mut elems, pre, p, "removeVideoEffects", tl!("Video effects"));
                 check(ui, &mut elems, pre, p, "removeAudioEffects", tl!("Audio effects"));
-                check(ui, &mut elems, pre, p, "removeText", tl!("Text (graphics and captions)"));
+                check(ui, &mut elems, pre, p, "removeText", tl!("Text (graphics)"));
                 ui.label(RichText::new(tl!("Clips")).strong());
                 check(ui, &mut elems, pre, p, "moveClipsDown", tl!("Move clips to the lowest track possible"));
                 radios(
@@ -745,22 +739,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                     tl!("Keep:"),
                     &[("both", tl!("Video and Audio")), ("video", tl!("Video Only")), ("audio", tl!("Audio Only"))],
                 );
-            }
-            "sequence.transcribe" => {
-                let langs = pairs(&["auto", "en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh", "nl", "ru"]);
-                combo(ui, &mut elems, "transcribe.language", tl!("Language:"), &mut p["language"], &langs);
-                let mut tracks: Vec<(String, String)> = vec![("mix".into(), tl!("Mix").into())];
-                tracks.extend(
-                    d.info["tracks"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default()
-                        .iter()
-                        .filter_map(|t| t.as_str())
-                        .map(|t| (t.to_string(), tlf!("Audio on track {t}", t))),
-                );
-                combo(ui, &mut elems, "transcribe.track", tl!("Audio analysis:"), &mut p["track"], &tracks);
-                check(ui, &mut elems, pre, p, "diarize", tl!("Recognize when different speakers are talking"));
             }
             "file.saveAsTemplate" => text(ui, &mut elems, pre, p, "name", tl!("Template Name:"), 240.0),
             "file.newColorMatte" => {
@@ -906,9 +884,6 @@ fn run(app: &mut FilmcraftApp, d: &ClipDialogDraft) -> Result<Option<String>, St
             let mut q = p.clone();
             if cmd == "markers.addFlashCue" && q["name"].as_str().is_some_and(str::is_empty) {
                 q.as_object_mut().map(|m| m.remove("name"));
-            }
-            if cmd == "sequence.transcribe" && q["language"] == "auto" {
-                q.as_object_mut().map(|m| m.remove("language"));
             }
             s.execute(cmd, q).map_err(|e| e.to_string())?;
             Ok(None)

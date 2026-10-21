@@ -17,7 +17,6 @@
 //! | `timeline.increaseVideoHeight` … `timeline.decreaseAudioHeight` | Increase / Decrease Video / Audio Tracks Height | Cmd+= / Cmd+- / Alt+= / Alt+- (Timeline) |
 //! | `timeline.nextScreen` / `timeline.prevScreen` | Show Next / Previous Screen | PageDown / PageUp (Timeline) |
 //! | `projectPanel.*` | Project panel: List / Icon / Toggle View, Hover Scrub, thumbnail size, Move / Extend Selection | (Project) |
-//! | `textPanel.*` | Text panel transcript: word / line / segment navigation and selection, Delete, Ripple Delete, Show Program Transcript | (Text) |
 //! | `graphics.beginTextEditing` | Begin Text Editing for a Graphic Layer | Cmd+Alt+' |
 //! | `help.filmcraftHelp` | Help (Premiere Help…) | F1 |
 //! | `app.quit` | Quit | Cmd+Q |
@@ -112,21 +111,6 @@ pub const COMMANDS: &[UiCommand] = &[
     uic!("projectPanel.saveArrangement", "Save Arrangement…", [], None),
     uic!("projectPanel.revealProject", "Reveal Project in Finder…", [], None),
     uic!("projectPanel.newPanel", "New Project Panel", ["Window"], None),
-    uic!("textPanel.prevWord", "Navigate to Previous Word", [], None),
-    uic!("textPanel.nextWord", "Navigate to Next Word", [], None),
-    uic!("textPanel.selectPrevWord", "Select to Previous Word", [], None),
-    uic!("textPanel.selectNextWord", "Select to Next Word", [], None),
-    uic!("textPanel.prevLine", "Navigate to Previous Line", [], None),
-    uic!("textPanel.nextLine", "Navigate to Next Line", [], None),
-    uic!("textPanel.selectPrevLine", "Select to Previous Line", [], None),
-    uic!("textPanel.selectNextLine", "Select to Next Line", [], None),
-    uic!("textPanel.segmentStart", "Navigate to Start of Segment", [], None),
-    uic!("textPanel.segmentEnd", "Navigate to End of Segment", [], None),
-    uic!("textPanel.selectToSegmentStart", "Select to Segment Start", [], None),
-    uic!("textPanel.selectToSegmentEnd", "Select to Segment End", [], None),
-    uic!("textPanel.delete", "Delete", [], None),
-    uic!("textPanel.rippleDelete", "Ripple Delete", [], None),
-    uic!("textPanel.showProgramTranscript", "Show Program Transcript", [], None),
     uic!("graphics.beginTextEditing", "Begin Text Editing for a Graphic Layer", [], Some("Cmd+Alt+'")),
     uic!("help.filmcraftHelp", "FilmCraft Help…", ["Help"], Some("F1")),
     uic!("app.quit", "Quit FilmCraft", [], Some("Cmd+Q")),
@@ -221,7 +205,6 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
             Some(r) => r,
             None => project_panel(app, &id["projectPanel.".len()..]),
         },
-        _ if id.starts_with("textPanel.") => text_panel(app, &id["textPanel.".len()..]),
         _ => return None,
     };
     if let Err(e) = &r {
@@ -462,93 +445,4 @@ fn project_panel(app: &mut FilmcraftApp, op: &str) -> Result<Value, String> {
     let ids: Vec<u64> = new_sel.iter().map(|i| i.0).collect();
     app.session.execute("project.select", json!({"items": ids})).map_err(|e| e.to_string())?;
     Ok(json!({"items": ids}))
-}
-
-// ------------------------------------------------------------------ Text panel (transcript)
-
-fn text_panel(app: &mut FilmcraftApp, op: &str) -> Result<Value, String> {
-    if op == "showProgramTranscript" {
-        app.show_panel(PanelKind::Text);
-        app.ui.text_tab = "Transcript".into();
-        return Ok(json!({"tab": "Transcript"}));
-    }
-    if app.ui.text_tab != "Transcript" {
-        // the Captions tab: Delete / Ripple Delete act on the selected captions
-        return match op {
-            "delete" => app.session.execute("edit.clear", json!({})).map_err(|e| e.to_string()),
-            "rippleDelete" => app.session.execute("edit.rippleDelete", json!({})).map_err(|e| e.to_string()),
-            _ => Ok(Value::Null),
-        };
-    }
-    let words = waltcut_engine::transcript::sequence_words(&app.session);
-    if words.is_empty() {
-        return Err("the sequence has no transcript".into());
-    }
-    let n = words.len();
-    let paras = waltcut_edit::transcript::paragraphs(&words, waltcut_time::Tick::from_seconds_f64(1.5));
-    let para_of = |i: usize| paras.iter().position(|p| p.contains(&i)).unwrap_or(0);
-    // a selection left over from a longer transcript (e.g. after `transcript.extract` over the control channel) counts as none, as when drawing
-    let (anchor, cur) = app.ui.transcript_sel.filter(|(a, b)| *a < n && *b < n).unwrap_or_else(|| {
-        let i = waltcut_edit::transcript::word_at(&words, app.session.playhead()).unwrap_or(0);
-        (i, i)
-    });
-    let line = |i: usize, d: i64| -> usize {
-        let p = para_of(i) as i64 + d;
-        if p < 0 { 0 } else { paras.get(p as usize).map_or(n - 1, |r| r.start) }
-    };
-    let (to, extend) = match op {
-        "prevWord" => (cur.saturating_sub(1), false),
-        "nextWord" => ((cur + 1).min(n - 1), false),
-        "selectPrevWord" => (cur.saturating_sub(1), true),
-        "selectNextWord" => ((cur + 1).min(n - 1), true),
-        "prevLine" => (line(cur, -1), false),
-        "nextLine" => (line(cur, 1), false),
-        "selectPrevLine" => (line(cur, -1), true),
-        "selectNextLine" => (line(cur, 1), true),
-        "segmentStart" => (paras[para_of(cur)].start, false),
-        "segmentEnd" => (paras[para_of(cur)].end - 1, false),
-        "selectToSegmentStart" => (paras[para_of(cur)].start, true),
-        "selectToSegmentEnd" => (paras[para_of(cur)].end - 1, true),
-        "delete" | "rippleDelete" => {
-            let Some((a, b)) = app.ui.transcript_sel else { return Err("select text in the transcript".into()) };
-            let cmd = if op == "delete" { "transcript.lift" } else { "transcript.extract" };
-            let r = app.session.execute(cmd, json!({"from": a.min(b), "to": a.max(b)})).map_err(|e| e.to_string())?;
-            app.ui.transcript_sel = None;
-            return Ok(r);
-        }
-        _ => return Err(format!("unknown Text panel command `{op}`")),
-    };
-    app.ui.transcript_sel = Some(if extend { (anchor, to) } else { (to, to) });
-    // the playhead follows the caret
-    app.session.set_playhead(words[to].start);
-    Ok(json!({"selection": [anchor.min(to), anchor.max(to)], "word": to}))
-}
-
-#[cfg(test)]
-mod transcript_selection_tests {
-    use serde_json::{Value, json};
-
-    #[test]
-    fn prev_word_after_the_transcript_shrank_under_the_selection_does_not_panic() {
-        let mut session = waltcut_engine::Session::default();
-        session.execute("file.openDemoProject", json!({})).unwrap();
-        let a = session.active_sequence().unwrap().audio_tracks[0].items[0].clone();
-        let tk = |s: f64| a.source_in.0 + (s * waltcut_time::TICKS_PER_SECOND as f64) as i64;
-        let words: Vec<Value> = ["one", "two", "three", "four"]
-            .iter()
-            .enumerate()
-            .map(|(i, w)| json!({"text": w, "start": tk(0.5 + i as f64 * 0.5), "end": tk(0.9 + i as f64 * 0.5)}))
-            .collect();
-        session.execute("transcript.set", json!({"item": a.item.0, "transcript": {"language": "en", "words": words}})).unwrap();
-        let mut app = crate::FilmcraftApp::new(session);
-        app.ui.text_tab = "Transcript".into();
-        app.ui.transcript_sel = Some((3, 3));
-        // the transcript shrinks behind the panel's back, as with `transcript.extract` over the control channel
-        app.session.execute("transcript.extract", json!({"from": 0, "to": 1})).unwrap();
-        assert_eq!(waltcut_engine::transcript::sequence_words(&app.session).len(), 2);
-        let r = super::text_panel(&mut app, "prevWord").unwrap();
-        let (sa, sb) = app.ui.transcript_sel.unwrap();
-        assert!(sa < 2 && sb < 2, "selection {sa}..{sb} outside the 2-word transcript");
-        assert_eq!(r["word"], json!(sb));
-    }
 }

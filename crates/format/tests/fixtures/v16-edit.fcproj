@@ -388,8 +388,7 @@
               "solo_safe": false,
               "input_map": "Stereo"
             },
-            "submix_tracks": [],
-            "caption_tracks": []
+            "submix_tracks": []
           }
         },
         "metadata": {},

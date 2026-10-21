@@ -1,4 +1,4 @@
-//! Escape during a drag-and-drop abandons it (#580): moving clips and captions on the Timeline,
+//! Escape during a drag-and-drop abandons it (#580): moving clips on the Timeline,
 //! dragging an item out of the Project panel, moving a Freeform card and dragging an effect onto a
 //! clip. Each test
 //! also makes the same drag without Escape, so it shows the drag would otherwise have done something.
@@ -112,22 +112,6 @@ fn escape_puts_a_moved_timeline_clip_back() {
     assert!(d.harness.state().session.state.selection.contains(&clip), "the clip is still selected (with its linked audio)");
     d.drag(from, to, false);
     assert_ne!(d.project(), before, "without Escape the same drag moves the clip");
-}
-
-#[test]
-fn escape_puts_a_moved_caption_back() {
-    let mut d = Driver::demo();
-    let id =
-        d.ok("engine.execute", json!({"command": "captions.add", "params": {"seconds": 2.0, "durationSeconds": 2.0}}))["caption"].as_u64().expect("caption id");
-    d.frames(4);
-    let from = centre(d.rect(&format!("timeline.caption.{id}")));
-    let to = from + egui::vec2(60.0, 0.0);
-    let (before, undo) = (d.project(), d.undo_len());
-    d.drag(from, to, true);
-    assert_eq!(d.project(), before, "the caption stayed where it was");
-    assert_eq!(d.undo_len(), undo);
-    d.drag(from, to, false);
-    assert_ne!(d.project(), before, "without Escape the same drag moves the caption");
 }
 
 #[test]

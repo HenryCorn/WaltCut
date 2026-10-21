@@ -13,7 +13,6 @@
 pub mod aaf_omf;
 pub mod ai;
 pub mod autosave;
-pub mod captions;
 pub mod clip_ops;
 pub mod color;
 pub mod commands;
@@ -34,7 +33,6 @@ pub mod media_pool;
 pub mod media_watch;
 pub mod mixer;
 pub mod multicam;
-pub mod narration;
 pub mod panels;
 pub mod paste_media;
 pub mod perf;
@@ -55,7 +53,6 @@ pub mod shortcut_presets;
 pub mod shortcuts;
 pub mod source_monitor;
 pub mod sync;
-pub mod transcript;
 pub mod trim;
 pub mod voiceover;
 
@@ -303,9 +300,6 @@ pub struct EditorState {
     /// Trim Monitor Out/In shift counters for the selected edit point.
     #[serde(default)]
     pub trim_shift: trim::TrimShift,
-    /// Selected captions (caption tracks / Captions panel).
-    #[serde(default)]
-    pub caption_selection: Vec<ClipId>,
     /// Selected transitions (clicked in the Timeline): Effect Controls shows one, Delete removes
     /// them. Selecting clips clears it and selecting transitions clears the clip selection.
     #[serde(default)]
@@ -409,10 +403,6 @@ pub struct Session {
     pub mcrec: multicam::Recorder,
     /// Voice-over recording: the input device and the take in progress.
     pub voiceover: voiceover::VoiceOver,
-    /// The last `tts.preview` result, for the host to play (Text to Speech ▸ Preview).
-    pub tts_preview: Option<Arc<waltcut_tts::Audio>>,
-    /// Synthesized narrations (`tts.render` fills it from a background job).
-    pub tts_cache: narration::SynthCache,
     /// Dynamic (J/K/L) trimming and trim-mode loop playback in progress.
     pub trim_play: trim::TrimPlayback,
     /// Keyboard shortcuts (active bindings, presets; `shortcuts.*` commands).
@@ -437,9 +427,6 @@ pub struct Session {
     pub export_queue: export_tools::ExportQueue,
     /// Exports run a batch at a time by [`Session::pump_jobs`] (hosts without threads: web).
     pub stepped: Vec<SteppedJob>,
-    /// Speech recogniser for `transcript.generate` (None = the Whisper model named by the command,
-    /// feature `whisper`). Hosts and tests install one here.
-    pub transcriber: Option<Arc<dyn waltcut_speech::Transcriber>>,
     /// The Events panel log: failed commands, job results, auto-save errors, messages.
     pub log: panels::EventLog,
     /// Media Browser navigation (directory, back / forward history, selected files).
@@ -524,8 +511,6 @@ impl Session {
             mixrec: Default::default(),
             mcrec: Default::default(),
             voiceover: Default::default(),
-            tts_preview: None,
-            tts_cache: Default::default(),
             trim_play: Default::default(),
             shortcuts: shortcuts::Shortcuts::new(),
             offline: Default::default(),
@@ -538,7 +523,6 @@ impl Session {
             export_presets: Default::default(),
             export_queue: Default::default(),
             stepped: Vec::new(),
-            transcriber: None,
             log: Default::default(),
             browser: Default::default(),
             exec_depth: 0,
@@ -1036,10 +1020,8 @@ impl Session {
         source_monitor::track_history(self);
         if let Some(seq) = self.state.active_sequence.and_then(|s| p.sequence(s)) {
             self.state.selection.retain(|c| seq.find_item(*c).is_some());
-            self.state.caption_selection.retain(|c| seq.find_caption(*c).is_some());
         } else {
             self.state.selection.clear();
-            self.state.caption_selection.clear();
         }
         self.state.project_selection.retain(|i| p.item(*i).is_some());
         self.drop_stale_gap();
@@ -1157,7 +1139,7 @@ impl Session {
     fn render_program_with(&self, scale: f32, t: Tick, provider: &dyn waltcut_render::SourceProvider) -> Result<waltcut_render::Image> {
         let seq = self.renderable_sequence(scale)?;
         let t = self.sequence_rate().snap(t.max(Tick::ZERO));
-        let opts = waltcut_render::RenderOptions { scale, captions: true, ..Default::default() };
+        let opts = waltcut_render::RenderOptions { scale, ..Default::default() };
         Ok(waltcut_render::render_sequence(&self.project, seq, t, opts, provider))
     }
 
@@ -1268,7 +1250,6 @@ mod mixer_tests;
 #[cfg(test)]
 mod multicam_tests;
 #[cfg(test)]
-mod narration_tests;
 #[cfg(test)]
 mod nest_editing_tests;
 #[cfg(test)]
@@ -1326,7 +1307,6 @@ mod timeline_move_tests;
 #[cfg(test)]
 mod track_params_tests;
 #[cfg(test)]
-mod transcript_tests;
 #[cfg(test)]
 mod trim_tests;
 #[cfg(test)]

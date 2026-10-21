@@ -17,7 +17,6 @@
 //! | `file.reveal` | Project panel ▸ Reveal in Finder / Show in Explorer: the frontend reveals the media file |
 //! | `clip.editOffline` | Clip ▸ Edit Offline… |
 //! | `clip.sourceSettings` | Clip ▸ Source Settings… |
-//! | `clip.restoreCaptionsFromSource` | Clip ▸ Restore Captions from Source Clip (always disabled: no embedded caption reader) |
 //! | `clip.updateMetadata` | Clip ▸ Update Metadata… (XMP sidecars) |
 //! | `clip.generateAudioWaveform` | Clip ▸ Generate Audio Waveform (the frontend rebuilds its peaks) |
 //! | `clip.automateToSequence` | Clip ▸ Automate to Sequence… |
@@ -177,9 +176,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             edit_offline,
         ),
         query("clip.sourceSettings", "Source Settings…", &["Clip"], None, r#"{"item":id?}"#, has_media_selection, source_settings),
-        spec("clip.restoreCaptionsFromSource", "Restore Captions from Source Clip", &["Clip"], None, "{}", no_embedded_captions, |_, _| {
-            Err(EngineError::Other(NO_CAPTIONS.into()))
-        }),
         spec("clip.updateMetadata", "Update Metadata…", &["Clip"], None, r#"{"items":[id]?}"#, has_file_selection, update_metadata),
         query("clip.generateAudioWaveform", "Generate Audio Waveform", &["Clip"], None, r#"{"items":[id]?}"#, has_audio_selection, generate_waveform),
         spec(
@@ -245,14 +241,10 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         (At::After("edit.consolidateDuplicates"), vec!["edit.editOriginal"]),
         (At::After("clip.editSubclip"), vec!["clip.editOffline", "clip.sourceSettings"]),
         (At::After("clip.speedDuration"), vec!["clip.sceneEditDetection"]),
-        (
-            At::After("clip.replaceFromBin"),
-            vec!["clip.restoreCaptionsFromSource", "clip.updateMetadata", "clip.generateAudioWaveform", "clip.automateToSequence"],
-        ),
+        (At::After("clip.replaceFromBin"), vec!["clip.updateMetadata", "clip.generateAudioWaveform", "clip.automateToSequence"]),
         (At::After("sequence.applyAudioTransition"), vec!["trim.applyDefaultTransition"]),
         (At::After("sequence.showThroughEdits"), vec!["sequence.normalizeMixTrack"]),
-        (At::After("sequence.makeSubsequence"), vec!["sequence.transcribe", "sequence.simplify"]),
-        (At::After("captions.showAll"), vec!["captions.showActiveOnly"]),
+        (At::After("sequence.makeSubsequence"), vec!["sequence.simplify"]),
         (At::After("markers.addChapter"), vec!["markers.addFlashCue"]),
         (At::Before("file.close"), vec!["file.open"]),
         (At::After("media.makeOffline"), vec!["file.importFromMediaBrowser", "file.import", "file.importImageSequence"]),
@@ -278,7 +270,7 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
 }
 
 /// The Sequence menu in Premiere's order (submenu items where their submenu goes).
-const SEQUENCE_MENU: [&str; 34] = [
+const SEQUENCE_MENU: [&str; 33] = [
     "sequence.settings",
     "sequence.renderEffectsInToOut",
     "sequence.renderInToOut",
@@ -307,7 +299,6 @@ const SEQUENCE_MENU: [&str; 34] = [
     "sequence.showThroughEdits",
     "sequence.normalizeMixTrack",
     "sequence.makeSubsequence",
-    "sequence.transcribe",
     "sequence.simplify",
     "sequence.addTracks",
     "sequence.deleteTracks",
@@ -334,12 +325,6 @@ fn reorder(v: &mut Vec<CommandSpec>, ids: &[&str]) {
 
 fn only_one_project(_: &Session) -> std::result::Result<(), String> {
     Err("only one project is open".into())
-}
-
-const NO_CAPTIONS: &str = "the clip's media has no embedded captions FilmCraft can read (embedded CEA-608/708 caption streams are not supported yet)";
-
-fn no_embedded_captions(_: &Session) -> std::result::Result<(), String> {
-    Err(NO_CAPTIONS.into())
 }
 
 fn has_find(s: &Session) -> std::result::Result<(), String> {
@@ -784,8 +769,6 @@ pub fn project_subset(p: &Project, keep: &BTreeSet<ItemId>) -> Project {
     let mut out = p.clone();
     out.items.retain(|id, _| keep.contains(id));
     prune(&mut out.root, keep);
-    out.transcripts.retain(|id, _| keep.contains(id));
-    out.narrations.retain(|id, _| keep.contains(id));
     out.search_bins.clear();
     out
 }
@@ -1405,7 +1388,6 @@ pub fn system_report() -> Value {
         "decoders": ["H.264 (AVC)", "H.265 (HEVC) Main / Main 10", "VP8", "VP9", "AV1 Main", "Apple ProRes", "Avid DNxHD / DNxHR", "Motion JPEG", "AAC-LC", "Opus", "PCM"],
         "containers": ["MP4 / MOV (ISO BMFF)", "Matroska / WebM", "WAV", "PNG / JPEG stills"],
         "exportFormats": formats,
-        "speechToText": crate::transcript::speech_available(),
         "checks": [
             {"name": "Operating system", "ok": true, "detail": format!("{} ({})", std::env::consts::OS, std::env::consts::ARCH)},
             {"name": "CPU", "ok": cpus >= 4, "detail": format!("{cpus} hardware threads{}", if cpus < 4 { " — 4 or more recommended for 1080p playback" } else { "" })},

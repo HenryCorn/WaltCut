@@ -79,23 +79,19 @@ pub(crate) fn has_selection(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
     if s.state.selection.is_empty() { Err("no clips selected".into()) } else { Ok(()) }
 }
-/// Clips or captions selected (Clear / Ripple Delete work on either).
+/// Clips, transitions or a gap selected (Clear works on any).
 fn has_any_selection(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
-    if s.state.selection.is_empty() && s.state.caption_selection.is_empty() && s.state.transition_selection.is_empty() && s.state.gap_selection.is_none() {
+    if s.state.selection.is_empty() && s.state.transition_selection.is_empty() && s.state.gap_selection.is_none() {
         Err("nothing selected".into())
     } else {
         Ok(())
     }
 }
-/// Clips, captions or a gap selected (Ripple Delete: a transition has no length of its own to close).
-fn has_clip_or_caption_selection(s: &Session) -> std::result::Result<(), String> {
+/// Clips or a gap selected (Ripple Delete: a transition has no length of its own to close).
+fn has_clip_or_gap_selection(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
-    if s.state.selection.is_empty() && s.state.caption_selection.is_empty() && s.state.gap_selection.is_none() {
-        Err("nothing selected".into())
-    } else {
-        Ok(())
-    }
+    if s.state.selection.is_empty() && s.state.gap_selection.is_none() { Err("nothing selected".into()) } else { Ok(()) }
 }
 fn has_source(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
@@ -1371,12 +1367,7 @@ fn build() -> Vec<CommandSpec> {
                         Err(e) => errors.push(format!("{path}: {e}")),
                     },
                     Ok(b) => {
-                        if let Some(fmt) = crate::captions::detect(&path, &b) {
-                            match crate::captions::import(s, &path, &b, fmt, None) {
-                                Ok(r) => reports.push(r),
-                                Err(e) => errors.push(format!("{path}: {e}")),
-                            }
-                        } else if let Some(fmt) = crate::interchange::detect(&path, &b) {
+                        if let Some(fmt) = crate::interchange::detect(&path, &b) {
                             match crate::interchange::import(s, &path, &b, fmt) {
                                 Ok(r) => {
                                     sequences.extend(r["sequences"].as_array().cloned().unwrap_or_default());
@@ -1400,21 +1391,6 @@ fn build() -> Vec<CommandSpec> {
             // Project Settings ▸ Ingest: copy / transcode / create proxies
             // (image sequences are many files: ingest copies and transcodes single files only)
             let item_ids: Vec<ItemId> = ids.iter().filter(|i| !image_sequences.iter().any(|q| q["item"].as_u64() == Some(**i))).map(|i| ItemId(*i)).collect();
-            // Settings ▸ Media Analysis & Transcription ▸ Automatically transcribe clips
-            let ma = &s.prefs.media_analysis;
-            if ma.auto_transcribe && ma.auto_transcribe_scope == "allImported" && !ids.is_empty() {
-                let audio: Vec<u64> = ids.iter().copied().filter(|i| s.project.item(ItemId(*i)).is_some_and(|it| it.has_audio())).collect();
-                if !audio.is_empty() {
-                    // without speech-to-text the setting can't act: say so instead of importing
-                    // silently untranscribed (#89)
-                    let r = crate::transcript::can_transcribe(s)
-                        .map_err(EngineError::Other)
-                        .and_then(|()| s.execute("transcript.generate", json!({"items": audio})));
-                    if let Err(e) = r {
-                        errors.push(format!("transcription: {e}"));
-                    }
-                }
-            }
             let ingest = match crate::proxies::ingest(s, &item_ids) {
                 Ok(v) => v,
                 Err(e) => {
@@ -1600,7 +1576,7 @@ fn build() -> Vec<CommandSpec> {
             "Media…",
             ["File", "Export"],
             None,
-            r#"{"path":str,"preset":str?,"settings":ExportSettings?,"format":"h264|hevc|prores|dnxhr|apv|mjpeg|mxf-op1a|mxf-opatom|png|tiff|bmp|jpg|tga|dpx|exr|gif|wav|aiff|aac|flac"?,"audioCodec":"auto|aac|pcm|flac"?,"flacLevel":0..8=5,"width":u32?,"height":u32?,"fps":f64?,"bitrateKbps":u32?,"bitrateMode":"cbr|vbr1Pass|vbr2Pass|crf"?,"crf":0..51=23,"hardwareEncoding":"off|auto"?,"scale":f32=1,"audio":bool=true,"quality":0..100,"burnCaptions":bool=false,"alpha":bool=false,"exrCompression":"none|rle|zips|zip"?,"captionSidecar":"srt|vtt"?,"loudnessLufs":f64?,"proresProfile":"proxy|lt|standard|hq|4444|4444xq"?,"dnxProfile":"lb|sq|hq|hqx"?,"apvProfile":"422-10|422-12|444-10|444-12"?,"mxfVideoCodec":"dnxhr|proRes|h264"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startSeconds":f64?,"endSeconds":f64?,"wait":bool=false}"#,
+            r#"{"path":str,"preset":str?,"settings":ExportSettings?,"format":"h264|hevc|prores|dnxhr|apv|mjpeg|mxf-op1a|mxf-opatom|png|tiff|bmp|jpg|tga|dpx|exr|gif|wav|aiff|aac|flac"?,"audioCodec":"auto|aac|pcm|flac"?,"flacLevel":0..8=5,"width":u32?,"height":u32?,"fps":f64?,"bitrateKbps":u32?,"bitrateMode":"cbr|vbr1Pass|vbr2Pass|crf"?,"crf":0..51=23,"hardwareEncoding":"off|auto"?,"scale":f32=1,"audio":bool=true,"quality":0..100,"alpha":bool=false,"exrCompression":"none|rle|zips|zip"?,"loudnessLufs":f64?,"proresProfile":"proxy|lt|standard|hq|4444|4444xq"?,"dnxProfile":"lb|sq|hq|hqx"?,"apvProfile":"422-10|422-12|444-10|444-12"?,"mxfVideoCodec":"dnxhr|proRes|h264"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startSeconds":f64?,"endSeconds":f64?,"wait":bool=false}"#,
             has_seq,
             crate::export_tools::export_media
         ),
@@ -1639,13 +1615,10 @@ fn build() -> Vec<CommandSpec> {
                     return remove_transitions(s, &ids, "Clear");
                 }
                 // a selected gap closes, as in Premiere Pro (#648, #668)
-                if s.state.caption_selection.is_empty()
-                    && let Some(g) = s.state.gap_selection
-                {
+                if let Some(g) = s.state.gap_selection {
                     return ripple_delete_gap(s, g);
                 }
-                let caps = s.state.caption_selection.clone();
-                return crate::captions::delete(s, &caps, false);
+                return Err(EngineError::Other("nothing selected".into()));
             }
             // An Alt selection is already exact; explicit targets keep the command's linked behavior.
             let sel = if p.get("clips").is_some() || p.get("clip").is_some() { with_links(s, &clips_p(s, p)) } else { s.state.selection.clone() };
@@ -1656,15 +1629,12 @@ fn build() -> Vec<CommandSpec> {
             })?;
             Ok(Value::Null)
         }),
-        cmd!("edit.rippleDelete", "Ripple Delete", ["Edit"], Some("Shift+Delete"), r#"{"clips":[id]?}"#, has_clip_or_caption_selection, |s, p| {
+        cmd!("edit.rippleDelete", "Ripple Delete", ["Edit"], Some("Shift+Delete"), r#"{"clips":[id]?}"#, has_clip_or_gap_selection, |s, p| {
             if p.get("clips").is_none() && p.get("clip").is_none() && s.state.selection.is_empty() {
-                if s.state.caption_selection.is_empty()
-                    && let Some(g) = s.state.gap_selection
-                {
+                if let Some(g) = s.state.gap_selection {
                     return ripple_delete_gap(s, g);
                 }
-                let caps = s.state.caption_selection.clone();
-                return crate::captions::delete(s, &caps, true);
+                return Err(EngineError::Other("nothing selected".into()));
             }
             let sel = if p.get("clips").is_some() || p.get("clip").is_some() { with_links(s, &clips_p(s, p)) } else { s.state.selection.clone() };
             s.edit_sequence("Ripple Delete", |q, _, st| {
@@ -1739,7 +1709,6 @@ fn build() -> Vec<CommandSpec> {
         }),
         cmd!("edit.deselectAll", "Deselect All", ["Edit"], Some("Cmd+Shift+A"), "{}", always, |s, _| {
             s.state.selection.clear();
-            s.state.caption_selection.clear();
             s.state.gap_selection = None;
             Ok(Value::Null)
         }),
@@ -2070,11 +2039,7 @@ fn build() -> Vec<CommandSpec> {
         }),
         cmd!("sequence.addEditAllTracks", "Add Edit to All Tracks", ["Sequence"], Some("Cmd+Shift+K"), r#"{"time":ticks?}"#, has_seq, |s, p| {
             let t = time_p(s, p, "").unwrap_or(s.playhead());
-            let n = s.edit_sequence("Add Edit to All Tracks", |q, ctx, _| {
-                let mut n = edit::razor(q, &[], t, ctx);
-                n.extend(edit::captions::split_captions_at(q, &[], t, ctx));
-                Ok(n)
-            })?;
+            let n = s.edit_sequence("Add Edit to All Tracks", |q, ctx, _| Ok(edit::razor(q, &[], t, ctx)))?;
             Ok(json!({"cuts": n.len()}))
         }),
         cmd!("sequence.lift", "Lift", ["Sequence"], Some(";"), "{}", has_in_out, |s, _| {
@@ -2617,7 +2582,6 @@ fn build() -> Vec<CommandSpec> {
                 }
             } else {
                 s.state.selection = clips;
-                s.state.caption_selection.clear();
             }
             Ok(json!({"selection": s.state.selection.iter().map(|c| c.0).collect::<Vec<_>>()}))
         }),
@@ -3418,7 +3382,6 @@ fn build() -> Vec<CommandSpec> {
         )),
     ];
     crate::sequence_tools::splice(&mut v);
-    v.extend(crate::captions::commands());
     v.extend(crate::settings::commands());
     v.extend(crate::mixer::commands());
     v.extend(crate::multicam::commands());
@@ -3435,12 +3398,10 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::masks::commands());
     v.extend(crate::presets::commands());
     v.extend(crate::export_tools::commands());
-    v.extend(crate::transcript::commands());
     v.extend(crate::panels::commands());
     v.extend(crate::scopes::commands());
     v.extend(crate::remix::commands());
     v.extend(crate::voiceover::commands());
-    v.extend(crate::narration::commands());
     v.extend(crate::keyboard::commands());
     v.extend(crate::project_panel::commands());
     v.extend(crate::media_browser::commands());
@@ -3979,7 +3940,7 @@ fn select_effect(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// `timeline.select {"transitions": […]}`: select transitions (clicking one in the Timeline). It
-/// replaces the clip, edit point and caption selections, as a clip selection replaces it.
+/// replaces the clip and edit point selections, as a clip selection replaces it.
 fn select_transitions(s: &mut Session, ids: &Value, add: bool, toggle: bool) -> Result<Value> {
     const CMD: &str = "timeline.select";
     let ids = transition_ids_p(ids).ok_or_else(|| bad(CMD, "`transitions` is a list of transition ids"))?;
@@ -4006,7 +3967,6 @@ fn select_transitions(s: &mut Session, ids: &Value, add: bool, toggle: bool) -> 
         s.state.transition_selection = ids;
     }
     s.state.selection.clear();
-    s.state.caption_selection.clear();
     s.state.gap_selection = None;
     s.state.edit_points.clear();
     s.state.trim_shift = Default::default();
@@ -4025,7 +3985,7 @@ fn remove_transitions(s: &mut Session, ids: &[TransitionId], label: &str) -> Res
 }
 
 /// `timeline.selectGap`: select the gap on `track` at `time` (clicking empty space between
-/// clips, #648, #668). It replaces the clip, transition, caption and edit point selections, as
+/// clips, #648, #668). It replaces the clip, transition and edit point selections, as
 /// in Premiere Pro. Empty time after a track's last clip is not a gap.
 fn select_gap(s: &mut Session, p: &Value) -> Result<Value> {
     const CMD: &str = "timeline.selectGap";
@@ -4039,7 +3999,6 @@ fn select_gap(s: &mut Session, p: &Value) -> Result<Value> {
     let range = edit::through::track_gaps(tr).into_iter().find(|g| g.contains(t)).ok_or_else(|| bad(CMD, "there is no gap there"))?;
     s.state.gap_selection = Some(crate::GapSelection { track, range });
     s.state.selection.clear();
-    s.state.caption_selection.clear();
     s.state.transition_selection.clear();
     s.state.edit_points.clear();
     s.state.trim_shift = Default::default();

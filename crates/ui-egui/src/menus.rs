@@ -156,7 +156,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("app.settings.graphics", "Graphics…", ["Edit", "Preferences"], None),
     uic!("app.settings.labels", "Labels…", ["Edit", "Preferences"], None),
     uic!("app.settings.media", "Media…", ["Edit", "Preferences"], None),
-    uic!("app.settings.mediaAnalysis", "Media Analysis & Transcription…", ["Edit", "Preferences"], None),
     uic!("app.settings.mediaCache", "Media Cache…", ["Edit", "Preferences"], None),
     uic!("app.settings.memory", "Memory…", ["Edit", "Preferences"], None),
     uic!("app.settings.playback", "Playback…", ["Edit", "Preferences"], None),
@@ -590,7 +589,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         || (id == "file.saveCopy" && params.get("path").is_none())
         || (id == "file.open" && params.get("path").is_none())
         || (id == "file.save" && params.get("path").is_none() && app.session.path.is_none())
-        || (matches!(id, "captions.import" | "captions.export") && params.get("path").is_none())
         || (id == "graphics.newFromFile" && params.get("path").is_none())
         || (crate::EXPORT_SAVE_DIALOGS.iter().any(|(c, ..)| *c == id) && params.get("path").is_none())
     {
