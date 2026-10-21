@@ -77,7 +77,6 @@ pub enum Icon {
     Import,
     Gear,
     Info,
-    Captions,
     Adjust,
     Nest,
     Undo,
@@ -598,12 +597,6 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             pen.line(&[(8.0, 7.0), (8.0, 11.5)]);
             pen.dot(8.0, 4.8, 0.9);
         }
-        Captions => {
-            pen.rect(1.5, 3.0, 14.5, 13.0);
-            pen.line(&[(4.0, 9.0), (7.0, 9.0)]);
-            pen.line(&[(9.0, 9.0), (12.0, 9.0)]);
-            pen.line(&[(4.0, 11.0), (12.0, 11.0)]);
-        }
         Adjust => {
             for (y, x) in [(4.0, 10.0), (8.0, 5.0), (12.0, 9.0)] {
                 pen.line(&[(2.0, y), (14.0, y)]);
@@ -876,7 +869,6 @@ mod tests {
         Import,
         Gear,
         Info,
-        Captions,
         Adjust,
         Nest,
         Undo,

@@ -43,18 +43,15 @@ pub mod scopes;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;
-pub mod text;
 pub mod timecode;
 pub mod timeline;
 pub mod timeline_automation;
-pub mod timeline_captions;
 pub mod timeline_hit;
 pub mod timeline_volume;
 pub mod tools;
 pub mod transform_handles;
 pub mod transition_controls;
 pub mod trim_monitor;
-pub mod tts;
 pub mod voiceover;
 pub mod workspaces;
 
@@ -88,7 +85,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::AudioMeters => meters::show(app, ui, rect),
         PanelKind::LumetriColor => lumetri::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),
-        PanelKind::Properties if text::caption_selected(app) => text::caption_properties(app, ui, rect),
         PanelKind::Properties => effect_controls::properties_panel(app, ui, rect),
         PanelKind::EssentialGraphics => graphics_templates::essential_graphics(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
@@ -103,9 +99,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::Events => events::events(app, ui, rect),
         PanelKind::Progress => events::progress(app, ui, rect),
         PanelKind::ReferenceMonitor => reference::show(app, ui, rect),
-        PanelKind::Text => text::show(app, ui, rect),
         PanelKind::EssentialSound => essential_sound::show(app, ui, rect),
-        PanelKind::TextToSpeech => tts::show(app, ui, rect),
         PanelKind::ProjectNotes => notes::show(app, ui, rect),
         other => crate::dock::placeholder(ui, rect, &app.tokens, &tlf!("{panel} — coming in a later milestone", panel = crate::i18n::t(other.title()))),
     }
@@ -357,5 +351,3 @@ pub fn panel_menu_popup(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
         ui.ctx().data_mut(|d| d.remove::<(PanelKind, egui::Pos2)>(id));
     }
 }
-
-pub(crate) mod transcript_cache;

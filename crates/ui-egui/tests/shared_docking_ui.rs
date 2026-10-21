@@ -405,7 +405,7 @@ fn catalog_docking_action_supports_resize_reorder_and_floating_geometry() {
 fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name() {
     let root = DockNode::Tabs { panels: vec![PanelKind::Project], active: 0 };
     let valid = json!({"name": "Valid", "layout": root, "floating": [{
-        "panels": ["TextToSpeech", "Timeline"], "active": 0, "rect": [80, 90, 420, 320]
+        "panels": ["Metadata", "Timeline"], "active": 0, "rect": [80, 90, 420, 320]
     }]});
     for (index, bad) in [
         json!([{"panels": ["FuturePanel"], "active": 0, "rect": [80, 90, 420, 320]}]),
@@ -424,7 +424,7 @@ fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name
         let restored = dock::saved_docking(&loaded, "Valid");
         restored.validate().unwrap();
         assert_eq!(restored.root, root);
-        assert_eq!(restored.floating[0].panels, vec![PanelKind::TextToSpeech, PanelKind::Timeline]);
+        assert_eq!(restored.floating[0].panels, vec![PanelKind::Metadata, PanelKind::Timeline]);
         assert_eq!(dock::saved_docking(&loaded, "Broken").root, dock::workspace("Broken"));
         loaded.save(&path).unwrap();
         assert_eq!(dock::WorkspacePrefs::load(&path), loaded, "saving preserves the unreadable entry for a future version");
@@ -433,131 +433,32 @@ fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name
 }
 
 #[test]
-fn floating_tts_and_timeline_reveal_keeps_one_owner_and_draft_without_project_edits() {
+fn floating_panel_and_timeline_reveal_keeps_one_owner_without_project_edits() {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
     let mut app = FilmcraftApp::new(session);
-    app.ui.tts.text = "Synthetic retained narration".into();
-    app.show_panel(PanelKind::TextToSpeech);
+    app.show_panel(PanelKind::Metadata);
     let project = app.session.project.clone();
     let state = serde_json::to_value(&app.session.state).unwrap();
-    let draft = serde_json::to_value(&app.ui.tts).unwrap();
     let ctx = egui::Context::default();
-    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "TextToSpeech", "rect": [80, 90, 420, 320]})).unwrap();
+    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Metadata", "rect": [80, 90, 420, 320]})).unwrap();
     menus::invoke(
         &mut app,
         &ctx,
         "window.dockAction",
         json!({"action": Action::Move {
-            panel: PanelKind::Timeline, anchor: PanelKind::TextToSpeech, placement: Placement::Tab { before: None }
+            panel: PanelKind::Timeline, anchor: PanelKind::Metadata, placement: Placement::Tab { before: None }
         }}),
     )
     .unwrap();
-    app.show_panel(PanelKind::TextToSpeech);
+    app.show_panel(PanelKind::Metadata);
     app.show_panel(PanelKind::Timeline);
-    assert!(!app.ui.dock.contains(PanelKind::TextToSpeech));
+    assert!(!app.ui.dock.contains(PanelKind::Metadata));
     assert!(!app.ui.dock.contains(PanelKind::Timeline));
-    assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::TextToSpeech).count(), 1);
+    assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::Metadata).count(), 1);
     assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::Timeline).count(), 1);
-    assert_eq!(serde_json::to_value(&app.ui.tts).unwrap(), draft);
     assert!(std::sync::Arc::ptr_eq(&project, &app.session.project));
     assert_eq!(serde_json::to_value(&app.session.state).unwrap(), state);
-}
-
-#[test]
-fn narration_selection_reveals_covered_floating_tts_once_without_editing_the_project() {
-    let mut session = Session::default();
-    session.execute("file.openDemoProject", json!({})).unwrap();
-    let clip = session
-        .active_sequence()
-        .unwrap()
-        .audio_tracks
-        .iter()
-        .flat_map(|track| &track.items)
-        .find(|clip| {
-            session.project.item(clip.item).and_then(|item| item.as_media()).is_some_and(|media| media.info.kind == waltcut_media::MediaKind::AudioOnly)
-        })
-        .unwrap()
-        .clone();
-    let narration = waltcut_project::Narration {
-        text: "Synthetic narration behind an overlapping pane".into(),
-        language: "en-US".into(),
-        voice: waltcut_tts::default_voice_id().into(),
-        pitch: waltcut_project::VocalPitch::Default,
-        pace: 1.2,
-        speech_duration: waltcut_time::Tick::ZERO,
-    };
-    std::sync::Arc::make_mut(&mut session.project).narrations.insert(clip.item, narration.clone());
-    let project = session.project.clone();
-    let mut app = FilmcraftApp::new(session);
-    app.show_panel(PanelKind::TextToSpeech);
-    let mut h = Harness::builder().with_size(vec2(1200.0, 760.0)).build_eframe(move |_| app);
-    for _ in 0..4 {
-        step(&mut h);
-    }
-    let ctx = h.ctx.clone();
-    for panel in ["TextToSpeech", "Info"] {
-        menus::invoke(h.state_mut(), &ctx, "window.floatPanel", json!({"panel": panel, "rect": [400, 220, 450, 360]})).unwrap();
-        for _ in 0..4 {
-            step(&mut h);
-        }
-    }
-    let layer = |panel: PanelKind| egui::LayerId::new(egui::Order::Middle, egui::Id::new(("floating-panel", panel.id())));
-    let covered = rect(&h, "panel.TextToSpeech").center();
-    assert!(rect(&h, "panel.Info").contains(covered));
-    ctx.move_to_top(layer(PanelKind::Info));
-    for _ in 0..3 {
-        step(&mut h);
-    }
-    assert_eq!(ctx.layer_id_at(covered), Some(layer(PanelKind::Info)), "precondition: Info really covers TTS");
-    h.state_mut().session.state.selection = vec![clip.id];
-    for _ in 0..4 {
-        step(&mut h);
-    }
-    let draft = h.state().ui.tts.clone();
-    assert_eq!(draft.text, narration.text);
-    assert_eq!(draft.pace, narration.pace);
-    assert_eq!(draft.loaded_from, Some((clip.id.0, clip.item.0)));
-    assert_eq!(ctx.layer_id_at(covered), Some(layer(PanelKind::TextToSpeech)), "narration selection must bring its floating editor forward");
-    assert_eq!(h.state().ui.focused, PanelKind::TextToSpeech);
-    assert!(!h.state().ui.dock.contains(PanelKind::TextToSpeech));
-    assert_eq!(h.state().ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::TextToSpeech).count(), 1);
-    assert!(std::sync::Arc::ptr_eq(&project, &h.state().session.project));
-    // A reveal is one-shot: drawing the selected narration must not steal stacking
-    // from another pane that the user subsequently brings forward.
-    ctx.move_to_top(layer(PanelKind::Info));
-    for _ in 0..4 {
-        step(&mut h);
-    }
-    assert_eq!(ctx.layer_id_at(covered), Some(layer(PanelKind::Info)));
-    assert_eq!(h.state().ui.tts, draft);
-    menus::invoke(h.state_mut(), &ctx, "window.panel.TextToSpeech", json!({})).unwrap();
-    for _ in 0..4 {
-        step(&mut h);
-    }
-    assert_eq!(ctx.layer_id_at(covered), Some(layer(PanelKind::TextToSpeech)));
-    assert_eq!(h.state().ui.tts, draft);
-    assert!(std::sync::Arc::ptr_eq(&project, &h.state().session.project));
-    // Replacing the workspace cancels a queued reveal before the next render,
-    // even when the destination happens to contain the same floating panel IDs.
-    ctx.move_to_top(layer(PanelKind::Info));
-    for _ in 0..3 {
-        step(&mut h);
-    }
-    let saved = dock::SavedWorkspace {
-        name: "Reveal cancellation".into(),
-        layout: serde_json::to_value(&h.state().ui.dock).unwrap(),
-        floating: serde_json::to_value(&h.state().ui.floating).unwrap(),
-    };
-    h.state_mut().workspaces.saved.push(saved);
-    h.state_mut().show_panel(PanelKind::TextToSpeech);
-    h.state_mut().set_workspace("Reveal cancellation");
-    for _ in 0..4 {
-        step(&mut h);
-    }
-    assert_eq!(ctx.layer_id_at(covered), Some(layer(PanelKind::Info)));
-    assert_eq!(h.state().ui.tts, draft);
-    assert!(std::sync::Arc::ptr_eq(&project, &h.state().session.project));
 }
 
 /// #1985: a panel closed while floating came back docked when opened again from the Window menu;

@@ -27,7 +27,6 @@ impl FakeFs {
             "/home/me/Movies/shot_0001.png",
             "/home/me/Movies/shot_0002.png",
             "/home/me/Movies/edit.edl",
-            "/home/me/Movies/subs.srt",
             "/home/me/Movies/clip.mov",
             "/home/me/Movies/CLIP.MOV",
         ] {
@@ -101,7 +100,7 @@ fn listing_puts_folders_first_and_hides_unsupported_files() {
     assert_eq!(l["dir"], "/home/me");
     assert_eq!(names(&l), ["Movies"]);
     let l = s.execute("mediaBrowser.list", json!({"path": "/home/me/Movies"})).unwrap();
-    assert_eq!(names(&l), ["Selects", "A-interview.wav", "b-roll.wav", "CLIP.MOV", "clip.mov", "edit.edl", "shot_0001.png", "shot_0002.png", "subs.srt"]);
+    assert_eq!(names(&l), ["Selects", "A-interview.wav", "b-roll.wav", "CLIP.MOV", "clip.mov", "edit.edl", "shot_0001.png", "shot_0002.png"]);
     let e = &l["entries"][0];
     assert_eq!((e["isDir"].as_bool(), e["kind"].as_str()), (Some(true), Some("folder")));
     let shot = l["entries"].as_array().unwrap().iter().find(|e| e["name"] == "shot_0001.png").unwrap();

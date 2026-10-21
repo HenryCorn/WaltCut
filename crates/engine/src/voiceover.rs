@@ -389,7 +389,7 @@ fn record_dir(s: &Session, p: &Value) -> String {
     media_dir(s, p, "Voice-over Recordings")
 }
 
-/// Directory generated media (recordings, narrations) is written to: `dir`, else Project
+/// Directory generated media (recordings) is written to: `dir`, else Project
 /// Settings ▸ Scratch Disks ▸ Captured, else next to the project, else `fallback` in the data or
 /// temporary directory.
 pub(crate) fn media_dir(s: &Session, p: &Value, fallback: &str) -> String {

@@ -1,7 +1,7 @@
 //! M6.5 export parity through engine commands: every built-in preset exports the demo sequence
 //! and ffprobe (an external test oracle only) confirms codec / size / rate / bitrate; the user
 //! preset library; the export queue (order, cancel, retry, several sequences and ranges); Quick
-//! Export; ranges and caption sidecars.
+//! Export; ranges.
 
 use std::path::{Path, PathBuf};
 
@@ -673,9 +673,8 @@ fn quick_export_uses_and_remembers_a_preset() {
 }
 
 #[test]
-fn ranges_resolve_and_sidecar_captions_are_written() {
+fn ranges_resolve() {
     let mut s = demo();
-    let dir = Scratch::new("ranges");
     let fps = 24000.0 / 1001.0;
     let frames = |s: &mut Session, p: Value| s.execute("export.resolve", p).unwrap()["frames"].as_i64().unwrap();
     let whole = frames(&mut s, json!({"preset": "PNG Sequence", "range": "entire"}));
@@ -695,20 +694,8 @@ fn ranges_resolve_and_sidecar_captions_are_written() {
     assert_eq!(res["output"]["width"], 3840);
     assert!(res["summary"]["video"].as_str().unwrap().contains("3840x2160"));
     assert!(res["summary"]["estimated_bytes"].as_u64().unwrap() > 1_000_000);
-    // caption sidecar next to the output
-    s.execute("captions.add", json!({"seconds": 1.5, "durationSeconds": 1.0, "text": "Hello sidecar"})).unwrap();
-    let out = dir.path("cap.wav");
-    s.execute("file.exportMedia", json!({"preset": "Waveform Audio 48 kHz 16-bit", "path": out, "captionSidecar": "srt", "wait": true})).unwrap();
-    let srt = std::fs::read_to_string(dir.path("cap.srt")).unwrap();
-    // Timed from In at 1 s (the caption starts on frame 35), clipped to the export duration.
-    let resolved = s.execute("export.resolve", json!({"preset": "Waveform Audio 48 kHz 16-bit"})).unwrap();
-    let duration = waltcut_time::Tick(resolved["range"]["duration"].as_i64().unwrap());
-    let timing = format!("00:00:00,460 --> {}", waltcut_captions::format_clock(duration, ','));
-    assert!(srt.contains("Hello sidecar") && srt.contains(&timing), "{srt}");
-    s.execute("file.exportMedia", json!({"preset": "Waveform Audio 48 kHz 16-bit", "path": out, "captionSidecar": "vtt", "wait": true})).unwrap();
-    assert!(std::fs::read_to_string(dir.path("cap.vtt")).unwrap().starts_with("WEBVTT"));
     // a bad preset name is a clean error
-    assert!(s.execute("file.exportMedia", json!({"preset": "Nope", "path": out})).is_err());
+    assert!(s.execute("file.exportMedia", json!({"preset": "Nope", "path": "x"})).is_err());
 }
 
 /// Export mode asks for a default folder as soon as it opens. With no saved project and no
@@ -738,112 +725,10 @@ fn unknown_settings_keys_are_errors_not_ignored() {
     assert!(err.to_string().contains("`effects.loudness.targetLoudness`"), "{err}");
     // Both spellings of a snake_case field are known (#531), and null sets nothing.
     for key in ["target_lufs", "targetLufs"] {
-        let (_, ok) = crate::export_tools::settings_from_params(
-            &s,
-            &json!({"settings": {"effects": {"loudness": {"enabled": true, key: -14}}, "captionSidecar": null}}),
-            "file.exportMedia",
-        )
-        .unwrap();
+        let (_, ok) =
+            crate::export_tools::settings_from_params(&s, &json!({"settings": {"effects": {"loudness": {"enabled": true, key: -14}}}}), "file.exportMedia")
+                .unwrap();
         assert!(ok.effects.loudness.enabled);
         assert_eq!(ok.effects.loudness.target_lufs, -14.0, "{key}");
-    }
-}
-
-#[test]
-fn caption_sidecars_keep_only_the_exported_interval() {
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
-
-    use waltcut_captions::{Document, Format};
-    use waltcut_media::MediaSource;
-    use waltcut_time::{TICKS_PER_SECOND, Tick};
-
-    #[derive(Default)]
-    struct MemoryFiles(Mutex<BTreeMap<String, Vec<u8>>>);
-    impl crate::Services for MemoryFiles {
-        fn read_file(&self, path: &str) -> std::io::Result<Vec<u8>> {
-            self.0.lock().unwrap().get(path).cloned().ok_or_else(|| std::io::ErrorKind::NotFound.into())
-        }
-        fn write_file(&self, path: &str, bytes: &[u8]) -> std::io::Result<()> {
-            self.0.lock().unwrap().insert(path.to_owned(), bytes.to_vec());
-            Ok(())
-        }
-        fn export_in_memory(&self) -> bool {
-            true
-        }
-    }
-
-    fn session(text: &str) -> (Session, Arc<MemoryFiles>) {
-        let files = Arc::new(MemoryFiles::default());
-        files.0.lock().unwrap().insert("input.vtt".into(), text.as_bytes().to_vec());
-        let mut s = Session::new(files.clone());
-        s.execute("file.newSequence", json!({"name":"Caption range", "fps":25, "width":16, "height":16, "video":0, "audio":0})).unwrap();
-        s.execute("captions.import", json!({"path":"input.vtt"})).unwrap();
-        s.execute("markers.markIn", json!({"time":2 * TICKS_PER_SECOND})).unwrap();
-        // The UI Out point includes that frame; the export range ends at exactly five seconds.
-        s.execute("markers.markOut", json!({"time":5 * TICKS_PER_SECOND - TICKS_PER_SECOND / 25})).unwrap();
-        (s, files)
-    }
-
-    fn sidecar(s: &mut Session, files: &MemoryFiles, format: Format, range: Value, duration: Tick) -> Document {
-        let ext = format.extension();
-        let mut params = json!({"format":"wav", "path":"output.wav", "captionSidecar":ext, "wait":true});
-        params.as_object_mut().unwrap().extend(range.as_object().unwrap().clone());
-        let result = s.execute("file.exportMedia", params).unwrap();
-        assert_eq!(result["result"]["path"], "output.wav");
-        assert!(result["result"]["bytes"].as_u64().is_some_and(|n| n > 0), "{result}");
-        let wav = files.0.lock().unwrap().get("output.wav").unwrap().clone();
-        let audio = waltcut_media::wav::WavSource::parse("output.wav", wav.into()).unwrap();
-        assert_eq!(audio.info().duration, duration, "exported audio duration");
-        let bytes = files.0.lock().unwrap().get(&format!("output.{ext}")).unwrap().clone();
-        let doc = waltcut_captions::parse(&bytes, format).unwrap();
-        assert!(doc.warnings.is_empty(), "{doc:?}");
-        doc
-    }
-
-    // Every time is both a millisecond and an exact frame boundary at 25 fps.
-    let fixture = "WEBVTT\n\nSTYLE\n::cue { color: yellow }\n\nREGION\nid:bottom\n\nNOTE original fixture\n\nbefore\n00:00:00.000 --> 00:00:01.000\nBefore\n\nin\n00:00:01.600 --> 00:00:02.400 line:90% align:center\n<v Ann>Crossing In\n\ninside\n00:00:03.000 --> 00:00:04.000\nInside\n\nout\n00:00:04.600 --> 00:00:05.400\nCrossing Out\n\nafter\n00:00:06.000 --> 00:00:07.000\nAfter\n";
-    let (mut s, files) = session(fixture);
-    let original = serde_json::to_value(&s.project).unwrap();
-    let history = s.execute("history.list", json!({})).unwrap();
-    let ticks = |tenths: i64| Tick(tenths * (TICKS_PER_SECOND / 10));
-    let expected = [(ticks(0), ticks(4), "Crossing In"), (ticks(10), ticks(20), "Inside"), (ticks(26), ticks(30), "Crossing Out")];
-    for format in [Format::Srt, Format::WebVtt] {
-        for range in [json!({"range":"custom", "startTime":2 * TICKS_PER_SECOND, "endTime":5 * TICKS_PER_SECOND}), json!({"range":"inOut"}), json!({})] {
-            let doc = sidecar(&mut s, &files, format, range, ticks(30));
-            let actual: Vec<_> = doc.cues.iter().map(|c| (c.start, c.end, c.text.as_str())).collect();
-            assert_eq!(actual, expected, "{format:?}: exclude later cues and clip both crossing boundaries");
-            if format == Format::WebVtt {
-                assert_eq!(doc.cues[0].id.as_deref(), Some("in"));
-                assert_eq!(doc.cues[0].speaker.as_deref(), Some("Ann"));
-                assert_eq!(doc.cues[0].settings, "line:90% align:center");
-                assert_eq!(doc.blocks, ["STYLE\n::cue { color: yellow }", "REGION\nid:bottom", "NOTE original fixture"]);
-            }
-        }
-        let all = sidecar(&mut s, &files, format, json!({"range":"entire"}), ticks(70));
-        let actual: Vec<_> = all.cues.iter().map(|c| (c.start, c.end, c.text.as_str())).collect();
-        assert_eq!(
-            actual,
-            [
-                (ticks(0), ticks(10), "Before"),
-                (ticks(16), ticks(24), "Crossing In"),
-                (ticks(30), ticks(40), "Inside"),
-                (ticks(46), ticks(54), "Crossing Out"),
-                (ticks(60), ticks(70), "After")
-            ]
-        );
-        // A standalone caption export still exports the whole track even with sequence In/Out set.
-        let path = format!("standalone.{}", format.extension());
-        s.execute("captions.export", json!({"path":path})).unwrap();
-        let standalone = waltcut_captions::parse(files.0.lock().unwrap().get(&path).unwrap(), format).unwrap();
-        assert_eq!(standalone, all);
-    }
-    assert_eq!(serde_json::to_value(&s.project).unwrap(), original, "export must not trim the project captions");
-    assert_eq!(s.execute("history.list", json!({})).unwrap(), history);
-
-    let (mut edge, edge_files) = session("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nEnds at In\n\n00:00:05.000 --> 00:00:06.000\nStarts at Out\n");
-    for format in [Format::Srt, Format::WebVtt] {
-        let doc = sidecar(&mut edge, &edge_files, format, json!({"range":"inOut"}), ticks(30));
-        assert!(doc.cues.is_empty(), "half-open export excludes cues touching either boundary: {doc:?}");
     }
 }

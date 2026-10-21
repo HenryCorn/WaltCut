@@ -69,11 +69,7 @@ const LAYERS: &[(&str, u8)] = &[
     ("keyframe", 2),
     ("effects", 2),
     ("audio", 2),
-    ("captions", 2),
-    ("speech", 2),
     ("genai", 2),
-    ("tts", 2),
-    ("tts-text", 2),
     ("interchange", 2),
     ("render", 3),
     ("gpu", 3),
@@ -107,7 +103,6 @@ const SAME_LAYER: &[(&str, &str)] = &[
     ("scopes", "gpu"),
     ("gpu", "render"),
     ("cli", "waltcut"),
-    ("tts", "tts-text"),
 ];
 
 /// Crates that must not appear below L5 (UI toolkits, windowing, OS audio/menus).

@@ -121,7 +121,7 @@ progress and stop it:
   `notifications/progress` `{progressToken: T, progress: <frames done>, total: <frames>, message:
   <job status>}` at most every 100 ms while frames advance. Without a token it sends none.
 - `notifications/cancelled` for the request stops the encode at the next batch (`jobs.cancel`),
-  deletes the partial output (the movie, or the frames and caption sidecar written so far) and sends
+  deletes the partial output (the movie, or the frames written so far) and sends
   no response, as the MCP cancellation utility asks.
 - Without `wait` the command returns `{job, path, poll: "jobs.list", cancel: "jobs.cancel"}` at
   once: poll `jobs.list` for the job's `progress`, `etaSeconds`, `finished` and `result`, and stop it

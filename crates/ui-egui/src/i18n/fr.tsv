@@ -18,7 +18,6 @@
 
 	About FilmCraft	À propos de FilmCraft
 	Add Audio Submix Track	Ajouter une piste de sous-mixage audio
-	Add Caption at Playhead	Ajouter un sous-titre à la tête de lecture
 	Add Chapter Marker…	Ajouter un marqueur de chapitre…
 	Add Edit	Ajouter un point de montage
 	Add Edit to All Tracks	Ajouter un point de montage à toutes les pistes
@@ -26,7 +25,6 @@
 	Add Frame Hold	Ajouter une image figée
 	Add Guide…	Ajouter un repère…
 	Add Marker	Ajouter un marqueur
-	Add New Caption Track…	Ajouter une piste de sous-titres…
 	Add Range Marker	Ajouter un marqueur de plage
 	Add Range Marker to In and Out	Ajouter un marqueur de plage de l'entrée à la sortie
 	Add Tracks…	Ajouter des pistes…
@@ -67,9 +65,7 @@
 	Bring Forward	Avancer
 	Bring to Front	Mettre au premier plan
 	Brown	Marron
-	Captions	Sous-titres
 	Captions and Graphics	Sous-titres et graphiques
-	Captions…	Sous-titres…
 	Caribbean	Caraïbes
 	Center Horizontally	Centrer horizontalement
 	Center Vertically	Centrer verticalement
@@ -93,7 +89,6 @@
 	Consolidate Duplicates	Regrouper les doublons
 	Copy	Copier
 	Copy Paste Includes Sequence Markers	Copier-coller inclut les marqueurs de séquence
-	Create Captions from Transcript…	Créer des sous-titres à partir de la transcription…
 	Create Multi-Camera Source Sequence…	Créer une séquence source multicaméra…
 	Create Proxies…	Créer des proxys…
 	Cut	Couper
@@ -101,7 +96,6 @@
 	Delete Render Files	Supprimer les fichiers de rendu
 	Delete Render Files In to Out	Supprimer les fichiers de rendu de l'entrée à la sortie
 	Delete Tracks…	Supprimer des pistes…
-	Delete Transcript	Supprimer la transcription
 	Demo Footage	Rushes de démonstration
 	Demo Project	Projet de démonstration
 	Deselect All	Tout désélectionner
@@ -156,10 +150,8 @@
 	Get Media File Properties for	Obtenir les propriétés du fichier média pour
 	Go to Gap	Atteindre l'espace vide
 	Go to In	Atteindre l'entrée
-	Go to Next Caption Segment	Atteindre le segment de sous-titre suivant
 	Go to Next Marker	Atteindre le marqueur suivant
 	Go to Out	Atteindre la sortie
-	Go to Previous Caption Segment	Atteindre le segment de sous-titre précédent
 	Go to Previous Marker	Atteindre le marqueur précédent
 	Go to Split	Atteindre la division
 	Graphics and Titles	Graphiques et titres
@@ -168,7 +160,6 @@
 	Group	Grouper
 	Guide Templates	Modèles de repères
 	Help	Aide
-	Hide All Caption Tracks	Masquer toutes les pistes de sous-titres
 	High Quality Playback	Lecture haute qualité
 	History	Historique
 	Import From	Importer depuis
@@ -211,7 +202,6 @@
 	Mark Split	Marquer la division
 	Markers	Marqueurs
 	Match Frame	Faire correspondre l'image
-	Media Analysis & Transcription…	Analyse et transcription des médias…
 	Media Browser	Explorateur de médias
 	Media Cache…	Cache des médias…
 	Media…	Média…
@@ -265,8 +255,6 @@
 	Remix	Remix
 	Remix Properties…	Propriétés du remix…
 	Remove Attributes…	Supprimer les attributs…
-	Remove Filler Words	Supprimer les mots parasites
-	Remove Pauses	Supprimer les pauses
 	Remove Unused	Supprimer les éléments inutilisés
 	Rename…	Renommer…
 	Render Audio	Effectuer le rendu audio
@@ -279,7 +267,6 @@
 	Reset All Parameters	Réinitialiser tous les paramètres
 	Reset Duration	Réinitialiser la durée
 	Reset to Saved Layout	Réinitialiser la disposition enregistrée
-	Restore Captions from Source Clip	Restaurer les sous-titres du clip source
 	Reveal Log Files…	Afficher les fichiers journaux…
 	Reverse Match Frame	Correspondance d'image inverse
 	Revert	Revenir à la version enregistrée
@@ -318,8 +305,6 @@
 	Sequence From Clip	Séquence à partir du clip
 	Sequence Settings…	Paramètres de séquence…
 	Sequence…	Séquence…
-	Show Active Caption Tracks Only	Afficher uniquement les pistes de sous-titres actives
-	Show All Caption Tracks	Afficher toutes les pistes de sous-titres
 	Show All Marker Colors	Afficher toutes les couleurs de marqueur
 	Show Guides	Afficher les repères
 	Show Rulers	Afficher les règles
@@ -343,9 +328,6 @@
 	Toggle Proxies	Activer/désactiver les proxys
 	Tools	Outils
 	Top	Haut
-	Transcribe Sequence…	Transcrire la séquence…
-	Transcribe…	Transcrire…
-	Transcript	Transcription
 	Transparent Video…	Vidéo transparente…
 	Trim Edit	Rogner le point de montage
 	Trim…	Rogner…
@@ -353,7 +335,6 @@
 	Ungroup	Dissocier le groupe
 	Universal Counting Leader…	Amorce de décompte universelle…
 	Update Metadata…	Mettre à jour les métadonnées…
-	Upgrade Caption to Graphic	Convertir le sous-titre en graphique
 	Upgrade to Source Graphic	Convertir en graphique source
 	Vertical Text	Texte vertical
 	Video In	Entrée vidéo
@@ -414,10 +395,6 @@
 	Delete Video Tracks	Supprimer des pistes vidéo
 	Delete Audio Tracks	Supprimer des pistes audio
 	All Empty Tracks	Toutes les pistes vides
-	Caption Tracks	Pistes de sous-titres
-	Delete Caption Tracks	Supprimer des pistes de sous-titres
-	Delete Caption Track	Supprimer la piste de sous-titres
-	Delete Empty Caption Tracks	Supprimer les pistes de sous-titres vides
 	Version {version}	Version {version}
 	A clean-room, pure-Rust non-linear video editor. Part of the ArtCraft family.	Un éditeur vidéo non linéaire en pur Rust, conçu en salle blanche. Membre de la famille ArtCraft.
 	Join the ArtCraft Discord	Rejoindre le Discord d'ArtCraft
@@ -568,28 +545,10 @@
 	Restore	Restaurer
 	Overwrite with Current View	Remplacer par la vue actuelle
 	Graphics text search arrives with M10.1–M10.2	La recherche de texte dans les graphiques arrive avec M10.1–M10.2
-	Open a sequence to work with captions	Ouvrez une séquence pour travailler sur les sous-titres
-	Add captions	Ajouter des sous-titres
-	Create a caption track or import a caption file.	Créez une piste de sous-titres ou importez un fichier de sous-titres.
-	Create new caption track	Créer une piste de sous-titres
-	Import captions file…	Importer un fichier de sous-titres…
 	New {format} track	Nouvelle piste {format}
-	Add caption at playhead	Ajouter un sous-titre à la tête de lecture
-	Split caption at playhead	Scinder le sous-titre à la tête de lecture
-	Merge selected captions	Fusionner les sous-titres sélectionnés
-	Delete selected captions	Supprimer les sous-titres sélectionnés
-	No captions on this track. Press + to add one at the playhead.	Aucun sous-titre sur cette piste. Appuyez sur + pour en ajouter un à la tête de lecture.
-	No matching captions.	Aucun sous-titre correspondant.
-	Open a sequence to see its transcript	Ouvrez une séquence pour voir sa transcription
-	Transcribe sequence	Transcrire la séquence
-	Speech-to-text turns the dialogue into editable text.	La reconnaissance vocale convertit les dialogues en texte modifiable.
-	This build has no speech-to-text; import a transcript with transcript.set.	Cette version n'inclut pas la reconnaissance vocale ; importez une transcription avec transcript.set.
-	Transcribe	Transcrire
 	Extract selected text	Extraire le texte sélectionné
 	Lift selected text	Soulever le texte sélectionné
 	Remove filler words	Supprimer les mots parasites
-	Create captions	Créer des sous-titres
-	Speaker	Intervenant
 	Box	Cadre
 	Align	Aligner
 	Align left	Aligner à gauche
@@ -1226,7 +1185,6 @@
 	Open Demo Project	Ouvrir le projet de démonstration
 	Insert and overwrite sequences as nests or individual clips	Insérer et écraser des séquences en tant que séquences imbriquées ou clips individuels
 	Snap in Timeline (S)	Magnétisme dans la timeline (S)
-	Caption track options	Options de la piste de sous-titres
 	Timeline Display Settings	Paramètres d'affichage de la timeline
 	Show Video Thumbnails	Afficher les vignettes vidéo
 	Head	Début
@@ -1289,7 +1247,6 @@
 	Alpha Blurriness	Flou alpha
 	Alpha Channel	Canal alpha
 	Alpha Glow	Lueur alpha
-	Always import embedded CEA-708 closed captions with wide aspect.	Toujours importer les sous-titres codés CEA-708 incorporés au format large.
 	Always override audio tags	Toujours remplacer les balises audio
 	Ambience	Ambiance
 	Ambience Intensity	Intensité de l'ambiance
@@ -1334,8 +1291,6 @@
 	Auto Save	Enregistrement automatique
 	Auto Save also saves the current project(s)	L'enregistrement automatique enregistre aussi le ou les projets actuels
 	Auto-tag audio types in the timeline	Baliser automatiquement les types audio dans la timeline
-	Auto-transcribe all imported clips	Transcrire automatiquement tous les clips importés
-	Auto-transcribe only clips in sequences	Transcrire automatiquement uniquement les clips des séquences
 	Automatch Time	Durée de correspondance automatique
 	Automatic Click Remover	Suppression automatique des clics
 	Automatically Hide Dependent Clips	Masquer automatiquement les clips dépendants
@@ -1345,7 +1300,6 @@
 	Automatically refresh growing files	Actualiser automatiquement les fichiers en croissance
 	Automatically resume playback for growing files in Source Monitor	Reprendre automatiquement la lecture des fichiers en croissance dans le moniteur source
 	Automatically save projects	Enregistrer automatiquement les projets
-	Automatically transcribe clips	Transcrire automatiquement les clips
 	Automation Keyframe Optimization	Optimisation des images clés d'automatisation
 	Background Color	Couleur d'arrière-plan
 	Background Corner Radius	Rayon des angles de l'arrière-plan
@@ -1490,7 +1444,6 @@
 	Clock Wipe (Legacy)	Balayage horloge (ancien)
 	Clockwise	Sens horaire
 	Clone	Cloner
-	Closed Captions	Sous-titres codés
 	Color & Alpha	Couleur et alpha
 	Color 1	Couleur 1
 	Color 2	Couleur 2
@@ -1580,7 +1533,6 @@
 	Default Emoji font	Police d'emoji par défaut
 	Default Media Scaling	Mise à l'échelle des médias par défaut
 	Default Output	Sortie par défaut
-	Default closed caption font	Police par défaut des sous-titres codés
 	Default language	Langue par défaut
 	Default paragraph direction	Sens de paragraphe par défaut
 	Default subtitle and text font	Police par défaut des sous-titres et du texte
@@ -1631,7 +1583,6 @@
 	Distortion Type	Type de distorsion
 	Divide	Diviser
 	Do not delete cache files automatically	Ne pas supprimer automatiquement les fichiers de cache
-	Don't label speakers	Ne pas étiqueter les intervenants
 	Double-click	Double-clic
 	Draft decoding at reduced playback resolution (H.264: faster, some frames less filtered)	Décodage brouillon à résolution de lecture réduite (H.264 : plus rapide, certaines images moins filtrées)
 	Drive	Saturation
@@ -1878,7 +1829,6 @@
 	In the Media Cache	Dans le cache des médias
 	In the project	Dans le projet
 	In/Out Duration	Durée de l'entrée à la sortie
-	Include captions on import	Inclure les sous-titres lors de l'importation
 	Incoming	Entrant
 	Indeterminate Media Timebase	Base temporelle des médias indéterminée
 	Initial Delay	Retard initial
@@ -1925,7 +1875,6 @@
 	Keying	Incrustation
 	Korean	Coréen
 	Label Defaults	Étiquettes par défaut
-	Label speakers	Étiqueter les intervenants
 	Labels	Étiquettes
 	Large Hall	Grande salle
 	Large Trim Offset	Grand décalage de rognage
@@ -2038,7 +1987,6 @@
 	Maximum Scale	Échelle maximale
 	Media	Médias
 	Media Analysis	Analyse des médias
-	Media Analysis & Transcription	Analyse et transcription des médias
 	Media Cache	Cache des médias
 	Media Cache Database	Base de données du cache des médias
 	Media Cache Files	Fichiers du cache des médias
@@ -2048,7 +1996,6 @@
 	Media Time	Temps du média
 	Media Timecode	Timecode du média
 	Media Type	Type de média
-	Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.	Les analyses et transcriptions des médias seront mises en cache dans le dossier du cache des médias. Aucune nouvelle analyse ne sera nécessaire si les médias sont importés dans un autre projet sur cet ordinateur.
 	Median	Médiane
 	Medium Room	Pièce moyenne
 	Memory	Mémoire
@@ -2430,10 +2377,8 @@
 	Spacer	Espaceur
 	Spanish	Espagnol
 	Speaker Angle	Angle du haut-parleur
-	Speaker Labeling	Identification des intervenants
 	Special	Spécial
 	Special Effects	Effets spéciaux
-	Speech model	Modèle de parole
 	Speed	Vitesse
 	Spherize	Sphériser
 	Spiky	Hérissé
@@ -2556,8 +2501,6 @@
 	Top Right	En haut à droite
 	Touch	Toucher
 	Track Matte Key	Incrustation par cache de piste
-	Transcription	Transcription
-	Transcription preferences	Préférences de transcription
 	Transform	Transformation
 	Transformers	Transformateurs
 	Transience	Transitoires
@@ -2682,9 +2625,6 @@
 	When Opening a Project	À l'ouverture d'un projet
 	Whip	Fouetté
 	Whip (Legacy)	Fouetté (ancien)
-	Whisper base (balanced)	Whisper base (équilibré)
-	Whisper small (most accurate)	Whisper small (le plus précis)
-	Whisper tiny (fastest)	Whisper tiny (le plus rapide)
 	White	Blanc
 	White Input Level	Niveau d'entrée du blanc
 	White Is High	Le blanc est haut
@@ -2741,7 +2681,6 @@
 	Normalize Mix Track	Normaliser la piste de mixage
 	Simplify Sequence	Simplifier la séquence
 	Simplify	Simplifier
-	Transcribe Sequence	Transcrire la séquence
 	Save as Template	Enregistrer comme modèle
 	Flash Cue Marker	Marqueur de repère Flash
 	System Compatibility Report	Rapport de compatibilité système
@@ -2819,7 +2758,7 @@
 	Gaps	Espaces vides
 	Video effects	Effets vidéo
 	Audio effects	Effets audio
-	Text (graphics and captions)	Texte (graphiques et sous-titres)
+	Text (graphics)	Texte (graphiques et sous-titres)
 	Clips	Clips
 	Move clips to the lowest track possible	Déplacer les clips vers la piste la plus basse possible
 	Keep:	Conserver :
@@ -2829,7 +2768,6 @@
 	Language:	Langue :
 	Audio on track {t}	Audio de la piste {t}
 	Audio analysis:	Analyse audio :
-	Recognize when different speakers are talking	Reconnaître les changements d'intervenant
 	Template Name:	Nom du modèle :
 	Comments:	Commentaires :
 	 (unavailable)	 (indisponible)
@@ -2893,12 +2831,9 @@
 	Preset	Préréglage
 	More presets…	Plus de préréglages…
 	Multiplexer	Multiplexeur
-	The sequence has no caption track.	La séquence ne comporte aucune piste de sous-titres.
 	Export Options	Options d'exportation
-	Burn Captions Into Video	Incruster les sous-titres dans la vidéo
 	Create Sidecar File	Créer un fichier annexe
 	File Format	Format de fichier
-	SubRip Subtitle (.srt)	Sous-titres SubRip (.srt)
 	WebVTT (.vtt)	WebVTT (.vtt)
 	Title	Titre
 	Creator	Créateur
@@ -3058,15 +2993,12 @@
 	Decrease Leading by Five Units	Réduire l'interlignage de cinq unités
 	Decrease Leading by One Unit	Réduire l'interlignage d'une unité
 	Decrease Video Tracks Height	Réduire la hauteur des pistes vidéo
-	Delete Captions	Supprimer les sous-titres
 	Delete Graphic Layer	Supprimer le calque graphique
 	Delete Guide Template	Supprimer le modèle de repères
 	Delete Media Cache Files	Supprimer les fichiers du cache des médias
 	Discard Unsaved Changes	Abandonner les modifications non enregistrées
 	Does Not Contain	Ne contient pas
-	Download Speech Model	Télécharger le modèle vocal
 	Dynamic Trim Stop	Arrêter le rognage dynamique
-	Edit Caption Text	Modifier le texte du sous-titre
 	Ellipse Tool	Outil Ellipse
 	Ends With	Se termine par
 	Entire Source	Source entière
@@ -3143,7 +3075,6 @@
 	Media Browser Settings	Paramètres de l'Explorateur de médias
 	MediaBrowser	Explorateur de médias
 	MediaCache	Cache des médias
-	Merge Captions	Fusionner les sous-titres
 	Mixer	Mixeur
 	Mosaic In	Entrée en mosaïque
 	Move All Audio Targets Down	Descendre toutes les cibles audio
@@ -3257,7 +3188,6 @@
 	Set Project Panel View	Définir l'affichage du panneau Projet
 	Show Next Screen	Afficher l'écran suivant
 	Show Previous Screen	Afficher l'écran précédent
-	Show Program Transcript	Afficher la transcription du programme
 	Shuttle Left	Navette vers la gauche
 	Shuttle Right	Navette vers la droite
 	Shuttle Slow Left	Navette lente vers la gauche
@@ -3276,7 +3206,6 @@
 	Social Vertical 1080×1920	Vertical réseaux sociaux 1080×1920
 	Soft Vignette	Vignettage doux
 	Source In/Out	Entrée/sortie source
-	Split Caption	Scinder le sous-titre
 	Square Pixels (1.0)	Pixels carrés (1.0)
 	Stack Clips	Empiler les clips
 	Start Export Queue	Démarrer la file d'attente d'exportation
@@ -3548,8 +3477,6 @@
 	Solid	Uni
 	GPU Rendering	Rendu GPU
 	Composite on the GPU when available	Composer sur le GPU si disponible
-	Text to Speech	Synthèse vocale
-	Edit Narration	Modifier la narration
 	Project Notes	Notes du projet
 	Get Project Notes	Obtenir les notes du projet
 	Edit Project Notes	Modifier les notes du projet

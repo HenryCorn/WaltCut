@@ -515,7 +515,6 @@ pub(crate) fn empty_sequence(settings: SequenceSettings) -> Sequence {
         master_effects: Vec::new(),
         master_mixer: Default::default(),
         submix_tracks: Vec::new(),
-        caption_tracks: Vec::new(),
         multicam: None,
         merged: None,
         split: Default::default(),

@@ -682,7 +682,6 @@ mod tests {
             let mut session = crate::Session { project: Arc::new(project.clone()), ..Default::default() };
             session.state.project_selection = vec![a];
             assert!(!session.is_enabled("file.mediaProperties"));
-            assert!(session.execute("transcript.generate", serde_json::json!({"items":[a.0]})).is_err());
         }
     }
 

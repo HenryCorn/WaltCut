@@ -68,7 +68,6 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "clip.speedDuration",
             "clip.sceneEditDetection",
             "clip.replaceFromBin",
-            "clip.restoreCaptionsFromSource",
             "clip.updateMetadata",
             "clip.generateAudioWaveform",
             "clip.automateToSequence",
@@ -379,7 +378,6 @@ fn edit_original_update_metadata_and_clip_items() {
     assert!(d.is_enabled("clip.sourceSettings"));
     let ss = d.execute("clip.sourceSettings", json!({})).unwrap();
     assert!(ss["message"].as_str().unwrap().contains("no source settings"));
-    assert!(!d.is_enabled("clip.restoreCaptionsFromSource"));
     let w = d.execute("clip.generateAudioWaveform", json!({})).unwrap();
     assert_eq!(w["items"], json!([ocean.0]));
     // Update Metadata writes an XMP sidecar with the log fields

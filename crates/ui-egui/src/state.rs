@@ -498,25 +498,9 @@ pub struct UiState {
     /// Essential Sound sub-tab: "Edit" or "Browse".
     #[serde(default)]
     pub essential_sound_tab: String,
-    /// Text to Speech panel: the script and voice settings being written or edited.
-    #[serde(default)]
-    pub tts: crate::panels::tts::TtsDraft,
     /// Export mode: settings, preset, destination, range, the Preset Manager and Quick Export.
     #[serde(default)]
     pub export: crate::panels::export_mode::ExportUi,
-    /// Text panel: active tab ("Transcript" / "Captions" / "Graphics").
-    #[serde(default = "captions_tab")]
-    pub text_tab: String,
-    /// Text panel: caption search filter.
-    #[serde(default)]
-    pub caption_search: String,
-    /// Text panel ▸ Transcript: selected words of the sequence transcript (anchor, end; indices as
-    /// `transcript.inspect` lists them).
-    #[serde(default)]
-    pub transcript_sel: Option<(usize, usize)>,
-    /// Text panel ▸ Transcript: search text.
-    #[serde(default)]
-    pub transcript_search: String,
     /// Preferences ▸ Playback: play the rendered range when a preview render finishes.
     #[serde(default = "yes")]
     pub play_after_render: bool,
@@ -922,13 +906,11 @@ pub struct DeleteTracksDraft {
     pub video_target: String,
     pub audio: bool,
     pub audio_target: String,
-    pub captions: bool,
-    pub captions_target: String,
 }
 
 impl Default for DeleteTracksDraft {
     fn default() -> Self {
-        Self { video: false, video_target: "empty".into(), audio: false, audio_target: "empty".into(), captions: false, captions_target: "empty".into() }
+        Self { video: false, video_target: "empty".into(), audio: false, audio_target: "empty".into() }
     }
 }
 
@@ -958,10 +940,6 @@ pub struct GfxEdit {
 
 fn shown() -> bool {
     true
-}
-
-fn captions_tab() -> String {
-    "Captions".into()
 }
 
 fn yes() -> bool {
@@ -1001,12 +979,7 @@ impl Default for UiState {
             eyedropper: None,
             keyframe_selection: Vec::new(),
             essential_sound_tab: "Edit".into(),
-            tts: Default::default(),
             export: Default::default(),
-            text_tab: captions_tab(),
-            caption_search: String::new(),
-            transcript_sel: None,
-            transcript_search: String::new(),
             play_after_render: true,
             mixer_fx_open: false,
             mixer_hidden: Vec::new(),

@@ -11,7 +11,6 @@
 #   （FilmCraft、ArtCraft、Lumetri、ProRes、LUFS……）保留原文拼写。
 	About FilmCraft	关于 FilmCraft
 	Add Audio Submix Track	添加音频子混音轨道
-	Add Caption at Playhead	在播放头处添加字幕
 	Add Chapter Marker…	添加章节标记…
 	Add Edit	添加编辑
 	Add Edit to All Tracks	在所有轨道添加编辑点
@@ -19,7 +18,6 @@
 	Add Frame Hold	添加帧定格
 	Add Guide…	添加参考线…
 	Add Marker	添加标记
-	Add New Caption Track…	添加新字幕轨道…
 	Add Range Marker	添加范围标记
 	Add Range Marker to In and Out	在入点和出点间添加范围标记
 	Add Tracks…	添加轨道…
@@ -60,9 +58,7 @@
 	Bring Forward	上移一层
 	Bring to Front	置于顶层
 	Brown	棕
-	Captions	字幕
 	Captions and Graphics	字幕与图形
-	Captions…	字幕…
 	Caribbean	加勒比
 	Center Horizontally	水平居中
 	Center Vertically	垂直居中
@@ -86,7 +82,6 @@
 	Consolidate Duplicates	合并重复项
 	Copy	复制
 	Copy Paste Includes Sequence Markers	复制粘贴包含序列标记
-	Create Captions from Transcript…	根据转录文稿创建字幕…
 	Create Multi-Camera Source Sequence…	创建多机位源序列…
 	Create Proxies…	创建代理文件…
 	Cut	剪切
@@ -94,7 +89,6 @@
 	Delete Render Files	删除渲染文件
 	Delete Render Files In to Out	删除入点到出点间的渲染文件
 	Delete Tracks…	删除轨道…
-	Delete Transcript	删除转录文稿
 	Demo Footage	演示素材
 	Demo Project	演示项目
 	Deselect All	取消全选
@@ -149,10 +143,8 @@
 	Get Media File Properties for	获取媒体文件属性：
 	Go to Gap	转到间隙
 	Go to In	转到入点
-	Go to Next Caption Segment	转到下一段字幕
 	Go to Next Marker	转到下一个标记
 	Go to Out	转到出点
-	Go to Previous Caption Segment	转到上一段字幕
 	Go to Previous Marker	转到上一个标记
 	Go to Split	转到拆分点
 	Graphics and Titles	图形与字幕
@@ -161,7 +153,6 @@
 	Group	编组
 	Guide Templates	参考线模板
 	Help	帮助
-	Hide All Caption Tracks	隐藏所有字幕轨道
 	High Quality Playback	高质量播放
 	History	历史记录
 	Import From	导入来源
@@ -204,7 +195,6 @@
 	Mark Split	标记拆分点
 	Markers	标记
 	Match Frame	匹配帧
-	Media Analysis & Transcription…	媒体分析与转录…
 	Media Browser	媒体浏览器
 	Media Cache…	媒体缓存…
 	Media…	媒体…
@@ -258,8 +248,6 @@
 	Remix	重新混音
 	Remix Properties…	重新混音属性…
 	Remove Attributes…	移除属性…
-	Remove Filler Words	移除填充词
-	Remove Pauses	移除停顿
 	Remove Unused	移除未使用项
 	Rename…	重命名…
 	Render Audio	渲染音频
@@ -272,7 +260,6 @@
 	Reset All Parameters	重置所有参数
 	Reset Duration	重置持续时间
 	Reset to Saved Layout	重置为已保存的布局
-	Restore Captions from Source Clip	从源剪辑恢复字幕
 	Reveal Log Files…	显示日志文件…
 	Reverse Match Frame	反向匹配帧
 	Revert	还原
@@ -311,8 +298,6 @@
 	Sequence From Clip	从剪辑创建序列
 	Sequence Settings…	序列设置…
 	Sequence…	序列…
-	Show Active Caption Tracks Only	仅显示活动字幕轨道
-	Show All Caption Tracks	显示所有字幕轨道
 	Show All Marker Colors	显示所有标记颜色
 	Show Guides	显示参考线
 	Show Rulers	显示标尺
@@ -336,9 +321,6 @@
 	Toggle Proxies	切换代理文件
 	Tools	工具
 	Top	顶部
-	Transcribe Sequence…	转录序列…
-	Transcribe…	转录…
-	Transcript	转录文稿
 	Transparent Video…	透明视频…
 	Trim Edit	修剪编辑
 	Trim…	修剪…
@@ -346,7 +328,6 @@
 	Ungroup	取消编组
 	Universal Counting Leader…	通用计数片头…
 	Update Metadata…	更新元数据…
-	Upgrade Caption to Graphic	将字幕升级为图形
 	Upgrade to Source Graphic	升级为源图形
 	Vertical Text	竖排文本
 	Video In	视频入
@@ -557,28 +538,10 @@
 	Restore	恢复
 	Overwrite with Current View	用当前视图覆盖
 	Graphics text search arrives with M10.1–M10.2	图形文本搜索将在 M10.1–M10.2 中推出
-	Open a sequence to work with captions	打开一个序列以编辑字幕
-	Add captions	添加字幕
-	Create a caption track or import a caption file.	创建字幕轨道或导入字幕文件。
-	Create new caption track	创建新字幕轨道
-	Import captions file…	导入字幕文件…
 	New {format} track	新建 {format} 轨道
-	Add caption at playhead	在播放头处添加字幕
-	Split caption at playhead	在播放头处拆分字幕
-	Merge selected captions	合并所选字幕
-	Delete selected captions	删除所选字幕
-	No captions on this track. Press + to add one at the playhead.	此轨道暂无字幕。按 + 键在播放头处添加。
-	No matching captions.	无匹配字幕。
-	Open a sequence to see its transcript	打开一个序列以查看其转录文稿
-	Transcribe sequence	转录序列
-	Speech-to-text turns the dialogue into editable text.	语音转文字可将对白转换为可编辑文本。
-	This build has no speech-to-text; import a transcript with transcript.set.	此版本不含语音转文字；请使用 transcript.set 导入转录文稿。
-	Transcribe	转录
 	Extract selected text	提取所选文本
 	Lift selected text	提升所选文本
 	Remove filler words	移除填充词
-	Create captions	创建字幕
-	Speaker	说话人
 	Box	文本框
 	Align	对齐
 	Align left	左对齐
@@ -1214,7 +1177,6 @@
 	Open Demo Project	打开演示项目
 	Insert and overwrite sequences as nests or individual clips	以嵌套或单个剪辑方式插入和覆盖序列
 	Snap in Timeline (S)	在时间轴中吸附（S）
-	Caption track options	字幕轨道选项
 	Timeline Display Settings	时间轴显示设置
 	Show Video Thumbnails	显示视频缩略图
 	Head	首帧
@@ -1277,7 +1239,6 @@
 	Alpha Blurriness	Alpha 模糊度
 	Alpha Channel	Alpha 通道
 	Alpha Glow	Alpha 辉光
-	Always import embedded CEA-708 closed captions with wide aspect.	始终以宽幅宽高比导入内嵌的 CEA-708 隐藏字幕。
 	Always override audio tags	始终覆盖音频标签
 	Ambience	环境氛围
 	Ambience Intensity	环境强度
@@ -1322,8 +1283,6 @@
 	Auto Save	自动保存
 	Auto Save also saves the current project(s)	自动保存同时保存当前项目
 	Auto-tag audio types in the timeline	在时间轴中自动标记音频类型
-	Auto-transcribe all imported clips	自动转录所有导入的剪辑
-	Auto-transcribe only clips in sequences	仅自动转录序列中的剪辑
 	Automatch Time	自动匹配时间
 	Automatic Click Remover	自动咔嗒声消除
 	Automatically Hide Dependent Clips	自动隐藏依赖剪辑
@@ -1333,7 +1292,6 @@
 	Automatically refresh growing files	自动刷新增长中的文件
 	Automatically resume playback for growing files in Source Monitor	自动恢复源监视器中增长文件的播放
 	Automatically save projects	自动保存项目
-	Automatically transcribe clips	自动转录剪辑
 	Automation Keyframe Optimization	自动化关键帧优化
 	Background Color	背景颜色
 	Background Corner Radius	背景圆角半径
@@ -1478,7 +1436,6 @@
 	Clock Wipe (Legacy)	时钟擦除（旧版）
 	Clockwise	顺时针
 	Clone	克隆
-	Closed Captions	隐藏字幕
 	Color & Alpha	颜色与 Alpha
 	Color 1	颜色 1
 	Color 2	颜色 2
@@ -1568,7 +1525,6 @@
 	Default Emoji font	默认表情符号字体
 	Default Media Scaling	默认媒体缩放
 	Default Output	默认输出
-	Default closed caption font	默认隐藏字幕字体
 	Default language	默认语言
 	Default paragraph direction	默认段落方向
 	Default subtitle and text font	默认字幕与文本字体
@@ -1619,7 +1575,6 @@
 	Distortion Type	畸变类型
 	Divide	分割
 	Do not delete cache files automatically	不自动删除缓存文件
-	Don't label speakers	不标记说话人
 	Double-click	双击
 	Draft decoding at reduced playback resolution (H.264: faster, some frames less filtered)	以降低的播放分辨率进行草稿解码（H.264：更快，部分帧滤波较少）
 	Drive	驱动器
@@ -1866,7 +1821,6 @@
 	In the Media Cache	在媒体缓存中
 	In the project	在项目中
 	In/Out Duration	入点/出点时长
-	Include captions on import	导入时包含字幕
 	Incoming	入向
 	Indeterminate Media Timebase	不确定的媒体时基
 	Initial Delay	初始延迟
@@ -1908,7 +1862,6 @@
 	Keying	键控
 	Korean	韩语
 	Label Defaults	标签默认值
-	Label speakers	标记说话人
 	Labels	标签
 	Large Hall	大厅
 	Large Trim Offset	大修剪偏移
@@ -2021,7 +1974,6 @@
 	Maximum Scale	最大缩放
 	Media	媒体
 	Media Analysis	媒体分析
-	Media Analysis & Transcription	媒体分析与转录
 	Media Cache	媒体缓存
 	Media Cache Database	媒体缓存数据库
 	Media Cache Files	媒体缓存文件
@@ -2031,7 +1983,6 @@
 	Media Time	媒体时间
 	Media Timecode	媒体时间码
 	Media Type	媒体类型
-	Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.	媒体分析与转录将缓存在媒体缓存文件夹中。若媒体在本机其他项目中再次导入，无需重新分析。
 	Median	中位数
 	Medium Room	中等房间
 	Memory	内存
@@ -2413,10 +2364,8 @@
 	Spacer	间隔
 	Spanish	西班牙语
 	Speaker Angle	扬声器角度
-	Speaker Labeling	扬声器标签
 	Special	特殊
 	Special Effects	特殊效果
-	Speech model	语音模型
 	Speed	速度
 	Spherize	球面化
 	Spiky	尖锐
@@ -2539,8 +2488,6 @@
 	Top Right	右上
 	Touch	触摸
 	Track Matte Key	轨道遮罩键
-	Transcription	转录
-	Transcription preferences	转录偏好设置
 	Transform	变换
 	Transformers	变换器
 	Transience	瞬态
@@ -2665,9 +2612,6 @@
 	When Opening a Project	打开项目时
 	Whip	抽鞭
 	Whip (Legacy)	抽鞭（旧版）
-	Whisper base (balanced)	Whisper base（均衡）
-	Whisper small (most accurate)	Whisper small（最准确）
-	Whisper tiny (fastest)	Whisper tiny（最快）
 	White	白色
 	White Input Level	白色输入电平
 	White Is High	白色为高
@@ -2724,7 +2668,6 @@
 	Normalize Mix Track	标准化混音轨道
 	Simplify Sequence	简化序列
 	Simplify	简化
-	Transcribe Sequence	转录序列
 	Save as Template	另存为模板
 	Flash Cue Marker	闪存提示标记
 	System Compatibility Report	系统兼容性报告
@@ -2802,7 +2745,7 @@
 	Gaps	间隙
 	Video effects	视频效果
 	Audio effects	音频效果
-	Text (graphics and captions)	文本（图形与字幕）
+	Text (graphics)	文本（图形与字幕）
 	Clips	剪辑
 	Move clips to the lowest track possible	将剪辑移至尽可能低的轨道
 	Keep:	保留：
@@ -2812,7 +2755,6 @@
 	Language:	语言：
 	Audio on track {t}	轨道 {t} 上的音频
 	Audio analysis:	音频分析：
-	Recognize when different speakers are talking	识别不同说话人讲话时
 	Template Name:	模板名称：
 	Comments:	注释：
 	 (unavailable)	（不可用）
@@ -2876,12 +2818,9 @@
 	Preset	预设
 	More presets…	更多预设…
 	Multiplexer	复用器
-	The sequence has no caption track.	该序列没有字幕轨道。
 	Export Options	导出选项
-	Burn Captions Into Video	将字幕烧录到视频
 	Create Sidecar File	创建附带文件
 	File Format	文件格式
-	SubRip Subtitle (.srt)	SubRip 字幕（.srt）
 	WebVTT (.vtt)	WebVTT（.vtt）
 	Title	标题
 	Creator	创建者
@@ -3046,15 +2985,12 @@
 	Decrease Leading by Five Units	将行距减小五个单位
 	Decrease Leading by One Unit	将行距减小一个单位
 	Decrease Video Tracks Height	降低视频轨道高度
-	Delete Captions	删除字幕
 	Delete Graphic Layer	删除图形图层
 	Delete Guide Template	删除参考线模板
 	Delete Media Cache Files	删除媒体缓存文件
 	Discard Unsaved Changes	放弃未保存的更改
 	Does Not Contain	不包含
-	Download Speech Model	下载语音模型
 	Dynamic Trim Stop	动态修剪停止
-	Edit Caption Text	编辑字幕文本
 	Ellipse Tool	椭圆工具
 	Ends With	结尾为
 	Entire Source	整个源
@@ -3131,7 +3067,6 @@
 	Media Browser Settings	媒体浏览器设置
 	MediaBrowser	MediaBrowser
 	MediaCache	MediaCache
-	Merge Captions	合并字幕
 	Mixer	混音器
 	Mosaic In	马赛克入
 	Move All Audio Targets Down	将所有音频目标下移
@@ -3257,7 +3192,6 @@
 	Set Project Panel View	设置项目面板视图
 	Show Next Screen	显示下一个屏幕
 	Show Previous Screen	显示上一个屏幕
-	Show Program Transcript	显示节目转录
 	Shuttle Left	向左穿梭
 	Shuttle Right	向右穿梭
 	Shuttle Slow Left	向左慢速穿梭
@@ -3276,7 +3210,6 @@
 	Social Vertical 1080×1920	社交竖版 1080×1920
 	Soft Vignette	柔和暗角
 	Source In/Out	源入/出点
-	Split Caption	拆分字幕
 	Square Pixels (1.0)	方形像素（1.0）
 	Stack Clips	堆叠剪辑
 	Start Export Queue	启动导出队列
@@ -3542,8 +3475,6 @@
 	Auto (system)	自动（系统）
 	GPU Rendering	GPU 渲染
 	Composite on the GPU when available	可用时在 GPU 上合成
-	Text to Speech	文字转语音
-	Edit Narration	编辑旁白
 	Clear Transition	清除过渡
 	Set Transition Duration	设置过渡持续时间
 	Resize floating panel	调整浮动面板大小
@@ -3554,10 +3485,6 @@
 	Edit Project Notes	编辑项目备注
 	Notes for this project: to-dos, instructions, frame numbers… Saved with the project.	此项目的备注：待办事项、说明、帧号等… 随项目一起保存。
 	GPU acceleration is unavailable; preview renders on the CPU	GPU 加速不可用；预览在 CPU 上渲染
-	Caption Tracks	字幕轨道
-	Delete Caption Track	删除字幕轨道
-	Delete Caption Tracks	删除多个字幕轨道
-	Delete Empty Caption Tracks	删除空字幕轨道
 
 	Appearance Settings…	外观设置…
 

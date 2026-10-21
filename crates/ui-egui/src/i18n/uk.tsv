@@ -6,7 +6,6 @@
 
 	About FilmCraft	Про FilmCraft
 	Add Audio Submix Track	Додати доріжку підміксу аудіо
-	Add Caption at Playhead	Додати субтитр у позиції курсора відтворення
 	Add Chapter Marker…	Додати маркер розділу…
 	Add Edit	Додати розріз
 	Add Edit to All Tracks	Додати розріз на всіх доріжках
@@ -14,7 +13,6 @@
 	Add Frame Hold	Додати стоп-кадр
 	Add Guide…	Додати напрямну…
 	Add Marker	Додати маркер
-	Add New Caption Track…	Додати нову доріжку субтитрів…
 	Add Range Marker	Додати маркер діапазону
 	Add Range Marker to In and Out	Додати маркер діапазону між початковою та кінцевою позначками
 	Add Tracks…	Додати доріжки…
@@ -56,9 +54,7 @@
 	Bring Forward	Перемістити вперед
 	Bring to Front	На передній план
 	Brown	Коричневий
-	Captions	Субтитри
 	Captions and Graphics	Субтитри й графіка
-	Captions…	Субтитри…
 	Caribbean	Карибський
 	Center Horizontally	По центру горизонтально
 	Center Vertically	По центру вертикально
@@ -83,7 +79,6 @@
 	Consolidate Duplicates	Об’єднати дублікати
 	Copy	Копіювати
 	Copy Paste Includes Sequence Markers	Копіювати й вставляти разом із маркерами секвенції
-	Create Captions from Transcript…	Створити субтитри з транскрипції…
 	Create Multi-Camera Source Sequence…	Створити вихідну мультикамерну секвенцію…
 	Create Proxies…	Створити проксі…
 	Cut	Вирізати
@@ -92,7 +87,6 @@
 	Delete Render Files	Видалити файли рендерингу
 	Delete Render Files In to Out	Видалити файли рендерингу між початковою та кінцевою позначками
 	Delete Tracks…	Видалити доріжки…
-	Delete Transcript	Видалити транскрипцію
 	Demo Footage	Демонстраційні матеріали
 	Demo Project	Демонстраційний проєкт
 	Deselect All	Зняти все виділення
@@ -147,10 +141,8 @@
 	Get Media File Properties for	Показати властивості медіафайлу для
 	Go to Gap	Перейти до проміжку
 	Go to In	Перейти до початкової позначки
-	Go to Next Caption Segment	Перейти до наступного сегмента субтитрів
 	Go to Next Marker	Перейти до наступного маркера
 	Go to Out	Перейти до кінцевої позначки
-	Go to Previous Caption Segment	Перейти до попереднього сегмента субтитрів
 	Go to Previous Marker	Перейти до попереднього маркера
 	Go to Split	Перейти до розділеної позначки
 	Graphics and Titles	Графіка й титри
@@ -159,7 +151,6 @@
 	Group	Згрупувати
 	Guide Templates	Шаблони напрямних
 	Help	Довідка
-	Hide All Caption Tracks	Приховати всі доріжки субтитрів
 	High Quality Playback	Відтворення у високій якості
 	History	Історія
 	Import From	Імпортувати з
@@ -201,7 +192,6 @@
 	Mark Split	Установити розділену позначку
 	Markers	Маркери
 	Match Frame	Знайти відповідний кадр
-	Media Analysis & Transcription…	Аналіз медіа й транскрибування…
 	Media Browser	Медіабраузер
 	Media Cache…	Медіакеш…
 	Media…	Медіа…
@@ -254,8 +244,6 @@
 	Remix	Ремікс
 	Remix Properties…	Властивості реміксу…
 	Remove Attributes…	Видалити атрибути…
-	Remove Filler Words	Видалити слова-паразити
-	Remove Pauses	Видалити паузи
 	Remove Unused	Видалити невикористане
 	Rename…	Перейменувати…
 	Render Audio	Рендерити аудіо
@@ -268,7 +256,6 @@
 	Reset All Parameters	Скинути всі параметри
 	Reset Duration	Скинути тривалість
 	Reset to Saved Layout	Відновити збережене компонування
-	Restore Captions from Source Clip	Відновити субтитри з вихідного кліпу
 	Reveal Log Files…	Показати файли журналу…
 	Reverse Match Frame	Знайти відповідний кадр у секвенції
 	Revert	Повернути до збереженого
@@ -308,8 +295,6 @@
 	Sequence Settings…	Налаштування секвенції…
 	Sequence…	Секвенція…
 	Settings	Налаштування
-	Show Active Caption Tracks Only	Показати лише активні доріжки субтитрів
-	Show All Caption Tracks	Показати всі доріжки субтитрів
 	Show All Marker Colors	Показати всі кольори маркерів
 	Show Guides	Показати напрямні
 	Show Rulers	Показати лінійки
@@ -333,9 +318,6 @@
 	Toggle Proxies	Перемкнути проксі
 	Tools	Інструменти
 	Top	Верх
-	Transcribe Sequence…	Транскрибувати секвенцію…
-	Transcribe…	Транскрибувати…
-	Transcript	Транскрипція
 	Transparent Video…	Прозоре відео…
 	Trim Edit	Підрізати склейку
 	Trim…	Підрізання…
@@ -343,7 +325,6 @@
 	Ungroup	Розгрупувати
 	Universal Counting Leader…	Універсальний зворотний відлік…
 	Update Metadata…	Оновити метадані…
-	Upgrade Caption to Graphic	Перетворити субтитр на графіку
 	Upgrade to Source Graphic	Перетворити на вихідну графіку
 	Vertical Text	Вертикальний текст
 	Video In	Початок відео

@@ -26,7 +26,7 @@ Design principles:
  L5  ui-egui · automation · platform
  L4  engine
  L3  render · gpu · export · golden (test-only)
- L2  edit · codecs · interchange · captions · speech · tts · tts-text
+ L2  edit · codecs · interchange
  L1  frame · media · project · audio-dsp · text
  L0  foundation: time · geom · color · bitstream · testkit (dev-dependency only)
      codecs/containers: isobmff · matroska · mxf · cfb · mpegts · ogg · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · dnx · apv · dng · aac · ac3 · mpa · opus
@@ -64,10 +64,7 @@ and `filmcraft-cli`.
 | `project` | L1 | document model, effect definitions, keyframes |
 | `audio-dsp` | L1 | loudness metering (BS.1770 / R128), audio effects, channel layouts (BS.775 up/downmix, 5.1 panner), music remix analysis; no dependencies |
 | `text` | L1 | text engine: font database (bundled OFL fonts + system fonts), shaping (harfrust), bidi, line breaking, paragraph layout, glyph/path rasteriser, strokes ([crates/text/README.md](../crates/text/README.md)) |
-| `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…; text-based editing: `edit::transcript`) |
-| `speech` | L2 | speech-to-text: `Transcriber` trait, Whisper model catalogue + verified downloader (feature `download`), pure-Rust Whisper inference on candle with word timestamps (feature `whisper`), speaker labelling ([transcripts.md](transcripts.md)) |
-| `tts` | L2 | text to speech: `Voice` trait, voice catalogue, pause markers, built-in formant voices; Kokoro-82M natural voices on candle and their pinned package catalogue (feature `kokoro`). Same-layer edge to `tts-text` |
-| `tts-text` | L2 | text front end for narration: normalizer (numbers, money, dates, acronyms, pauses) and English pronunciation (CMUdict + letter-to-sound) to Kokoro phonemes |
+| `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…) |
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
 | `interchange` | L2 | EDL, FCP7 XML, FCPXML, OTIO, AAF (on `cfb`) and OMF 2.0 import/export (no file I/O; the engine supplies rendered audio essence) ([README](../crates/interchange/README.md)) |
 | `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
@@ -461,10 +458,6 @@ stereo / mono track ──5.1 panner───┼─► 5.1 submix / 5.1 Mix ─�
 
 **Voice-over recording** (`engine::voiceover`, `audio.voiceover.*`). The record point R is the playhead, or the In point when In/Out are set (punch-in; punch-out at Out). Playback starts the pre-roll before it (C = max(0, R − pre-roll)) and the input is captured from C. When the UI's audio clock really starts, `audio.voiceover.sync` restarts the capture there. `audio.voiceover.stop` keeps the audio from R to min(stop, Out), writes a mono 32-bit float WAV `<Name> <n>.wav` (Scratch Disks ▸ Captured, else next to the project, else the data or temporary directory), imports it and overwrites it onto the record track at R as one undo step. The record track is the given one, else the record-armed one, else the first targeted one. Input goes through the `AudioInput` trait: cpal in the desktop app (`apps/waltcut/src/audio_in.rs`, on its own thread), and `SyntheticInput` headless, which produces exactly the samples the timeline asks for so recordings land sample-accurately. Voice-Over Record Settings (Source, Input channel, Name, Countdown Sound Cues, Pre-/Post-roll) are preferences (`voiceOver`). The track header's microphone records or stops, and a right-click opens the settings dialog. Countdown beeps (1 kHz, 100 ms, each whole second of pre-roll and at R) are mixed into playback, an overlay counts down, and playback stops at Out + post-roll. A take records anywhere, also on the empty timeline past the end of the sequence: starting it never returns the playhead to the beginning, and playback keeps going past the end until the take is stopped.
 
-### 5.1.2a Text to Speech (narrations)
-
-**Narrations** (`engine::narration`, `tts.*`; voices in `waltcut-tts`). The Text to Speech panel (Window ▸ Text to Speech) writes a script with pause markers (`[pause 1s]`), a voice, a vocal pitch and a pace; `tts.create` synthesizes it, writes `Narration <n>.wav` (mono 32-bit float, 24 kHz, where voice-over recordings go), imports it and places it at the playhead on the first free targeted audio track, else the first free audio track, else a new one, as one undo step. The settings are kept per generated item in `Project::narrations` (schema v14). Selecting a narration clip loads it into the panel; `tts.edit` writes a new file (beside the previous one) and swaps the clip to it, keeping the clip's start, duration and speed: longer speech is kept whole in the file but plays only to the clip's end; shorter speech is padded with silence to the clip's length. The old item and narration stay, so undo is exact. `tts.preview` synthesizes without changing the project and the UI plays `Session::tts_preview` on the audio output. Built-in voices are an original formant synthesizer (robotic, no download). The natural voices (feature `neural-voices` of the desktop app, off by default like `whisper`) are Kokoro-82M on candle (`waltcut-tts`) fed by `waltcut-tts-text` (normalizer, CMUdict + letter-to-sound); their 336 MB package is downloaded once after the user confirms (`tts.downloadVoices`, a job). The UI synthesizes with `tts.render` (a job filling `Session::tts_cache`) and then runs create / edit / preview, which use the cache.
-
 ### 5.1.3 Remix
 
 ```text
@@ -685,7 +678,7 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
   maximum render quality), Audio (codec, sample rate, channels, AAC bitrate, PCM / FLAC sample size: `bits` 16, 24 or 32
   and `float` for 32-bit float PCM in WAV, AIFF and QuickTime — `supports_sample_format` says
   which a codec and container store, and Export mode greys out the rest),
-  Multiplexer (audio channels: mono, stereo or 5.1, §5.1.1), Captions (burn-in or SRT / WebVTT sidecar), Effects (image / name / timecode
+  Multiplexer (audio channels: mono, stereo or 5.1, §5.1.1), Effects (image / name / timecode
   overlays, video limiter, loudness normalization), Metadata (`udta` `©nam`, `©ART`, `©cpy`, `©des`,
   `©cmt`). `settings.summary()` / `estimate_bytes()` feed Export mode's Summary.
 - **Presets.** `export::presets::builtin_presets()` are our own definitions (Match Source adaptive

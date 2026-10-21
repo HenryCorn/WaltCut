@@ -805,7 +805,6 @@ mod tests {
         crate::credits::NameMode::ALL.iter().for_each(|m| push(&mut out, m.label()));
         crate::credits::SortKey::ALL.iter().for_each(|k| push(&mut out, k.label().0));
         waltcut_project::TimeInterpolation::ALL.iter().for_each(|m| push(&mut out, m.label()));
-        waltcut_project::CaptionFormat::ALL.iter().for_each(|f| push(&mut out, f.label()));
         waltcut_project::MaskMode::ALL.iter().for_each(|m| push(&mut out, m.label()));
         use waltcut_project::essential as es;
         for kind in es::AudioType::ALL {

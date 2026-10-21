@@ -279,29 +279,6 @@ fn character_styles_follow_edits() {
 }
 
 #[test]
-fn upgrade_caption_to_graphic() {
-    let mut s = demo("gt-caption");
-    s.execute("captions.add", json!({"text": "Hello <i>there</i>", "seconds": 600, "durationSeconds": 2})).unwrap();
-    let caps = s.execute("captions.list", json!({})).unwrap()["tracks"][0]["captions"].clone();
-    let before = caps.as_array().unwrap().len();
-    let cap = caps.as_array().unwrap().iter().find(|c| c["text"] == "Hello <i>there</i>").unwrap().clone();
-    let r = s.execute("graphics.upgradeCaption", json!({})).unwrap();
-    assert_eq!(r["upgraded"], 1);
-    let c = ClipId(r["clips"][0].as_u64().unwrap());
-    assert_eq!(texts(&s, c), vec!["Hello there"]);
-    let it = item(&s, c);
-    assert_eq!(it.start.0, cap["start"].as_i64().unwrap());
-    assert_eq!(it.end().0, cap["end"].as_i64().unwrap());
-    let ex = it.effects.iter().find(|e| e.effect == "graphic_text").unwrap().layer.as_ref().unwrap();
-    assert_eq!((ex.runs[0].start, ex.runs[0].end, ex.runs[0].style.faux_italic), (6, 11, Some(true)));
-    let after = s.execute("captions.list", json!({})).unwrap()["tracks"][0]["captions"].as_array().unwrap().len();
-    assert_eq!(after, before - 1, "the caption became a graphic");
-    s.execute("edit.undo", json!({})).unwrap();
-    assert!(s.active_sequence().unwrap().find_item(c).is_none());
-    assert_eq!(s.execute("captions.list", json!({})).unwrap()["tracks"][0]["captions"].as_array().unwrap().len(), before);
-}
-
-#[test]
 fn source_graphics_share_edits() {
     let mut s = demo("gt-source");
     let c = clip_of(&s.execute("graphics.newText", json!({"text": "Shared"})).unwrap());
@@ -340,28 +317,6 @@ fn replace_fonts_in_project() {
     s.execute("edit.undo", json!({})).unwrap();
     let used = s.execute("graphics.fonts.used", json!({})).unwrap();
     assert!(used.as_array().unwrap().iter().any(|f| f["family"] == "Noto Serif"));
-}
-
-#[test]
-fn caption_formats_through_the_engine() {
-    let mut s = demo("gt-capfmt");
-    s.execute("captions.add", json!({"text": "One", "seconds": 1, "durationSeconds": 2})).unwrap();
-    s.execute("captions.add", json!({"text": "Two\nlines", "seconds": 4, "durationSeconds": 1})).unwrap();
-    let d = tmp_dir("gt-capfmt-files");
-    let want = s.execute("captions.list", json!({})).unwrap()["tracks"][0]["captions"].clone();
-    for ext in ["mcc", "stl", "ttml", "dfxp"] {
-        let path = d.join(format!("caps.{ext}")).to_string_lossy().to_string();
-        let r = s.execute("captions.export", json!({"path": path})).unwrap();
-        assert_eq!(r["captions"], 2, "{ext}");
-        let imp = s.execute("captions.import", json!({"path": path})).unwrap();
-        assert_eq!(imp["captions"], 2, "{ext}: {imp}");
-        let got = s.execute("captions.list", json!({"track": "C1"})).unwrap()["tracks"][0]["captions"].clone();
-        for i in 0..2 {
-            assert_eq!(got[i]["text"], want[i]["text"], "{ext}");
-            assert_eq!(got[i]["in"], want[i]["in"], "{ext}");
-            assert_eq!(got[i]["out"], want[i]["out"], "{ext}");
-        }
-    }
 }
 
 /// #188: a copied Graphic clip pastes at the playhead as a second Graphic clip.

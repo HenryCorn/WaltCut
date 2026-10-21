@@ -70,9 +70,6 @@ pub struct RenderOptions {
     pub effects: bool,
     /// Nesting depth guard (see [`MAX_NEST_DEPTH`]).
     pub depth: u32,
-    /// Draw the sequence's visible caption tracks over the picture (Program monitor, burn-in on
-    /// export). Never applies to nested sequences.
-    pub captions: bool,
     /// Return the image in the sequence's working space (HDR exports, scopes) instead of
     /// converting it for an SDR monitor. Only matters for HDR / wide-gamut sequences.
     pub working_output: bool,
@@ -80,7 +77,7 @@ pub struct RenderOptions {
 
 impl Default for RenderOptions {
     fn default() -> Self {
-        Self { scale: 1.0, effects: true, depth: 0, captions: false, working_output: false }
+        Self { scale: 1.0, effects: true, depth: 0, working_output: false }
     }
 }
 
@@ -261,12 +258,6 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
     if opts.depth == 0 && !opts.working_output {
         colorman::to_display(&mut canvas, &seq.settings.color);
     }
-    // (a nested sequence's captions are part of its picture: see `base_layer`)
-    if opts.captions {
-        for o in caption_overlays(seq, t, w, h) {
-            o.composite_onto(&mut canvas.px, w, h);
-        }
-    }
     canvas
 }
 
@@ -335,14 +326,6 @@ fn adjustment_region(seq: &Sequence, item: &TrackItem, project: &Project, mt: Ti
         return None;
     }
     Some(Image::filled(fw, fh, [1.0; 4]).transformed(w, h, &m))
-}
-
-/// Rendered captions of the visible caption tracks at `t` for a `w`×`h` output.
-pub fn caption_overlays(seq: &Sequence, t: Tick, w: usize, h: usize) -> Vec<waltcut_captions::burn::Overlay> {
-    if seq.caption_tracks.is_empty() {
-        return Vec::new();
-    }
-    waltcut_captions::burn::sequence_overlays(seq, t, w, h)
 }
 
 fn with_opacity(mut img: Image, op: f32) -> Image {
@@ -624,7 +607,7 @@ pub(crate) fn base_layer(
             media_image(project, seq, item, t, &src, &frame, n, want)
         }
         ItemKind::Sequence(nested) => {
-            let sub = RenderOptions { scale: want, effects: opts.effects, depth: opts.depth + 1, captions: false, working_output: true };
+            let sub = RenderOptions { scale: want, effects: opts.effects, depth: opts.depth + 1, working_output: true };
             match item.multicam_angle(nested) {
                 // a multi-camera clip shows its angle's track only (nothing for an audio-only angle)
                 Some(angle) => match nested.angle_video_track_index(angle) {
@@ -634,9 +617,7 @@ pub(crate) fn base_layer(
                         Image::new(nw, nh)
                     }
                 },
-                // A nested sequence shows its captions wherever it is nested, as part of its
-                // picture (Premiere does the same), whether or not the outer sequence shows its own.
-                None => render_seq(project, nested, ft, RenderOptions { captions: true, ..sub }, sources),
+                None => render_seq(project, nested, ft, sub, sources),
             }
         }
         ItemKind::AdjustmentLayer { .. } => return None,

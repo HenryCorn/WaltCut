@@ -166,7 +166,6 @@ pub struct Preferences {
     pub graphics: settings::GraphicsPrefs,
     pub labels: settings::LabelPrefs,
     pub media: MediaPrefs,
-    pub media_analysis: settings::MediaAnalysisPrefs,
     pub media_cache: settings::MediaCachePrefs,
     pub memory: settings::MemoryPrefs,
     pub playback: PlaybackPrefs,
@@ -198,7 +197,6 @@ impl Default for Preferences {
             graphics: Default::default(),
             labels: Default::default(),
             media: Default::default(),
-            media_analysis: Default::default(),
             media_cache: Default::default(),
             memory: Default::default(),
             playback: Default::default(),
@@ -254,7 +252,6 @@ pub struct MediaPrefs {
     pub validate_content_credentials: bool,
     pub write_clip_markers_to_xmp: bool,
     pub enable_xmp_linking: bool,
-    pub include_captions_on_import: bool,
     /// "Enable proxies": playback and monitors read attached proxies (the monitors' Toggle
     /// Proxies button). Export always uses full-resolution media.
     pub enable_proxies: bool,
@@ -280,7 +277,6 @@ impl Default for MediaPrefs {
             validate_content_credentials: true,
             write_clip_markers_to_xmp: false,
             enable_xmp_linking: false,
-            include_captions_on_import: true,
             enable_proxies: false,
             allow_duplicate_media: false,
             create_folder_for_imported_projects: false,

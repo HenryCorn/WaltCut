@@ -4,16 +4,13 @@
 //! |---|---|---|
 //! | `sequence.applyDefaultTransitionsToSelection` | Sequence ▸ Apply Default Transitions to Selection (⇧D) | selected clips' edges; selected edit points |
 //! | `sequence.normalizeMixTrack` | Sequence ▸ Normalize Mix Track… | Mix fader so the mix peaks at the target |
-//! | `sequence.transcribe` | Sequence ▸ Transcribe Sequence… | `transcript.generate` on the sequence's audio clips |
 //! | `sequence.simplify` | Sequence ▸ Simplify Sequence… | a simplified copy of the sequence |
-//! | `captions.showActiveOnly` | Sequence ▸ Captions ▸ Show Active Caption Tracks Only | |
 //! | `markers.addFlashCue` | Markers ▸ Add Flash Cue Marker… | `MarkerKind::FlashCue` |
 //!
 //! **Simplify Sequence** (Premiere 26): makes a copy named "<name> (Simplified)" and opens it;
 //! the original is untouched. Options: remove disabled clips, remove empty tracks, close gaps (spans
 //! where no track has a clip), move video clips down to the lowest free track, remove video / audio
-//! effects (standard effects; Motion, Opacity, Volume… are kept), remove text (graphic clips and
-//! caption tracks), keep only video or only audio.
+//! effects (standard effects; Motion, Opacity, Volume… are kept), remove text (graphic clips), keep only video or only audio.
 
 use serde_json::{Value, json};
 use waltcut_edit as edit;
@@ -52,15 +49,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
         ),
         spec("sequence.normalizeMixTrack", "Normalize Mix Track…", &["Sequence"], None, r#"{"db":f64=0}"#, has_audio_clips, normalize_mix),
         spec(
-            "sequence.transcribe",
-            "Transcribe Sequence…",
-            &["Sequence"],
-            None,
-            r#"{"track":"mix"|"A1"|id?,"language":"en|auto"?,"diarize":bool?,"maxSpeakers":n?,"model":str?}"#,
-            can_transcribe_sequence,
-            transcribe,
-        ),
-        spec(
             "sequence.simplify",
             "Simplify Sequence…",
             &["Sequence"],
@@ -68,15 +56,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             r#"{"name":str?,"removeDisabled":bool=true,"removeEmptyTracks":bool=true,"closeGaps":bool=false,"moveClipsDown":bool=false,"removeVideoEffects":bool=false,"removeAudioEffects":bool=false,"removeText":bool=false,"keep":"both|video|audio"}"#,
             has_seq,
             simplify,
-        ),
-        spec(
-            "captions.showActiveOnly",
-            "Show Active Caption Tracks Only",
-            &["Sequence", "Captions"],
-            None,
-            r#"{"track":id|"C1"?}"#,
-            has_caption_track,
-            show_active_only,
         ),
         spec(
             "markers.addFlashCue",
@@ -103,18 +82,6 @@ fn has_audio_clips(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
     let q = s.active_sequence().ok_or("no sequence is open")?;
     if q.audio_tracks.iter().any(|t| !t.items.is_empty()) { Ok(()) } else { Err("the sequence has no audio clips".into()) }
-}
-
-/// Transcribe Sequence runs `transcript.generate`: disabled like it in a build without
-/// speech-to-text (#97), and when the sequence has no sound.
-fn can_transcribe_sequence(s: &Session) -> std::result::Result<(), String> {
-    crate::transcript::can_transcribe(s)?;
-    has_audio_clips(s)
-}
-
-fn has_caption_track(s: &Session) -> std::result::Result<(), String> {
-    has_seq(s)?;
-    if s.active_sequence().is_some_and(|q| !q.caption_tracks.is_empty()) { Ok(()) } else { Err("the sequence has no caption track".into()) }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -261,39 +228,6 @@ fn normalize_mix(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Transcribe Sequence
-// ---------------------------------------------------------------------------------------------
-
-/// Sequence ▸ Transcribe Sequence…: transcribe the media of the sequence's audio clips (all audio
-/// tracks — "Mix" — or one track) with `transcript.generate`.
-fn transcribe(s: &mut Session, p: &Value) -> Result<Value> {
-    let q = s.active_sequence().ok_or(EngineError::NoSequence)?;
-    let track = match p.get("track") {
-        None => None,
-        Some(Value::String(t)) if t.eq_ignore_ascii_case("mix") => None,
-        Some(_) => Some(crate::commands::track_p(s, p, "track", "sequence.transcribe")?.ok_or_else(|| bad("sequence.transcribe", "unknown `track`"))?),
-    };
-    let mut items = Vec::new();
-    for t in q.audio_tracks.iter().filter(|t| track.is_none_or(|x| x == t.id)) {
-        for it in t.items.iter().filter(|i| i.enabled) {
-            if !items.contains(&it.item.0) {
-                items.push(it.item.0);
-            }
-        }
-    }
-    if items.is_empty() {
-        return Err(EngineError::Other("there are no audio clips to transcribe".into()));
-    }
-    let mut params = json!({"items": items});
-    for k in ["language", "diarize", "maxSpeakers", "model"] {
-        if let Some(v) = p.get(k) {
-            params[k] = v.clone();
-        }
-    }
-    s.execute("transcript.generate", params)
-}
-
-// ---------------------------------------------------------------------------------------------
 // Simplify Sequence
 // ---------------------------------------------------------------------------------------------
 
@@ -369,9 +303,6 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
         }
         edit::remove_orphan_transitions(t);
     }
-    if o.remove_text {
-        q.caption_tracks.clear();
-    }
     // effects (standard ones; intrinsic Motion / Opacity / Volume… and Essential Sound stay)
     let mut removed_effects = 0usize;
     for (video, tracks) in [(true, &mut q.video_tracks), (false, &mut q.audio_tracks)] {
@@ -414,7 +345,6 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
     let mut closed = Tick::ZERO;
     if o.close_gaps {
         let mut spans: Vec<TimeRange> = q.all_tracks().flat_map(|t| t.items.iter().map(|i| i.range())).collect();
-        spans.extend(q.caption_tracks.iter().flat_map(|t| t.captions.iter().map(|c| c.range())));
         spans.sort_by_key(|r| r.start);
         let mut gaps: Vec<TimeRange> = Vec::new();
         let mut cursor = Tick::ZERO;
@@ -427,11 +357,6 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
         for g in gaps.iter().rev() {
             for t in q.video_tracks.iter_mut().chain(q.audio_tracks.iter_mut()) {
                 edit::shift_track_from(t, g.end(), Tick::ZERO - g.duration);
-            }
-            for t in &mut q.caption_tracks {
-                for c in t.captions.iter_mut().filter(|c| c.start >= g.end()) {
-                    c.start -= g.duration;
-                }
             }
             crate::sequence_tools::ripple_markers(&mut q.markers, g.end(), Tick::ZERO - g.duration);
             closed += g.duration;
@@ -481,40 +406,6 @@ fn simplify(s: &mut Session, p: &Value) -> Result<Value> {
     out["sequence"] = json!(id.0);
     out["name"] = json!(name);
     Ok(out)
-}
-
-// ---------------------------------------------------------------------------------------------
-// Captions ▸ Show Active Caption Tracks Only
-// ---------------------------------------------------------------------------------------------
-
-/// The active caption track: the one named by `track`, else the track of the selected caption,
-/// else a targeted caption track, else the top one.
-fn active_caption_track(s: &Session, p: &Value) -> Option<TrackId> {
-    let q = s.active_sequence()?;
-    if let Some(v) = p.get("track") {
-        if let Some(id) = v.as_u64() {
-            return q.caption_track(TrackId(id)).map(|t| t.id);
-        }
-        let n: usize = v.as_str()?.trim_start_matches(['C', 'c']).parse().ok()?;
-        return q.caption_tracks.get(n.checked_sub(1)?).map(|t| t.id);
-    }
-    if let Some(t) = s.state.caption_selection.iter().find_map(|c| q.find_caption(*c).map(|x| x.0)) {
-        return Some(t);
-    }
-    let tg = s.targeting().targeted;
-    q.caption_tracks.iter().find(|t| tg.contains(&t.id)).or(q.caption_tracks.first()).map(|t| t.id)
-}
-
-fn show_active_only(s: &mut Session, p: &Value) -> Result<Value> {
-    let active = active_caption_track(s, p).ok_or_else(|| bad("captions.showActiveOnly", "no such caption track"))?;
-    s.edit("Show Active Caption Tracks Only", |pr, st| {
-        let seq = st.active_sequence.ok_or(EngineError::NoSequence)?;
-        for t in &mut pr.sequence_mut(seq).ok_or(EngineError::NoSequence)?.caption_tracks {
-            t.enabled = t.id == active;
-        }
-        Ok(())
-    })?;
-    Ok(json!({"track": active.0}))
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -17,11 +17,9 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-pub mod captions;
 pub mod frame_size;
 pub mod multicam;
 pub mod through;
-pub mod transcript;
 pub mod transitions;
 
 use std::collections::HashMap;
@@ -293,9 +291,6 @@ pub fn insert(seq: &mut Sequence, placements: Vec<(TrackId, TrackItem)>, ctx: &m
             insert_track_gap(t, at, dur, ctx, &mut links);
         }
     }
-    for ct in seq.caption_tracks.iter_mut().filter(|c| !c.locked && c.sync_lock) {
-        captions::insert_gap(ct, at, dur, ctx);
-    }
     let mut ids = Vec::new();
     for (tid, item) in placements {
         let t = track_mut(seq, tid)?;
@@ -361,9 +356,6 @@ pub fn extract(seq: &mut Sequence, tracks: &[TrackId], range: TimeRange, ctx: &m
         }
         removed.extend(clear_track_range(tr, range, ctx, &mut links));
         shift_track_from(tr, range.end(), -range.duration);
-    }
-    for ct in seq.caption_tracks.iter_mut().filter(|c| !c.locked && c.sync_lock) {
-        captions::extract_range(ct, range);
     }
     removed
 }

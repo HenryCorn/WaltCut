@@ -105,7 +105,7 @@ impl Driver {
     }
 }
 
-const CATEGORIES: [&str; 16] = [
+const CATEGORIES: [&str; 15] = [
     "general",
     "appearance",
     "audio",
@@ -115,7 +115,6 @@ const CATEGORIES: [&str; 16] = [
     "graphics",
     "labels",
     "media",
-    "mediaAnalysis",
     "mediaCache",
     "memory",
     "playback",
@@ -484,7 +483,7 @@ fn long_translations_stay_on_the_page() {
                 .map(|(l, r)| format!("{l:?} {:.0}..{:.0}", r.left(), r.right()))
                 .collect();
             assert!(outside.is_empty(), "{lang} {c}: outside the page {:.0}..{:.0}: {outside:?}", page.left(), page.right());
-            if matches!(c, "mediaAnalysis" | "mediaCache" | "memory" | "timeline") {
+            if matches!(c, "mediaCache" | "memory" | "timeline") {
                 d.shot(&format!("{lang}-{c}"));
             }
             d.click("settings.cancel");

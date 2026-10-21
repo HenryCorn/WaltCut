@@ -274,9 +274,6 @@ pub fn settings_from_params(s: &Session, p: &Value, cmd: &str) -> Result<(Option
             other => serde_json::from_value(other.clone()).map_err(|_| bad(cmd, "gpuRendering: off | auto"))?,
         };
     }
-    if let Some(v) = bool_p(p, "burnCaptions") {
-        settings.burn_captions = v;
-    }
     if let Some(v) = str_p(p, "proresProfile") {
         settings.prores_profile = v.to_string();
     }
@@ -311,9 +308,6 @@ pub fn settings_from_params(s: &Session, p: &Value, cmd: &str) -> Result<(Option
     }
     if let Some(v) = p.get("fps") {
         settings.frame_rate = Some(parse_rate(v).ok_or_else(|| bad(cmd, "fps: a number (29.97) or \"num/den\""))?);
-    }
-    if let Some(v) = str_p(p, "captionSidecar") {
-        settings.caption_sidecar = (!v.is_empty() && v != "none").then(|| v.to_ascii_lowercase());
     }
     if let Some(v) = f64_p(p, "loudnessLufs") {
         settings.effects.loudness.enabled = true;
@@ -442,25 +436,6 @@ fn output_path(s: &Session, p: &Value, seq: ItemId, settings: &ExportSettings, s
     }
 }
 
-/// Write the caption sidecar (`settings.caption_sidecar`) next to `path` for `range` of `seq`.
-fn write_sidecar(s: &Session, project: &Project, seq: ItemId, settings: &ExportSettings) -> Result<Option<String>> {
-    let Some(kind) = settings.caption_sidecar.as_deref() else { return Ok(None) };
-    let q = project.sequence(seq).ok_or(EngineError::NoSequence)?;
-    let Some(track) = q.caption_tracks.first() else { return Ok(None) };
-    let format = waltcut_captions::Format::from_name(kind).ok_or_else(|| bad("export", format!("caption sidecar `{kind}`: srt | vtt")))?;
-    let range = waltcut_export::export_range(project, seq, settings).map_err(|e| EngineError::Other(e.to_string()))?;
-    let mut doc = waltcut_captions::document_from_track(track, range.start);
-    doc.cues.retain_mut(|cue| {
-        cue.end = cue.end.min(range.duration);
-        cue.start < cue.end
-    });
-    let bytes = waltcut_captions::write(&doc, format, waltcut_captions::WriteOptions { drop_frame: q.settings.drop_frame, rate: Some(q.settings.frame_rate) });
-    let ext = if format == waltcut_captions::Format::WebVtt { "vtt" } else { kind };
-    let path = format!("{}.{ext}", settings.path.rsplit_once('.').map_or(settings.path.as_str(), |x| x.0));
-    s.services.write_file(&path, &bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
-    Ok(Some(path))
-}
-
 /// Run an export of `seq` in `project` as a background job (or now, with `wait`); returns the job id.
 pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut settings: ExportSettings, label: String, wait: bool) -> Result<u64> {
     let format = settings.format;
@@ -474,7 +449,6 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     if let Some(dir) = Path::new(&settings.path).parent().filter(|d| !d.as_os_str().is_empty() && !s.services.export_in_memory()) {
         let _ = std::fs::create_dir_all(dir);
     }
-    write_sidecar(s, &project, seq, &settings)?;
     let id = s.jobs.iter().map(|j| j.id).max().unwrap_or(0) + 1;
     let job = crate::Job { id, label, progress: Default::default(), result: Default::default() };
     // Export always renders full-resolution media, whatever the proxy toggle says.

@@ -1,10 +1,7 @@
 //! Tests of the M3.11 Sequence / Markers commands (`sequence_extras`).
 
-use std::sync::Arc;
-
 use serde_json::json;
-use waltcut_project::{ItemKind, MarkerKind, Transcript, Word};
-use waltcut_speech::FixedTranscriber;
+use waltcut_project::{ItemKind, MarkerKind};
 use waltcut_time::Tick;
 
 use crate::Session;
@@ -39,7 +36,6 @@ fn sequence_and_markers_menu_order_matches_premiere() {
         "sequence.showThroughEdits",
         "sequence.normalizeMixTrack",
         "sequence.makeSubsequence",
-        "sequence.transcribe",
         "sequence.simplify",
         "sequence.addTracks",
     ];
@@ -51,8 +47,6 @@ fn sequence_and_markers_menu_order_matches_premiere() {
     assert_eq!(spec.label, "Apply Default Transitions to Selection");
     assert_eq!(Session::default().shortcuts.primary("trim.applyDefaultTransition").as_deref(), Some("Shift+D"));
     assert_eq!(crate::commands::find("sequence.normalizeMixTrack").unwrap().label, "Normalize Mix Track…");
-    let caps = menu_ids(&["Sequence", "Captions"]);
-    assert_eq!(pos(&caps, "captions.showActiveOnly"), pos(&caps, "captions.showAll") + 1);
     let markers = menu_ids(&["Markers"]);
     assert_eq!(pos(&markers, "markers.addFlashCue"), pos(&markers, "markers.addChapter") + 1);
 }
@@ -144,26 +138,6 @@ fn normalize_mix_track_hits_the_target_peak() {
 }
 
 #[test]
-fn transcribe_sequence_runs_transcript_generate_on_its_audio() {
-    let mut s = demo();
-    let mut t = Transcript { language: "en".into(), ..Default::default() };
-    t.words.push(Word::new("Hello", Tick::from_seconds_f64(0.1), Tick::from_seconds_f64(0.4)));
-    s.transcriber = Some(Arc::new(FixedTranscriber { transcript: t, id: "fixed".into() }));
-    // a project selection must not change what Transcribe Sequence transcribes
-    let music = s.project.items.values().find(|i| i.name == "Ambient_Score.wav").unwrap().id;
-    s.execute("project.select", json!({"items": [music.0]})).unwrap();
-    let r = s.execute("sequence.transcribe", json!({"track": "A1"})).unwrap();
-    let q = s.active_sequence().unwrap();
-    let expected: std::collections::BTreeSet<_> = q.audio_tracks[0].items.iter().map(|i| i.item).collect();
-    assert_eq!(r["items"].as_array().unwrap().len(), expected.len(), "{r}");
-    for i in &expected {
-        assert!(s.project.transcripts.contains_key(i));
-    }
-    assert!(!s.project.transcripts.contains_key(&music));
-    assert!(s.execute("sequence.transcribe", json!({"track": "A9"})).is_err());
-}
-
-#[test]
 fn simplify_sequence_makes_a_clean_copy() {
     let mut s = demo();
     let orig_id = s.state.active_sequence.unwrap();
@@ -237,25 +211,6 @@ fn simplify_moves_clips_down_where_they_fit() {
     assert_eq!(r["movedClips"], 1);
     assert!(q.video_tracks[0].item(ov.id).is_some() && q.video_tracks[1].items.is_empty());
     q.check().unwrap();
-}
-
-#[test]
-fn show_active_caption_track_only() {
-    let mut s = demo();
-    assert!(!s.is_enabled("captions.showActiveOnly"), "no caption tracks");
-    let a = s.execute("captions.newTrack", json!({"name": "English"})).unwrap();
-    let b = s.execute("captions.newTrack", json!({"name": "French"})).unwrap();
-    let id_of = |v: &serde_json::Value| v["track"].as_u64().or_else(|| v.as_u64()).unwrap();
-    let (ta, tb) = (id_of(&a), id_of(&b));
-    s.execute("captions.showActiveOnly", json!({"track": tb})).unwrap();
-    let on: Vec<(u64, bool)> = s.active_sequence().unwrap().caption_tracks.iter().map(|t| (t.id.0, t.enabled)).collect();
-    assert!(on.contains(&(tb, true)) && on.contains(&(ta, false)), "{on:?}");
-    s.execute("captions.showActiveOnly", json!({"track": "C1"})).unwrap();
-    let first = s.active_sequence().unwrap().caption_tracks[0].id.0;
-    assert!(s.active_sequence().unwrap().caption_tracks.iter().all(|t| t.enabled == (t.id.0 == first)));
-    s.execute("edit.undo", json!({})).unwrap();
-    assert!(s.active_sequence().unwrap().caption_tracks.iter().any(|t| t.id.0 == tb && t.enabled));
-    assert!(s.execute("captions.showActiveOnly", json!({"track": "C9"})).is_err());
 }
 
 #[test]

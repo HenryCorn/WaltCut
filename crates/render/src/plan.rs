@@ -200,16 +200,6 @@ pub fn plan_frame(project: &Project, seq_id: ItemId, t: Tick, opts: RenderOption
     }
     let mut layers = PlanStack::default();
     push_tracks(project, seq, t, opts, sources, 0, &mut layers);
-    if opts.captions {
-        for o in crate::caption_overlays(seq, t, w, h) {
-            layers.push(PlanLayer::new(
-                Arc::new(VideoFrame::rgba_f32(o.w as u32, o.h as u32, o.px)),
-                Affine::translate(o.x as f64, o.y as f64),
-                1.0,
-                Blend::Normal,
-            ));
-        }
-    }
     layers.finish(w, h)
 }
 
@@ -371,7 +361,7 @@ fn push_item(
     }
     // A nested sequence that is only shown (no effects, untransformed, fully opaque, blending
     // Normal) contributes its own layers: the compositor draws them like the clips of this
-    // sequence, with no CPU pass over the nested sequence. Its captions are part of its picture.
+    // sequence, with no CPU pass over the nested sequence.
     if let Some(ItemKind::Sequence(nested)) = project.item(item.item).map(|p| &p.kind)
         && nest < crate::MAX_NEST_DEPTH
         && item.multicam_angle(nested).is_none()
@@ -383,15 +373,6 @@ fn push_item(
         && nest_is_plain(project, seq, nested, ft)
     {
         push_tracks(project, nested, ft, opts, sources, nest + 1, out);
-        let (w, h) = output_size(nested, opts.scale);
-        for o in crate::caption_overlays(nested, ft, w, h) {
-            out.push(PlanLayer::new(
-                Arc::new(VideoFrame::rgba_f32(o.w as u32, o.h as u32, o.px)),
-                Affine::translate(o.x as f64, o.y as f64),
-                1.0,
-                Blend::Normal,
-            ));
-        }
         return;
     }
     // Graphic clips without standard effects: the layers are rasterised (cached) into one tight

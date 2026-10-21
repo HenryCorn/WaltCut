@@ -1,6 +1,6 @@
 //! Paste media from the system clipboard (#611). The desktop app reads the clipboard: copied files
 //! paste by path, and an image is first saved by [`save_pasted_image`] as `Pasted Image <n>.png`
-//! where voice-over takes and narrations go (Scratch Disks ▸ Captured Audio and Video, else next
+//! where voice-over takes go (Scratch Disks ▸ Captured Audio and Video, else next
 //! to the project).
 //!
 //! `edit.pasteMedia` imports the files and puts them on the Timeline at the playhead, end to end,

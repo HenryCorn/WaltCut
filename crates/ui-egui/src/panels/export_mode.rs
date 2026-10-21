@@ -1,6 +1,6 @@
 //! Export mode (header "Export"), laid out like Premiere 26: Destinations and the export queue on
 //! the left; the Media File settings in the middle (File Name, Location, Preset, Format, then the
-//! Video, Audio, Multiplexer, Captions, Effects and Metadata sections); the preview, Range,
+//! Video, Audio, Multiplexer, Effects and Metadata sections); the preview, Range,
 //! Scaling, the Summary with the estimated file size, and Send to Queue / Export on the right.
 //! Also the Preset Manager (Preset ▸ More presets…) and the header's Quick Export popup.
 //!
@@ -9,7 +9,7 @@
 //! `export.quick`).
 //!
 //! Automation ids: `export.fileName`, `export.location`, `export.preset`, `export.preset.more`,
-//! `export.format`, `export.section.<video|audio|multiplexer|captions|effects|metadata>`,
+//! `export.format`, `export.section.<video|audio|multiplexer|effects|metadata>`,
 //! `export.video.*`, `export.audio.*`, `export.effects.*`, `export.metadata.*`, `export.range`,
 //! `export.scaling`, `export.summary`, `export.estimate`, `export.sendToQueue`, `export.button`,
 //! `export.queue.start|stop|clear`, `export.queue.item.<id>` and `….<id>.<up|down|cancel|retry|remove>`;
@@ -455,7 +455,6 @@ fn settings_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         .active_sequence()
         .map(|q| (q.settings.width, q.settings.height, q.settings.frame_rate, q.settings.sample_rate))
         .unwrap_or((1920, 1080, FrameRate::FPS_24, 48_000));
-    let has_captions = app.session.active_sequence().is_some_and(|q| !q.caption_tracks.is_empty());
     // an HDR sequence exports HDR (H.265 Main 10 where the hardware encoder has it) unless SDR is asked for
     let seq_hdr = app.session.active_sequence().is_some_and(|q| q.settings.color.working.is_hdr());
     let all_presets = app.session.export_presets.all();
@@ -559,34 +558,6 @@ fn settings_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     s.multiplexer = if i == 0 { Multiplexer::Mp4 } else { Multiplexer::Mov };
                 }
             });
-        }
-        if s.has_video() && section(ui, &mut reg, &mut ex.open_sections, "captions", tl!("Captions"), &t) {
-            if !has_captions {
-                ui.label(egui::RichText::new(tl!("The sequence has no caption track.")).color(t.text_dim).size(11.5));
-            }
-            row(ui, &t, tl!("Export Options"), |ui| {
-                let modes = [tl!("None"), tl!("Burn Captions Into Video"), tl!("Create Sidecar File")];
-                let cur = if s.burn_captions {
-                    modes[1]
-                } else if s.caption_sidecar.is_some() {
-                    modes[2]
-                } else {
-                    modes[0]
-                };
-                if let Some(i) = combo(ui, &mut reg, "export.captions.mode", cur, &opts(&modes), 220.0) {
-                    s.burn_captions = i == 1;
-                    s.caption_sidecar = (i == 2).then(|| s.caption_sidecar.clone().unwrap_or_else(|| "srt".into()));
-                }
-            });
-            if let Some(kind) = s.caption_sidecar.clone() {
-                row(ui, &t, tl!("File Format"), |ui| {
-                    let formats = [tl!("SubRip Subtitle (.srt)"), tl!("WebVTT (.vtt)")];
-                    let cur = if kind == "vtt" { formats[1] } else { formats[0] };
-                    if let Some(i) = combo(ui, &mut reg, "export.captions.format", cur, &opts(&formats), 220.0) {
-                        s.caption_sidecar = Some(if i == 0 { "srt" } else { "vtt" }.into());
-                    }
-                });
-            }
         }
         if section(ui, &mut reg, &mut ex.open_sections, "effects", tl!("Effects"), &t) {
             pick_overlay = effects_section(ui, &mut reg, s, &t);

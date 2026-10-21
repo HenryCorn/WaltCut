@@ -1,7 +1,7 @@
 # waltcut-text
 
 FilmCraft's text engine (layer L1: depends on `waltcut-color`, `skrifa`, `harfrust`,
-`unicode-bidi` and `unicode-linebreak`). It draws graphic-clip text and shapes, caption burn-in
+`unicode-bidi` and `unicode-linebreak`). It draws graphic-clip text and shapes
 and the Timecode / Clip Name effects. Pure Rust; it builds for `wasm32-unknown-unknown`.
 
 | Module | What |

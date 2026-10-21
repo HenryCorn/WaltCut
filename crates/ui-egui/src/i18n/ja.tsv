@@ -18,7 +18,6 @@
 
 	About FilmCraft	FilmCraft について
 	Add Audio Submix Track	オーディオサブミックストラックを追加
-	Add Caption at Playhead	再生ヘッドの位置にキャプションを追加
 	Add Chapter Marker…	チャプターマーカーを追加…
 	Add Edit	編集点を追加
 	Add Edit to All Tracks	すべてのトラックに編集点を追加
@@ -26,7 +25,6 @@
 	Add Frame Hold	フレームホールドを追加
 	Add Guide…	ガイドを追加…
 	Add Marker	マーカーを追加
-	Add New Caption Track…	新規キャプショントラックを追加…
 	Add Range Marker	範囲マーカーを追加
 	Add Range Marker to In and Out	イン点からアウト点までの範囲マーカーを追加
 	Add Tracks…	トラックを追加…
@@ -67,9 +65,7 @@
 	Bring Forward	前面へ
 	Bring to Front	最前面へ
 	Brown	ブラウン
-	Captions	キャプション
 	Captions and Graphics	キャプションとグラフィックス
-	Captions…	キャプション…
 	Caribbean	カリビアン
 	Center Horizontally	水平方向の中央に整列
 	Center Vertically	垂直方向の中央に整列
@@ -93,7 +89,6 @@
 	Consolidate Duplicates	重複を統合
 	Copy	コピー
 	Copy Paste Includes Sequence Markers	コピーと貼り付けにシーケンスマーカーを含める
-	Create Captions from Transcript…	文字起こしからキャプションを作成…
 	Create Multi-Camera Source Sequence…	マルチカメラソースシーケンスを作成…
 	Create Proxies…	プロキシを作成…
 	Cut	切り取り
@@ -101,7 +96,6 @@
 	Delete Render Files	レンダリングファイルを削除
 	Delete Render Files In to Out	イン点からアウト点までのレンダリングファイルを削除
 	Delete Tracks…	トラックを削除…
-	Delete Transcript	文字起こしを削除
 	Demo Footage	デモ素材
 	Demo Project	デモプロジェクト
 	Deselect All	すべての選択を解除
@@ -156,10 +150,8 @@
 	Get Media File Properties for	メディアファイルのプロパティを取得
 	Go to Gap	ギャップへ移動
 	Go to In	イン点へ移動
-	Go to Next Caption Segment	次のキャプションセグメントへ移動
 	Go to Next Marker	次のマーカーへ移動
 	Go to Out	アウト点へ移動
-	Go to Previous Caption Segment	前のキャプションセグメントへ移動
 	Go to Previous Marker	前のマーカーへ移動
 	Go to Split	スプリットへ移動
 	Graphics and Titles	グラフィックスとタイトル
@@ -168,7 +160,6 @@
 	Group	グループ
 	Guide Templates	ガイドテンプレート
 	Help	ヘルプ
-	Hide All Caption Tracks	すべてのキャプショントラックを非表示
 	High Quality Playback	高画質再生
 	History	履歴
 	Import From	読み込み元
@@ -210,7 +201,6 @@
 	Mark Split	スプリットをマーク
 	Markers	マーカー
 	Match Frame	マッチフレーム
-	Media Analysis & Transcription…	メディア分析と文字起こし…
 	Media Browser	メディアブラウザー
 	Media Cache…	メディアキャッシュ…
 	Media…	メディア…
@@ -264,8 +254,6 @@
 	Remix	リミックス
 	Remix Properties…	リミックスのプロパティ…
 	Remove Attributes…	属性を削除…
-	Remove Filler Words	フィラーワードを削除
-	Remove Pauses	無音部分を削除
 	Remove Unused	未使用の項目を削除
 	Rename…	名前を変更…
 	Render Audio	オーディオをレンダリング
@@ -278,7 +266,6 @@
 	Reset All Parameters	すべてのパラメーターをリセット
 	Reset Duration	長さをリセット
 	Reset to Saved Layout	保存したレイアウトにリセット
-	Restore Captions from Source Clip	ソースクリップからキャプションを復元
 	Reveal Log Files…	ログファイルを表示…
 	Reverse Match Frame	逆マッチフレーム
 	Revert	保存済みの状態に戻す
@@ -317,8 +304,6 @@
 	Sequence From Clip	クリップからシーケンスを作成
 	Sequence Settings…	シーケンス設定…
 	Sequence…	シーケンス…
-	Show Active Caption Tracks Only	アクティブなキャプショントラックのみ表示
-	Show All Caption Tracks	すべてのキャプショントラックを表示
 	Show All Marker Colors	すべての色のマーカーを表示
 	Show Guides	ガイドを表示
 	Show Rulers	ルーラーを表示
@@ -342,9 +327,6 @@
 	Toggle Proxies	プロキシを切り替え
 	Tools	ツール
 	Top	上
-	Transcribe Sequence…	シーケンスを文字起こし…
-	Transcribe…	文字起こし…
-	Transcript	文字起こし
 	Transparent Video…	透明ビデオ…
 	Trim Edit	トリム編集
 	Trim…	トリム…
@@ -352,7 +334,6 @@
 	Ungroup	グループ解除
 	Universal Counting Leader…	ユニバーサルカウントリーダー…
 	Update Metadata…	メタデータを更新…
-	Upgrade Caption to Graphic	キャプションをグラフィックに変換
 	Upgrade to Source Graphic	ソースグラフィックに変換
 	Vertical Text	縦書き
 	Video In	ビデオのイン点
@@ -563,28 +544,10 @@
 	Restore	復元
 	Overwrite with Current View	現在の表示で上書き
 	Graphics text search arrives with M10.1–M10.2	グラフィックスのテキスト検索は M10.1–M10.2 で対応予定です
-	Open a sequence to work with captions	キャプションを扱うにはシーケンスを開いてください
-	Add captions	キャプションを追加
-	Create a caption track or import a caption file.	キャプショントラックを作成するか、キャプションファイルを読み込んでください。
-	Create new caption track	新規キャプショントラックを作成
-	Import captions file…	キャプションファイルを読み込み…
 	New {format} track	新規 {format} トラック
-	Add caption at playhead	再生ヘッドの位置にキャプションを追加
-	Split caption at playhead	再生ヘッドの位置でキャプションを分割
-	Merge selected captions	選択したキャプションを結合
-	Delete selected captions	選択したキャプションを削除
-	No captions on this track. Press + to add one at the playhead.	このトラックにはキャプションがありません。+ を押すと、再生ヘッドの位置に追加できます。
-	No matching captions.	一致するキャプションはありません。
-	Open a sequence to see its transcript	文字起こしを表示するにはシーケンスを開いてください
-	Transcribe sequence	シーケンスを文字起こし
-	Speech-to-text turns the dialogue into editable text.	音声認識で、セリフを編集できるテキストに変換します。
-	This build has no speech-to-text; import a transcript with transcript.set.	このビルドには音声認識機能がありません。transcript.set で文字起こしを読み込んでください。
-	Transcribe	文字起こし
 	Extract selected text	選択したテキストを抽出
 	Lift selected text	選択したテキストをリフト
 	Remove filler words	フィラーワードを削除
-	Create captions	キャプションを作成
-	Speaker	話者
 	Box	ボックス
 	Align	整列
 	Align left	左揃え
@@ -1220,7 +1183,6 @@
 	Open Demo Project	デモプロジェクトを開く
 	Insert and overwrite sequences as nests or individual clips	シーケンスをネストまたは個別のクリップとして挿入・上書き
 	Snap in Timeline (S)	タイムラインでスナップ (S)
-	Caption track options	キャプショントラックのオプション
 	Timeline Display Settings	タイムライン表示設定
 	Show Video Thumbnails	ビデオのサムネイルを表示
 	Head	先頭
@@ -1283,7 +1245,6 @@
 	Alpha Blurriness	アルファのぼかし
 	Alpha Channel	アルファチャンネル
 	Alpha Glow	アルファグロー
-	Always import embedded CEA-708 closed captions with wide aspect.	埋め込まれた CEA-708 クローズドキャプションを常にワイドアスペクトで読み込む
 	Always override audio tags	オーディオタグを常に上書きする
 	Ambience	環境音
 	Ambience Intensity	環境光の強さ
@@ -1328,8 +1289,6 @@
 	Auto Save	自動保存
 	Auto Save also saves the current project(s)	自動保存時に現在のプロジェクトも保存する
 	Auto-tag audio types in the timeline	タイムラインでオーディオの種類を自動でタグ付けする
-	Auto-transcribe all imported clips	読み込んだすべてのクリップを自動で文字起こし
-	Auto-transcribe only clips in sequences	シーケンス内のクリップのみ自動で文字起こし
 	Automatch Time	オートマッチ時間
 	Automatic Click Remover	クリックノイズ自動除去
 	Automatically Hide Dependent Clips	依存クリップを自動的に非表示にする
@@ -1339,7 +1298,6 @@
 	Automatically refresh growing files	書き込み中のファイルを自動的に更新する
 	Automatically resume playback for growing files in Source Monitor	ソースモニターで書き込み中のファイルの再生を自動的に再開する
 	Automatically save projects	プロジェクトを自動保存する
-	Automatically transcribe clips	クリップを自動的に文字起こしする
 	Automation Keyframe Optimization	オートメーションキーフレームの最適化
 	Background Color	背景色
 	Background Corner Radius	背景の角丸の半径
@@ -1484,7 +1442,6 @@
 	Clock Wipe (Legacy)	クロックワイプ (従来版)
 	Clockwise	時計回り
 	Clone	クローン
-	Closed Captions	クローズドキャプション
 	Color & Alpha	カラーとアルファ
 	Color 1	カラー 1
 	Color 2	カラー 2
@@ -1574,7 +1531,6 @@
 	Default Emoji font	既定の絵文字フォント
 	Default Media Scaling	既定のメディアスケーリング
 	Default Output	既定の出力
-	Default closed caption font	既定のクローズドキャプションフォント
 	Default language	既定の言語
 	Default paragraph direction	既定の段落の方向
 	Default subtitle and text font	既定の字幕・テキストフォント
@@ -1625,7 +1581,6 @@
 	Distortion Type	ディストーションの種類
 	Divide	除算
 	Do not delete cache files automatically	キャッシュファイルを自動的に削除しない
-	Don't label speakers	話者にラベルを付けない
 	Double-click	ダブルクリック
 	Draft decoding at reduced playback resolution (H.264: faster, some frames less filtered)	再生解像度を下げたときのドラフトデコード (H.264: 高速化、一部のフレームはフィルター処理を軽減)
 	Drive	ドライブ
@@ -1872,7 +1827,6 @@
 	In the Media Cache	メディアキャッシュ内
 	In the project	プロジェクト内
 	In/Out Duration	イン/アウト間の長さ
-	Include captions on import	読み込み時にキャプションを含める
 	Incoming	次のクリップ
 	Indeterminate Media Timebase	不定メディアのタイムベース
 	Initial Delay	初期ディレイ
@@ -1914,7 +1868,6 @@
 	Keying	キーイング
 	Korean	韓国語
 	Label Defaults	既定のラベル
-	Label speakers	話者にラベルを付ける
 	Labels	ラベル
 	Large Hall	大きなホール
 	Large Trim Offset	大幅トリムのオフセット
@@ -2027,7 +1980,6 @@
 	Maximum Scale	最大スケール
 	Media	メディア
 	Media Analysis	メディア解析
-	Media Analysis & Transcription	メディア解析と文字起こし
 	Media Cache	メディアキャッシュ
 	Media Cache Database	メディアキャッシュデータベース
 	Media Cache Files	メディアキャッシュファイル
@@ -2037,7 +1989,6 @@
 	Media Time	メディア時間
 	Media Timecode	メディアのタイムコード
 	Media Type	メディアの種類
-	Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.	メディアの解析結果と文字起こしは、メディアキャッシュフォルダーにキャッシュされます。このコンピューター上の別のプロジェクトにメディアを読み込んだ場合でも、再解析は必要ありません。
 	Median	中央値
 	Medium Room	中くらいの部屋
 	Memory	メモリー
@@ -2419,10 +2370,8 @@
 	Spacer	スペーサー
 	Spanish	スペイン語
 	Speaker Angle	スピーカー角度
-	Speaker Labeling	話者のラベル付け
 	Special	特殊
 	Special Effects	特殊エフェクト
-	Speech model	音声認識モデル
 	Speed	速度
 	Spherize	球面
 	Spiky	とげ状
@@ -2545,8 +2494,6 @@
 	Top Right	右上
 	Touch	タッチ
 	Track Matte Key	トラックマットキー
-	Transcription	文字起こし
-	Transcription preferences	文字起こしの設定
 	Transform	変形
 	Transformers	変形
 	Transience	トランジェント
@@ -2671,9 +2618,6 @@
 	When Opening a Project	プロジェクトを開くとき
 	Whip	ウィップ
 	Whip (Legacy)	ウィップ (従来版)
-	Whisper base (balanced)	Whisper base (バランス重視)
-	Whisper small (most accurate)	Whisper small (最高精度)
-	Whisper tiny (fastest)	Whisper tiny (最速)
 	White	白
 	White Input Level	入力白レベル
 	White Is High	白を高く
@@ -2730,7 +2674,6 @@
 	Normalize Mix Track	ミックストラックをノーマライズ
 	Simplify Sequence	シーケンスを単純化
 	Simplify	単純化
-	Transcribe Sequence	シーケンスを文字起こし
 	Save as Template	テンプレートとして保存
 	Flash Cue Marker	フラッシュキューマーカー
 	System Compatibility Report	システム互換性レポート
@@ -2808,7 +2751,7 @@
 	Gaps	ギャップ
 	Video effects	ビデオエフェクト
 	Audio effects	オーディオエフェクト
-	Text (graphics and captions)	テキスト (グラフィックスとキャプション)
+	Text (graphics)	テキスト (グラフィックスとキャプション)
 	Clips	クリップ
 	Move clips to the lowest track possible	クリップをできるだけ下のトラックへ移動
 	Keep:	保持:
@@ -2818,7 +2761,6 @@
 	Language:	言語:
 	Audio on track {t}	トラック {t} のオーディオ
 	Audio analysis:	分析するオーディオ:
-	Recognize when different speakers are talking	話者の切り替わりを認識
 	Template Name:	テンプレート名:
 	Comments:	コメント:
 	 (unavailable)	 (使用不可)
@@ -2882,12 +2824,9 @@
 	Preset	プリセット
 	More presets…	その他のプリセット…
 	Multiplexer	マルチプレクサー
-	The sequence has no caption track.	このシーケンスにはキャプショントラックがありません。
 	Export Options	書き出しオプション
-	Burn Captions Into Video	キャプションをビデオに焼き込み
 	Create Sidecar File	サイドカーファイルを作成
 	File Format	ファイル形式
-	SubRip Subtitle (.srt)	SubRip 字幕 (.srt)
 	WebVTT (.vtt)	WebVTT (.vtt)
 	Title	タイトル
 	Creator	作成者
@@ -3052,15 +2991,12 @@
 	Decrease Leading by Five Units	行送りを 5 単位減らす
 	Decrease Leading by One Unit	行送りを 1 単位減らす
 	Decrease Video Tracks Height	ビデオトラックの高さを縮小
-	Delete Captions	キャプションを削除
 	Delete Graphic Layer	グラフィックレイヤーを削除
 	Delete Guide Template	ガイドテンプレートを削除
 	Delete Media Cache Files	メディアキャッシュファイルを削除
 	Discard Unsaved Changes	未保存の変更を破棄
 	Does Not Contain	含まない
-	Download Speech Model	音声認識モデルをダウンロード
 	Dynamic Trim Stop	ダイナミックトリムを停止
-	Edit Caption Text	キャプションのテキストを編集
 	Ellipse Tool	楕円ツール
 	Ends With	後方一致
 	Entire Source	ソース全体
@@ -3137,7 +3073,6 @@
 	Media Browser Settings	メディアブラウザーの設定
 	MediaBrowser	メディアブラウザー
 	MediaCache	メディアキャッシュ
-	Merge Captions	キャプションを結合
 	Mixer	ミキサー
 	Mosaic In	モザイクイン
 	Move All Audio Targets Down	すべてのオーディオターゲットを下へ移動
@@ -3263,7 +3198,6 @@
 	Set Project Panel View	プロジェクトパネルの表示を設定
 	Show Next Screen	次の画面を表示
 	Show Previous Screen	前の画面を表示
-	Show Program Transcript	プログラムの文字起こしを表示
 	Shuttle Left	左へシャトル
 	Shuttle Right	右へシャトル
 	Shuttle Slow Left	低速で左へシャトル
@@ -3282,7 +3216,6 @@
 	Social Vertical 1080×1920	SNS 縦型 1080×1920
 	Soft Vignette	ソフトビネット
 	Source In/Out	ソースのイン/アウト
-	Split Caption	キャプションを分割
 	Square Pixels (1.0)	正方形ピクセル (1.0)
 	Stack Clips	クリップをスタック
 	Start Export Queue	書き出しキューを開始
@@ -3552,8 +3485,6 @@
 	Solid	べた塗り
 	GPU Rendering	GPU レンダリング
 	Composite on the GPU when available	利用可能な場合は GPU で合成
-	Text to Speech	テキスト読み上げ
-	Edit Narration	ナレーションを編集
 	Clear Transition	トランジションを消去
 	Set Transition Duration	トランジションの長さを設定
 	Refresh Changed Media	変更されたメディアを更新
@@ -3572,10 +3503,6 @@
 	ZIP (1 scan line)	ZIP（1 スキャンライン）
 	ZIP (16 scan lines)	ZIP（16 スキャンライン）
 
-	Caption Tracks	キャプショントラック
-	Delete Caption Track	キャプショントラックを削除
-	Delete Caption Tracks	キャプショントラックを削除
-	Delete Empty Caption Tracks	空のキャプショントラックを削除
 	Dock Panel	パネルをドッキング
 	Undock Panel	パネルのドッキングを解除
 	Docking Action	ドッキング操作

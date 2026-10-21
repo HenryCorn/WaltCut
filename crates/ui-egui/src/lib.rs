@@ -54,7 +54,6 @@ pub mod panels;
 pub mod perf;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod play_ahead;
-mod rtl;
 pub mod scrub;
 mod shuttle;
 pub mod source_playback;
@@ -374,7 +373,6 @@ pub struct FilmcraftApp {
     pub shortcut_editor: panels::shortcuts_dialog::EditorState,
     pub toast: Option<(String, f64)>,
     pub tl: panels::timeline::TlState,
-    pub(crate) transcript_cache: panels::transcript_cache::TranscriptCache,
     /// Commands from outside the UI (native menu bar), invoked on the UI thread.
     pub command_inbox: Option<Receiver<String>>,
     /// A V key press (or a Ctrl+V paste) reached the app and its release hasn't yet.
@@ -603,7 +601,6 @@ impl FilmcraftApp {
             toast: None,
             graphics_notice: None,
             tl: Default::default(),
-            transcript_cache: Default::default(),
             command_inbox: None,
             v_down: false,
             stale_clipboard_media: None,
@@ -887,11 +884,6 @@ impl FilmcraftApp {
         }
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
-                // a side panel beside Properties (or Essential Sound), never over the Program monitor
-                PanelKind::TextToSpeech => [PanelKind::Properties, PanelKind::EssentialSound, PanelKind::EssentialGraphics]
-                    .into_iter()
-                    .find(|k| self.ui.dock.contains(*k))
-                    .unwrap_or(PanelKind::Program),
                 PanelKind::LumetriColor | PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
                 PanelKind::Source
                 | PanelKind::EffectControls
@@ -899,7 +891,6 @@ impl FilmcraftApp {
                 | PanelKind::Metadata
                 | PanelKind::LumetriScopes
                 | PanelKind::AudioTrackMixer
-                | PanelKind::Text
                 | PanelKind::ReferenceMonitor
                 | PanelKind::Timecode => PanelKind::Source,
                 _ => PanelKind::Project,
@@ -1023,34 +1014,6 @@ impl FilmcraftApp {
         panels::multicam::on_play(self);
         // voice-over: the capture starts with the audio clock
         panels::voiceover::on_play(self);
-    }
-
-    /// Play the last Text to Speech preview (`Session::tts_preview`) on the audio output, stopping
-    /// timeline playback first. Starting playback again takes the output back.
-    pub fn play_tts_preview(&mut self) -> Result<f64, String> {
-        let audio = self.session.tts_preview.clone().ok_or("nothing to preview")?;
-        if self.playback.playing {
-            self.stop();
-        }
-        let a = self.audio.as_mut().ok_or("no audio output (check Settings ▸ Audio Hardware)")?;
-        let sr = a.sample_rate().max(1);
-        a.stop();
-        let step = f64::from(audio.sample_rate.max(1)) / f64::from(sr);
-        let seconds = audio.seconds();
-        let mut pos = 0.0f64;
-        let fill = Box::new(move |buf: &mut [f32], ch: usize| {
-            for frame in buf.chunks_mut(ch.max(1)) {
-                let i = pos as usize;
-                let f = (pos - i as f64) as f32;
-                let x0 = audio.samples.get(i).copied().unwrap_or(0.0);
-                let x1 = audio.samples.get(i + 1).copied().unwrap_or(0.0);
-                frame.fill(x0 + (x1 - x0) * f);
-                pos += step;
-            }
-        });
-        a.start(fill)?;
-        self.playback.audio_clock = false;
-        Ok(seconds)
     }
 
     pub fn stop(&mut self) {
@@ -1389,25 +1352,6 @@ impl FilmcraftApp {
                 self.pick(FileDialog::open_files(&exts), |app, paths| {
                     let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
                     app.session.execute("graphics.newFromFile", json!({"path": path})).map_err(|e| e.to_string())
-                })
-            }
-            "captions.import" => self.pick(FileDialog::open_files(&["srt", "vtt", "scc", "mcc", "stl", "ttml", "dfxp", "xml"]), |app, paths| {
-                let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
-                app.session.execute("captions.import", json!({"path": path})).map_err(|e| e.to_string())
-            }),
-            "captions.export" => {
-                let name = self.session.state.active_sequence.and_then(|s| self.session.project.item(s)).map(|i| i.name.clone()).unwrap_or_default();
-                let suggested = format!("{}.srt", name.replace(' ', "_"));
-                let dialog = FileDialog::save_as(
-                    "Captions (SRT, WebVTT, SCC, MCC, EBU STL, TTML, DFXP)",
-                    &["srt", "vtt", "scc", "mcc", "stl", "ttml", "dfxp"],
-                    &suggested,
-                );
-                let mut p = params.clone();
-                self.pick(dialog, move |app, paths| {
-                    let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
-                    p["path"] = json!(path);
-                    app.session.execute("captions.export", p).map_err(|e| e.to_string())
                 })
             }
             _ => match EXPORT_SAVE_DIALOGS.iter().find(|(c, ..)| *c == id) {
@@ -1839,12 +1783,7 @@ impl FilmcraftApp {
         self.advance_playback(&ctx);
         self.advance_source_playback(&ctx);
         self.scrub_audio(&ctx);
-        // Text to Speech: a selected narration clip loads into the panel
-        panels::tts::follow_selection(self);
         panels::ai::window(self, &ctx);
-        if self.ui.tts.pending.is_some() || self.ui.tts.download_job.is_some() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
-        }
         let t = self.tokens;
         let full = ui.max_rect();
         ui.painter().rect_filled(full, 0.0, t.app_bg);

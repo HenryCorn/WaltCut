@@ -231,7 +231,7 @@ impl Default for ColorPrefs {
     }
 }
 
-/// Settings ▸ Graphics (Text, Shapes, Closed Captions).
+/// Settings ▸ Graphics (Text, Shapes).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GraphicsPrefs {
@@ -253,9 +253,6 @@ pub struct GraphicsPrefs {
     pub shape_line_join: String,
     pub shape_miter_limit: f64,
     pub shape_line_cap: String,
-    pub caption_font: String,
-    pub caption_monospace_only: bool,
-    pub cea708_wide: bool,
 }
 
 impl Default for GraphicsPrefs {
@@ -275,9 +272,6 @@ impl Default for GraphicsPrefs {
             shape_line_join: "miter".into(),
             shape_miter_limit: 2.5,
             shape_line_cap: "butt".into(),
-            caption_font: "JetBrains Mono".into(),
-            caption_monospace_only: true,
-            cea708_wide: false,
         }
     }
 }
@@ -308,7 +302,6 @@ pub struct LabelDefaults {
     pub sequence: Label,
     pub dynamic_link: Label,
     pub bin: Label,
-    pub captions: Label,
 }
 
 impl Default for LabelDefaults {
@@ -321,7 +314,6 @@ impl Default for LabelDefaults {
             sequence: Label::Forest,
             dynamic_link: Label::Rose,
             bin: Label::Mango,
-            captions: Label::Mango,
         }
     }
 }
@@ -432,7 +424,7 @@ pub struct PresetLabel {
 
 /// The built-in presets after [`DEFAULT_LABEL_PRESET`]: (name, 16 × (label name, colour)) in
 /// [`Label::ALL`] order. "Roles" puts the label defaults (Video, Movie, Audio, Still, Sequence,
-/// Dynamic Link, Bin / Captions on labels 0, 1, 2, 3, 5, 6, 7) on matching roles.
+/// Dynamic Link, Bin on labels 0, 1, 2, 3, 5, 6) on matching roles.
 const BUILTIN_LABEL_PRESETS: [(&str, [(&str, &str); 16]); 2] = [
     (
         "Bright",
@@ -619,41 +611,6 @@ impl Session {
         let (_, file) = self.label_presets().into_iter().find(|(p, _)| p.name == name).ok_or_else(|| format!("there is no label color preset “{name}”"))?;
         let file = file.ok_or("built-in presets can't be deleted")?;
         std::fs::remove_file(&file).map_err(|e| format!("{}: {e}", file.display()))
-    }
-}
-
-/// Settings ▸ Media Analysis & Transcription.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct MediaAnalysisPrefs {
-    /// "Cache analysis results for re-use": `mediaCache` | `project`.
-    pub cache_results: String,
-    pub analyze_imported_media: bool,
-    /// "Automatically transcribe clips".
-    pub auto_transcribe: bool,
-    /// `allImported` (transcribe on import) | `sequenceClips` (only clips edited into sequences).
-    pub auto_transcribe_scope: String,
-    /// "Speaker Labeling": `on` | `off`.
-    pub speaker_labeling: String,
-    pub language_auto_detect: bool,
-    /// "Default language" (ISO 639-1).
-    pub default_language: String,
-    /// Speech model (`transcript.models`).
-    pub whisper_model: String,
-}
-
-impl Default for MediaAnalysisPrefs {
-    fn default() -> Self {
-        Self {
-            cache_results: "mediaCache".into(),
-            analyze_imported_media: true,
-            auto_transcribe: false,
-            auto_transcribe_scope: "sequenceClips".into(),
-            speaker_labeling: "on".into(),
-            language_auto_detect: false,
-            default_language: "en".into(),
-            whisper_model: waltcut_speech::models::DEFAULT_MODEL.into(),
-        }
     }
 }
 
@@ -950,26 +907,6 @@ const TIMEBASE: &[(&str, &str)] = &[
 const TIMECODE: &[(&str, &str)] = &[("useMediaSource", "Use Media Source"), ("generate", "Generate Timecode")];
 const FRAME_COUNT: &[(&str, &str)] = &[("startAt0", "Start at 0"), ("startAt1", "Start at 1"), ("timecodeConversion", "Timecode Conversion")];
 const SCALING: &[(&str, &str)] = &[("none", "None"), ("scaleToFrameSize", "Scale to frame size"), ("setToFrameSize", "Set to frame size")];
-const ANALYSIS_CACHE: &[(&str, &str)] = &[("mediaCache", "In the Media Cache"), ("project", "In the project")];
-const TRANSCRIBE_SCOPE: &[(&str, &str)] =
-    &[("sequenceClips", "Auto-transcribe only clips in sequences"), ("allImported", "Auto-transcribe all imported clips")];
-const SPEAKERS: &[(&str, &str)] = &[("on", "Label speakers"), ("off", "Don't label speakers")];
-const LANGUAGES: &[(&str, &str)] = &[
-    ("en", "English"),
-    ("es", "Spanish"),
-    ("fr", "French"),
-    ("de", "German"),
-    ("it", "Italian"),
-    ("pt", "Portuguese"),
-    ("nl", "Dutch"),
-    ("ja", "Japanese"),
-    ("ko", "Korean"),
-    ("zh", "Chinese"),
-    ("ru", "Russian"),
-    ("hi", "Hindi"),
-];
-const MODELS: &[(&str, &str)] =
-    &[("whisper-tiny", "Whisper tiny (fastest)"), ("whisper-base", "Whisper base (balanced)"), ("whisper-small", "Whisper small (most accurate)")];
 const CACHE_MGMT: &[(&str, &str)] = &[
     ("never", "Do not delete cache files automatically"),
     ("olderThan", "Automatically delete cache files older than"),
@@ -1176,14 +1113,6 @@ static CATEGORIES: &[Category] = &[
                     f("graphics.shapeLineCap", "Stroke line cap", Kind::Choice(CAP), false),
                 ],
             ),
-            Row::Group(
-                "Closed Captions",
-                &[
-                    f("graphics.captionFont", "Default closed caption font", Kind::Font, false),
-                    b("graphics.captionMonospaceOnly", "Monospace only", false),
-                    b("graphics.cea708Wide", "Always import embedded CEA-708 closed captions with wide aspect.", false),
-                ],
-            ),
         ],
     },
     Category {
@@ -1201,7 +1130,6 @@ static CATEGORIES: &[Category] = &[
                     f("labels.defaults.sequence", "Sequence", Kind::Label, true),
                     f("labels.defaults.dynamicLink", "Dynamic Link", Kind::Label, false),
                     f("labels.defaults.bin", "Bin", Kind::Label, false),
-                    f("labels.defaults.captions", "Captions", Kind::Label, false),
                 ],
             ),
             Row::Custom("labelPresets"),
@@ -1219,7 +1147,6 @@ static CATEGORIES: &[Category] = &[
             b("media.validateContentCredentials", "Validate Content Credentials on import", false),
             b("media.writeClipMarkersToXmp", "Write clip markers to XMP", false),
             b("media.enableXmpLinking", "Enable clip and XMP metadata linking", false),
-            b("media.includeCaptionsOnImport", "Include captions on import", false),
             b("media.enableProxies", "Enable proxies", true),
             b("media.allowDuplicateMedia", "Allow duplicate media during project import", false),
             b("media.createFolderForImportedProjects", "Create folder for imported projects", false),
@@ -1235,28 +1162,6 @@ static CATEGORIES: &[Category] = &[
             ),
             b("media.hardwareDecoding", "Enable hardware accelerated decoding (requires restart)", false),
             b("media.proresHardwareEncoding", "Enable ProRes hardware accelerated encoding, if available", false),
-        ],
-    },
-    Category {
-        id: "mediaAnalysis",
-        title: "Media Analysis & Transcription",
-        rows: &[
-            f("mediaAnalysis.cacheResults", "Cache analysis results for re-use", Kind::Choice(ANALYSIS_CACHE), false),
-            Row::Note(
-                "Media analysis and transcriptions will be cached in the Media Cache folder. Reanalysis won't be required if the media is imported into another project on this computer.",
-            ),
-            Row::Group("Media Analysis", &[b("mediaAnalysis.analyzeImportedMedia", "Analyze all imported media to search for visuals or audio", false)]),
-            Row::Group(
-                "Transcription",
-                &[
-                    b("mediaAnalysis.autoTranscribe", "Automatically transcribe clips", true),
-                    sub("mediaAnalysis.autoTranscribeScope", "Transcription preferences", Kind::Choice(TRANSCRIBE_SCOPE), "mediaAnalysis.autoTranscribe", true),
-                    f("mediaAnalysis.speakerLabeling", "Speaker Labeling", Kind::Choice(SPEAKERS), true),
-                    b("mediaAnalysis.languageAutoDetect", "Enable language auto-detection", true),
-                    f("mediaAnalysis.defaultLanguage", "Default language", Kind::Choice(LANGUAGES), true),
-                    f("mediaAnalysis.whisperModel", "Speech model", Kind::Choice(MODELS), true),
-                ],
-            ),
         ],
     },
     Category {

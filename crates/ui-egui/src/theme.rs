@@ -119,7 +119,6 @@ pub struct Tokens {
     pub slider_disabled_knob: Color32,
     pub button_hover: Color32,
     pub button_border: Color32,
-    pub caption_track_bg: Color32,
     pub scroll_thumb: Color32,
     pub scroll_thumb_hover: Color32,
     pub vertical_scroll_thumb: Color32,
@@ -214,7 +213,6 @@ impl Tokens {
             slider_disabled_knob: Color32::from_gray(106),
             button_hover: Color32::from_gray(42),
             button_border: Color32::from_gray(75),
-            caption_track_bg: Color32::from_rgb(0x23, 0x20, 0x2a),
             scroll_thumb: Color32::from_gray(0x4b),
             scroll_thumb_hover: Color32::from_gray(0x6a),
             vertical_scroll_thumb: Color32::from_gray(80),
@@ -316,7 +314,6 @@ impl Tokens {
                 button_hover: Color32::from_gray(210),
                 button_border: Color32::from_gray(170),
                 icon_active: Color32::from_rgb(34, 34, 34),
-                caption_track_bg: Color32::from_rgb(222, 215, 233),
                 scroll_thumb: Color32::from_gray(150),
                 scroll_thumb_hover: Color32::from_gray(130),
                 vertical_scroll_thumb: Color32::from_gray(150),
@@ -431,7 +428,6 @@ pub fn install(ctx: &egui::Context, t: &Tokens) {
     // glyph forms; Chinese faces still cover the hanzi Japanese fonts lack
     add_craft_fonts(&mut fonts);
     crate::cjk::install(&mut fonts);
-    crate::rtl::install(&mut fonts);
     ctx.set_fonts(fonts);
     apply_visuals(ctx, t);
 }
@@ -543,7 +539,6 @@ mod tests {
             ("plot", dark.plot_bg, light.plot_bg),
             ("keyframe plot", dark.keyframe_plot_bg, light.keyframe_plot_bg),
             ("panner", dark.panner_bg, light.panner_bg),
-            ("caption lane", dark.caption_track_bg, light.caption_track_bg),
             ("active toggle", dark.pressed, light.pressed),
             ("meter", dark.meter_bg, light.meter_bg),
             ("meter readout", dark.meter_readout_bg, light.meter_readout_bg),
@@ -676,8 +671,7 @@ mod tests {
         ctx.fonts_mut(|fonts| {
             let defs = fonts.definitions().clone();
             for (family, stack) in &defs.families {
-                // installed right-to-left faces (Hebrew is not in craft-fonts) come after the craft run
-                let stack: Vec<&String> = stack.iter().filter(|n| !crate::rtl::is_system_face(n)).collect();
+                let stack: Vec<&String> = stack.iter().collect();
                 let first = stack.iter().position(|n| n.starts_with("craft:")).unwrap_or(stack.len());
                 assert!(first > 0 && stack[first..].iter().all(|n| n.starts_with("craft:")), "{family:?}: {stack:?}");
                 let first_japanese = stack.iter().find(|n| n.starts_with("craft:BIZ") || n.starts_with("craft:Shippori"));
@@ -701,7 +695,7 @@ mod tests {
     #[test]
     fn works_without_craft_fonts() {
         let ctx = installed();
-        let n = waltcut_text::fonts::craft_japanese().count() + crate::cjk::craft_fonts().count() + crate::rtl::craft_fonts().count();
+        let n = waltcut_text::fonts::craft_japanese().count() + crate::cjk::craft_fonts().count();
         ctx.fonts_mut(|fonts| {
             let defs = fonts.definitions().clone();
             assert_eq!(defs.font_data.keys().filter(|k| k.starts_with("craft:")).count(), n);

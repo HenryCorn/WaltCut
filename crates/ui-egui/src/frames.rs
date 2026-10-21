@@ -908,25 +908,14 @@ fn provider(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>) -> J
 }
 
 fn plan_job(job: &Job, seq: ItemId, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, previews: &PreviewStore) -> (waltcut_render::plan::FramePlan, bool) {
-    let opts = waltcut_render::RenderOptions { scale: job.scale, captions: true, ..Default::default() };
+    let opts = waltcut_render::RenderOptions { scale: job.scale, ..Default::default() };
     if let Some(frame) = preview_frame(job, seq, pool, previews)
         && let Some(q) = job.project.sequence(seq)
     {
-        // One full-frame layer: the preview scaled to the output size. Previews never contain
-        // captions (they are not part of the preview hash), so captions are layered on live.
+        // One full-frame layer: the preview scaled to the output size.
         let (w, h) = waltcut_render::output_size(q, job.scale);
         let matrix = waltcut_geom::Affine::scale(w as f64 / frame.width.max(1) as f64, h as f64 / frame.height.max(1) as f64);
-        let mut layers = vec![waltcut_render::plan::PlanLayer { frame, matrix, opacity: 1.0, blend: waltcut_render::Blend::Normal, fx: None, input: None }];
-        for o in waltcut_render::caption_overlays(q, job.time, w, h) {
-            layers.push(waltcut_render::plan::PlanLayer {
-                frame: Arc::new(waltcut_frame::VideoFrame::rgba_f32(o.w as u32, o.h as u32, o.px)),
-                matrix: waltcut_geom::Affine::translate(o.x as f64, o.y as f64),
-                opacity: 1.0,
-                blend: waltcut_render::Blend::Normal,
-                fx: None,
-                input: None,
-            });
-        }
+        let layers = vec![waltcut_render::plan::PlanLayer { frame, matrix, opacity: 1.0, blend: waltcut_render::Blend::Normal, fx: None, input: None }];
         return (waltcut_render::plan::FramePlan::Layers { width: w, height: h, layers }, true);
     }
     let provider = provider(job, pool, services);
@@ -941,20 +930,15 @@ fn render_job(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, pr
     {
         let (w, h) = waltcut_render::output_size(q, job.scale);
         let img = waltcut_render::Image { w: f.width as usize, h: f.height as usize, px: f.to_linear_f32() };
-        let mut img = if img.w == w && img.h == h {
+        let img = if img.w == w && img.h == h {
             img
         } else {
             img.transformed(w, h, &waltcut_geom::Affine::scale(w as f64 / img.w.max(1) as f64, h as f64 / img.h.max(1) as f64))
         };
-        if matches!(job.key.target, Target::Sequence(_)) {
-            for o in waltcut_render::caption_overlays(q, job.time, w, h) {
-                o.composite_onto(&mut img.px, w, h);
-            }
-        }
         return (Rgba { w: img.w, h: img.h, px: img.over_black_rgba8() }, true);
     }
     let provider = provider(job, pool, services);
-    let opts = waltcut_render::RenderOptions { scale: job.scale, captions: true, ..Default::default() };
+    let opts = waltcut_render::RenderOptions { scale: job.scale, ..Default::default() };
     let img = match job.key.target {
         Target::Sequence(seq) | Target::SequencePlan(seq) => Some(waltcut_render::render_sequence(&job.project, seq, job.time, opts, &provider)),
         Target::Item(item) => waltcut_render::render_item(&job.project, item, job.time, job.scale, &provider),
