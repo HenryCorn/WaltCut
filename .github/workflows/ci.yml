@@ -18,7 +18,7 @@ jobs:
   quality:
     name: quality (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +38,9 @@ jobs:
       - name: Run full quality gates
         if: matrix.os == 'ubuntu-latest'
         run: cargo xtask ci
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
       - name: Check native platform targets
         if: matrix.os != 'ubuntu-latest'
         run: |

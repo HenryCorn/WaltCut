@@ -155,8 +155,10 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
 Open pull requests against `main` from a short-lived branch named for the work. Link the issue,
 explain the user-visible change, and report relevant local checks in the pull request description.
 The repository CI workflow runs the full `cargo xtask ci` gate on Linux and checks formatting and
-all-target Clippy on macOS and Windows for every pull request and push to `main`; all platform
-checks must pass before merge.
+all-target Clippy on macOS and Windows for every pull request and push to `main`. Linux CI disables
+release LTO and uses 16 codegen units to keep the full test build practical; this does not change
+the release profile used for shipped builds. Each platform job has a 45-minute timeout, and all
+platform checks must pass before merge.
 
 CodeRabbit is configured to review pull requests when its GitHub integration is enabled. Its
 findings are advisory; resolve review conversations and follow the project's safety and licensing
