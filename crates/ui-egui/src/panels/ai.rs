@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use filmcraft_engine::ai::CONFIRM_ABOVE_FRAMES;
+
 use crate::FilmcraftApp;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +46,9 @@ pub struct AiWindow {
     pub seed: u64,
     pub range: RestyleRange,
     pub every: u32,
+    /// Ticked to send more frames than `CONFIRM_ABOVE_FRAMES`; asked again for every request.
+    #[serde(skip)]
+    pub confirm: bool,
     #[serde(skip)]
     pub key_input: String,
     #[serde(skip)]
@@ -60,11 +65,25 @@ impl Default for AiWindow {
             seed: 1234,
             range: RestyleRange::Playhead,
             every: 2,
+            confirm: false,
             key_input: String::new(),
             job: None,
         }
     }
 }
+
+/// Drawing assists on the same image-to-image call: (label, prompt, avoid, strength). Low strength
+/// keeps the drawing's composition.
+const ASSIST_PRESETS: [(&str, &str, &str, f32); 3] = [
+    ("Watercolor", "hand-painted watercolor illustration, soft paper texture", "blurry, low quality, text, watermark", 0.55),
+    (
+        "Sketch cleanup (rough to clean line art)",
+        "clean black ink line art, smooth confident lines, white background, no shading",
+        "sketchy, messy lines, colour, shading, blurry, text",
+        0.45,
+    ),
+    ("Flat colour fill", "flat colour cel animation, solid fills, clean outlines, no gradients", "gradients, shading, texture, blurry, text, watermark", 0.40),
+];
 
 /// How many frames a request would send.
 fn frame_count(app: &FilmcraftApp, w: &AiWindow) -> Option<u64> {
@@ -99,6 +118,18 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
                     }
                 }
             });
+            let endpoint = status["endpoint"].as_str().unwrap_or_default().to_string();
+            let models = status["models"].as_array().cloned().unwrap_or_default();
+            let label_of = |m: &Value| m["label"].as_str().unwrap_or_default().to_string();
+            let current = models.iter().find(|m| m["endpoint"].as_str() == Some(endpoint.as_str())).map_or(endpoint.clone(), label_of);
+            egui::ComboBox::from_label("Model").selected_text(current).show_ui(ui, |ui| {
+                for m in &models {
+                    let ep = m["endpoint"].as_str().unwrap_or_default();
+                    if ui.selectable_label(endpoint == ep, label_of(m)).clicked() {
+                        run(app, "ai.setup", json!({"endpoint": ep}));
+                    }
+                }
+            });
             let key = status["key"].as_str().unwrap_or("missing");
             ui.label(match key {
                 "saved" => "API key: saved",
@@ -120,6 +151,13 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
         app.auto.add("ai.provider", r.header_response.rect, "provider");
         ui.separator();
         let w = &mut app.ui.ai;
+        egui::ComboBox::from_label("Preset").selected_text("Choose…").show_ui(ui, |ui| {
+            for (label, prompt, negative, strength) in ASSIST_PRESETS {
+                if ui.selectable_label(false, label).clicked() {
+                    (w.prompt, w.negative, w.strength) = (prompt.into(), negative.into(), strength);
+                }
+            }
+        });
         ui.label("Style prompt");
         ui.add(egui::TextEdit::multiline(&mut w.prompt).desired_rows(3).desired_width(f32::INFINITY));
         ui.label("Avoid");
@@ -136,7 +174,15 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
             }
         });
         if w.range != RestyleRange::Playhead {
-            ui.add(egui::Slider::new(&mut w.every, 1..=12).text("every Nth frame (2 = on twos)"));
+            ui.horizontal(|ui| {
+                ui.label("Animate on");
+                for (n, label) in [(2, "every 2nd"), (3, "every 3rd"), (4, "every 4th")] {
+                    ui.selectable_value(&mut w.every, n, label);
+                }
+            });
+            if !(2..=4).contains(&w.every) {
+                w.every = 2;
+            }
         }
         let snapshot = app.ui.ai.clone();
         let n = frame_count(app, &snapshot);
@@ -149,7 +195,12 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
             .job
             .and_then(|id| app.session.jobs.iter().find(|j| j.id == id))
             .is_some_and(|j| !j.progress.finished.load(std::sync::atomic::Ordering::Relaxed));
-        let go = ui.add_enabled(!busy && n.is_some() && status["ready"].as_bool().unwrap_or(false), egui::Button::new("Restyle"));
+        let big = n.is_some_and(|n| n > CONFIRM_ABOVE_FRAMES as u64);
+        if big {
+            ui.checkbox(&mut app.ui.ai.confirm, format!("I understand this sends {} billed frames", n.unwrap_or(0)));
+        }
+        let allowed = !big || app.ui.ai.confirm;
+        let go = ui.add_enabled(!busy && n.is_some() && allowed && status["ready"].as_bool().unwrap_or(false), egui::Button::new("Restyle"));
         app.auto.add("ai.restyle", go.rect, "Restyle");
         if go.clicked() {
             let p = json!({
@@ -159,9 +210,13 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 "seed": snapshot.seed,
                 "range": snapshot.range.param(),
                 "every": snapshot.every,
+                "confirm": big && snapshot.confirm,
             });
             match app.session.execute("ai.restyle", p) {
-                Ok(r) => app.ui.ai.job = r["job"].as_u64(),
+                Ok(r) => {
+                    app.ui.ai.job = r["job"].as_u64();
+                    app.ui.ai.confirm = false;
+                }
                 Err(e) => app.ui.status = e.to_string(),
             }
         }
