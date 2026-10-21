@@ -46,7 +46,6 @@ pub const PANELS: &[&str] = &[
     "Effects",
     "History",
     "Markers",
-    "Media Browser",
     "Metadata",
     "Audio Track Mixer",
     "Audio Clip Mixer",

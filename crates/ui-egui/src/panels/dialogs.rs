@@ -11,8 +11,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     crate::panels::graphics_templates::show(app, ctx);
     crate::panels::presets::save_dialog(app, ctx);
     crate::panels::audio_fx_editor::show(app, ctx);
-    crate::panels::multicam::show_dialog(app, ctx);
-    crate::panels::multicam::show_edit_cameras(app, ctx);
     crate::panels::monitor_view::dialogs(app, ctx);
     crate::panels::graphics::dialogs(app, ctx);
     crate::panels::workspaces::dialogs(app, ctx);
@@ -21,7 +19,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     crate::links::show_failed(app, ctx);
     crate::panels::frame_export::show(app, ctx);
     crate::panels::project_dialogs::show(app, ctx);
-    crate::panels::media_browser::dialogs(app, ctx);
     let Some(d) = app.dialog else { return };
     if let Some(still_open) = crate::panels::file_dialogs::show(app, ctx, d) {
         if !still_open && app.dialog == Some(d) {

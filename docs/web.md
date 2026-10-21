@@ -58,7 +58,7 @@ wasm threads need a cross-origin isolated page **and** a wasm build with atomics
 `build-std` toolchain), so this build is single-threaded everywhere: frame rendering, decoding,
 mixing and encoding are cooperative on the UI thread, and `rayon` runs inline.
 `filmcraft.info()` reports `crossOriginIsolated` so a threaded build can choose at start-up.
-Commands that need a thread on the desktop (render previews, proxies, Project Manager, mask
+Commands that need a thread on the desktop (render previews, mask
 tracking) report an error on the web for now.
 
 ### Media reads

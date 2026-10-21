@@ -1,6 +1,5 @@
 //! Headless UI tests of media management: the Link Media dialog opening for a project whose media
-//! moved (search a folder, link, the others follow), Project panel offline / proxy badges, the
-//! monitors' Toggle Proxies button, Create Proxies and Project Manager dialogs.
+//! moved (search a folder, link, the others follow) and Locate.
 //!
 //! Set `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` to also render the window offscreen with wgpu and write PNGs
 //! there (`media-*.png`).
@@ -39,7 +38,6 @@ fn make_movie(path: &Path, scene: DemoScene, w: u32, h: u32, frames: i64) {
         mark_out: None,
         markers: vec![],
         offline: false,
-        proxy: None,
         identity: None,
     };
     let mut p = Project::new("fixture");
@@ -197,7 +195,6 @@ fn source_transport_steps_every_frame_at_a_fractional_tick_rate() {
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,
@@ -240,7 +237,6 @@ fn source_menu_steps_use_ordinals_for_explicit_targets_and_focus() {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             }),
             None,
@@ -316,7 +312,6 @@ fn zero_tick_frame_duration_source() -> (Driver, Tick) {
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,
@@ -413,59 +408,6 @@ fn link_media_dialog_relinks_moved_media() {
     assert!(d.app().ui.link_media.is_none(), "both clips relinked (the second by folder remap), dialog closed");
     let st = d.exec("media.status", json!({}));
     assert!(st.as_array().unwrap().iter().all(|m| m["status"] == "online"), "{st}");
-    let _ = std::fs::remove_dir_all(&root);
-}
-
-#[test]
-fn offline_badges_proxy_toggle_and_dialogs() {
-    let root = tmp_dir("badges");
-    let path = moved_project(&root);
-    let mut s = Session::default();
-    s.execute("file.open", json!({"path": path})).unwrap();
-    let mut d = Driver::new(s);
-    d.frames(4);
-    d.click("linkMedia.cancel");
-    assert!(d.app().ui.link_media.is_none());
-    // the Program monitor shows the offline slate; the project panel marks offline items
-    d.exec("playhead.set", json!({"frame": 6}));
-    d.frames(30);
-    let offline_badges = d.ids("project.item.").into_iter().filter(|i| i.ends_with(".offline")).count();
-    assert_eq!(offline_badges, 2, "icon-view offline markers");
-    d.snapshot("media-offline-project");
-    // relink by folder remap, create proxies through the dialog, toggle them from the monitor
-    d.exec("media.autoRelink", json!({"from": root.join("Media").to_string_lossy(), "to": root.join("Moved/Media").to_string_lossy()}));
-    let items: Vec<u64> = d.exec("media.status", json!({})).as_array().unwrap().iter().map(|m| m["item"].as_u64().unwrap()).collect();
-    d.exec("project.select", json!({"items": items}));
-    d.ok("ui.menu.invoke", json!({"id": "media.createProxies"}));
-    d.frames(3);
-    assert!(d.app().ui.create_proxies.is_some());
-    d.snapshot("media-create-proxies");
-    d.click("proxies.preset.prores_proxy_quarter");
-    d.click("proxies.ok");
-    for _ in 0..400 {
-        d.frames(1);
-        let attached = d.app().session.project.items.values().filter(|i| i.as_media().is_some_and(|m| m.proxy.is_some())).count();
-        if attached == 2 {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
-    assert_eq!(d.app().session.project.items.values().filter(|i| i.as_media().is_some_and(|m| m.proxy.is_some())).count(), 2, "proxies attached");
-    d.click("program.transport.media.toggleProxies");
-    assert!(d.app().session.prefs.media.enable_proxies);
-    assert_eq!(d.ids("project.item.").into_iter().filter(|i| i.ends_with(".proxy")).count(), 2, "proxy badges");
-    d.frames(20);
-    d.snapshot("media-proxies-on");
-    // Project Manager dialog: calculate the size estimate
-    d.ok("ui.menu.invoke", json!({"id": "file.projectManager"}));
-    d.frames(2);
-    d.app().ui.project_manager.as_mut().unwrap().destination = root.join("Collected").to_string_lossy().into_owned();
-    d.click("pm.calculate");
-    let est = d.app().ui.project_manager.as_ref().unwrap().estimate;
-    assert!(est.is_some_and(|(a, b, n)| a > 0 && b == a && n == 2), "{est:?}");
-    d.snapshot("media-project-manager");
-    d.click("pm.ok");
-    assert!(d.app().ui.project_manager.is_none());
     let _ = std::fs::remove_dir_all(&root);
 }
 

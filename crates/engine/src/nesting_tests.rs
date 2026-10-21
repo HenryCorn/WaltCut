@@ -112,7 +112,7 @@ fn joining_transition(s: &Session) -> (waltcut_project::Transition, ClipId, Clip
 }
 
 fn frame_at(s: &Session, t: Tick) -> waltcut_render::Image {
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let opts = waltcut_render::RenderOptions { scale: 0.25, ..Default::default() };
     waltcut_render::render_sequence(&s.project, s.state.active_sequence.unwrap(), t, opts, &provider)
 }
@@ -193,7 +193,7 @@ fn nest_clip(s: &Session, id: ClipId) -> waltcut_project::TrackItem {
 fn mix_at(s: &Session, t: Tick, frames: usize) -> waltcut_frame::AudioBuffer {
     let q = s.active_sequence().unwrap();
     let sr = q.settings.sample_rate as i64;
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     waltcut_render::audio::mix_sequence(&s.project, q, t.to_units_floor(sr), frames, &provider)
 }
 

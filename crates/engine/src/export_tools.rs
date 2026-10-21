@@ -372,7 +372,7 @@ pub fn default_export_dir(s: &Session) -> PathBuf {
         // the web build's virtual file table: written files are offered as downloads
         return PathBuf::from("/exports");
     }
-    if let Some(h) = crate::media_browser::std_home_dir() {
+    if let Some(h) = crate::std_home_dir() {
         let movies = Path::new(&h).join("Movies");
         return if movies.is_dir() { movies } else { PathBuf::from(h) };
     }
@@ -405,7 +405,7 @@ fn with_extension(path: &str, settings: &ExportSettings) -> String {
 /// `~/` expanded to the home directory (`USERPROFILE` on Windows). On Windows `/` becomes `\`:
 /// after a `\\?\` prefix (what `canonicalize` returns) `/` is not a separator.
 pub fn expand_home(p: &str) -> String {
-    let p = match (p.strip_prefix("~/"), crate::media_browser::std_home_dir()) {
+    let p = match (p.strip_prefix("~/"), crate::std_home_dir()) {
         (Some(rest), Some(h)) => format!("{h}/{rest}"),
         _ => p.to_string(),
     };
@@ -451,8 +451,7 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     }
     let id = s.jobs.iter().map(|j| j.id).max().unwrap_or(0) + 1;
     let job = crate::Job { id, label, progress: Default::default(), result: Default::default() };
-    // Export always renders full-resolution media, whatever the proxy toggle says.
-    let provider = s.media.full_res_provider(project.clone(), s.services.clone()).recording();
+    let provider = s.media.provider(project.clone(), s.services.clone()).recording();
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let offline = s.export_offline.entry(id).or_default().clone();
     if cfg!(target_arch = "wasm32") && !wait && waltcut_export::stepped(format) {
@@ -482,7 +481,7 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     Ok(id)
 }
 
-/// Last-resort guard for a background job body (export, previews, proxies, …): a panic marks the
+/// Last-resort guard for a background job body (export, previews, …): a panic marks the
 /// job failed with an error instead of killing its thread and leaving the job "running" forever.
 /// The panic hook has already logged where it happened.
 pub(crate) fn guard_job(

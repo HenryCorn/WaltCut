@@ -20,7 +20,6 @@ fn add_gen(p: &mut Project, g: GeneratorSource) -> ItemId {
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,

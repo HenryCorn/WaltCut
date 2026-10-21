@@ -12,7 +12,6 @@ focused monitor (Program by default). Code: `crates/ui-egui/src/panels/monitor_v
 | `view.pausedRes.<…>` | View ▸ Paused Resolution | render scale while stopped (default Full) |
 | `view.highQualityPlayback` | View ▸ High Quality Playback | play at the paused resolution when it is higher |
 | `view.display.<composite\|alpha\|red\|green\|blue>` | View ▸ Display Mode | composite, or one channel as greyscale (colour channels premultiplied) |
-| `view.display.multicam` | Display Mode ▸ Multi-Camera | the Program's multi-camera view (`multicam.toggleView`) |
 | `view.display.audioWaveform`, `view.display.videoAndWaveform` | Display Mode ▸ Audio Waveform / Video and Audio Waveform Split | Source Monitor: the clip's waveform (click to move the source playhead); audio-only clips always show it |
 | `view.magnification.<fit\|10\|25\|50\|75\|100\|150\|200\|400\|800\|1600>` | View ▸ Magnification and the zoom dropdown | 100% = one frame pixel per screen pixel. The mouse wheel (or a pinch) over a monitor zooms about the pointer, from Fit too, within 10%–1600%; drag with the middle mouse button, or with the Hand tool, to pan; Fit resets both. Each monitor keeps its own zoom and pan |
 | `view.showRulers`, `view.showGuides`, `view.lockGuides`, `view.clearGuides` | View | toggles take `{"enabled": bool}` |
@@ -157,7 +156,7 @@ format/depth combinations. In the browser the still is offered as a download. Im
 adds the saved still as one undoable edit. Failed writes retain the settings and report an error.
 
 The monitor, item and frame time are captured when the settings open. Export uses the original
-full-resolution media, even with proxies or reduced preview resolution enabled. Source exports
+full-resolution media, even with reduced preview resolution enabled. Source exports
 the source picture at its media playhead; Program exports the sequence composite and effects at its
 timeline playhead. Audio-only Source clips have no picture to export.
 

@@ -1,6 +1,6 @@
 //! Monitor view options (the View menu and the monitors' wrench menus): Playback / Paused
 //! Resolution, High Quality Playback, Display Mode (Composite Video, Alpha, Red, Green, Blue,
-//! Multi-Camera, Audio Waveform, Comparison View, Video and Audio Waveform Split), Magnification
+//! Audio Waveform, Video and Audio Waveform Split), Magnification
 //! (Fit, 10%…1600%, the wheel zooming about the pointer, middle-button or Hand-tool panning),
 //! rulers, guides (dragged out of the rulers, Add
 //! Guide…, Clear Guides, Lock Guides, templates saved in the user preferences) and Snap in Program
@@ -228,10 +228,6 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
 }
 
 fn set_display(app: &mut FilmcraftApp, w: Which, d: &str) -> Result<Value, String> {
-    if d == "multicam" {
-        app.ui.program.multicam = true;
-        return Ok(json!({"monitor": "program", "display": "multicam"}));
-    }
     let (_, mode) = DISPLAY_NAMES.iter().find(|(n, _)| *n == d).ok_or_else(|| format!("unknown display mode `{d}`"))?;
     // Audio Waveform and the split view are Source Monitor modes.
     let w = match mode {
@@ -240,9 +236,6 @@ fn set_display(app: &mut FilmcraftApp, w: Which, d: &str) -> Result<Value, Strin
     };
     let v = view_mut(app, w);
     v.display = *mode;
-    if w == Which::Program {
-        v.multicam = false;
-    }
     Ok(json!({"monitor": prefix(w), "display": d}))
 }
 
@@ -271,15 +264,12 @@ pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
         return RES_NAMES.iter().find(|(n, _)| *n == r).map(|(_, x)| *x == v.paused_res);
     }
     if let Some(d) = rest.strip_prefix("display.") {
-        if d == "multicam" {
-            return Some(app.ui.program.multicam);
-        }
         let (_, mode) = DISPLAY_NAMES.iter().find(|(n, _)| *n == d)?;
         let v = match mode {
             DisplayMode::AudioWaveform | DisplayMode::VideoAndWaveform => &app.ui.source,
             _ => v,
         };
-        return Some(v.display_mode() == Some(*mode));
+        return Some(v.display == *mode);
     }
     if let Some(z) = rest.strip_prefix("magnification.") {
         return Some(if z == "fit" { v.zoom.is_none() } else { ZOOMS.iter().find(|(n, _)| *n == z).is_some_and(|(_, f)| v.zoom == Some(*f)) });
@@ -673,7 +663,7 @@ fn pick(ui: &mut egui::Ui, out: &mut Picks, key: &str, label: &str, on: bool) {
 /// The view items of a monitor's wrench menu (display modes, resolutions, rulers, guides, snap).
 pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
     let v = view(app, w).clone();
-    let mode = v.display_mode();
+    let mode = Some(v.display);
     let mut out: Picks = Vec::new();
     pick(ui, &mut out, "display.composite", tl!("Composite Video"), mode == Some(DisplayMode::Composite));
     ui.menu_button(tl!("RGBA Channels"), |ui| {
@@ -687,7 +677,6 @@ pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
         }
     });
     if w == Which::Program {
-        pick(ui, &mut out, "display.multicam", tl!("Multi-Camera"), v.multicam);
     } else {
         pick(ui, &mut out, "display.audioWaveform", tl!("Audio Waveform"), mode == Some(DisplayMode::AudioWaveform));
         pick(ui, &mut out, "display.videoAndWaveform", tl!("Video and Audio Waveform Split"), mode == Some(DisplayMode::VideoAndWaveform));

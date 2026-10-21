@@ -267,7 +267,7 @@ pub fn install_hooks(app: &mut FilmcraftApp) {
         let file = std::path::Path::new(name).file_name().map_or(name.into(), |n| n.to_string_lossy());
         Some(format!("/exports/{file}"))
     }));
-    // Link Media ▸ Locate…, Attach Proxies, Reconnect Full Resolution: the picker is async, so the
+    // Link Media ▸ Locate…: the picker is async, so the
     // hint's command runs once the user has chosen (#111).
     app.hooks.pick_file_for_relink = Some(Box::new(|exts: &[&str], hint: Option<RelinkHint>| {
         if hint.is_some() {

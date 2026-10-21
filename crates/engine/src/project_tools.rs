@@ -1,5 +1,5 @@
 //! File / Edit / Clip menu long tail (M3.11), and [`apply_layout`], which puts these commands (and
-//! those of `sequence_extras` and `scene_detect`) in Premiere's menu order.
+//! those of `sequence_extras`) in Premiere's menu order.
 //!
 //! | Id | Menu |
 //! |---|---|
@@ -7,7 +7,6 @@
 //! | `file.close` | File ▸ Close (⌘W): closes the active sequence |
 //! | `file.closeAllProjects` / `file.closeAllOtherProjects` | File ▸ Close All Projects / Close All Other Projects |
 //! | `file.saveAsTemplate` | File ▸ Save as Template… (`file.templates`, `file.newProjectFromTemplate`) |
-//! | `file.importFromMediaBrowser` | File ▸ Import from Media Browser (⌥⌘I) |
 //! | `file.exportSelectionProject` | File ▸ Export ▸ Selection as FilmCraft Project… |
 //! | `file.mediaPropertiesFile` / `file.mediaProperties` | File ▸ Get Media File Properties for ▸ File… / Selection… (⇧⌘H) |
 //! | `file.projectSettings.general` / `.scratchDisks` | File ▸ Project Settings ▸ General… / Scratch Disks… |
@@ -91,26 +90,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
         spec("file.saveAsTemplate", "Save as Template…", &["File"], None, r#"{"name":str?,"path":str?}"#, always, save_as_template),
         query("file.templates", "List Project Templates", &[], None, "{}", always, list_templates),
         spec("file.newProjectFromTemplate", "New Project from Template", &[], None, r#"{"template":name|path,"name":str?}"#, always, new_from_template),
-        spec(
-            "file.importFromMediaBrowser",
-            "Import from Media Browser",
-            &["File"],
-            Some("Cmd+Alt+I"),
-            r#"{"paths":[str]?,"imageSequence":bool?}"#,
-            always,
-            |s, p| {
-                // the Media Browser's selection unless `paths` are given
-                let paths = match p.get("paths").and_then(Value::as_array) {
-                    Some(a) => a.clone(),
-                    None => s.browser.selection.iter().map(|x| json!(x)).collect(),
-                };
-                if paths.is_empty() {
-                    return Err(bad("file.importFromMediaBrowser", "select files in the Media Browser"));
-                }
-                let seq = p.get("imageSequence").and_then(Value::as_bool).unwrap_or(false);
-                s.execute("file.import", json!({"paths": paths, "imageSequence": seq}))
-            },
-        ),
         // File ▸ Import with "Image Sequence" checked (the UI asks for the first frame).
         spec("file.importImageSequence", "Import Image Sequence…", &["File"], None, r#"{"path":str,"bin":binId?}"#, always, |s, p| {
             let path = p.get("path").and_then(Value::as_str).ok_or_else(|| bad("file.importImageSequence", "need `path` (the first numbered still)"))?;
@@ -199,12 +178,11 @@ enum At {
     Before(&'static str),
 }
 
-/// Add this module's, `sequence_extras`' and `scene_detect`'s commands and arrange them (and a few
+/// Add this module's and `sequence_extras`' commands and arrange them (and a few
 /// existing ones) in Premiere's menu order.
 pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
     let mut pool = commands();
     pool.extend(crate::sequence_extras::commands());
-    pool.extend(crate::scene_detect::commands());
     // Apply Default Transitions to Selection works on selected clips too (⇧D), not only on
     // selected edit points; the Trim Monitor button keeps using the same id.
     if let Some(c) = v.iter_mut().find(|c| c.id == "trim.applyDefaultTransition")
@@ -215,10 +193,6 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         c.run = new.run;
         c.params = new.params;
     }
-    // Project Settings ▸ Ingest Settings…
-    if let Some(c) = v.iter_mut().find(|c| c.id == "project.ingestSettings") {
-        c.menu = &["File", "Project Settings"];
-    }
     let layout: Vec<(At, Vec<&'static str>)> = vec![
         (At::After("file.newBinFromSelection"), vec!["file.newSearchBin"]),
         (At::Before("file.closeProject"), vec!["file.close"]),
@@ -227,25 +201,18 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         (At::After("file.exportMedia"), vec!["file.exportSelectionProject"]),
         (
             At::Before("file.projectManager"),
-            vec![
-                "file.mediaPropertiesFile",
-                "file.mediaProperties",
-                "file.projectSettings.general",
-                "file.projectSettings.scratchDisks",
-                "project.ingestSettings",
-            ],
+            vec!["file.mediaPropertiesFile", "file.mediaProperties", "file.projectSettings.general", "file.projectSettings.scratchDisks"],
         ),
         (At::After("edit.deselectAll"), vec!["edit.find", "edit.findNext"]),
         (At::After("edit.consolidateDuplicates"), vec!["edit.editOriginal"]),
         (At::After("clip.editSubclip"), vec!["clip.editOffline", "clip.sourceSettings"]),
-        (At::After("clip.speedDuration"), vec!["clip.sceneEditDetection"]),
         (At::After("clip.replaceFromBin"), vec!["clip.updateMetadata", "clip.generateAudioWaveform", "clip.automateToSequence"]),
         (At::After("sequence.applyAudioTransition"), vec!["trim.applyDefaultTransition"]),
         (At::After("sequence.showThroughEdits"), vec!["sequence.normalizeMixTrack"]),
         (At::After("sequence.makeSubsequence"), vec!["sequence.simplify"]),
         (At::After("markers.addChapter"), vec!["markers.addFlashCue"]),
         (At::Before("file.close"), vec!["file.open"]),
-        (At::After("media.makeOffline"), vec!["file.importFromMediaBrowser", "file.import", "file.importImageSequence"]),
+        (At::After("media.makeOffline"), vec!["file.import", "file.importImageSequence"]),
     ];
     for (at, ids) in layout {
         let mut run = Vec::new();
@@ -683,7 +650,7 @@ fn new_from_template(s: &mut Session, p: &Value) -> Result<Value> {
 // ---------------------------------------------------------------------------------------------
 
 /// The selected items plus everything they need: sequence contents (recursively), subclip
-/// parents, multi-camera / merged-clip sources and graphic canvases.
+/// parents and graphic canvases.
 ///
 /// Bins and items share one id space, so a named bin contributes every item it holds (and
 /// everything those items need), as `project.delete` does. The project's own top bin does not,
@@ -738,11 +705,6 @@ pub fn closure(p: &Project, roots: &[ItemId]) -> BTreeSet<ItemId> {
                 for t in q.all_tracks() {
                     todo.extend(t.items.iter().map(|i| i.item));
                 }
-                let mut ids = BTreeSet::new();
-                for v in [serde_json::to_value(&q.multicam).unwrap_or_default(), serde_json::to_value(&q.merged).unwrap_or_default()] {
-                    crate::clip_ops::collect_ids(&v, &mut ids, p);
-                }
-                todo.extend(ids);
             }
             _ => {}
         }

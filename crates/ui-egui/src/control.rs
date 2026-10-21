@@ -246,18 +246,12 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
                     Err(e) => return err(format!("`panels`: {e}")),
                 }
             }
-            // Project panel / Media Browser view state (`panels::project`, `panels::media_browser`), merged
-            for (k, which) in [("projectPanel", 0), ("mediaBrowser", 1)] {
+            // Project panel view state (`panels::project`), merged
+            for k in ["projectPanel"] {
                 let Some(patch) = p.get(k) else { continue };
-                let mut cur =
-                    if which == 0 { serde_json::to_value(&app.ui.project_panel) } else { serde_json::to_value(&app.ui.media_browser) }.unwrap_or_default();
+                let mut cur = serde_json::to_value(&app.ui.project_panel).unwrap_or_default();
                 merge(&mut cur, patch);
-                let r = if which == 0 {
-                    serde_json::from_value(cur).map(|v| app.ui.project_panel = v)
-                } else {
-                    serde_json::from_value(cur).map(|v| app.ui.media_browser = v)
-                };
-                if let Err(e) = r {
+                if let Err(e) = serde_json::from_value(cur).map(|v| app.ui.project_panel = v) {
                     return err(format!("`{k}`: {e}"));
                 }
             }

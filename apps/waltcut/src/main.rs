@@ -269,7 +269,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
                 .map(|p| p.to_string_lossy().to_string())
                 .collect()
         }));
-        // Link Media ▸ Locate…, Attach Proxies, Reconnect Full Resolution: one path, not imported.
+        // Link Media ▸ Locate…: one path, not imported.
         app.hooks.pick_file_for_relink = Some(Box::new(|exts: &[&str], _hint| {
             rfd::FileDialog::new()
                 .add_filter(waltcut_ui_egui::i18n::t("Media"), &file_filters::extensions(exts))

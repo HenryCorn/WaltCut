@@ -216,7 +216,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
     job.progress.total.store(n as u64, Ordering::Relaxed);
     let dir = output_dir(s, id);
     let outputs: Arc<Mutex<Vec<(Tick, String)>>> = Default::default();
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let project = s.project.clone();
     let (prog, res, outs) = (job.progress.clone(), job.result.clone(), outputs.clone());
     let t0 = web_time::Instant::now();

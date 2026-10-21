@@ -34,7 +34,7 @@ panic path, and fix a crash before building on top of it. The cross-app standard
 5. **Bound recursion and loops.** Projects can be cyclic (nested sequences) or deeply nested: walk them
    with seen-sets or depth limits.
 6. **Don't cascade.** Lock poisoning is not fatal: `lock().unwrap_or_else(PoisonError::into_inner)`.
-   Every thread or job (export, previews, proxies, decoding workers…) runs under `catch_unwind` and
+   Every thread or job (export, previews, decoding workers…) runs under `catch_unwind` and
    reports a failure as an error: a dead worker leaves monitors blank or jobs "running" forever.
 7. **Last-resort guard.** The panic hook (`crates/ui-egui/src/crash.rs`) logs every panic, and the UI pass
    runs under `catch_unwind`, so an escaped panic becomes an error window and the session (and unsaved

@@ -1084,7 +1084,6 @@ mod pipeline {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             }),
             None,

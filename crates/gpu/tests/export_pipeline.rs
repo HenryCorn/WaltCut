@@ -49,7 +49,6 @@ fn project(width: u32, height: u32) -> (Arc<waltcut_project::Project>, waltcut_p
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,

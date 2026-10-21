@@ -230,11 +230,9 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   graphics and adjustment layers are in sequence pixels. New Sequence From Clip copies the clip's
   ratio, and the Source and Program monitors draw the picture at its display aspect. The
   renderer does not read decoded frames' own `VideoFrame::par`.
-- **Offline media and proxies.** The pool caches each item's source per reference (path, offline
+- **Offline media.** The pool caches each item's source per reference (path, offline
   flag), so relinking and undo take effect at once. Media that can't be opened renders the offline
-  slate (`render::offline`) instead of failing. With proxies enabled, an item with a proxy reads
-  it through `ProxySource`, which reports the original's size. Export always uses
-  `MediaPool::full_res_provider`. See [project-files.md](project-files.md#media-offline-relinking-proxies-ingest).
+  slate (`render::offline`) instead of failing. See [project-files.md](project-files.md#media-offline-and-relinking).
 - **Seeking.** `codecs::Mp4Source` seeks to the preceding sync sample and decodes forward, caching
   every frame of the GOP. Sequential playback reuses the decoder. Decoders implement
   `codecs::VideoDecoder`. `register_video_decoder` puts a factory in front of the built-in ones, so a
@@ -573,57 +571,6 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
   wired up: there is no `platform` crate yet and eframe/wgpu do not expose an EDR surface, so HDR
   values above SDR white are never sent to the display.
 
-### 5.4 Multi-camera and synchronisation
-
-```text
-clips ──sync (in | out | timecode[±hours] | marker | audio)──► anchors (media time ↔ common instant)
-  ├─ clip.synchronize        moves selected timeline clips (link groups together) onto the reference
-  ├─ clip.mergeClips         video + ≤16 audio clips → a merged-clip sequence
-  └─ clip.createMulticam     cameras → a multi-camera source sequence (one video track per angle)
-multi-camera clip = nested source + TrackItem::multicam {enabled, angle}
-  render: only the angle's video track · audio: camera 1 | all | the angle (Switch Audio)
-```
-
-- **Model** (`project::multicam`). `Sequence::multicam` (`MulticamSource`: cameras with their video
-  track, audio tracks, name, shown flag and source item; audio mode) marks a multi-camera source;
-  `Sequence::merged` a merged clip. `TrackItem::multicam` (`MulticamSel`) makes a nested clip a
-  multi-camera clip; any nest can be one (its video tracks are then the angles,
-  `Sequence::cameras()`). Editing a multi-camera source into a sequence gives an enabled clip on the
-  first angle (`Project::make_track_item`). Project schema v7.
-- **Sync** (`engine::sync`). Each method reduces a clip to an *anchor* (the media time that lines up
-  with the common instant). Audio uses `audio_dsp::sync::find_offset`: DC removal, windowed-sinc
-  decimation to ≤ 8 kHz, GCC-PHAT-β (β = 0.75) via one packed complex FFT for the coarse lag, then
-  the same at the full rate on the loudest common window (≤ 2.7 s) and parabolic interpolation.
-  Recordings with different gains, microphones (filtered), 0 dB SNR noise or a strong echo are
-  aligned to the sample; two 10-minute recordings take ~2.4 s (release). Clips are placed on frame
-  boundaries with the sub-frame remainder taken from their source In, so video stays on frames
-  while audio keeps sample accuracy.
-- **Render.** `render::item_layer` renders a multi-camera clip's angle track only
-  (`render_seq_tracks`); `render::audio` mixes the nested source with only the audible tracks
-  (`Sequence::with_angle_audio`). Nested audio now plays at all (it was skipped when the nest had
-  no media source) and is limited to the clip's range. `render::multicam::render_grid_page` renders
-  one page of the shown angles at the cell scale in parallel (rayon) and tiles them: the
-  Multi-Camera view is one frame job (`frames::Target::MulticamGrid(source, layout, page)`),
-  prefetched while playing like the program. Only the page's angles are decoded.
-- **Multi-Camera view settings** (`EditorState::multicam_view`, Program ▸ wrench menu): grid
-  layout (automatic = smallest square up to 4×4, or fixed 2×2 / 3×3 / 4×4) with pages when the
-  angles don't fit (`render::multicam::page_layout`; `multicam.gridLayout`, `multicam.page`,
-  page arrows; keys 1–9 pick cameras on the shown page, `multicam.cut {camera}` stays absolute);
-  Multi-Camera Selection Top Down (stacked multi-camera clips: topmost instead of lowest);
-  Show Multi-Camera Preview Monitor (off: the grid fills the monitor); Auto-Adjust Multi-Camera
-  Playback Quality (`grid_cell_scale`: ½ / ¼ of the cell scale while playing); Transmit
-  Multi-Camera View (stored; there is no transmit device yet). `multicam.grid` returns the page.
-  Edit Cameras… shows a thumbnail per angle (`frames::Target::MulticamAngle`).
-- **Editing** (`edit::multicam`, `engine::multicam`). `multicam.switchAngle` (click an angle,
-  Ctrl/⌘-click for video only), `multicam.selectCamera1…9` (keys 1–9) and `cutToCamera1…9`
-  (Ctrl+1–9), Enable/Flatten, Edit Cameras, Audio Follows Video (`EditorState`). Live switching:
-  playback in the Multi-Camera view runs `multicam.recordStart`; each key/click is a
-  `multicam.cut` that is applied at once (the program shows it) by re-applying the whole pass to
-  the project from before the pass (`edit_merged`), so a pass is one undo step; Stop runs
-  `multicam.recordStop`, which ends the last angle at the stop point. Through edits inside the
-  recorded range are healed, so pressing the angle already showing adds no edit. Flatten replaces
-  a clip by the clip(s) its angle shows (outer effects carried over; linked pairs stay linked).
-
 ## 6. Export jobs (`waltcut-export`)
 
 ```text
@@ -699,19 +646,15 @@ All of these dispatch the same command ids.
   `jobs.cancel`), Project Notes (`project.notes` / `project.setNotes`, plain text in
   `Project::notes`, schema v15; one typing session is one undo step). The Timecode panel is a frontend-only view. Their settings are
   `UiState::panels` (`ui.set {"panels": {...}}`).
-- **Project panel and Media Browser** (M12.7). View settings (List / Icon / Freeform, thumbnail
+- **Project panel** (M12.7). View settings (List / Icon / Freeform, thumbnail
   and font size, Preview Area, Hover Scrub), the List view's columns, widths and sort, and ten view
   presets are preferences (`Preferences::project_panel`; `project.view.*`, `project.columns.*`,
   `project.sort`, `project.viewPreset.*`). Freeform positions, Clip Size, stacks and saved
   arrangements are item metadata (`Freeform Position`, `Freeform Stack`,
   `Freeform Arrangement: <name>`; `project.freeform.*`), so they are undoable and saved with the
-  project without a schema change. The Media Browser lists directories through
-  `Services::list_entries` / `volumes` / `home_dir` (native: `std::fs`; web: the virtual file
-  table; tests: a fake filesystem): `engine::media_browser` keeps navigation history and the
-  selection in `Session::browser`, Favorites / recent directories / file types / columns in
-  `Preferences::media_browser` (`mediaBrowser.*`). Bins opened in a tab or a window, the inline
-  rename, dialogs and the hover-scrubbed card are `UiState::project_panel`; the browser's tree
-  state is `UiState::media_browser` (`ui.set {"projectPanel": …, "mediaBrowser": …}`).
+  project without a schema change. Bins opened in a tab or a window, the inline
+  rename, dialogs and the hover-scrubbed card are `UiState::project_panel`
+  (`ui.set {"projectPanel": …}`).
 
 Protocol reference: [control-protocol.md](control-protocol.md). Agent guide: [agents.md](agents.md).
 

@@ -11,12 +11,6 @@
       "default_still_duration": 1270080000000,
       "default_transition_duration_frames": 24,
       "default_audio_transition_duration": 254016000000,
-      "ingest": {
-        "enabled": false,
-        "action": "createProxies",
-        "destination": null,
-        "preset": ""
-      },
       "title_safe": [
         20.0,
         20.0
@@ -112,8 +106,7 @@
             "mark_in": null,
             "mark_out": null,
             "markers": [],
-            "offline": false,
-            "proxy": null
+            "offline": false
           }
         },
         "metadata": {},

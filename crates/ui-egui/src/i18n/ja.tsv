@@ -42,7 +42,6 @@
 	Arrange	重ね順
 	ArtCraft Website	ArtCraft の Web サイト
 	Assembly	アセンブリ
-	Attach Proxies…	プロキシを関連付け…
 	Audio Channels…	オーディオチャンネル…
 	Audio Clip Mixer	オーディオクリップミキサー
 	Audio Gain…	オーディオゲイン…
@@ -88,8 +87,6 @@
 	Consolidate Duplicates	重複を統合
 	Copy	コピー
 	Copy Paste Includes Sequence Markers	コピーと貼り付けにシーケンスマーカーを含める
-	Create Multi-Camera Source Sequence…	マルチカメラソースシーケンスを作成…
-	Create Proxies…	プロキシを作成…
 	Cut	切り取り
 	Darkest	最も暗い
 	Delete Render Files	レンダリングファイルを削除
@@ -98,7 +95,6 @@
 	Demo Footage	デモ素材
 	Demo Project	デモプロジェクト
 	Deselect All	すべての選択を解除
-	Detach Proxies	プロキシの関連付けを解除
 	Display Mode	表示モード
 	Distribute	均等配置
 	Distribute Horizontally	水平方向に均等配置
@@ -135,7 +131,6 @@
 	Find…	検索…
 	Fit	合わせる
 	Fit to frame	フレームに合わせる
-	Flatten	フラット化
 	Forest	フォレスト
 	Frame Blending	フレームブレンド
 	Frame Hold Options…	フレームホールドオプション…
@@ -163,10 +158,8 @@
 	History	履歴
 	Import From	読み込み元
 	Import Image Sequence…	連番画像を読み込み…
-	Import from Media Browser	メディアブラウザーから読み込み
 	Import…	読み込み…
 	Info	情報
-	Ingest Settings…	取り込み設定…
 	Insert	挿入
 	Insert Frame Hold Segment	フレームホールドセグメントを挿入
 	Install Motion Graphics Template…	モーショングラフィックステンプレートをインストール…
@@ -198,17 +191,13 @@
 	Mark Split	スプリットをマーク
 	Markers	マーカー
 	Match Frame	マッチフレーム
-	Media Browser	メディアブラウザー
 	Media Cache…	メディアキャッシュ…
 	Media…	メディア…
 	Medium	中
 	Memory…	メモリー…
-	Merge Clips…	クリップを結合…
 	Metadata	メタデータ
 	Modify	変更
 	Motion Graphics Template…	モーショングラフィックステンプレート…
-	Multi-Camera	マルチカメラ
-	Multi-Camera View	マルチカメラ表示
 	Nest…	ネスト…
 	New	新規
 	New Layer	新規レイヤー
@@ -237,12 +226,10 @@
 	Program	プログラム
 	Progress	進行状況
 	Project	プロジェクト
-	Project Manager…	プロジェクトマネージャー…
 	Project Settings	プロジェクト設定
 	Project…	プロジェクト…
 	Properties	プロパティ
 	Purple	パープル
-	Reconnect Full Resolution Media…	フル解像度メディアに再接続…
 	Recover Unsaved Changes…	未保存の変更を復元…
 	Rectangle	長方形
 	Red	レッド
@@ -280,7 +267,6 @@
 	Save a Copy…	コピーを保存…
 	Save as Template…	テンプレートとして保存…
 	Scale to Frame Size	フレームサイズに合わせてスケール
-	Scene Edit Detection…	シーンの編集点を検出…
 	Scratch Disks…	スクラッチディスク…
 	Search Bin	検索ビン
 	Select	選択
@@ -310,7 +296,6 @@
 	Source	ソース
 	Source Settings…	ソース設定…
 	Speed/Duration…	速度・長さ…
-	Synchronize…	同期…
 	System Compatibility Report…	システム互換性レポート…
 	Tan	タン
 	Teal	ティール
@@ -320,7 +305,6 @@
 	Timecode…	タイムコード…
 	Timeline	タイムライン
 	Timeline…	タイムライン…
-	Toggle Proxies	プロキシを切り替え
 	Tools	ツール
 	Top	上
 	Transparent Video…	透明ビデオ…
@@ -610,15 +594,7 @@
 	(no clips)	(クリップなし)
 	Show Transport Controls	トランスポートコントロールを表示
 	Loop	ループ
-	Multi-Camera Audio Follows Video	マルチカメラでオーディオをビデオに追従させる
-	Multi-Camera Record	マルチカメラ記録
-	Multi-Camera Selection Top Down	マルチカメラの選択を上から順に
-	Show Multi-Camera Preview Monitor	マルチカメラプレビューモニターを表示
-	Auto-Adjust Multi-Camera Playback Quality	マルチカメラの再生画質を自動調整
-	Transmit Multi-Camera View	マルチカメラ表示を送出
-	Multi-Camera Layout	マルチカメラのレイアウト
 	Automatic	自動
-	Edit Cameras…	カメラを編集…
 	Add Marker (M)	マーカーを追加 (M)
 	Mark In (I)	イン点をマーク (I)
 	Mark Out (O)	アウト点をマーク (O)
@@ -634,22 +610,15 @@
 	Extract (')	抽出 (')
 	Export Frame: use Export mode (M6)	フレームの書き出し: 書き出しモードを使用してください (M6)
 	Button Editor	ボタンエディター
-	Multi-Camera Record on	マルチカメラ記録: オン
-	Multi-Camera Record off	マルチカメラ記録: オフ
 	{first} - Merged	{first} - 結合済み
-	{first} Multicam	{first} マルチカメラ
 	In Points	イン点
 	Out Points	アウト点
 	Clip Marker	クリップマーカー
 	Audio	オーディオ
-	Merge Clips	クリップを結合
-	Create Multi-Camera Source Sequence	マルチカメラソースシーケンスを作成
-	Synchronize Clips	クリップを同期
 	Clip Name:	クリップ名:
 	Sequence Name:	シーケンス名:
 	{n} clip(s): {names}	{n} 個のクリップ: {names}
 	{n} clip(s) selected; the clip on the reference track stays put.	{n} 個のクリップを選択中。基準トラックのクリップは移動しません。
-	Synchronize Point	同期ポイント
 	Ignore Hours	時間の桁を無視
 	first marker	最初のマーカー
 	Offset Audio by:	オーディオのオフセット:
@@ -658,27 +627,13 @@
 	Reference track:	基準トラック:
 	lowest (V1…)	最下段 (V1…)
 	Remove Audio from AV Clip	AV クリップからオーディオを削除
-	Camera 1	カメラ 1
-	All Cameras	すべてのカメラ
 	Switch Audio	オーディオを切り替え
-	Camera Names	カメラ名
 	Clip Names	クリップ名
-	Enumerate Cameras	カメラの連番
-	Camera Angle Metadata	カメラアングルのメタデータ
 	Move source clips to Processed Clips bin	ソースクリップを「Processed Clips」ビンに移動
-	Synchronized {n} clip group(s)	{n} 個のクリップグループを同期しました
-	Merged clip created	結合クリップを作成しました
-	Multi-camera source sequence with {n} camera(s)	マルチカメラソースシーケンス (カメラ {n} 台)
-	No multi-camera clip at the playhead	再生ヘッドの位置にマルチカメラクリップがありません
-	Camera {n} — {name}	カメラ {n} — {name}
 	Page {page} of {pages}	{page} / {pages} ページ
 	Previous page	前のページ
 	Next page	次のページ
-	Multi-Camera Record On/Off (0)	マルチカメラ記録のオン/オフ (0)
 	Record	記録
-	Edit Cameras	カメラを編集
-	Cameras shown in the Multi-Camera view (uncheck to hide).	マルチカメラ表示に含めるカメラです (チェックを外すと非表示になります)。
-	Recorded {n} multi-camera cut(s)	{n} 個のマルチカメラカットを記録しました
 	Clamp Signal	信号をクランプ
 	Presets	プリセット
 	Waveform ({kind})	波形 ({kind})
@@ -776,28 +731,20 @@
 	Make {n} selected clip(s) offline. Their clips show the offline slate until you link them again.	選択した {n} 個のクリップをオフラインにします。再びリンクするまで、クリップにはオフライン画面が表示されます。
 	Media files remain on disk	メディアファイルをディスクに残す
 	Media files are deleted	メディアファイルを削除する
-	Create Proxies	プロキシを作成
 	{n} clip(s) selected.	{n} 個のクリップが選択されています。
 	Format and size	形式とサイズ
 	Destination	出力先
-	Next to the original media, in a Proxies folder	元のメディアと同じ場所の Proxies フォルダー
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	プロキシはバックグラウンドで作成され、完了すると関連付けられます。書き出しには常にフル解像度のメディアが使われます。
-	Creating {n} proxy file(s)…	{n} 個のプロキシファイルを作成中…
-	Project Manager	プロジェクトマネージャー
 	Sequences	シーケンス
 	Resulting Project	処理後のプロジェクト
 	Collect Files and Copy to New Location	ファイルを収集して新しい場所にコピー
-	Consolidate and Transcode	統合してトランスコード
 	Options	オプション
 	Exclude Unused Clips	未使用のクリップを除外
 	Include Handles:	ハンドルを含める:
-	Include Proxies	プロキシを含める
 	Include Preview Files	プレビューファイルを含める
 	Destination Path	出力先のパス
 	Disk space: original {original} · resulting {result} ({n} files)	ディスク容量: 処理前 {original} · 処理後 {result} ({n} ファイル)
 	Disk space: —	ディスク容量: —
 	Calculate	計算
-	Project Manager: writing {path}	プロジェクトマネージャー: {path} を書き込み中
 	Timeline: (no sequences)	タイムライン: (シーケンスなし)
 	Browse	参照
 	Select audio clips, then click a preset to apply it.	オーディオクリップを選択し、プリセットをクリックして適用します。
@@ -1068,8 +1015,6 @@
 	File Types Displayed	表示するファイルの種類
 	List View	リスト表示
 	Thumbnail View	サムネイル表示
-	Ingest	取り込み
-	Open Ingest Settings	取り込み設定を開く
 	Import as Image Sequence	連番画像として読み込む
 	{sel} of {total} items selected	{total} 項目中 {sel} 項目を選択中
 	{total} items	{total} 項目
@@ -1086,7 +1031,6 @@
 	Reveal in Finder	Finder で表示
 	Edit Columns…	列を編集…
 	Hover Scrub	ホバースクラブ
-	New Media Browser Panel	新規メディアブラウザーパネル
 	Create Folder For Imported Projects	読み込んだプロジェクト用のフォルダーを作成
 	Allow Duplicate Media During Project Import	プロジェクトの読み込み時にメディアの重複を許可
 	Refresh	更新
@@ -1147,7 +1091,6 @@
 	Open in Timeline	タイムラインで開く
 	New Sequence From Clip	クリップから新規シーケンス
 	Set Poster Frame	ポスターフレームを設定
-	Proxy	プロキシ
 	Open in Place	その場で開く
 	Open in New Tab	新しいタブで開く
 	Open in New Window	新しいウィンドウで開く
@@ -1605,7 +1548,6 @@
 	Enable developer mode	開発者モードを有効にする
 	Enable hardware accelerated decoding (requires restart)	ハードウェアアクセラレーションによるデコードを有効にする (再起動が必要)
 	Enable language auto-detection	言語の自動検出を有効にする
-	Enable proxies	プロキシを有効にする
 	End Color	終了色
 	End Point	終点
 	End of Ramp	ランプの終了点
@@ -2632,7 +2574,6 @@
 	Source Settings	ソース設定
 	Update Metadata	メタデータを更新
 	Automate To Sequence	シーケンスに自動配置
-	Scene Edit Detection	シーン編集の検出
 	Analyze	分析
 	Normalize Mix Track	ミックストラックをノーマライズ
 	Simplify Sequence	シーケンスを単純化
@@ -2653,15 +2594,12 @@
 	Any	いずれか
 	Case Sensitive	大文字と小文字を区別
 	Scratch Disks	スクラッチディスク
-	Ingest Settings	取り込み設定
 	Captured and Generated:	キャプチャ・生成メディア:
 	Video Previews:	ビデオプレビュー:
 	Audio Previews:	オーディオプレビュー:
 	Project Auto Save:	プロジェクトの自動保存:
 	Same as Project	プロジェクトと同じ
 	Path: {path}	パス: {path}
-	Transcode	トランスコード
-	Copy and Create Proxies	コピーしてプロキシを作成
 	Action:	処理:
 	Destination:	出力先:
 	Next to the media	メディアと同じ場所
@@ -2731,7 +2669,6 @@
 	Export formats	書き出し形式
 	Match {n} of {total}	{total} 件中 {n} 件目
 	Saved template {path}	テンプレートを保存しました: {path}
-	Scene Edit Detection: analysing in the background (see Progress)	シーン編集の検出: バックグラウンドで分析中 (進行状況を参照)
 	Delete Search Bin	検索ビンを削除
 	 (removed from {list})	 ({list} から削除)
 	{key} can't be used as a shortcut	{key} はショートカットに使用できません
@@ -2932,15 +2869,6 @@
 	Close Bin	ビンを閉じる
 	Close Sequence	シーケンスを閉じる
 	Contains	含む
-	Cut to Camera 1	カメラ 1 にカット
-	Cut to Camera 2	カメラ 2 にカット
-	Cut to Camera 3	カメラ 3 にカット
-	Cut to Camera 4	カメラ 4 にカット
-	Cut to Camera 5	カメラ 5 にカット
-	Cut to Camera 6	カメラ 6 にカット
-	Cut to Camera 7	カメラ 7 にカット
-	Cut to Camera 8	カメラ 8 にカット
-	Cut to Camera 9	カメラ 9 にカット
 	D1/DV NTSC (0.9091)	D1/DV NTSC (0.9091)
 	D1/DV PAL (1.0940)	D1/DV PAL (1.0940)
 	DVCPRO HD (1.5)	DVCPRO HD (1.5)
@@ -3031,7 +2959,6 @@
 	Matches	一致
 	Maximize or Restore Active Frame	アクティブなパネルを最大化 / 元に戻す
 	Maximize or Restore Frame Under Cursor	カーソル下のパネルを最大化 / 元に戻す
-	Media Browser Settings	メディアブラウザーの設定
 	MediaBrowser	メディアブラウザー
 	MediaCache	メディアキャッシュ
 	Mixer	ミキサー
@@ -3048,8 +2975,6 @@
 	Move Selection Page Up	選択を 1 ページ上に移動
 	Move Selection Right	選択を右に移動
 	Move Selection Up	選択を上に移動
-	Multi-Camera Record On/Off Toggle	マルチカメラ記録のオン/オフを切り替え
-	Multicam	マルチカメラ
 	Navigate to End of Segment	セグメントの末尾へ移動
 	Navigate to Next Line	次の行へ移動
 	Navigate to Next Word	次の単語へ移動
@@ -3057,7 +2982,6 @@
 	Navigate to Previous Word	前の単語へ移動
 	Navigate to Start of Segment	セグメントの先頭へ移動
 	Navigation	ナビゲーション
-	Next Multi-Camera Page	次のマルチカメラページ
 	Nudge Clip Selection Down	選択したクリップを下へ微調整
 	Nudge Clip Selection Left Five Frames	選択したクリップを 5 フレーム左へ微調整
 	Nudge Clip Selection Left One Frame	選択したクリップを 1 フレーム左へ微調整
@@ -3105,7 +3029,6 @@
 	Play In to Out with Preroll/Postroll	プリロール/ポストロール付きでインからアウトまで再生
 	Play from Playhead to Out Point	再生ヘッドからアウト点まで再生
 	Play/Stop	再生/停止
-	Previous Multi-Camera Page	前のマルチカメラページ
 	Progressive	プログレッシブ
 	ProjectPanel	プロジェクトパネル
 	QuickTime (Motion JPEG)	QuickTime (Motion JPEG)
@@ -3131,15 +3054,6 @@
 	Ripple Trim Next Edit to Playhead	次の編集点を再生ヘッドまでリップルトリム
 	Ripple Trim Previous Edit to Playhead	前の編集点を再生ヘッドまでリップルトリム
 	Rolling Edit Tool	ロール編集ツール
-	Select Camera 1	カメラ 1 を選択
-	Select Camera 2	カメラ 2 を選択
-	Select Camera 3	カメラ 3 を選択
-	Select Camera 4	カメラ 4 を選択
-	Select Camera 5	カメラ 5 を選択
-	Select Camera 6	カメラ 6 を選択
-	Select Camera 7	カメラ 7 を選択
-	Select Camera 8	カメラ 8 を選択
-	Select Camera 9	カメラ 9 を選択
 	Select Clip at Playhead	再生ヘッドの位置のクリップを選択
 	Select Find Box	検索ボックスを選択
 	Select Next Clip	次のクリップを選択
@@ -3183,7 +3097,6 @@
 	Step Forward Five Frames	5 フレーム進む
 	Step Forward One Frame	1 フレーム進む
 	Stop Export Queue	書き出しキューを停止
-	Stop Multi-Camera Recording	マルチカメラの記録を停止
 	Stop Voice-over Recording	ナレーションの録音を停止
 	Sync Voice-over Capture	ナレーションのキャプチャを同期
 	TIFF	TIFF

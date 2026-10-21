@@ -121,7 +121,7 @@ ordinary project file: open it with File ▸ Open Project. `file.listAutoSaves` 
 first.
 
 Project Settings ▸ Scratch Disks can send auto-saves (Project Auto Save), render previews (Video
-Previews), captured and generated media (Captured Audio and Video, also the default for proxies)
+Previews), captured and generated media (Captured Audio and Video)
 and audio previews to another folder. A folder named in a project file is used only when it is
 inside the project's own folder or was chosen in Scratch Disks on this computer (remembered in
 `autoSave.scratchFolders`). Otherwise FilmCraft uses the default location and says so when the
@@ -220,7 +220,7 @@ opens the dialog on a page.
 | Color | stored only (display colour management, EDR monitoring, HDR graphics white) |
 | Graphics | new text layers: smart quotes, ligatures, default font |
 | Labels | the 16 label names and colours (timeline, Project panel, Edit ▸ Label), label defaults for imported movies / video / audio / stills and new sequences, Label Color Presets: JSON files (`{"name", "labels": [16 × {"name", "color": "#rrggbb"}]}`) in `<data dir>/Label Presets`, built in: "Default" (the labels FilmCraft ships with), "Bright" (16 saturated hues) and "Roles" (B-Roll, Footage, Dialogue… named so the label defaults land on matching roles) (`labels.presets`, `labels.importPreset {path}`, `labels.exportPreset {path}`, `labels.deletePreset {name}`; `labels.preset` is the selected one) |
-| Media | Indeterminate Media Timebase (frame rate of stills), Default Media Scaling (Scale to / Set to frame size when a clip of another size is edited in), Enable proxies |
+| Media | Indeterminate Media Timebase (frame rate of stills), Default Media Scaling (Scale to / Set to frame size when a clip of another size is edited in) |
 | Media Cache | location (`<data dir>/Media Cache` by default; unsaved projects' render previews live there), automatic deletion (older than N days / beyond N GB), Delete… (`mediaCache.clean {all?}`, `mediaCache.info`) |
 | Memory | frame cache budget of the monitors and thumbnails |
 | Playback | preroll / postroll (Play Around, trim loop), Step forward/back many |
@@ -237,14 +237,13 @@ the items of an open dropdown; `settings.<key>.browse`, `settings.<key>.hex`;
 `settings.cancel`, `settings.ok`. The open dialog's page and draft are `ui.settings` in `ui.inspect`;
 `ui.set {"settings": {"page": id, "values": {key: value}}}` edits the draft (OK applies it).
 
-## Media: offline, relinking, proxies, ingest
+## Media: offline and relinking
 
 Media is referenced by path. Each imported file also records its **identity**
 (`MediaClip::identity`): the size and a 64-bit fingerprint of the size, the first MiB and the last
 MiB. Reading 2 MiB is cheap on any file, and it tells a moved original from a different take with
-the same name. The field is optional (`skip_serializing_if`); it and `ProjectSettings::ingest` came with schema
-v6, so builds that would drop them on save refuse the file instead. Projects from older builds
-have no identity, so relinking them skips the fingerprint check.
+the same name. The field is optional (`skip_serializing_if`); a project without it skips the fingerprint check
+when relinking.
 
 ### Offline media
 
@@ -257,7 +256,7 @@ have no identity, so relinking them skips the fingerprint check.
   deleted only with `deleteFiles: true`.
 - The media pool caches sources per item **and** per reference (path, offline flag). So relinking,
   Make Offline and undoing either take effect on the next frame.
-- **Stored paths.** Media and proxy paths read from a document (the project file, a project
+- **Stored paths.** Media paths read from a document (the project file, a project
   template, an interchange file) are opened only when they name a file on this computer or on
   the network share the document itself is on (`crates/engine/src/doc_path.rs`, built on
   `craft-docpath`); a relative path is taken from the document's folder. Other paths (another
@@ -268,8 +267,8 @@ have no identity, so relinking them skips the fingerprint check.
 
 | Command | |
 |---|---|
-| `media.findMissing` | `{missing: [{item, name, fileName, path, status: missing\|offline\|proxyMissing, duration, startTimecode}]}` |
-| `media.status {item?}` | per item: `online`, `missing`, `offline`, `unreadable` or `generated`, plus identity and proxy |
+| `media.findMissing` | `{missing: [{item, name, fileName, path, status: missing\|offline, duration, startTimecode}]}` |
+| `media.status {item?}` | per item: `online`, `missing`, `offline`, `unreadable` or `generated`, plus identity |
 | `media.linkMedia` | File ▸ Link Media… (rescans; the UI opens the dialog) |
 | `media.relink {item, path, force?, relinkOthers?=true, alignTimecode?, match?}` | check, link, then the others |
 | `media.autoRelink {from, to}` / `{folder}` | batch relink: a folder-prefix remap, or a search of a folder tree |
@@ -300,101 +299,7 @@ Link Media dialog automation ids: `linkMedia.row.<n>`,
 `linkMedia.search`, `linkMedia.candidate.<n>`, `linkMedia.preview`, `linkMedia.link`,
 `linkMedia.locate`, `linkMedia.offline`, `linkMedia.offlineAll`, `linkMedia.cancel`.
 Make Offline: `makeOffline.keep|delete|ok|cancel`. In the Project panel, offline items get a
-broken-link badge (`project.item.<id>.offline` in Icon view), and items with a proxy get a **P**
-badge (`project.item.<id>.proxy`).
-
-### Proxies
-
-| Command | Menu | |
-|---|---|---|
-| `media.createProxies {items?, preset?, destination?, attach?=true, wait?}` | Clip ▸ Proxy ▸ Create Proxies… | background job; attaches when done |
-| `media.attachProxies {item, path}` / `{items, paths}` | Attach Proxies… | duration within one frame and the same frame rate are required; size and aspect may differ |
-| `media.detachProxies {items?}` | Detach Proxies | |
-| `media.reconnectFullRes {item, path}` | Reconnect Full Resolution Media… | link the full-resolution file of a clip that has a proxy |
-| `media.toggleProxies {enabled?}` | View ▸ Toggle Proxies, monitor button | Preferences ▸ Media ▸ `media.enableProxies` |
-| `media.proxyPresets` | | |
-
-The presets use our own encoders:
-
-- `prores_proxy_quarter` (default), `prores_proxy_half`, `prores_lt_half`: ProRes 422 Proxy or LT
-  in MOV with PCM audio;
-- `h264_quarter`, `h264_half`: H.264 + AAC in MP4.
-
-Proxies go to `<media folder>/Proxies/<name>_Proxy.<ext>`, or to the chosen folder. Job progress is
-in `jobs.list`. `Session::poll_persistence`, which the app calls every frame, attaches finished
-proxies.
-
-With proxies enabled, monitors, thumbnails and playback read the proxy. The proxy source reports
-the original's size. The compositor derives its pixel scale from the frame it gets, so Motion and
-pixel-size effect parameters (blur radii…) give the same picture at the proxy's resolution. A
-320×180 clip with Motion and Gaussian Blur and a ½-size ProRes Proxy measures 44 dB PSNR against
-full resolution (48 dB at ½ playback resolution). **Export always uses full resolution**
-(`MediaPool::full_res_provider`). Toggling proxies bumps the revision so caches refresh, but it is
-not an edit and doesn't mark the project as modified.
-
-**Cost.** These numbers are from `proxy_playback_perf_4k`, an ignored test: `RAYON_NUM_THREADS=1
-cargo test --release -p waltcut-engine proxy_playback_perf_4k -- --ignored --nocapture`. It plays a
-2 s 3840×2160 H.264 clip (ffmpeg `testsrc2`, libx264) on one core of the development Mac and reports
-milliseconds per frame:
-
-| | decode (GPU path) | CPU composite at ½ | CPU composite at ¼ | proxy creation |
-|---|---|---|---|---|
-| full resolution | 9.2 | 277 | 201 | |
-| ProRes Proxy ¼ | 8.9 | 150 | 35 | 17.8 s |
-| H.264 ¼ | 0.7 | 131 | 48 | 8.9 s |
-
-The test pattern is unusually cheap for H.264 to decode, so real camera footage gains more from
-proxies. The CPU composite (YUV→linear conversion and resampling) is what proxies cut most:
-5.7× at ¼ resolution, where the proxy needs no resampling.
-
-Create Proxies dialog ids: `proxies.preset.<id>`, `proxies.destination`, `proxies.browse`,
-`proxies.ok`, `proxies.cancel`. Monitor button: `program.transport.media.toggleProxies` (and
-`source.…`). It is lit while proxies are on.
-
-### Ingest settings
-
-`project.ingestSettings {enabled, action: copy|transcode|createProxies|copyAndCreateProxies,
-destination?, preset?}` (Project Settings ▸ Ingest) acts on every `file.import`:
-
-- **copy** copies the file to the destination (default `<media folder>/Ingested Media`), checks the
-  copy's fingerprint against the original, and then uses the copy;
-- **transcode** writes the preset's format (default ProRes 422 LT) in the background and switches the
-  clip to the result when it is done;
-- **createProxies** makes proxies in the background and attaches them;
-- **copyAndCreateProxies** does both.
-
-Copied files keep their names when available; collisions receive a numbered suffix before the
-extension (`A001 2.mov`) and never replace an existing file. Transcodes reserve distinct output
-names for every clip in the import batch. Copies keep their source fingerprint, and each proxy
-stays attached to its corresponding take.
-
-`file.import` reports this under `ingest`.
-
-## Project Manager
-
-`file.projectManager` (File ▸ Project Manager…) makes a self-contained copy of a project:
-
-```json
-{"destination": "/path/Folder", "mode": "collect|consolidate", "sequences": [id], "excludeUnused": true,
- "handles": 30, "preset": "prores_lt", "includeProxies": true, "includePreviews": false,
- "projectName": "…", "dryRun": false, "overwrite": false, "wait": false}
-```
-
-- **collect** copies every media file that the chosen sequences use (following nested sequences and
-  subclips), plus their proxies and render previews if asked.
-- **consolidate** writes only the used range of each movie or audio file, plus `handles` frames on
-  each side, with a transcode preset (`prores_lt`, `prores_hq`, `h264`). It then re-bases the clips'
-  media time, so every edit, keyframe and marker stays in place. Stills are copied.
-- **excludeUnused** drops media items and sequences that the chosen sequences don't use.
-- **dryRun** returns the plan and the disk-space estimate (`originalBytes`, `resultBytes`, `files`)
-  without writing anything.
-
-The copy runs as a job. The project file (`<destination>/<name>.fcproj`) is written last, with the
-new paths and fingerprints, so it opens with no missing media.
-
-Dialog ids: `pm.seq.<id>`, `pm.mode.<collect|consolidate>`, `pm.preset.<id>`, `pm.excludeUnused`,
-`pm.handles`, `pm.includeProxies`, `pm.includePreviews`, `pm.destination`, `pm.browse`,
-`pm.calculate`, `pm.sizes`, `pm.ok`, `pm.cancel`.
+broken-link badge (`project.item.<id>.offline` in Icon view).
 
 ## Effect presets
 

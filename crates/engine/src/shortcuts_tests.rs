@@ -304,7 +304,7 @@ fn default_keymaps_have_no_conflicts_on_any_platform() {
     }
     // macOS keeps every Premiere key it had
     let mac = s.shortcuts.builtin_for(crate::shortcuts::DEFAULT_PRESET, Platform::Mac).unwrap();
-    for (cmd, keys) in [("multicam.cutToCamera9", "Ctrl+9"), ("markers.addRange", "Ctrl+Shift+M"), ("graphics.newText", "Cmd+T")] {
+    for (cmd, keys) in [("markers.addRange", "Ctrl+Shift+M"), ("graphics.newText", "Cmd+T")] {
         assert!(mac.iter().any(|b| b.command == cmd && b.keys == keys), "{cmd} {keys} on macOS");
     }
 }

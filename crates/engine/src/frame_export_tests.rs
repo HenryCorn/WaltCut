@@ -26,20 +26,12 @@ fn frame_export_selects_the_correct_monitor_time_and_original_media() {
     let (mut s, item) = session();
     let dir = std::env::temp_dir().join(format!("fc-frame-original-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let proxy = dir.join("proxy.png");
-    image::RgbaImage::from_pixel(16, 9, image::Rgba([255, 0, 0, 255])).save(&proxy).unwrap();
-    Arc::make_mut(&mut s.project).item_mut(item).unwrap().as_media_mut().unwrap().proxy =
-        Some(waltcut_project::MediaRef::File { path: proxy.to_string_lossy().into_owned() });
-    s.media.set_use_proxies(true);
     s.state.source_playhead = FrameRate::FPS_24.tick_of(20);
     s.set_playhead(FrameRate::FPS_24.tick_of(35));
     let before = s.project.to_json();
     let revision = s.revision;
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let expected_source = waltcut_render::render_item(&s.project, item, s.state.source_playhead, 1.0, &provider).unwrap().to_rgba8();
-    let preview_provider = s.media.provider(s.project.clone(), s.services.clone());
-    let preview = waltcut_render::render_item(&s.project, item, s.state.source_playhead, 1.0, &preview_provider).unwrap().to_rgba8();
-    assert_ne!(preview, expected_source, "the preview really uses the red proxy");
     let seq = s.state.active_sequence.unwrap();
     let expected_program = waltcut_render::render_sequence(&s.project, seq, s.playhead(), waltcut_render::RenderOptions::default(), &provider).to_rgba8();
     assert_ne!(expected_source, expected_program);
@@ -53,7 +45,6 @@ fn frame_export_selects_the_correct_monitor_time_and_original_media() {
     }
     assert_eq!(s.project.to_json(), before);
     assert_eq!(s.revision, revision);
-    assert!(s.media.use_proxies());
     drop(s);
     std::fs::remove_dir_all(dir).unwrap();
 }

@@ -709,7 +709,6 @@ fn import_source(
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: Some(identity),
             }),
             bin,
@@ -968,8 +967,8 @@ pub(crate) fn place_item(
     audio_split: Option<(TimeRange, Tick)>,
 ) -> Result<Vec<ClipId>> {
     let pi = s.project.item(item).ok_or_else(|| bad(label, "no such item"))?.clone();
-    // the nest toggle off: a sequence edits in as its clips (a multi-camera source stays one clip)
-    if s.state.sequences_as_clips && pi.as_sequence().is_some_and(|q| q.multicam.is_none()) {
+    // the nest toggle off: a sequence edits in as its clips
+    if s.state.sequences_as_clips && pi.as_sequence().is_some() {
         return crate::sequence_tools::place_sequence_clips(s, item, range, at, vdest, adest, insert, label);
     }
     let (video, audio) = s.project.source_streams(item);
@@ -1374,17 +1373,7 @@ fn build() -> Vec<CommandSpec> {
             if ids.is_empty() && !errors.is_empty() {
                 return Err(EngineError::Other(errors.join("; ")));
             }
-            // Project Settings ▸ Ingest: copy / transcode / create proxies
-            // (image sequences are many files: ingest copies and transcodes single files only)
-            let item_ids: Vec<ItemId> = ids.iter().filter(|i| !image_sequences.iter().any(|q| q["item"].as_u64() == Some(**i))).map(|i| ItemId(*i)).collect();
-            let ingest = match crate::proxies::ingest(s, &item_ids) {
-                Ok(v) => v,
-                Err(e) => {
-                    errors.push(format!("ingest: {e}"));
-                    Value::Null
-                }
-            };
-            let mut out = if !ingest.is_null() { json!({"items": ids, "errors": errors, "ingest": ingest}) } else { json!({"items": ids, "errors": errors}) };
+            let mut out = json!({"items": ids, "errors": errors});
             if !image_sequences.is_empty() {
                 out["imageSequences"] = json!(image_sequences);
             }
@@ -3316,7 +3305,6 @@ fn build() -> Vec<CommandSpec> {
     crate::sequence_tools::splice(&mut v);
     v.extend(crate::settings::commands());
     v.extend(crate::mixer::commands());
-    v.extend(crate::multicam::commands());
     v.extend(crate::essential_sound::commands());
     v.extend(crate::color::commands());
     v.extend(crate::graphics::commands());
@@ -3325,8 +3313,6 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::graphic_templates::commands());
     v.extend(crate::shortcuts::commands());
     v.extend(crate::relink::commands());
-    v.extend(crate::proxies::commands());
-    v.extend(crate::project_manager::commands());
     v.extend(crate::masks::commands());
     v.extend(crate::presets::commands());
     v.extend(crate::export_tools::commands());
@@ -3335,7 +3321,6 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::voiceover::commands());
     v.extend(crate::keyboard::commands());
     v.extend(crate::project_panel::commands());
-    v.extend(crate::media_browser::commands());
     v.extend(crate::paste_media::commands());
     // Edit ▸ Label ▸ <colour>, Paste Attributes, subclips, Video / Audio Options, Replace With Clip…
     // and their menu order
@@ -4246,9 +4231,7 @@ fn write_project(s: &mut Session, path: &str, adopt: bool) -> Result<Value> {
 
 /// Make `proj` the session's project (fresh history, media pool and editor state).
 fn install_project(s: &mut Session, proj: waltcut_project::Project, path: Option<String>, clean: bool) {
-    let proxies = s.media.use_proxies();
     s.media = std::sync::Arc::new(crate::MediaPool::default());
-    s.media.set_use_proxies(proxies);
     s.offline = Default::default();
     let first = proj.sequences().next().map(|i| i.id);
     s.media.add_stored(&proj, path.as_deref());

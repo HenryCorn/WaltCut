@@ -320,7 +320,7 @@ fn nest_is_plain(project: &Project, seq: &Sequence, nested: &Sequence, ft: Tick)
 
 /// Push the layer(s) of `item`. `blend` overrides the item's own blend mode: inside a transition
 /// the CPU reference mixes the clips and composites the result Normal, ignoring their modes.
-/// `nest` counts the multi-camera clips already followed to reach `item` (see
+/// `nest` counts the nested sequences already followed to reach `item` (see
 /// [`crate::MAX_NEST_DEPTH`]).
 #[allow(clippy::too_many_arguments)]
 fn push_item(
@@ -340,31 +340,11 @@ fn push_item(
     let mt = item.effect_time_at(t);
     let (op, own) = crate::opacity_blend(item, mt);
     let bl = blend.unwrap_or(own);
-    // A multi-camera clip that only shows its angle (no effects, untransformed, same frame size)
-    // draws the angle's clip directly: no CPU pass over the nested sequence.
-    if let Some(ItemKind::Sequence(nested)) = project.item(item.item).map(|p| &p.kind)
-        && nest < crate::MAX_NEST_DEPTH
-        && let Some(angle) = item.multicam_angle(nested)
-        && !(opts.effects && item.has_standard_effects())
-        && (nested.settings.width, nested.settings.height) == (seq.settings.width, seq.settings.height)
-        && near_identity(&motion_matrix(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt))
-        && let Some(tr) = nested.angle_video_track_index(angle).and_then(|i| nested.video_tracks.get(i))
-        && !tr.transitions.iter().any(|x| x.range().contains(ft))
-        && tr.item_at(ft).is_none_or(|i| crate::opacity_blend(i, i.effect_time_at(ft)).1 != Blend::Dissolve)
-    {
-        // Inside the nested sequence the angle's clip is composited onto an empty canvas, where
-        // every mode but Dissolve is Normal; the multicam clip's own mode then applies to it.
-        if let Some(inner) = tr.item_at(ft).filter(|i| i.enabled) {
-            push_item(project, nested, inner, ft, opts, sources, extra_opacity * op, Some(bl), nest + 1, out);
-        }
-        return;
-    }
     // A nested sequence that is only shown (no effects, untransformed, fully opaque, blending
     // Normal) contributes its own layers: the compositor draws them like the clips of this
     // sequence, with no CPU pass over the nested sequence.
     if let Some(ItemKind::Sequence(nested)) = project.item(item.item).map(|p| &p.kind)
         && nest < crate::MAX_NEST_DEPTH
-        && item.multicam_angle(nested).is_none()
         && !(opts.effects && item.has_standard_effects())
         && !item.has_opacity_masks()
         && bl == Blend::Normal

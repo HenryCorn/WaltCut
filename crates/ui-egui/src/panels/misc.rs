@@ -1,4 +1,4 @@
-//! Smaller panels: History, Markers, Info (the Media Browser is `panels::media_browser`).
+//! Smaller panels: History, Markers, Info .
 
 use egui::{Align2, Color32, Rect, Sense, pos2, vec2};
 use waltcut_time::{TimeDisplay, format_time};

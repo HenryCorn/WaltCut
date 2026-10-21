@@ -71,7 +71,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.display.red", "Red", ["View", "Display Mode"], None),
     uic!("view.display.green", "Green", ["View", "Display Mode"], None),
     uic!("view.display.blue", "Blue", ["View", "Display Mode"], None),
-    uic!("view.display.multicam", "Multi-Camera", ["View", "Display Mode"], None),
     uic!("view.display.audioWaveform", "Audio Waveform", ["View", "Display Mode"], None),
     uic!("view.display.videoAndWaveform", "Video and Audio Waveform Split", ["View", "Display Mode"], None),
     uic!("view.magnification.fit", "Fit", ["View", "Magnification"], None),
@@ -97,9 +96,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.guideTemplates.apply", "Apply Guide Template", [], None),
     uic!("view.guideTemplates.delete", "Delete Guide Template", [], None),
     uic!("view.dynamicAudioWaveforms", "Dynamic Audio Waveforms", ["View"], None),
-    uic!("multicam.toggleView", "Multi-Camera View", ["View"], Some("Shift+0")),
-    uic!("multicam.recordToggle", "Multi-Camera Record On/Off Toggle", [], Some("0")),
-    uic!("multicam.editCamerasDialog", "Edit Cameras…", [], None),
     uic!("voiceover.recordToggle", "Voice-over Record", [], None),
     uic!("voiceover.settingsDialog", "Voice-Over Record Settings…", [], None),
     // ids follow `ThemeKind`, labels follow Settings ▸ Appearance ▸ Color Theme (`darkest`, `dark`, `light`)
@@ -271,12 +267,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if !targets_source(app, &params)
         && let Some(r) = crate::panels::trim_monitor::route_transport(app, ctx, id)
     {
-        return r;
-    }
-    if let Some(r) = crate::panels::multicam::route(app, id, &params) {
-        if let Err(e) = &r {
-            app.ui.status = e.clone();
-        }
         return r;
     }
     if let Some(r) = crate::panels::voiceover::route(app, ctx, id, &params) {
