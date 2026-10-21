@@ -206,15 +206,11 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
             }
             return Some(r);
         }
-        "file.exportSelectionProject" | "file.exportAle" if params.get("path").is_none() => {
+        "file.exportSelectionProject" if params.get("path").is_none() => {
             if let Err(e) = enabled(app, id) {
                 return Some(Err(e));
             }
-            let (filter, ext, name) = if id == "file.exportAle" {
-                (tl!("Avid Log Exchange"), "ale", format!("{}.ale", app.session.project.name))
-            } else {
-                (tl!("FilmCraft Project"), "fcproj", tlf!("{name} Selection.fcproj", name = app.session.project.name))
-            };
+            let (filter, ext, name) = (tl!("FilmCraft Project"), "fcproj", tlf!("{name} Selection.fcproj", name = app.session.project.name));
             let mut p = params.clone();
             if !p.is_object() {
                 p = json!({});

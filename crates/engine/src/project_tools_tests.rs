@@ -54,7 +54,7 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "file.projectManager",
         ],
     );
-    assert_order(&menu_ids(&["File", "Export"]), &["file.exportEdl", "file.exportSelectionProject", "file.exportAle", "file.exportOtio", "file.exportFcp7Xml"]);
+    assert_order(&menu_ids(&["File", "Export"]), &["file.exportMedia", "file.exportSelectionProject"]);
     assert_eq!(menu_ids(&["File", "Get Media File Properties for"]), vec!["file.mediaPropertiesFile", "file.mediaProperties"]);
     assert_eq!(menu_ids(&["File", "Project Settings"]), vec!["file.projectSettings.general", "file.projectSettings.scratchDisks", "project.ingestSettings"]);
     assert_order(&menu_ids(&["Edit"]), &["edit.deselectAll", "edit.find", "edit.findNext", "edit.consolidateDuplicates", "edit.editOriginal"]);
@@ -78,7 +78,6 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
         ("file.importFromMediaBrowser", "Import from Media Browser", Some("Cmd+Alt+I")),
         ("file.mediaProperties", "Selection…", Some("Cmd+Shift+H")),
         ("file.exportSelectionProject", "Selection as FilmCraft Project…", None),
-        ("file.exportAle", "Avid Log Exchange…", None),
         ("edit.find", "Find…", Some("Cmd+F")),
         ("edit.editOriginal", "Edit Original", Some("Cmd+E")),
         ("clip.sceneEditDetection", "Scene Edit Detection…", None),
@@ -208,15 +207,6 @@ fn export_selection_project_and_ale() {
     let mut listed = Vec::new();
     p.root.all_items(&mut listed);
     assert!(p.items.keys().all(|k| listed.contains(k) || matches!(p.item(*k).unwrap().kind, ItemKind::Graphic { .. })));
-    // ALE of the selection, or of the whole project
-    let ale = dir.join("log.ale").to_string_lossy().to_string();
-    s.execute("project.select", json!({"items": []})).unwrap();
-    let r = s.execute("file.exportAle", json!({"path": ale})).unwrap();
-    let doc = waltcut_interchange::ale::parse(&std::fs::read_to_string(&ale).unwrap()).unwrap();
-    assert_eq!(r["clips"].as_u64().unwrap() as usize, doc.rows.len());
-    assert!(doc.rows.len() >= 9, "{}", doc.rows.len());
-    assert_eq!(doc.heading("FPS"), Some("23.976"));
-    assert!(doc.rows.iter().any(|r| r[0] == "Ambient_Score.wav" && r[1] == "A1A2"));
 }
 
 #[test]

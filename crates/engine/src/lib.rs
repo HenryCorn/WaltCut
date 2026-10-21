@@ -10,7 +10,6 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-pub mod aaf_omf;
 pub mod ai;
 pub mod autosave;
 pub mod clip_ops;
@@ -23,7 +22,6 @@ pub mod essential_sound;
 pub mod export_tools;
 pub mod graphic_templates;
 pub mod graphics;
-pub mod interchange;
 pub mod keyboard;
 mod keyframe_move;
 mod marker_export;
@@ -1195,7 +1193,6 @@ pub fn media_duration(p: &Project, _pool: &MediaPool, id: ItemId) -> Option<Tick
 const MAX_SUBCLIP_CHAIN: usize = 16;
 
 #[cfg(test)]
-mod aaf_omf_tests;
 #[cfg(test)]
 mod ai_tests;
 #[cfg(test)]
@@ -1229,7 +1226,6 @@ mod image_sequence_tests;
 #[cfg(test)]
 mod individual_selection_tests;
 #[cfg(test)]
-mod interchange_auto_points_tests;
 #[cfg(test)]
 mod keyboard_tests;
 #[cfg(test)]

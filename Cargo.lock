@@ -4095,15 +4095,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxmltree"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5472,10 +5463,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-cfb"
-version = "0.10.0"
-
-[[package]]
 name = "waltcut-cli"
 version = "0.10.0"
 dependencies = [
@@ -5593,7 +5580,6 @@ dependencies = [
  "waltcut-frame",
  "waltcut-genai",
  "waltcut-geom",
- "waltcut-interchange",
  "waltcut-isobmff",
  "waltcut-media",
  "waltcut-mxf",
@@ -5753,23 +5739,6 @@ dependencies = [
  "thiserror 2.0.21",
  "waltcut-bitstream",
  "waltcut-testkit",
-]
-
-[[package]]
-name = "waltcut-interchange"
-version = "0.10.0"
-dependencies = [
- "proptest",
- "roxmltree",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "waltcut-cfb",
- "waltcut-color",
- "waltcut-geom",
- "waltcut-media",
- "waltcut-project",
- "waltcut-time",
 ]
 
 [[package]]
@@ -5978,7 +5947,6 @@ dependencies = [
  "waltcut-frame",
  "waltcut-geom",
  "waltcut-gpu",
- "waltcut-interchange",
  "waltcut-media",
  "waltcut-platform",
  "waltcut-project",

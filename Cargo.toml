@@ -20,7 +20,6 @@ waltcut-isobmff = { path = "crates/isobmff" }
 waltcut-avi = { path = "crates/avi" }
 waltcut-matroska = { path = "crates/matroska" }
 waltcut-mxf = { path = "crates/mxf" }
-waltcut-cfb = { path = "crates/cfb" }
 waltcut-mpegts = { path = "crates/mpegts" }
 waltcut-mpeg2v = { path = "crates/mpeg2v" }
 waltcut-ac3 = { path = "crates/ac3" }
@@ -45,7 +44,6 @@ waltcut-media = { path = "crates/media" }
 waltcut-codecs = { path = "crates/codecs" }
 waltcut-project = { path = "crates/project" }
 waltcut-edit = { path = "crates/edit" }
-waltcut-interchange = { path = "crates/interchange" }
 waltcut-text = { path = "crates/text" }
 waltcut-genai = { path = "crates/genai" }
 waltcut-render = { path = "crates/render" }

@@ -60,16 +60,15 @@ pub struct Volume {
 
 /// File types shown (the "File Types Displayed" menu).
 pub const FILE_TYPES: [(&str, &str); 5] =
-    [("all", "All Supported Files"), ("video", "Video Files"), ("audio", "Audio Files"), ("image", "Still Images"), ("project", "Projects and Interchange")];
+    [("all", "All Supported Files"), ("video", "Video Files"), ("audio", "Audio Files"), ("image", "Still Images"), ("project", "Projects")];
 
 /// Columns the list view can show (Edit Columns…), in default order.
 pub const ALL_COLUMNS: [&str; 10] =
     ["Name", "Media Type", "Size", "Date Modified", "Frame Rate", "Media Duration", "Video Info", "Audio Info", "Video Codec", "Audio Codec"];
 pub const DEFAULT_COLUMNS: [&str; 5] = ["Name", "Frame Rate", "Media Duration", "Video Info", "Size"];
 
-/// Project and interchange files the browser can import. Avid Log Exchange (`.ale`) is left out:
-/// FilmCraft writes it (File ▸ Export) but, like Premiere, does not read it (#1292).
-const PROJECT_EXTENSIONS: [&str; 5] = ["fcproj", "edl", "xml", "fcpxml", "otio"];
+/// Project files the browser can import.
+const PROJECT_EXTENSIONS: [&str; 1] = ["fcproj"];
 const RECENT_MAX: usize = 10;
 
 /// Preferences of the Media Browser (`Preferences::media_browser`).

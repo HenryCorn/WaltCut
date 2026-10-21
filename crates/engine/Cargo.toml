@@ -29,7 +29,6 @@ waltcut-audio-dsp = { workspace = true }
 waltcut-export = { workspace = true }
 waltcut-mxf = { workspace = true }
 waltcut-format = { workspace = true }
-waltcut-interchange = { workspace = true }
 waltcut-genai = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

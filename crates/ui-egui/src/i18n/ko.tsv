@@ -70,8 +70,6 @@
 	A title on a rounded card with a soft shadow.	부드러운 그림자가 있는 둥근 카드 위 제목.
 	AAC Audio	AAC 오디오
 	AAC Audio 48 kHz 320 kbps	AAC 오디오 48 kHz 320 kbps
-	AAF Export Settings	AAF 내보내기 설정
-	AAF…	AAF…
 	About	정보
 	About FilmCraft	FilmCraft 정보
 	Accent Color	강조 색상
@@ -320,8 +318,6 @@
 	Avid DNxHR HQ	Avid DNxHR HQ
 	Avid DNxHR LB	Avid DNxHR LB
 	Avid DNxHR SQ	Avid DNxHR SQ
-	Avid Log Exchange	Avid Log Exchange
-	Avid Log Exchange…	Avid Log Exchange…
 	Avid-style OP-Atom: DNxHR HQ picture file plus one 24-bit 48 kHz PCM file per channel (_A1, _A2…)	Avid 방식 OP-Atom: DNxHR HQ 영상 파일 + 채널별 24비트 48 kHz PCM 파일(_A1, _A2…)
 	Background	배경
 	Background Color	배경 색상
@@ -976,7 +972,6 @@
 	Editing	편집
 	Editing Mode:	편집 모드:
 	Edit…	편집…
-	EDL…	EDL…
 	Effect	효과
 	Effect Controls	효과 컨트롤
 	Effect presets	효과 사전 설정
@@ -1084,7 +1079,6 @@
 	Faux Italic	가짜 기울임꼴
 	Favorites	즐겨찾기
 	Favorites only	즐겨찾기만
-	FCPXML…	FCPXML…
 	Feather	페더
 	Feedback	피드백
 	Feedback 1	피드백 1
@@ -1138,7 +1132,6 @@
 	Filter and EQ	필터 및 EQ
 	Filter Frequency	필터 주파수
 	Filter Resonance	필터 공진
-	Final Cut Pro XML…	Final Cut Pro XML…
 	Final Delay	최종 지연
 	Find	찾기
 	Find Edges	가장자리 찾기
@@ -2075,9 +2068,6 @@
 	Offset To	오프셋 끝
 	Offset:	오프셋:
 	OK	확인
-	OMF Export Settings	OMF 내보내기 설정
-	OMF Title:	OMF 제목:
-	OMF…	OMF…
 	Omni	무지향
 	On	켬
 	On Original Image	원본 이미지에
@@ -2107,7 +2097,6 @@
 	OpenEXR	OpenEXR
 	OpenEXR Sequence	OpenEXR 시퀀스
 	Opens up the shadows	그림자를 밝힙니다
-	OpenTimelineIO…	OpenTimelineIO…
 	OpenType	OpenType
 	Optical Flow	광학 흐름
 	Options	옵션

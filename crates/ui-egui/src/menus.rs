@@ -452,11 +452,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             crate::panels::shortcuts_dialog::open(app);
             return Ok(Value::Null);
         }
-        // File ▸ Export ▸ AAF… / OMF… open their settings dialogs; with a path they export directly.
-        "file.exportAaf" | "file.exportOmf" if params.get("path").is_none() => {
-            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
-            return crate::panels::interchange_export::open(app, ctx, id);
-        }
         // File ▸ Export ▸ Media… opens the Export mode, like ⌘M (#382); with a path it exports directly.
         "file.exportMedia" if params.get("path").is_none() => {
             waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
