@@ -13,6 +13,11 @@ use crate::{GenError, Picture, RestyleRequest, Restyler, Result};
 pub const DEFAULT_ENDPOINT: &str = "fal-ai/fast-lightning-sdxl/image-to-image";
 const BASE: &str = "https://fal.run/";
 
+/// Image-to-image endpoints known to take `image_url`, `prompt` and `strength`: (endpoint id, label).
+/// Prices change; check fal.ai/models before a long run.
+pub const PRESETS: [(&str, &str); 2] =
+    [(DEFAULT_ENDPOINT, "SDXL Lightning (fast, ~$0.002/frame)"), ("fal-ai/flux/dev/image-to-image", "FLUX dev (better, $0.03/megapixel)")];
+
 /// Check an endpoint id (`owner/model[/variant…]`): it becomes part of the request URL.
 pub fn check_endpoint(endpoint: &str) -> Result<()> {
     let ok = !endpoint.is_empty()
@@ -58,7 +63,7 @@ pub fn request_body(picture: &Picture, req: &RestyleRequest) -> Value {
 /// Where the first generated image is: a `data:` URI or an HTTPS URL.
 pub fn image_location(reply: &Value) -> Result<String> {
     if reply.get("has_nsfw_concepts").and_then(Value::as_array).and_then(|a| a.first()).and_then(Value::as_bool) == Some(true) {
-        return Err(GenError::Provider("the safety checker blocked this frame".into()));
+        return Err(GenError::Filtered);
     }
     let url = reply
         .get("images")
@@ -206,6 +211,13 @@ mod http {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn presets_are_valid_endpoints() {
+        for (ep, _) in super::PRESETS {
+            assert!(super::check_endpoint(ep).is_ok(), "{ep}");
+        }
+    }
+
     use super::*;
 
     fn pic() -> Picture {
@@ -241,7 +253,7 @@ mod tests {
         assert!(image_location(&json!({"images": [{"url": "https://v3.fal.media/x.png"}]})).is_ok());
         assert!(image_location(&json!({"images": []})).is_err());
         assert!(image_location(&json!({"images": [{"url": "file:///etc/passwd"}]})).is_err());
-        assert!(matches!(image_location(&json!({"images": [{"url": "data:,"}], "has_nsfw_concepts": [true]})), Err(GenError::Provider(_))));
+        assert!(matches!(image_location(&json!({"images": [{"url": "data:,"}], "has_nsfw_concepts": [true]})), Err(GenError::Filtered)));
         assert_eq!(error_message(401, "{}"), "fal.ai refused the API key");
         assert!(error_message(422, r#"{"detail": "strength must be <= 1"}"#).contains("strength must be"));
     }

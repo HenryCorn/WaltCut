@@ -31,6 +31,10 @@ pub enum GenError {
     BadRequest(String),
     #[error("network error: {0}")]
     Network(String),
+    /// The provider's safety checker refused this one picture (it often does so for harmless
+    /// abstract frames). Other frames can still go through.
+    #[error("the provider's safety checker blocked this frame")]
+    Filtered,
     #[error("the AI provider answered with an error: {0}")]
     Provider(String),
     #[error("unexpected answer from the AI provider: {0}")]

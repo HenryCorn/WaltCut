@@ -24,6 +24,10 @@ use crate::{EngineError, Result, Session};
 
 /// The most frames one request may send (each one is billed by a cloud provider).
 pub const DEFAULT_MAX_FRAMES: u64 = 240;
+/// Requests with more frames than this need `confirm: true` (each frame is billed).
+pub const CONFIRM_ABOVE_FRAMES: usize = 20;
+/// Frames sent to the provider at once.
+const DEFAULT_CONCURRENCY: usize = 3;
 const KEY_FILE: &str = "fal.key";
 
 /// A re-style job whose frames still have to be placed.
@@ -122,6 +126,7 @@ fn status(s: &mut Session, _: &Value) -> Result<Value> {
         "providerLabel": st.provider.label(),
         "endpoint": st.fal_endpoint,
         "key": key,
+        "models": filmcraft_genai::fal::PRESETS.iter().map(|(e, l)| json!({"endpoint": e, "label": l})).collect::<Vec<_>>(),
         "ready": s.restyler_override.is_some() || st.restyler().is_ok(),
         "cloud": cfg!(feature = "ai-cloud"),
     }))
@@ -191,6 +196,10 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
     };
     req.validate().map_err(|e| bad(ID, e.to_string()))?;
     let (times, hold) = frame_times(s, ID, p)?;
+    if times.len() > CONFIRM_ABOVE_FRAMES && !bool_p(p, "confirm").unwrap_or(false) {
+        return Err(bad(ID, format!("this sends {} frames, each billed by the provider; repeat with `confirm: true` to go ahead", times.len())));
+    }
+    let concurrency = (u64_p(p, "concurrency").unwrap_or(DEFAULT_CONCURRENCY as u64) as usize).clamp(1, 4);
     let backend = restyler(s)?;
     let seq_id = s.state.active_sequence.ok_or(EngineError::NoSequence)?;
     let (w, h) = s.active_sequence().map(|q| (q.settings.width, q.settings.height)).ok_or(EngineError::NoSequence)?;
@@ -214,29 +223,58 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
     let run = move || {
         let r = (|| -> std::result::Result<usize, String> {
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            for (i, t) in times.iter().enumerate() {
+            let skipped = std::sync::atomic::AtomicUsize::new(0);
+            for (c, chunk) in times.chunks(concurrency).enumerate() {
                 if prog.cancel.load(Ordering::Relaxed) {
                     return Err("cancelled".into());
                 }
-                *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Frame {} of {n}", i + 1);
+                let first = c * concurrency;
+                *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Frame {} of {n}", first + 1);
                 let opts = filmcraft_render::RenderOptions { scale, ..Default::default() };
-                let img = filmcraft_render::render_sequence(&project, seq_id, *t, opts, &provider);
-                let png = filmcraft_export::encode_png(img.over_black_rgba8(), img.w as u32, img.h as u32).map_err(|e| e.to_string())?;
-                let out = backend.restyle(&Picture { png, width: img.w as u32, height: img.h as u32 }, &req).map_err(|e| format!("frame {}: {e}", i + 1))?;
-                let ext = if out.starts_with(b"\x89PNG") { "png" } else { "jpg" };
-                let path = dir.join(format!("frame_{:05}.{ext}", i + 1));
-                std::fs::write(&path, &out).map_err(|e| format!("{}: {e}", path.display()))?;
-                outs.lock().unwrap_or_else(PoisonError::into_inner).push((*t, path.to_string_lossy().to_string()));
-                prog.done.fetch_add(1, Ordering::Relaxed);
+                let mut pictures = Vec::new();
+                for t in chunk {
+                    let img = filmcraft_render::render_sequence(&project, seq_id, *t, opts, &provider);
+                    let png = filmcraft_export::encode_png(img.over_black_rgba8(), img.w as u32, img.h as u32).map_err(|e| e.to_string())?;
+                    pictures.push(Picture { png, width: img.w as u32, height: img.h as u32 });
+                }
+                let results: Vec<std::result::Result<Option<Vec<u8>>, String>> = std::thread::scope(|sc| {
+                    let handles: Vec<_> = pictures.iter().map(|pic| sc.spawn(|| backend.restyle(pic, &req))).collect();
+                    handles
+                        .into_iter()
+                        .map(|h| match h.join().unwrap_or_else(|_| Err(filmcraft_genai::GenError::Provider("worker panicked".into()))) {
+                            Ok(b) => Ok(Some(b)),
+                            // a blocked frame is skipped: the previous one is held longer
+                            Err(filmcraft_genai::GenError::Filtered) => Ok(None),
+                            Err(e) => Err(e.to_string()),
+                        })
+                        .collect()
+                });
+                for (k, (t, out)) in chunk.iter().zip(results).enumerate() {
+                    let i = first + k;
+                    let Some(out) = out.map_err(|e| format!("frame {}: {e}", i + 1))? else {
+                        skipped.fetch_add(1, Ordering::Relaxed);
+                        prog.done.fetch_add(1, Ordering::Relaxed);
+                        continue;
+                    };
+                    let ext = if out.starts_with(b"\x89PNG") { "png" } else { "jpg" };
+                    let path = dir.join(format!("frame_{:05}.{ext}", i + 1));
+                    std::fs::write(&path, &out).map_err(|e| format!("{}: {e}", path.display()))?;
+                    outs.lock().unwrap_or_else(PoisonError::into_inner).push((*t, path.to_string_lossy().to_string()));
+                    prog.done.fetch_add(1, Ordering::Relaxed);
+                }
             }
-            Ok(n)
+            let skipped = skipped.load(Ordering::Relaxed);
+            if skipped >= n {
+                return Err("the provider's safety checker blocked every frame".into());
+            }
+            Ok(n - skipped)
         })();
         let secs = t0.elapsed().as_secs_f64();
         let report =
             filmcraft_export::Report { path: dir.to_string_lossy().to_string(), frames: 0, seconds: secs, bytes: 0, render_fps: 0.0, extra_files: Vec::new() };
         let r = match r {
             Ok(done) => {
-                *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Restyled {done} frame(s)");
+                *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Restyled {done} of {n} frame(s)");
                 Ok(report)
             }
             Err(e) => {
@@ -319,7 +357,7 @@ pub fn commands() -> Vec<CommandSpec> {
             label: "AI Restyle…",
             menu: &[],
             shortcut: None,
-            params: r#"{"prompt":str,"negativePrompt":str?,"strength":0..1?,"seed":int?,"range":"playhead|inout|clip"?,"every":frames?,"maxFrames":int?,"wait":bool?}"#,
+            params: r#"{"prompt":str,"negativePrompt":str?,"strength":0..1?,"seed":int?,"range":"playhead|inout|clip"?,"every":frames?,"maxFrames":int?,"confirm":bool?,"concurrency":1..4?,"wait":bool?}"#,
             enabled: has_seq,
             run: restyle,
             // never replayed by crash recovery: each run is billed by a cloud provider

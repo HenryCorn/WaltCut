@@ -10,6 +10,8 @@ use crate::Session;
 struct Fake {
     calls: AtomicUsize,
     fail_from: usize,
+    /// Call index the provider's safety checker blocks.
+    filter_at: usize,
 }
 
 impl Restyler for Fake {
@@ -21,6 +23,9 @@ impl Restyler for Fake {
         assert!(picture.width > 0 && picture.height > 0);
         assert_eq!(req.prompt, "oil painting");
         let n = self.calls.fetch_add(1, Ordering::SeqCst);
+        if n == self.filter_at {
+            return Err(GenError::Filtered);
+        }
         if n >= self.fail_from {
             return Err(GenError::Provider("out of credit".into()));
         }
@@ -31,7 +36,7 @@ impl Restyler for Fake {
 fn session(fail_from: usize) -> (Session, Arc<Fake>) {
     let mut s = Session::default();
     s.execute("file.newSequence", json!({"name": "AI", "fps": 24, "width": 320, "height": 180, "video": 1, "audio": 1})).unwrap();
-    let fake = Arc::new(Fake { calls: AtomicUsize::new(0), fail_from });
+    let fake = Arc::new(Fake { calls: AtomicUsize::new(0), fail_from, filter_at: usize::MAX });
     s.restyler_override = Some(fake.clone());
     (s, fake)
 }
@@ -66,7 +71,7 @@ fn a_failing_provider_keeps_the_frames_it_finished() {
     s.execute("playhead.set", json!({"frame": 0})).unwrap();
     s.execute("markers.markIn", json!({"frame": 0})).unwrap();
     s.execute("markers.markOut", json!({"frame": 5})).unwrap();
-    let r = s.execute("ai.restyle", json!({"prompt": "oil painting", "range": "inout", "every": 1, "wait": true})).unwrap();
+    let r = s.execute("ai.restyle", json!({"prompt": "oil painting", "range": "inout", "every": 1, "concurrency": 1, "wait": true})).unwrap();
     let job = r["job"].as_u64().unwrap();
     let j = s.jobs.iter().find(|j| j.id == job).unwrap();
     assert!(j.progress.error.lock().unwrap().as_deref().is_some_and(|e| e.contains("out of credit")));
@@ -90,6 +95,55 @@ fn bad_requests_are_refused_before_anything_is_billed() {
     s.execute("markers.markOut", json!({"frame": 100})).unwrap();
     assert!(s.execute("ai.restyle", json!({"prompt": "oil painting", "range": "inout", "every": 1, "maxFrames": 10})).is_err());
     assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn big_requests_need_confirmation_before_anything_is_billed() {
+    let (mut s, fake) = session(usize::MAX);
+    s.execute("markers.markIn", json!({"frame": 0})).unwrap();
+    s.execute("markers.markOut", json!({"frame": 100})).unwrap();
+    let p = json!({"prompt": "oil painting", "range": "inout", "every": 2, "wait": true});
+    let e = s.execute("ai.restyle", p.clone()).unwrap_err().to_string();
+    assert!(e.contains("confirm"), "{e}");
+    assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
+    let mut p = p;
+    p["confirm"] = json!(true);
+    let r = s.execute("ai.restyle", p).unwrap();
+    assert_eq!(fake.calls.load(Ordering::SeqCst) as u64, r["frames"].as_u64().unwrap());
+}
+
+#[test]
+fn every_second_third_or_fourth_frame_and_parallel_sends_keep_order() {
+    for every in [2i64, 3, 4] {
+        for concurrency in [1, 4, 99] {
+            let (mut s, fake) = session(usize::MAX);
+            s.execute("markers.markIn", json!({"frame": 0})).unwrap();
+            s.execute("markers.markOut", json!({"frame": 16})).unwrap();
+            let p = json!({"prompt": "oil painting", "range": "inout", "every": every, "concurrency": concurrency, "wait": true});
+            let frames = s.execute("ai.restyle", p).unwrap()["frames"].as_u64().unwrap();
+            assert!(frames > 1);
+            assert_eq!(fake.calls.load(Ordering::SeqCst) as u64, frames);
+            let rate = s.active_sequence().unwrap().settings.frame_rate;
+            let starts: Vec<i64> = ai_track(&s).items.iter().map(|i| rate.frame_at(i.start)).collect();
+            assert_eq!(starts, (0..frames as i64).map(|k| k * every).collect::<Vec<_>>(), "every {every}, concurrency {concurrency}");
+        }
+    }
+}
+
+#[test]
+fn a_blocked_frame_is_skipped_and_the_previous_one_is_held_longer() {
+    let mut s = Session::default();
+    s.execute("file.newSequence", json!({"name": "AI", "fps": 24, "width": 320, "height": 180, "video": 1, "audio": 1})).unwrap();
+    let fake = Arc::new(Fake { calls: AtomicUsize::new(0), fail_from: usize::MAX, filter_at: 1 });
+    s.restyler_override = Some(fake.clone());
+    s.execute("markers.markIn", json!({"frame": 0})).unwrap();
+    s.execute("markers.markOut", json!({"frame": 8})).unwrap();
+    let r = s.execute("ai.restyle", json!({"prompt": "oil painting", "range": "inout", "every": 2, "concurrency": 1, "wait": true})).unwrap();
+    let frames = r["frames"].as_u64().unwrap() as usize;
+    let rate = s.active_sequence().unwrap().settings.frame_rate;
+    let tr = ai_track(&s);
+    assert_eq!(tr.items.len(), frames - 1);
+    assert_eq!(tr.items[0].duration, rate.tick_of(4), "the first frame covers the blocked one");
 }
 
 #[test]
