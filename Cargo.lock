@@ -5599,7 +5599,6 @@ dependencies = [
  "waltcut-mxf",
  "waltcut-project",
  "waltcut-render",
- "waltcut-scopes",
  "waltcut-testkit",
  "waltcut-text",
  "waltcut-time",
@@ -5927,15 +5926,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-scopes"
-version = "0.10.0"
-dependencies = [
- "serde",
- "serde_json",
- "waltcut-color",
-]
-
-[[package]]
 name = "waltcut-testkit"
 version = "0.10.0"
 dependencies = [
@@ -5993,7 +5983,6 @@ dependencies = [
  "waltcut-platform",
  "waltcut-project",
  "waltcut-render",
- "waltcut-scopes",
  "waltcut-text",
  "waltcut-time",
  "web-time",

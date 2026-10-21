@@ -1073,17 +1073,14 @@ static CATEGORIES: &[Category] = &[
     Category {
         id: "color",
         title: "Color",
-        rows: &[
-            Row::Group(
-                "Display Color Settings",
-                &[
-                    b("color.displayColorManagement", "Display Color Management", false),
-                    b("color.extendedDynamicRange", "Extended Dynamic Range Monitoring", false),
-                    f("color.hdrGraphicsWhite", "HDR Graphics White (Nits)", Kind::Choice(HDR_WHITE), false),
-                ],
-            ),
-            Row::Note("For color management parameters, go to the Settings tab in the Lumetri Color panel."),
-        ],
+        rows: &[Row::Group(
+            "Display Color Settings",
+            &[
+                b("color.displayColorManagement", "Display Color Management", false),
+                b("color.extendedDynamicRange", "Extended Dynamic Range Monitoring", false),
+                f("color.hdrGraphicsWhite", "HDR Graphics White (Nits)", Kind::Choice(HDR_WHITE), false),
+            ],
+        )],
     },
     Category {
         id: "graphics",

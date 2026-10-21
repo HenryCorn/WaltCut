@@ -757,13 +757,6 @@ mod tests {
         crate::panels::project::NEW_ITEMS.iter().for_each(|(l, _)| push(&mut out, l));
         // section headers keyed by their English name (collapsed state), translated when drawn
         let sections = [
-            // Lumetri Color
-            "Basic Correction",
-            "Creative",
-            "Curves",
-            "Color Wheels & Match",
-            "HSL Secondary",
-            "Vignette",
             // Properties
             "Transform",
             "Crop",
@@ -778,28 +771,14 @@ mod tests {
             "Appearance",
         ];
         sections.iter().for_each(|s| push(&mut out, s));
-        for p in waltcut_render::lumetri_presets::presets() {
-            push(&mut out, p.name);
-            push(&mut out, p.folder);
-            push(&mut out, p.description);
-        }
         crate::dock::PanelKind::ALL.iter().for_each(|p| push(&mut out, p.title()));
         crate::dock::WORKSPACES.iter().for_each(|w| push(&mut out, w));
         waltcut_project::Label::ALL.iter().for_each(|l| push(&mut out, l.name()));
         crate::panels::panel_state::TcMode::ALL.iter().for_each(|m| push(&mut out, m.label()));
         crate::panels::panel_state::TcSource::ALL.iter().for_each(|s| push(&mut out, s.label()));
-        crate::panels::panel_state::SCOPE_PRESETS.iter().for_each(|p| push(&mut out, p.0));
         waltcut_time::TimeDisplay::ALL.iter().for_each(|d| push(&mut out, d.label()));
         use waltcut_engine::panels::Level;
         [Level::Info, Level::Warning, Level::Error].iter().for_each(|l| push(&mut out, l.label()));
-        use waltcut_scopes as sc;
-        sc::ScopeKind::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        sc::WaveformType::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        sc::ParadeType::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        sc::ColorSpace::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        sc::Scale::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        sc::Brightness::ALL.iter().for_each(|k| push(&mut out, k.label()));
-        [sc::Targets::Percent75, sc::Targets::Percent100].iter().for_each(|k| push(&mut out, k.label()));
         crate::state::PlaybackRes::ALL.iter().for_each(|r| push(&mut out, r.label()));
         crate::state::Tool::ALL.iter().for_each(|t| push(&mut out, t.label()));
         crate::credits::NameMode::ALL.iter().for_each(|m| push(&mut out, m.label()));

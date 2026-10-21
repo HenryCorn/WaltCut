@@ -1229,10 +1229,6 @@ pub struct Project {
     pub items: BTreeMap<ItemId, ProjectItem>,
     /// Monotonic id source for all id types.
     pub next_id: u64,
-    /// The project's LUT library (Lumetri Input LUT / Creative Look "Browse…"). LUT files are
-    /// embedded, so projects render without the original files.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub luts: Vec<ProjectLut>,
     /// Search bins (File ▸ New ▸ Search Bin): saved Find queries listed in the Project panel.
     /// Schema v11.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1307,20 +1303,6 @@ impl ProjectView {
     pub const MAX_PLAYHEAD: Tick = Tick(10_000_000 * TICKS_PER_SECOND);
 }
 
-/// A LUT imported into the project (`lut.import`). Lumetri refers to it as `lib:<id>`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ProjectLut {
-    pub id: String,
-    pub name: String,
-    /// Where it was imported from (informational).
-    #[serde(default)]
-    pub source_path: Option<String>,
-    /// `cube` or `3dl`.
-    pub format: String,
-    /// The file's text.
-    pub text: std::sync::Arc<str>,
-}
-
 impl Default for Project {
     fn default() -> Self {
         Self::new("Untitled")
@@ -1335,7 +1317,6 @@ impl Project {
             root: Bin { id: BinId(0), name: name.into(), children: Vec::new() },
             items: BTreeMap::new(),
             next_id: 1,
-            luts: Vec::new(),
             search_bins: Vec::new(),
             source_graphics: BTreeMap::new(),
             notes: String::new(),

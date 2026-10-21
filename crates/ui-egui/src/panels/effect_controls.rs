@@ -1,6 +1,6 @@
 //! Effect Controls: the selected clip's effects (fixed Motion/Opacity/Time Remapping first, as in
 //! Premiere, then standard effects), generated from parameter schemas, with stopwatches and a
-//! keyframe lane on the right. Also hosts the Lumetri Color panel body (same editor, grouped).
+//! keyframe lane on the right.
 
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
 use serde_json::{Value, json};
@@ -88,10 +88,6 @@ pub(crate) fn select_all_keyframes(app: &mut FilmcraftApp) -> bool {
     }
     app.ui.keyframe_selection = keys;
     true
-}
-
-fn selected_clip(app: &FilmcraftApp) -> Option<(ClipId, TrackItem, TrackKind)> {
-    selected_clips(app).into_iter().next()
 }
 
 /// The selected clip (video first) and the audio linked to it when that audio is selected or
@@ -674,7 +670,7 @@ pub(crate) fn param_row(
             }
         }
         _ => {
-            vui.label(param_text(&app.session.project, pd.id, &value));
+            vui.label(param_text(&value));
         }
     }
     if let Some(v) = set {
@@ -761,82 +757,6 @@ fn keyframe_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, target: KeyframeRef,
         actions.push(("effects.deleteKeyframe".into(), params));
         ui.close();
     }
-}
-
-/// Lumetri Color panel: edits (or adds) the Lumetri effect on the selected clip, grouped by section.
-pub fn lumetri_panel(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
-    let t = app.tokens;
-    let Some((clip, it, _)) = selected_clip(app) else {
-        crate::dock::placeholder(ui, rect, &t, tl!("Select a clip to grade"));
-        return;
-    };
-    let idx = it.effects.iter().position(|e| e.effect == "lumetri");
-    let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(6.0)).id_salt("lumetri"));
-    bui.label(egui::RichText::new(tlf!("Master · {name}", name = it.name)).color(t.text_dim));
-    let Some(idx) = idx else {
-        if bui.button(tl!("Add Lumetri Color to clip")).clicked() {
-            let _ = app.session.execute("effects.apply", json!({"clips": [clip.0], "effect": "lumetri"}));
-        }
-        return;
-    };
-    let e = it.effects[idx].clone();
-    let Some(def) = e.def() else { return };
-    let ph = app.session.playhead();
-    let mt = it.source_time_at(ph.clamp(it.start, it.end() - Tick(1)));
-    let mut actions = Vec::new();
-    egui::ScrollArea::vertical().auto_shrink([false, false]).show(&mut bui, |ui| {
-        let mut groups: Vec<&str> = Vec::new();
-        for p in &def.params {
-            if let Some(g) = p.group
-                && !groups.contains(&g)
-            {
-                groups.push(g);
-            }
-        }
-        for g in groups {
-            let key = format!("lumetri:{g}");
-            let open = !app.ui.collapsed_fx.contains(&key);
-            let (resp, now_open) = crate::widgets::section_header(ui, egui::Id::new(&key), crate::i18n::t(g), open, &t, true);
-            app.auto.add(&format!("lumetri.section.{g}"), resp.rect, g);
-            if now_open != open {
-                if now_open {
-                    app.ui.collapsed_fx.retain(|k| *k != key);
-                } else {
-                    app.ui.collapsed_fx.push(key.clone());
-                }
-            }
-            if !now_open {
-                continue;
-            }
-            for pd in def.params.iter().filter(|p| p.group == Some(g)) {
-                let v = e.params.get(pd.id).map(|p| p.value_at(mt)).unwrap_or(pd.default.clone());
-                ui.horizontal(|ui| {
-                    ui.add_space(18.0);
-                    ui.add_sized(vec2(110.0, 18.0), egui::Label::new(egui::RichText::new(crate::i18n::t(pd.label)).size(12.0)));
-                    if let (ParamKind::Float { min, max, soft_min, soft_max, .. }, ParamValue::Float(x)) = (&pd.kind, &v) {
-                        let mut val = *x;
-                        let s = ui.add(egui::Slider::new(&mut val, *soft_min..=*soft_max).show_value(false));
-                        let (_, nv) =
-                            crate::widgets::hot_number(ui, egui::Id::new(("lum", pd.id)), val, (soft_max - soft_min) / 300.0, (*min, *max), 1, "", &t);
-                        if s.changed() {
-                            actions.push(json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": val}));
-                        } else if let Some(nv) = nv {
-                            actions.push(json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": nv}));
-                        }
-                        if s.double_clicked() {
-                            actions.push(json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": pd.default.as_f64().unwrap_or(0.0)}));
-                        }
-                    } else if let ParamValue::Color(c) = v {
-                        let mut rgba = egui::Rgba::from_rgba_unmultiplied(c[0], c[1], c[2], c[3]);
-                        if egui::color_picker::color_edit_button_rgba(ui, &mut rgba, egui::color_picker::Alpha::Opaque).changed() {
-                            actions.push(json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": [rgba.r(), rgba.g(), rgba.b(), 1.0]}));
-                        }
-                    }
-                });
-            }
-        }
-    });
-    run(app, ui.ctx(), actions.into_iter().map(|a| ("effects.setParam".to_string(), a)).collect());
 }
 
 /// Properties panel (Premiere 26): a compact inspector for the selected clip.
@@ -1024,7 +944,7 @@ pub(crate) fn row_fill(r: Rect) -> Rect {
     Rect::from_min_max(pos2(r.min.x + 1.0, r.min.y), r.max)
 }
 
-/// Run the panel's actions (also the Lumetri Color panel's). Parameter changes made
+/// Run the panel's actions. Parameter changes made
 /// while the mouse button is down (a drag) share one undo step, which the first change of each
 /// press begins (#201); typed values and clicks stay separate steps. A drag value only changes once
 /// the mouse moves, after the press frame, so the press that already began a step is remembered by
@@ -1276,10 +1196,9 @@ pub(crate) fn graph_rows(
     }
 }
 
-/// Read-only text for parameters without an inline editor (LUT references, free text, curves).
-fn param_text(project: &waltcut_project::Project, id: &str, value: &ParamValue) -> String {
+/// Read-only text for parameters without an inline editor (free text, curves).
+fn param_text(value: &ParamValue) -> String {
     match value {
-        ParamValue::Text(s) if id.ends_with("_lut") => waltcut_render::luts::label(Some(project), s),
         ParamValue::Text(s) if s.is_empty() => tl!("None").into(),
         ParamValue::Text(s) => s.clone(),
         ParamValue::Curve(pts) if pts.is_empty() || *pts == [[0.0, 0.0], [1.0, 1.0]] => tl!("Default").into(),
@@ -1293,15 +1212,12 @@ mod param_text_tests {
     use super::*;
 
     #[test]
-    fn readable_values_for_text_lut_and_curve_params() {
-        let p = waltcut_project::Project::default();
-        assert_eq!(param_text(&p, "input_lut", &ParamValue::Text(String::new())), "None");
-        assert_eq!(param_text(&p, "look_lut", &ParamValue::Text("builtin:look-teal-orange".into())), "Teal & Orange");
-        assert_eq!(param_text(&p, "label", &ParamValue::Text(String::new())), "None");
-        assert_eq!(param_text(&p, "label", &ParamValue::Text("Reel 3".into())), "Reel 3");
-        assert_eq!(param_text(&p, "curve_luma", &ParamValue::Curve(vec![[0.0, 0.0], [1.0, 1.0]])), "Default");
-        assert_eq!(param_text(&p, "hue_vs_sat", &ParamValue::Curve(vec![])), "Default");
-        assert_eq!(param_text(&p, "curve_luma", &ParamValue::Curve(vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]])), "Custom (3 points)");
+    fn readable_values_for_text_and_curve_params() {
+        assert_eq!(param_text(&ParamValue::Text(String::new())), "None");
+        assert_eq!(param_text(&ParamValue::Text("Reel 3".into())), "Reel 3");
+        assert_eq!(param_text(&ParamValue::Curve(vec![[0.0, 0.0], [1.0, 1.0]])), "Default");
+        assert_eq!(param_text(&ParamValue::Curve(vec![])), "Default");
+        assert_eq!(param_text(&ParamValue::Curve(vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]])), "Custom (3 points)");
     }
 }
 

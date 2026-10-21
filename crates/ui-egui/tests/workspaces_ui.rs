@@ -190,10 +190,10 @@ fn save_switch_reset_rename_delete_and_restart() {
     // switch away and back (by menu and by ui.set): the saved layout comes back
     d.menu("window.workspace.color", json!({}));
     assert_eq!(d.workspace(), "Color");
-    assert!(d.shows(PanelKind::LumetriColor));
+    assert!(d.shows(PanelKind::Effects));
     d.ok("ui.set", json!({"workspace": "cutting"}));
     assert_eq!(d.workspace(), "Cutting");
-    assert!(!d.shows(PanelKind::Metadata) && !d.shows(PanelKind::LumetriColor));
+    assert!(!d.shows(PanelKind::Metadata));
 
     // Reset to Saved Layout undoes changes made since the save
     d.ok("ui.panel.close", json!({"panel": "Project"}));

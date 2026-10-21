@@ -99,7 +99,6 @@
 	Add Guide	안내선 추가
 	Add Guide…	안내선 추가…
 	Add keyframe	키프레임 추가
-	Add Lumetri Color to clip	클립에 Lumetri Color 추가
 	Add Marker	마커 추가
 	Add Marker (M)	마커 추가(M)
 	Add media to your project. Drop files anywhere in the window, or choose a source below.	프로젝트에 미디어를 추가합니다. 창 아무 곳에나 파일을 놓거나 아래에서 소스를 선택하세요.
@@ -636,7 +635,6 @@
 	Color Theme	색상 테마
 	Color To Leave	유지할 색상
 	Color Tolerance	색상 허용치
-	Color Wheels & Match	색상 휠 및 일치
 	Color/Black	색상/검정
 	Color/Gray	색상/회색
 	Color:	색상:
@@ -653,8 +651,6 @@
 	Commits	커밋
 	Community	커뮤니티
 	Company	회사
-	Comparison	비교
-	Comparison View	비교 보기
 	Complexity	복잡도
 	Composite	합성
 	Composite In Back	뒤에 합성
@@ -995,7 +991,6 @@
 	Enable clip and XMP metadata linking	클립 및 XMP 메타데이터 연결 사용
 	Enable developer mode	개발자 모드 사용
 	Enable hardware accelerated decoding (requires restart)	하드웨어 가속 디코딩 사용(재시작 필요)
-	Enable HSL Secondary	HSL 보조 사용
 	Enable language auto-detection	언어 자동 감지 사용
 	Enable Mercury Transmit	Mercury Transmit 사용
 	Enable ProRes hardware accelerated encoding, if available	가능한 경우 ProRes 하드웨어 가속 인코딩 사용
@@ -1186,12 +1181,9 @@
 	Font Size	글꼴 크기
 	Font Style	글꼴 스타일
 	Fonts used in the project:	프로젝트에 사용된 글꼴:
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	색상 관리 매개변수는 Lumetri 색상 패널의 설정 탭에서 지정합니다.
 	Forest	포레스트
 	Format	형식
 	Format and size	형식 및 크기
-	Four Scopes (RGB, 8 bit)	4개 스코프(RGB, 8비트)
-	Four Scopes (YUV, float, no clamp)	4개 스코프(YUV, 부동, 클램프 없음)
 	Fractal Influence	프랙탈 영향
 	Fractal Type	프랙탈 유형
 	Frame	프레임
@@ -1411,9 +1403,7 @@
 	Highpass	하이패스
 	Hindi	힌디어
 	Hindi digits	힌디어 숫자
-	Histogram	히스토그램
 	History	작업 내역
-	HLS Vectorscope + Histogram	HLS 벡터스코프 + 히스토그램
 	Hold	홀드
 	Hold Filters	필터 고정
 	Hold On	고정 위치
@@ -1429,7 +1419,6 @@
 	Horizontal Flip	가로 뒤집기
 	Horizontal Margin	가로 여백
 	Hover Scrub	마우스오버 스크럽
-	HSL Secondary	HSL 보조
 	Hue	색조
 	Hue Center	색조 중심
 	Hue Range	색조 범위
@@ -1496,7 +1485,6 @@
 	Inner	안쪽
 	Inner Radius	안쪽 반경
 	Input Boost	입력 부스트
-	Input LUT	입력 LUT
 	Input:	입력:
 	Insert	삽입
 	Insert (,)	삽입(,)
@@ -1678,7 +1666,6 @@
 	Logo Cutout	로고 잘라내기
 	Long Shadow	긴 그림자
 	Look	룩
-	Look LUT	룩 LUT
 	Look-Ahead Time	예측 시간
 	Loop	반복
 	Loop marked range	표시 범위 반복
@@ -1712,14 +1699,9 @@
 	Luma Min / Max	루마 최소/최대
 	Luma Source	루마 소스
 	Luma vs Sat	휘도 대 채도
-	Lumetri	Lumetri
-	Lumetri Color	Lumetri 색상
-	Lumetri Presets	Lumetri 사전 설정
-	Lumetri Scopes	Lumetri 스코프
 	Luminance	휘도
 	Luminance Threshold	휘도 임계값
 	Luminosity	광도
-	LUT	LUT
 	Magenta	마젠타
 	Magnification	확대/축소 비율
 	Magnify	돋보기
@@ -2174,10 +2156,6 @@
 	Panels	패널
 	Panner	패너
 	Panner - Ambisonics	패너 - Ambisonics
-	Parade	퍼레이드
-	Parade (RGB)	퍼레이드(RGB)
-	Parade ({kind})	퍼레이드({kind})
-	Parade Type	퍼레이드 유형
 	Paragraph Text	단락 텍스트
 	Parametric Equalizer	파라메트릭 이퀄라이저
 	Passband Ripple	통과 대역 리플
@@ -2422,7 +2400,6 @@
 	Reduce Rumble	럼블 감소
 	Reference	참조
 	Reference  {tc}	참조  {tc}
-	Reference Monitor	참조 모니터
 	Reference track:	기준 트랙:
 	Reference: next frame	참조: 다음 프레임
 	Reference: previous frame	참조: 이전 프레임
@@ -2719,11 +2696,8 @@
 	Sequence…	시퀀스…
 	Sequentially	순차적으로
 	Set	설정
-	Set Comparison Reference	비교 기준 설정
-	Set Creative Look	크리에이티브 룩 설정
 	Set focus on the Timeline when performing Insert/Overwrite edits	삽입/덮어쓰기 편집 시 타임라인에 포커스
 	Set Gain to:	게인 설정:
-	Set Input LUT	입력 LUT 설정
 	Set Poster Frame	포스터 프레임 설정
 	Set Project Panel View	프로젝트 패널 보기 설정
 	Set the reference to the playhead	재생 헤드를 참조로 설정
@@ -3274,11 +3248,6 @@
 	Variations:	변형:
 	VBR, 1 pass	VBR, 1패스
 	VBR, 2 pass	VBR, 2패스
-	Vectorscope (YUV)	벡터스코프(YUV)
-	Vectorscope + Waveform YC	벡터스코프 + 파형 YC
-	Vectorscope HLS	벡터스코프 HLS
-	Vectorscope Targets	벡터스코프 대상
-	Vectorscope YUV	벡터스코프 YUV
 	Velocity	속력
 	Venetian Blinds	베니션 블라인드
 	Version	버전

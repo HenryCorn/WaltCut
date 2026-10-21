@@ -51,9 +51,7 @@ pub const PANELS: &[&str] = &[
     "Audio Track Mixer",
     "Audio Clip Mixer",
     "Essential Graphics",
-    "Text",
     "Properties",
-    "Lumetri Color",
 ];
 
 pub const DEFAULT_PRESET: &str = "FilmCraft Default";

@@ -70,7 +70,6 @@ and `filmcraft-cli`.
 | `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
 | `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU parity; empty library, dev-dependencies only |
-| `scopes` | L3 | video scope maths: waveform, parade, histogram, YUV / HLS vectorscopes, numeric summaries ([crates/scopes/README.md](../crates/scopes/README.md)) |
 | `export` | L3 | render → encode → mux pipeline, progress/cancel |
 | `engine` | L4 | `Session`, command registry, undo history, media pool, jobs, interchange glue |
 | `ui-egui` | L5 | the egui frontend: docking, panels, timeline, monitors, playback, control-channel handlers |
@@ -556,20 +555,10 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
   sRGB decodes exactly as before, and its layers stay on the GPU. Log, HDR or wide-gamut media,
   and every layer of an HDR/wide-gamut sequence, are converted on the CPU (the GPU path draws them
   as pre-rendered images, like layers with effects).
-- **Outputs.** `RenderOptions::working_output` returns working-space pixels (HDR exports,
-  scopes); otherwise the top-level render is converted for an SDR monitor. The other colour
+- **Outputs.** `RenderOptions::working_output` returns working-space pixels (HDR exports);
+  otherwise the top-level render is converted for an SDR monitor. The other colour
   effects work on display-encoded values clamped to 0..1 (they clip HDR highlights above
   reference white).
-- **HDR grading (Lumetri).** `FxCtx::working` carries the sequence's working space. In a PQ or HLG
-  sequence Lumetri grades the working space's own signal normalised to **HDR White** (cd/m²,
-  Basic Correction; the curves, wheels, looks and HSL Secondary use the Curves section's **HDR
-  Range**): `waltcut_color::GradeSpace` (PQ: `PQ⁻¹(nits/10000) / PQ⁻¹(white/10000)`; HLG: the
-  BT.2100 inverse OOTF of a display with that peak, then the OETF). So the sliders and curves span
-  0 … HDR White like black … white in SDR, exposure is stops of light, and highlights above HDR
-  White pass through (contrast leaves them alone; **HDR Specular** scales them). Rec. 709
-  sequences grade exactly as before. HSL Secondary ▸ Refine: **Denoise** (median of the key,
-  radius 1–3 px) and **Blur** (Gaussian of the key, σ ≤ 20 px), both scaled with the playback
-  resolution.
 - **HDR metadata.** `VideoStreamInfo::hdr` (`HdrMetadata`: ST 2086 mastering luminance, MaxCLL,
   MaxFALL) is read from `mdcv` / `clli` (MP4 / MOV) and Matroska `MasteringMetadata` / `MaxCLL` /
   `MaxFALL`. PQ media tone mapped into an SDR working space uses it as the BT.2390 source peak
@@ -584,12 +573,7 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
 - **Monitors / display colour management.** The monitors are SDR (sRGB-encoded RGBA8 textures):
   HDR sequences are shown tone mapped. macOS EDR (extended-range `CAMetalLayer` output) is not
   wired up: there is no `platform` crate yet and eframe/wgpu do not expose an EDR surface, so HDR
-  values above SDR white are never sent to the display. The scopes of an HDR sequence show the
-  working-space values (waveform in cd/m² on a PQ scale, BT.2020 vectorscope).
-- **LUTs.** Lumetri Input LUT and Creative Look reference `lib:<id>` (the project's LUT library,
-  `Project::luts`, embedded `.cube`/`.3dl` text) or `builtin:<id>` (code-generated camera
-  conversions and looks). `waltcut-gpu::GpuLut` is the WGSL tetrahedral counterpart, tested for
-  parity.
+  values above SDR white are never sent to the display.
 
 ### 5.4 Multi-camera and synchronisation
 
@@ -728,11 +712,10 @@ All of these dispatch the same command ids.
   settings) is in `crates/ui-egui/src/state.rs` as serde structs, so `ui.inspect` and `ui.set` can
   read and write it.
 
-- **Panels with engine data** (M8.9 / M12.6): Lumetri Scopes (`scopes.read` returns the same
-  scopes as numbers), Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
+- **Panels with engine data** (M8.9 / M12.6): Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
   `ProjectItem::metadata`), Events (`events.list` / `events.clear`), Progress (`jobs.list` /
   `jobs.cancel`), Project Notes (`project.notes` / `project.setNotes`, plain text in
-  `Project::notes`, schema v15; one typing session is one undo step). Timecode and Reference Monitor are frontend-only views. Their settings are
+  `Project::notes`, schema v15; one typing session is one undo step). The Timecode panel is a frontend-only view. Their settings are
   `UiState::panels` (`ui.set {"panels": {...}}`).
 - **Project panel and Media Browser** (M12.7). View settings (List / Icon / Freeform, thumbnail
   and font size, Preview Area, Hover Scrub), the List view's columns, widths and sort, and ten view

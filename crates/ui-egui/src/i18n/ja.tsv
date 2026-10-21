@@ -84,7 +84,6 @@
 	Close Project	プロジェクトを閉じる
 	Color Management…	カラーマネジメント…
 	Color Matte…	カラーマット…
-	Comparison View	比較表示
 	Composite Video	コンポジットビデオ
 	Consolidate Duplicates	重複を統合
 	Copy	コピー
@@ -187,8 +186,6 @@
 	Link Media…	メディアをリンク…
 	Linked Selection	リンクされた選択
 	Lock Guides	ガイドをロック
-	Lumetri Color	Lumetri カラー
-	Lumetri Scopes	Lumetri スコープ
 	Magnification	倍率
 	Make Offline…	オフラインに設定…
 	Make Subclip…	サブクリップを作成…
@@ -250,7 +247,6 @@
 	Rectangle	長方形
 	Red	レッド
 	Redo	やり直し
-	Reference Monitor	リファレンスモニター
 	Remix	リミックス
 	Remix Properties…	リミックスのプロパティ…
 	Remove Attributes…	属性を削除…
@@ -688,15 +684,11 @@
 	Recorded {n} multi-camera cut(s)	{n} 個のマルチカメラカットを記録しました
 	Clamp Signal	信号をクランプ
 	Presets	プリセット
-	Parade ({kind})	パレード ({kind})
 	Waveform ({kind})	波形 ({kind})
-	Parade Type	パレードの種類
 	Waveform Type	波形の種類
-	Vectorscope Targets	ベクトルスコープのターゲット
 	Colour Space	カラースペース
 	Brightness	明るさ
 	Signal Scale	信号スケール
-	Histogram	ヒストグラム
 	Paste Attributes	属性を貼り付け
 	Remove Attributes	属性を削除
 	New Offline File	新規オフラインファイル
@@ -848,8 +840,6 @@
 	Clip Volume	クリップの音量
 	(no clip selected)	(クリップが選択されていません)
 	Master · {name}	マスター · {name}
-	Add Lumetri Color to clip	クリップに Lumetri カラーを追加
-	Input LUT	入力 LUT
 	Color	カラー
 	Temperature	色温度
 	Tint	色合い
@@ -864,7 +854,6 @@
 	HDR White	HDR ホワイト
 	HDR Specular	HDR スペキュラー
 	Look	ルック
-	Look LUT	ルック LUT
 	Intensity	強さ
 	Adjustments	調整
 	Faded Film	色あせたフィルム
@@ -899,7 +888,6 @@
 	Midpoint	中間点
 	Roundness	丸み
 	Feather	ぼかし
-	LUT	LUT
 	Color Match	カラーマッチ
 	Reference	参照
 	Face Detection (protect skin tones)	顔検出 (肌の色を保護)
@@ -918,7 +906,6 @@
 	Stop tracking	トラッキングを停止
 	Tracking method: {method}	トラッキング方法: {method}
 	Composite	コンポジット
-	Comparison	比較
 	Video and Waveform	ビデオと波形
 	System Default	システムの既定
 	Default location	既定の場所
@@ -1461,7 +1448,6 @@
 	Color Theme	カラーテーマ
 	Color To Leave	残す色
 	Color Tolerance	色の許容値
-	Color Wheels & Match	カラーホイールとマッチ
 	Colorize	カラー化
 	Columns	列
 	Comment	コメント
@@ -1616,7 +1602,6 @@
 	Edge Width	エッジの幅
 	Elliptical	楕円
 	Emboss	エンボス
-	Enable HSL Secondary	HSL セカンダリを有効にする
 	Enable Mercury Transmit	Mercury Transmit を有効にする
 	Enable ProRes hardware accelerated encoding, if available	可能な場合は、ハードウェアアクセラレーションによる ProRes エンコードを有効にする
 	Enable clip and XMP metadata linking	クリップと XMP メタデータのリンクを有効にする
@@ -1685,10 +1670,7 @@
 	Focus Size	フォーカスのサイズ
 	Fold Motion	フォールドモーション
 	Foldback	フォールドバック
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	カラーマネジメントのパラメーターは、Lumetri カラーパネルの「設定」タブにあります。
 	Format	形式
-	Four Scopes (RGB, 8 bit)	4 つのスコープ (RGB、8 bit)
-	Four Scopes (YUV, float, no clamp)	4 つのスコープ (YUV、浮動小数点、クランプなし)
 	Fractal Influence	フラクタルの影響
 	Fractal Type	フラクタルの種類
 	Frame	フレーム
@@ -1772,8 +1754,6 @@
 	Grunge & Distort	グランジとゆがみ
 	GuitarSuite	ギタースイート
 	HDR Graphics White (Nits)	HDR グラフィックスのホワイトレベル (Nits)
-	HLS Vectorscope + Histogram	HLS ベクトルスコープ + ヒストグラム
-	HSL Secondary	HSL セカンダリ
 	Hard	ハード
 	Hard Clip	ハードクリップ
 	Hard Light	ハードライト
@@ -1947,7 +1927,6 @@
 	Luma Key	輝度キー
 	Luma Source	輝度のソース
 	Luma and Chroma	輝度とクロマ
-	Lumetri Presets	Lumetri プリセット
 	Luminance	輝度
 	Luminance Threshold	輝度のしきい値
 	Luminosity	輝度
@@ -2106,8 +2085,6 @@
 	Panel Wipe	パネルワイプ
 	Panels	パネル数
 	Panner - Ambisonics	パンナー - アンビソニックス
-	Parade	パレード
-	Parade (RGB)	パレード (RGB)
 	Parametric Equalizer	パラメトリックイコライザー
 	Passband Ripple	通過帯域リップル
 	Path	パス
@@ -2558,10 +2535,6 @@
 	VR Sharpen	VR シャープ
 	VR Spherical Blur	VR 球面ぼかし
 	Validate Content Credentials on import	読み込み時にコンテンツクレデンシャルを検証する
-	Vectorscope (YUV)	ベクトルスコープ (YUV)
-	Vectorscope + Waveform YC	ベクトルスコープ + YC 波形
-	Vectorscope HLS	ベクトルスコープ HLS
-	Vectorscope YUV	ベクトルスコープ YUV
 	Venetian Blinds	ベネチアンブラインド
 	Vertical 4:5	縦長 4:5
 	Vertical 9:16	縦長 9:16
@@ -3050,7 +3023,6 @@
 	Left align text	テキストを左揃え
 	Looping GIF, 640×360 at 15 fps	ループする GIF、640×360、15 fps
 	Lower First	下位フィールド優先
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR (Avid)
 	MXF OP1a	MXF OP1a
@@ -3192,9 +3164,6 @@
 	Select to Segment End	セグメントの末尾まで選択
 	Select to Segment Start	セグメントの先頭まで選択
 	Selection Tool	選択ツール
-	Set Comparison Reference	比較の基準を設定
-	Set Creative Look	クリエイティブのルックを設定
-	Set Input LUT	入力 LUT を設定
 	Set Project Panel View	プロジェクトパネルの表示を設定
 	Show Next Screen	次の画面を表示
 	Show Previous Screen	前の画面を表示

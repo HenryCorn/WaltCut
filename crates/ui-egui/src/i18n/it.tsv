@@ -82,7 +82,6 @@
 	Close Project	Chiudi progetto
 	Color Management…	Gestione del colore…
 	Color Matte…	Mascherino colore…
-	Comparison View	Vista di confronto
 	Composite Video	Video composito
 	Consolidate Duplicates	Consolida duplicati
 	Copy	Copia
@@ -186,8 +185,6 @@
 	Refresh Changed Media	Aggiorna media modificati
 	Linked Selection	Selezione collegata
 	Lock Guides	Blocca guide
-	Lumetri Color	Colore Lumetri
-	Lumetri Scopes	Ambiti Lumetri
 	Magnification	Ingrandimento
 	Make Offline…	Rendi offline…
 	Make Subclip…	Crea sottoclip…
@@ -246,7 +243,6 @@
 	Rectangle	Rettangolo
 	Red	Rosso
 	Redo	Ripeti
-	Reference Monitor	Monitor di riferimento
 	Remix	Remix
 	Remix Properties…	Proprietà remix…
 	Remove Attributes…	Rimuovi attributi…
@@ -685,15 +681,11 @@
 	Recorded {n} multi-camera cut(s)	{n} tagli multicamera registrati
 	Clamp Signal	Limita segnale
 	Presets	Predefiniti
-	Parade ({kind})	Parata ({kind})
 	Waveform ({kind})	Forma d'onda ({kind})
-	Parade Type	Tipo di parata
 	Waveform Type	Tipo di forma d'onda
-	Vectorscope Targets	Bersagli vettorscopio
 	Colour Space	Spazio colore
 	Brightness	Luminosità
 	Signal Scale	Scala del segnale
-	Histogram	Istogramma
 	Paste Attributes	Incolla attributi
 	Remove Attributes	Rimuovi attributi
 	New Offline File	Nuovo file offline
@@ -845,8 +837,6 @@
 	Clip Volume	Volume clip
 	(no clip selected)	(nessuna clip selezionata)
 	Master · {name}	Master · {name}
-	Add Lumetri Color to clip	Aggiungi Colore Lumetri alla clip
-	Input LUT	LUT di ingresso
 	Color	Colore
 	Temperature	Temperatura
 	Tint	Tinta
@@ -861,7 +851,6 @@
 	HDR White	Bianco HDR
 	HDR Specular	Speculare HDR
 	Look	Look
-	Look LUT	LUT look
 	Intensity	Intensità
 	Adjustments	Regolazioni
 	Faded Film	Pellicola sbiadita
@@ -896,7 +885,6 @@
 	Midpoint	Punto medio
 	Roundness	Arrotondamento
 	Feather	Sfumatura
-	LUT	LUT
 	Color Match	Corrispondenza colore
 	Reference	Riferimento
 	Face Detection (protect skin tones)	Rilevamento volti (protegge i toni della pelle)
@@ -915,7 +903,6 @@
 	Stop tracking	Interrompi tracciamento
 	Tracking method: {method}	Metodo di tracciamento: {method}
 	Composite	Composito
-	Comparison	Confronto
 	Video and Waveform	Video e forma d'onda
 	System Default	Predefinito di sistema
 	Default location	Posizione predefinita
@@ -1460,7 +1447,6 @@
 	Color Theme	Tema colori
 	Color To Leave	Colore da mantenere
 	Color Tolerance	Tolleranza colore
-	Color Wheels & Match	Ruote colore e corrispondenza
 	Colorize	Colora
 	Columns	Colonne
 	Comment	Commento
@@ -1615,7 +1601,6 @@
 	Edge Width	Larghezza bordo
 	Elliptical	Ellittico
 	Emboss	Rilievo
-	Enable HSL Secondary	Abilita HSL secondario
 	Enable Mercury Transmit	Abilita trasmissione Mercury
 	Enable ProRes hardware accelerated encoding, if available	Abilita la codifica ProRes con accelerazione hardware, se disponibile
 	Enable clip and XMP metadata linking	Abilita il collegamento dei metadati clip e XMP
@@ -1684,10 +1669,7 @@
 	Focus Size	Dimensione messa a fuoco
 	Fold Motion	Movimento di piegatura
 	Foldback	Ripiegamento
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	Per i parametri di gestione del colore, vai alla scheda Impostazioni del pannello Colore Lumetri.
 	Format	Formato
-	Four Scopes (RGB, 8 bit)	Quattro ambiti (RGB, 8 bit)
-	Four Scopes (YUV, float, no clamp)	Quattro ambiti (YUV, virgola mobile, senza limitazione)
 	Fractal Influence	Influenza frattale
 	Fractal Type	Tipo di frattale
 	Frame	Cornice
@@ -1771,8 +1753,6 @@
 	Grunge & Distort	Grunge e distorsione
 	GuitarSuite	GuitarSuite
 	HDR Graphics White (Nits)	Bianco grafica HDR (nit)
-	HLS Vectorscope + Histogram	Vettorscopio HLS + istogramma
-	HSL Secondary	HSL secondario
 	Hard	Duro
 	Hard Clip	Clipping duro
 	Hard Light	Luce intensa
@@ -1951,7 +1931,6 @@
 	Luma Key	Chiave luma
 	Luma Source	Sorgente luma
 	Luma and Chroma	Luma e croma
-	Lumetri Presets	Predefiniti Lumetri
 	Luminance	Luminanza
 	Luminance Threshold	Soglia luminanza
 	Luminosity	Luminosità
@@ -2110,8 +2089,6 @@
 	Panel Wipe	Tendina a pannelli
 	Panels	Pannelli
 	Panner - Ambisonics	Panner - Ambisonics
-	Parade	Parata
-	Parade (RGB)	Parata (RGB)
 	Parametric Equalizer	Equalizzatore parametrico
 	Passband Ripple	Ondulazione banda passante
 	Path	Tracciato
@@ -2562,10 +2539,6 @@
 	VR Sharpen	Nitidezza VR
 	VR Spherical Blur	Sfocatura sferica VR
 	Validate Content Credentials on import	Convalida le credenziali dei contenuti durante l'importazione
-	Vectorscope (YUV)	Vettorscopio (YUV)
-	Vectorscope + Waveform YC	Vettorscopio + forma d'onda YC
-	Vectorscope HLS	Vettorscopio HLS
-	Vectorscope YUV	Vettorscopio YUV
 	Venetian Blinds	Veneziana
 	Vertical 4:5	Verticale 4:5
 	Vertical 9:16	Verticale 9:16
@@ -3051,7 +3024,6 @@
 	Left align text	Allinea il testo a sinistra
 	Looping GIF, 640×360 at 15 fps	GIF in loop, 640×360 a 15 fps
 	Lower First	Prima il campo inferiore
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR (Avid)
 	MXF OP1a	MXF OP1a
@@ -3193,9 +3165,6 @@
 	Select to Segment End	Seleziona fino alla fine del segmento
 	Select to Segment Start	Seleziona fino all'inizio del segmento
 	Selection Tool	Strumento Selezione
-	Set Comparison Reference	Imposta riferimento di confronto
-	Set Creative Look	Imposta look creativo
-	Set Input LUT	Imposta LUT di ingresso
 	Set Project Panel View	Imposta vista pannello Progetto
 	Show Next Screen	Mostra schermata successiva
 	Show Previous Screen	Mostra schermata precedente

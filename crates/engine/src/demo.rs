@@ -152,16 +152,6 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
         o.set_at(r.tick_of(84), ParamValue::Float(100.0));
         o.set_at(r.tick_of(95), ParamValue::Float(0.0));
     }
-    // Grade on the dunes shot.
-    if let Some(mut lum) = find_effect("lumetri").map(|d| d.instance()) {
-        lum.params.get_mut("temperature").map(|v| v.value = ParamValue::Float(18.0));
-        lum.params.get_mut("contrast").map(|v| v.value = ParamValue::Float(22.0));
-        lum.params.get_mut("vignette_amount").map(|v| v.value = ParamValue::Float(-1.4));
-        let s = p.sequence_mut(seq)?;
-        if let Some(it) = s.video_tracks[0].items.get_mut(3) {
-            it.effects.insert(0, lum);
-        }
-    }
     let s = p.sequence_mut(seq)?;
     s.video_tracks[1].items.push(ov);
     // Transitions: cross dissolve between shots 1-2, dip to black 3-4, push 5-6, fade in at start.

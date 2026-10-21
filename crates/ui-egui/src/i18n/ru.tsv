@@ -74,7 +74,6 @@
 	Close Project	Закрыть проект
 	Color Management…	Управление цветом…
 	Color Matte…	Цветная подложка…
-	Comparison View	Режим сравнения
 	Composite Video	Составное видео
 	Consolidate Duplicates	Объединить дубликаты
 	Copy	Копировать
@@ -178,8 +177,6 @@
 	Link Media…	Привязать медиаданные…
 	Linked Selection	Связанное выделение
 	Lock Guides	Закрепить направляющие
-	Lumetri Color	Цвет Lumetri
-	Lumetri Scopes	Видеографика Lumetri
 	Magnification	Масштаб
 	Make Offline…	Сделать автономным…
 	Make Subclip…	Создать субклип…
@@ -239,7 +236,6 @@
 	Rectangle	Прямоугольник
 	Red	Красный
 	Redo	Повторить
-	Reference Monitor	Контрольный монитор
 	Remix	Ремикс
 	Remix Properties…	Свойства ремикса…
 	Remove Attributes…	Удалить атрибуты…

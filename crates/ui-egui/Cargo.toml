@@ -24,7 +24,6 @@ waltcut-audio-dsp = { workspace = true }
 waltcut-engine = { workspace = true }
 waltcut-export = { workspace = true }
 waltcut-gpu = { workspace = true }
-waltcut-scopes = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit"] }
 serde = { workspace = true }
