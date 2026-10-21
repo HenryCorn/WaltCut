@@ -1,0 +1,86 @@
+name: Baseline measurements
+
+# Size measurements for the reduction epic (#14). Run by hand on a ref; the
+# numbers land in the job summary and in the `baseline` artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, tag or branch to measure
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: measure (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install ffmpeg (test oracle and fixture generator)
+        run: brew install ffmpeg
+      - name: Measure
+        shell: bash
+        run: |
+          set -uo pipefail
+          now() { date +%s; }
+
+          crates=$(cargo metadata --no-deps --format-version 1 | jq '.packages | length')
+          deps=$(cargo metadata --no-deps --format-version 1 | jq '
+            [.packages[].name] as $own
+            | [.packages[].dependencies[] | select(.kind != "dev") | .name | select(. as $n | $own | index($n) | not)]
+            | unique | length')
+          dev_deps=$(cargo metadata --no-deps --format-version 1 | jq '
+            [.packages[].name] as $own
+            | [.packages[].dependencies[] | .name | select(. as $n | $own | index($n) | not)]
+            | unique | length')
+          rs_files=$(git ls-files '*.rs' | wc -l | tr -d ' ')
+          rs_lines=$(git ls-files -z '*.rs' | xargs -0 cat | wc -l | tr -d ' ')
+
+          t0=$(now)
+          cargo build --release -p filmcraft
+          build_status=$?
+          build_secs=$(( $(now) - t0 ))
+          bin_bytes=$(stat -f %z target/release/filmcraft 2>/dev/null || echo 0)
+
+          t0=$(now)
+          cargo test --workspace --release --no-fail-fast
+          test_status=$?
+          test_secs=$(( $(now) - t0 ))
+
+          cat > baseline.json <<EOF
+          {
+            "commit": "$(git rev-parse HEAD)",
+            "runner": "${RUNNER_OS} ${RUNNER_ARCH} ($(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores, $(( $(sysctl -n hw.memsize) / 1073741824 )) GiB)",
+            "rustc": "$(rustc --version)",
+            "crates": $crates,
+            "direct_dependencies": $deps,
+            "direct_dependencies_including_dev": $dev_deps,
+            "rust_files": $rs_files,
+            "rust_lines": $rs_lines,
+            "release_build_seconds": $build_secs,
+            "release_build_exit": $build_status,
+            "binary_bytes": $bin_bytes,
+            "test_seconds": $test_secs,
+            "test_exit": $test_status
+          }
+          EOF
+          cat baseline.json
+          {
+            echo '### Baseline'
+            echo '```json'
+            cat baseline.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline
+          path: baseline.json
