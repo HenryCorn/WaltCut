@@ -1,5 +1,5 @@
 [package]
-name = "filmcraft-genai"
+name = "waltcut-genai"
 description = "Generative image AI for WaltCut: the Restyler trait (re-style a frame from a prompt), the fal.ai cloud backend, and the provider settings"
 version.workspace = true
 edition.workspace = true

@@ -5,8 +5,8 @@ use serde_json::json;
 
 use crate::presets::{KeyframeMode, retime};
 use crate::{Services, Session};
-use filmcraft_project::{ClipId, ParamValue, TrackItem};
-use filmcraft_time::{TICKS_PER_SECOND, Tick};
+use waltcut_project::{ClipId, ParamValue, TrackItem};
+use waltcut_time::{TICKS_PER_SECOND, Tick};
 
 fn demo() -> (Session, Vec<ClipId>) {
     let mut s = Session::default();

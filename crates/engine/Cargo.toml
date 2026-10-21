@@ -1,5 +1,5 @@
 [package]
-name = "filmcraft-engine"
+name = "waltcut-engine"
 description = "FilmCraft engine façade: session, command registry, history, media pool"
 version.workspace = true
 edition.workspace = true
@@ -12,35 +12,35 @@ workspace = true
 [features]
 default = []
 # Speech-to-text with Whisper (candle, CPU). Off by default and in wasm builds.
-whisper = ["filmcraft-speech/whisper"]
+whisper = ["waltcut-speech/whisper"]
 # Speech-model downloads over HTTPS.
-speech-download = ["filmcraft-speech/download"]
+speech-download = ["waltcut-speech/download"]
 # Natural voices for Text to Speech: Kokoro-82M on candle (CPU) and their download.
-neural-voices = ["filmcraft-tts/kokoro", "speech-download"]
+neural-voices = ["waltcut-tts/kokoro", "speech-download"]
 # AI re-style through cloud providers (fal.ai) over HTTPS. Off in wasm builds.
-ai-cloud = ["filmcraft-genai/cloud"]
+ai-cloud = ["waltcut-genai/cloud"]
 
 [dependencies]
-filmcraft-time = { workspace = true }
-filmcraft-geom = { workspace = true }
-filmcraft-color = { workspace = true }
-filmcraft-frame = { workspace = true }
-filmcraft-media = { workspace = true }
-filmcraft-codecs = { workspace = true }
-filmcraft-project = { workspace = true }
-filmcraft-edit = { workspace = true }
-filmcraft-render = { workspace = true }
-filmcraft-scopes = { workspace = true }
-filmcraft-text = { workspace = true }
-filmcraft-audio-dsp = { workspace = true }
-filmcraft-export = { workspace = true }
-filmcraft-mxf = { workspace = true }
-filmcraft-format = { workspace = true }
-filmcraft-interchange = { workspace = true }
-filmcraft-captions = { workspace = true }
-filmcraft-speech = { workspace = true }
-filmcraft-genai = { workspace = true }
-filmcraft-tts = { workspace = true }
+waltcut-time = { workspace = true }
+waltcut-geom = { workspace = true }
+waltcut-color = { workspace = true }
+waltcut-frame = { workspace = true }
+waltcut-media = { workspace = true }
+waltcut-codecs = { workspace = true }
+waltcut-project = { workspace = true }
+waltcut-edit = { workspace = true }
+waltcut-render = { workspace = true }
+waltcut-scopes = { workspace = true }
+waltcut-text = { workspace = true }
+waltcut-audio-dsp = { workspace = true }
+waltcut-export = { workspace = true }
+waltcut-mxf = { workspace = true }
+waltcut-format = { workspace = true }
+waltcut-interchange = { workspace = true }
+waltcut-captions = { workspace = true }
+waltcut-speech = { workspace = true }
+waltcut-genai = { workspace = true }
+waltcut-tts = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -49,7 +49,7 @@ craft-docpath = { workspace = true }
 web-time = "1"
 
 [dev-dependencies]
-filmcraft-testkit = { workspace = true }
-filmcraft-dng = { workspace = true, features = ["writer"] }
-filmcraft-isobmff = { workspace = true }
+waltcut-testkit = { workspace = true }
+waltcut-dng = { workspace = true, features = ["writer"] }
+waltcut-isobmff = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "gif"] }

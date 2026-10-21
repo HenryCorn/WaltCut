@@ -1,9 +1,9 @@
 //! Keyframe selection gestures. The project changes only on a completed key drag; a marquee,
 //! modifier click, or cancelled preview only changes the UI selection.
 use egui::{Color32, Id, Pos2, Rect, Response, Sense, Stroke, vec2};
-use filmcraft_project::{Interpolation, TrackItem};
-use filmcraft_time::{FrameRate, Tick};
 use serde_json::json;
+use waltcut_project::{Interpolation, TrackItem};
+use waltcut_time::{FrameRate, Tick};
 
 use crate::{
     FilmcraftApp,
@@ -64,7 +64,7 @@ fn limits(app: &FilmcraftApp, keys: &[KeyframeRef]) -> Option<(i64, i64)> {
     let frame = q.settings.frame_rate.frame_duration();
     let (mut low, mut high) = (i64::MIN, i64::MAX);
     for key in keys {
-        let (_, it) = q.find_item(filmcraft_project::ClipId(key.clip))?;
+        let (_, it) = q.find_item(waltcut_project::ClipId(key.clip))?;
         let speed = it.speed.abs() * if it.reverse { -1.0 } else { 1.0 };
         if !speed.is_finite() || speed == 0.0 || it.duration < frame {
             return None;
@@ -267,7 +267,7 @@ mod tests {
     use super::*;
     #[test]
     fn keyframe_timeline_coordinates_follow_trim_speed_and_reverse() {
-        let mut session = filmcraft_engine::Session::default();
+        let mut session = waltcut_engine::Session::default();
         session.execute("file.openDemoProject", json!({})).unwrap();
         let mut it = session.active_sequence().unwrap().video_tracks[0].items[0].clone();
         it.start += Tick::from_seconds_f64(4.0);
@@ -293,14 +293,14 @@ mod tests {
                 key: key.clone(),
                 rect: Rect::from_center_size(Pos2::ZERO, vec2(15.0, 15.0)),
                 time: Tick::ZERO,
-                pixels_per_tick: 100.0 / filmcraft_time::TICKS_PER_SECOND as f64,
+                pixels_per_tick: 100.0 / waltcut_time::TICKS_PER_SECOND as f64,
                 interp: Interpolation::Linear,
             },
             Point {
                 key: other,
                 rect: Rect::from_center_size(egui::pos2(95.0, 30.0), vec2(15.0, 15.0)),
                 time: Tick::from_seconds_f64(0.95),
-                pixels_per_tick: 100.0 / filmcraft_time::TICKS_PER_SECOND as f64,
+                pixels_per_tick: 100.0 / waltcut_time::TICKS_PER_SECOND as f64,
                 interp: Interpolation::Linear,
             },
         ];
@@ -309,7 +309,7 @@ mod tests {
             keys: vec![key],
             press: Pos2::ZERO,
             time: Tick::ZERO,
-            ticks_per_pixel: filmcraft_time::TICKS_PER_SECOND as f64 / 100.0,
+            ticks_per_pixel: waltcut_time::TICKS_PER_SECOND as f64 / 100.0,
             low: 0,
             high: Tick::from_seconds_f64(1.0).0,
             delta: Tick::ZERO,

@@ -3,14 +3,14 @@
 use egui::{Event, Modifiers, PointerButton, Rect, pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::{
+use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::{
     FilmcraftApp,
     dock::{self, DockNode, PanelKind, SeqTabs},
     panels::monitor::{self, Which},
     theme::{self, ThemeKind},
 };
-use serde_json::json;
 
 fn harness(width: f32, kind: ThemeKind, which: Which) -> Harness<'static, FilmcraftApp> {
     harness_at_scale(width, kind, which, 1.0)
@@ -33,7 +33,7 @@ fn harness_at_scale(width: f32, kind: ThemeKind, which: Which, scale: f32) -> Ha
                 dock::draw_group_chrome(ui, &group, panel, &SeqTabs::default(), &app.tokens, &mut app.auto);
                 monitor::show(app, ui, group.content, which);
             }
-            let source = filmcraft_ui_egui::panels::dragged_source(ui);
+            let source = waltcut_ui_egui::panels::dragged_source(ui);
             ui.ctx().data_mut(|data| data.insert_temp(egui::Id::new("observed-source-drag"), source));
         },
         FilmcraftApp::new(session),
@@ -232,7 +232,7 @@ fn source_drag_choices(width: f32) {
         h.run_steps(2);
         let source = h
             .ctx
-            .data(|data| data.get_temp::<Option<filmcraft_ui_egui::panels::source_drag::SourceDrag>>(egui::Id::new("observed-source-drag")))
+            .data(|data| data.get_temp::<Option<waltcut_ui_egui::panels::source_drag::SourceDrag>>(egui::Id::new("observed-source-drag")))
             .flatten()
             .expect("drag must create the production Source payload");
         assert_eq!((source.video, source.audio), (video, audio));

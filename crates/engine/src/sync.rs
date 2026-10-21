@@ -10,14 +10,14 @@
 //! | `out` | the Out point (exclusive end) |
 //! | `timecode` | −(start timecode), optionally ignoring hours |
 //! | `marker` | the first clip marker (or the first one named `marker`) |
-//! | `audio` | from the waveform cross-correlation against the reference clip ([`filmcraft_audio_dsp::sync`]) |
+//! | `audio` | from the waveform cross-correlation against the reference clip ([`waltcut_audio_dsp::sync`]) |
 //!
 //! `offset` (frames) shifts every clip but the reference by that much (a known delay to correct).
 
-use filmcraft_audio_dsp::sync::{SyncOptions, SyncResult, find_offset, mixdown};
-use filmcraft_project::{ItemId, Project, TrackItem};
-use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 use serde_json::{Value, json};
+use waltcut_audio_dsp::sync::{SyncOptions, SyncResult, find_offset, mixdown};
+use waltcut_project::{ItemId, Project, TrackItem};
+use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
 use crate::{EngineError, Result, Session};
 
@@ -75,11 +75,11 @@ pub struct SyncClip {
 }
 
 /// The media item behind an item (subclips resolve to their parent) and its subclip range.
-fn media_of(p: &Project, item: ItemId) -> Option<(ItemId, &filmcraft_project::MediaClip, Option<TimeRange>)> {
+fn media_of(p: &Project, item: ItemId) -> Option<(ItemId, &waltcut_project::MediaClip, Option<TimeRange>)> {
     p.resolve_media(item)
 }
 
-fn start_timecode(m: &filmcraft_project::MediaClip) -> Tick {
+fn start_timecode(m: &waltcut_project::MediaClip) -> Tick {
     let rate = m.frame_rate();
     m.info.start_timecode.map(|f| rate.tick_of(f)).unwrap_or(Tick::ZERO)
 }

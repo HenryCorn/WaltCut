@@ -7,13 +7,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use filmcraft_export::{ExportSettings, Exporter, Format, FrameRenderer, GpuRendering, Progress, Step, export, gpu_render_stats, register_frame_renderer};
-use filmcraft_media::generators::GeneratorSource;
-use filmcraft_media::{Generator, MediaSource};
-use filmcraft_project::{ItemId, ItemKind, Label, MediaClip, MediaRef, Project, SequenceSettings, TrackKind};
-use filmcraft_render::{Image, RenderOptions, SourceMap, SourceProvider};
-use filmcraft_time::{FrameRate, Tick, TimeRange};
 use rayon::prelude::*;
+use waltcut_export::{ExportSettings, Exporter, Format, FrameRenderer, GpuRendering, Progress, Step, export, gpu_render_stats, register_frame_renderer};
+use waltcut_media::generators::GeneratorSource;
+use waltcut_media::{Generator, MediaSource};
+use waltcut_project::{ItemId, ItemKind, Label, MediaClip, MediaRef, Project, SequenceSettings, TrackKind};
+use waltcut_render::{Image, RenderOptions, SourceMap, SourceProvider};
+use waltcut_time::{FrameRate, Tick, TimeRange};
 
 const CHILD: &str = "FILMCRAFT_RENDERER_REENTRANCY_CASE";
 const FRAMES: i64 = 6;
@@ -30,7 +30,7 @@ impl FrameRenderer for YieldingRenderer {
         let checksum: usize = (0..4096usize).into_par_iter().map(|x| x ^ 37).sum();
         assert!(checksum > 0);
         RENDERED.fetch_add(1, Ordering::Relaxed);
-        Some(filmcraft_render::render_sequence(project, seq, t, opts, sources))
+        Some(waltcut_render::render_sequence(project, seq, t, opts, sources))
     }
 }
 

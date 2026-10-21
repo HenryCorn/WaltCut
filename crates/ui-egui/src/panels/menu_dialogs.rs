@@ -18,9 +18,9 @@
 
 use crate::widgets::CenteredDialog as _;
 use egui::{Align2, RichText};
-use filmcraft_project::{FindOp, find::COLUMNS};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use waltcut_project::{FindOp, find::COLUMNS};
 
 use crate::FilmcraftApp;
 use crate::dock::PanelKind;
@@ -99,7 +99,7 @@ fn dialog_command(id: &str) -> Option<&'static str> {
 }
 
 fn enabled(app: &FilmcraftApp, id: &str) -> Result<(), String> {
-    filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))
+    waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))
 }
 
 /// Checkmark state of this module's toggles in the menus.
@@ -110,7 +110,7 @@ pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
 /// Project Settings ▸ General ▸ Renderer is "Software Only": the Program monitor composites on
 /// the CPU.
 pub fn software_renderer(app: &FilmcraftApp) -> bool {
-    app.session.project.settings.renderer == filmcraft_engine::project_tools::RENDERER_SOFTWARE
+    app.session.project.settings.renderer == waltcut_engine::project_tools::RENDERER_SOFTWARE
 }
 
 /// Hand a path to the operating system (open it in its default application, or reveal it in the
@@ -133,7 +133,7 @@ pub fn open_path(app: &mut FilmcraftApp, ctx: &egui::Context, path: &str, reveal
 
 /// Where Reveal Log Files points: `<data dir>/Logs` (the temp folder without a data directory).
 pub fn logs_dir(app: &FilmcraftApp) -> std::path::PathBuf {
-    app.session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.join("Logs")).unwrap_or_else(|| filmcraft_engine::temp_dir().join("FilmCraft Logs"))
+    app.session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.join("Logs")).unwrap_or_else(|| waltcut_engine::temp_dir().join("FilmCraft Logs"))
 }
 
 /// Write this session's log (system report and the command journal) into [`logs_dir`].
@@ -151,7 +151,7 @@ fn write_session_log(app: &FilmcraftApp) -> Result<std::path::PathBuf, String> {
 
 /// The engine's report plus the GPU adapter (wgpu) when the GPU compositor is on.
 pub fn system_report(app: &FilmcraftApp) -> Value {
-    let mut r = filmcraft_engine::project_tools::system_report();
+    let mut r = waltcut_engine::project_tools::system_report();
     let gpu = app.gpu.as_ref().map(|g| {
         let i = g.render_state.adapter.get_info();
         json!({"name": i.name, "backend": format!("{:?}", i.backend), "type": format!("{:?}", i.device_type), "driver": i.driver, "driverInfo": i.driver_info})
@@ -202,7 +202,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
             if let Ok(v) = &r {
                 let mut peaks = app.tl.peaks.lock().unwrap_or_else(|e| e.into_inner());
                 for i in v["items"].as_array().cloned().unwrap_or_default() {
-                    let item = filmcraft_engine::project::ItemId(i.as_u64().unwrap_or_default());
+                    let item = waltcut_engine::project::ItemId(i.as_u64().unwrap_or_default());
                     peaks.retain(|(it, _), _| *it != item);
                 }
             }
@@ -230,7 +230,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
         }
         "file.mediaPropertiesFile" if params.get("path").is_none() => {
             let exts: Vec<&str> =
-                filmcraft_media::VIDEO_EXTENSIONS.iter().chain(filmcraft_media::AUDIO_EXTENSIONS).chain(filmcraft_media::STILL_EXTENSIONS).copied().collect();
+                waltcut_media::VIDEO_EXTENSIONS.iter().chain(waltcut_media::AUDIO_EXTENSIONS).chain(waltcut_media::STILL_EXTENSIONS).copied().collect();
             let id = id.to_string();
             return Some(app.pick(FileDialog::open_file(tl!("Media"), &exts), move |app, paths| {
                 let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
@@ -291,7 +291,7 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
             };
             let st = s.project.settings.clone();
             let general = s.execute("file.projectSettings.general", json!({})).map_err(|e| e.to_string())?;
-            let scratch = filmcraft_engine::project_tools::scratch_paths(s);
+            let scratch = waltcut_engine::project_tools::scratch_paths(s);
             let ingest = serde_json::to_value(&st.ingest).unwrap_or_default();
             let sc = &st.scratch;
             (
@@ -315,7 +315,7 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
             if let Some(it) = item {
                 p["item"] = json!(it.id.0);
                 p["mediaName"] = json!(it.name);
-                for (k, key) in filmcraft_engine::project_tools::OFFLINE_FIELDS {
+                for (k, key) in waltcut_engine::project_tools::OFFLINE_FIELDS {
                     p[k] = json!(it.metadata.get(key).cloned().unwrap_or_default());
                 }
             }
@@ -352,8 +352,8 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
         "project.matteColor" => {
             let matte = match s.state.project_selection.as_slice() {
                 [id] => s.project.item(*id).and_then(|it| match &it.kind {
-                    filmcraft_engine::project::ItemKind::Media(m) => match &m.media {
-                        filmcraft_engine::project::MediaRef::Generator(filmcraft_media::Generator::ColorMatte { color }) => Some((it.id, *color)),
+                    waltcut_engine::project::ItemKind::Media(m) => match &m.media {
+                        waltcut_engine::project::MediaRef::Generator(waltcut_media::Generator::ColorMatte { color }) => Some((it.id, *color)),
                         _ => None,
                     },
                     _ => None,
@@ -361,7 +361,7 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
                 _ => None,
             };
             let (id, color) = matte.ok_or("select one Color Matte")?;
-            (json!({"item": id.0, "color": filmcraft_color::to_hex(color)}), Value::Null)
+            (json!({"item": id.0, "color": waltcut_color::to_hex(color)}), Value::Null)
         }
         _ => (json!({}), Value::Null),
     })
@@ -435,7 +435,7 @@ fn combo(ui: &mut egui::Ui, elems: &mut Elems, id: &str, label: &str, value: &mu
 fn color(ui: &mut egui::Ui, elems: &mut Elems, pre: &str, p: &mut Value, key: &str, label: &str) {
     ui.horizontal(|ui| {
         ui.label(label);
-        let c = p.get(key).and_then(Value::as_str).and_then(filmcraft_color::parse_hex).unwrap_or([0.0, 0.0, 0.0, 1.0]);
+        let c = p.get(key).and_then(Value::as_str).and_then(waltcut_color::parse_hex).unwrap_or([0.0, 0.0, 0.0, 1.0]);
         let mut rgb = [c[0], c[1], c[2]].map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
         let r = egui::color_picker::color_edit_button_srgb(ui, &mut rgb);
         push(elems, format!("{pre}.{key}"), &r, label);
@@ -595,13 +595,12 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                     _ => {
                         ui.label(RichText::new(tl!("Video Rendering and Playback")).strong());
                         let rs = vec![
-                            (filmcraft_engine::project_tools::RENDERER_GPU.to_string(), filmcraft_engine::project_tools::RENDERER_GPU.to_string()),
-                            (filmcraft_engine::project_tools::RENDERER_SOFTWARE.to_string(), filmcraft_engine::project_tools::RENDERER_SOFTWARE.to_string()),
+                            (waltcut_engine::project_tools::RENDERER_GPU.to_string(), waltcut_engine::project_tools::RENDERER_GPU.to_string()),
+                            (waltcut_engine::project_tools::RENDERER_SOFTWARE.to_string(), waltcut_engine::project_tools::RENDERER_SOFTWARE.to_string()),
                         ];
                         combo(ui, &mut elems, "projectSettings.renderer", tl!("Renderer:"), &mut p["renderer"], &rs);
                         ui.label(RichText::new(tl!("Video")).strong());
-                        let vd: Vec<(String, String)> =
-                            filmcraft_time::TimeDisplay::ALL.iter().map(|t| (t.label().to_string(), t.label().to_string())).collect();
+                        let vd: Vec<(String, String)> = waltcut_time::TimeDisplay::ALL.iter().map(|t| (t.label().to_string(), t.label().to_string())).collect();
                         combo(ui, &mut elems, "projectSettings.videoDisplay", tl!("Display Format:"), &mut p["videoDisplay"], &vd);
                         ui.label(RichText::new(tl!("Audio")).strong());
                         combo(
@@ -924,7 +923,7 @@ pub fn search_bin_rows(
     ui: &mut egui::Ui,
     row: &mut usize,
     actions: &mut Vec<(String, Value)>,
-    draw_items: &mut dyn FnMut(&mut FilmcraftApp, &mut egui::Ui, &filmcraft_project::Bin, &mut usize, &mut Vec<(String, Value)>),
+    draw_items: &mut dyn FnMut(&mut FilmcraftApp, &mut egui::Ui, &waltcut_project::Bin, &mut usize, &mut Vec<(String, Value)>),
 ) {
     let t = app.tokens;
     for sb in app.session.project.search_bins.clone() {
@@ -970,8 +969,7 @@ pub fn search_bin_rows(
             }
         });
         if open {
-            let bin =
-                filmcraft_project::Bin { id: sb.id, name: sb.name.clone(), children: matches.into_iter().map(filmcraft_project::BinEntry::Item).collect() };
+            let bin = waltcut_project::Bin { id: sb.id, name: sb.name.clone(), children: matches.into_iter().map(waltcut_project::BinEntry::Item).collect() };
             draw_items(app, ui, &bin, row, actions);
         }
     }

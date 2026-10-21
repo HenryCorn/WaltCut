@@ -21,9 +21,9 @@
 //!   `mcam.cameraNames.<clip|track|metadata>`, `mcam.processedBin`, `mcam.ok`, `mcam.cancel`.
 
 use egui::{Align2, Color32, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::ItemId;
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_project::ItemId;
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};
@@ -40,7 +40,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
             return Some(Ok(json!({"multicam": app.ui.program.multicam})));
         }
         "multicam.editCamerasDialog" => {
-            let Some(src) = filmcraft_engine::multicam::multicam_clip_at(&app.session, app.session.playhead()).map(|c| c.1.item) else {
+            let Some(src) = waltcut_engine::multicam::multicam_clip_at(&app.session, app.session.playhead()).map(|c| c.1.item) else {
                 return Some(Err("no multi-camera clip at the playhead".into()));
             };
             let cams = app.session.project.sequence(src).map(|q| q.cameras()).unwrap_or_default();
@@ -67,11 +67,11 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
         "clip.createMulticam" => "multicam",
         _ => return None,
     };
-    if let Err(e) = filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session)) {
+    if let Err(e) = waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session)) {
         return Some(Err(e));
     }
     // the Project panel's selection, or the media of the clips selected in the Timeline (#1362)
-    let selected = filmcraft_engine::multicam::selected_items(&app.session);
+    let selected = waltcut_engine::multicam::selected_items(&app.session);
     let items: Vec<u64> = selected.iter().map(|i| i.0).collect();
     let first = selected.first().and_then(|i| app.session.project.item(*i)).map(|i| i.name.clone()).unwrap_or_default();
     let name = match kind {
@@ -297,7 +297,7 @@ pub fn grid(app: &mut FilmcraftApp, ui: &mut egui::Ui, area: Rect) {
     ui.painter().rect_filled(area, 0.0, t.panel_bg);
     app.auto.add("program.multicam.grid", area, "Multi-Camera");
     let playhead = app.session.playhead();
-    let info = filmcraft_engine::multicam::inspect_at(&app.session, playhead);
+    let info = waltcut_engine::multicam::inspect_at(&app.session, playhead);
     let Some(src) = info["source"].as_u64().map(ItemId) else {
         ui.painter().text(area.center(), Align2::CENTER_CENTER, tl!("No multi-camera clip at the playhead"), Tokens::ui(12.0), t.text_dim);
         return;
@@ -318,7 +318,7 @@ pub fn grid(app: &mut FilmcraftApp, ui: &mut egui::Ui, area: Rect) {
     // decode and composite at the cell's size (never more than the playback resolution; lower
     // while playing with Auto-Adjust Multi-Camera Playback Quality)
     let cell_px = cw * ctx.pixels_per_point();
-    let scale = crate::panels::monitor::quantize_scale(filmcraft_render::multicam::grid_cell_scale(
+    let scale = crate::panels::monitor::quantize_scale(waltcut_render::multicam::grid_cell_scale(
         q.settings.width,
         cell_px,
         app.ui.program.res.scale(),
@@ -432,7 +432,7 @@ pub fn show_edit_cameras(app: &mut FilmcraftApp, ctx: &egui::Context) {
         return;
     };
     let rate = q.settings.frame_rate;
-    let mt = filmcraft_engine::multicam::inspect_at(&app.session, app.session.playhead())["sourceTime"].as_i64().unwrap_or(0);
+    let mt = waltcut_engine::multicam::inspect_at(&app.session, app.session.playhead())["sourceTime"].as_i64().unwrap_or(0);
     let frame = rate.frame_at(Tick(mt));
     let rev = grid_revision(app, src);
     let mut elems: Elems = Vec::new();
@@ -526,7 +526,7 @@ pub fn show_edit_cameras(app: &mut FilmcraftApp, ctx: &egui::Context) {
 pub fn on_play(app: &mut FilmcraftApp) {
     if app.ui.program.multicam && app.ui.multicam_record && !app.session.mcrec.active() && (app.playback.speed - 1.0).abs() < 1e-9 {
         let t = app.session.playhead();
-        if filmcraft_engine::multicam::multicam_clip_at(&app.session, t).is_some() {
+        if waltcut_engine::multicam::multicam_clip_at(&app.session, t).is_some() {
             let _ = app.session.execute("multicam.recordStart", json!({"time": t.0}));
         }
     }

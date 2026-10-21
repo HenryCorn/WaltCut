@@ -5,9 +5,9 @@
 use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
 use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
     let ctx = h.ctx.clone();
@@ -216,7 +216,7 @@ fn several_files_dropped_together_are_placed_in_one_undo_step() {
 
 fn float_panel(h: &mut Harness<'static, FilmcraftApp>, panel: &str, rect: [f32; 4]) {
     let ctx = h.ctx.clone();
-    filmcraft_ui_egui::menus::invoke(h.state_mut(), &ctx, "window.floatPanel", json!({"panel": panel, "rect": rect})).unwrap();
+    waltcut_ui_egui::menus::invoke(h.state_mut(), &ctx, "window.floatPanel", json!({"panel": panel, "rect": rect})).unwrap();
     for _ in 0..4 {
         step(h);
     }
@@ -291,7 +291,7 @@ fn offscreen_float_uses_rendered_clamp_and_maximized_timeline_ignores_hidden_flo
     assert!(!hover_at(&mut h, at));
     drop_at(&mut h, at, &still("drop_clamped_occlusion.png"));
     assert_eq!(clip_counts(&h), (0, 0));
-    h.state_mut().ui.keys.maximized = Some(filmcraft_ui_egui::dock::PanelKind::Timeline);
+    h.state_mut().ui.keys.maximized = Some(waltcut_ui_egui::dock::PanelKind::Timeline);
     for _ in 0..4 {
         step(&mut h);
     }

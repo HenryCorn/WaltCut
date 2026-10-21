@@ -11,9 +11,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use filmcraft_project::{ClipId, ItemId, ItemKind, MediaRef, Project, TrackKind};
-use filmcraft_time::Tick;
 use serde::{Deserialize, Serialize};
+use waltcut_project::{ClipId, ItemId, ItemKind, MediaRef, Project, TrackKind};
+use waltcut_time::Tick;
 
 /// What a piece of essence stands in for: a whole media item, or one clip's rendered audio.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -211,8 +211,8 @@ fn collect_needs(
                             continue;
                         }
                         let channels = match t.channels {
-                            filmcraft_project::AudioChannels::Mono => 1,
-                            filmcraft_project::AudioChannels::Surround51 => 6,
+                            waltcut_project::AudioChannels::Mono => 1,
+                            waltcut_project::AudioChannels::Surround51 => 6,
                             _ => 2,
                         };
                         let key = EssenceKey::Clip(c.id);

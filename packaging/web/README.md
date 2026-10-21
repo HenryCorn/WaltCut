@@ -6,8 +6,8 @@ static site in `filmcraft-web-<version>/`:
 | File | What it is |
 |---|---|
 | `index.html` | The page. It loads everything through relative URLs. |
-| `filmcraft_web.js` | wasm-bindgen glue (generated, ES module) |
-| `filmcraft_web_bg.wasm` | The app, about 13 MB, or 5 MB with compression |
+| `waltcut_web.js` | wasm-bindgen glue (generated, ES module) |
+| `waltcut_web_bg.wasm` | The app, about 13 MB, or 5 MB with compression |
 | `_headers`, `.htaccess` | Sample header rules for Netlify/Cloudflare Pages and Apache |
 
 There is no server-side code. Upload the folder's contents anywhere that serves static files.

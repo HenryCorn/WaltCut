@@ -2,10 +2,10 @@
 
 mod support;
 
-use filmcraft_interchange::{ExportOptions, Format, import};
-use filmcraft_project::{Label, Marker, MarkerId, MarkerKind, Project, TrackKind};
-use filmcraft_time::{FrameRate, Tick};
 use support::*;
+use waltcut_interchange::{ExportOptions, Format, import};
+use waltcut_project::{Label, Marker, MarkerId, MarkerKind, Project, TrackKind};
+use waltcut_time::{FrameRate, Tick};
 
 fn fcpxml_with_markers(frame: &str, point_dur: &str, range_dur: &str) -> String {
     format!(

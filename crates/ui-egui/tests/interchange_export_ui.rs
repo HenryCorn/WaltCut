@@ -5,10 +5,10 @@ use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -73,8 +73,8 @@ fn session() -> Session {
             [x, x]
         })
         .collect();
-    let bytes: Arc<[u8]> = filmcraft_engine::previews::write_wav_f32(&inter, 48_000).into();
-    let item = filmcraft_engine::commands::import_bytes(&mut s, "/tone.wav", bytes, None).unwrap();
+    let bytes: Arc<[u8]> = waltcut_engine::previews::write_wav_f32(&inter, 48_000).into();
+    let item = waltcut_engine::commands::import_bytes(&mut s, "/tone.wav", bytes, None).unwrap();
     s.execute("timeline.place", json!({"item": item.0, "audioTrack": "A1", "seconds": 0.0})).unwrap();
     s
 }
@@ -130,10 +130,10 @@ fn aaf_and_omf_export_dialogs() {
     d.frames(4);
     assert!(d.ids("aafExport.").is_empty(), "the dialog closes");
     let aaf = std::fs::read(dir.join("Mix.aaf")).expect("Mix.aaf written");
-    assert!(filmcraft_interchange::aaf::sniff(&aaf));
-    let (imp, extracted, _) = filmcraft_interchange::aaf::import(&aaf, &Default::default()).unwrap();
+    assert!(waltcut_interchange::aaf::sniff(&aaf));
+    let (imp, extracted, _) = waltcut_interchange::aaf::import(&aaf, &Default::default()).unwrap();
     assert_eq!(extracted.len(), 2, "embedded, broken out to two mono essences");
-    let (_, ch, sr, bits) = filmcraft_interchange::wav::parse_wav(&extracted[0].wav).unwrap();
+    let (_, ch, sr, bits) = waltcut_interchange::wav::parse_wav(&extracted[0].wav).unwrap();
     assert_eq!((ch, sr, bits), (1, 48_000, 24));
     assert_eq!(imp.sequences.len(), 1);
 
@@ -154,7 +154,7 @@ fn aaf_and_omf_export_dialogs() {
     d.ok("ui.click", json!({"id": "omfExport.ok"}));
     d.frames(4);
     let omf = std::fs::read(dir.join("Mix.omf")).expect("Mix.omf written");
-    assert!(filmcraft_interchange::omf::sniff(&omf));
+    assert!(waltcut_interchange::omf::sniff(&omf));
     let audio_dir = dir.join("Mix Audio Files");
     let aifs: Vec<_> = std::fs::read_dir(&audio_dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.path().extension().is_some_and(|x| x == "aif")).collect();
     assert_eq!(aifs.len(), 1, "one trimmed AIFF");

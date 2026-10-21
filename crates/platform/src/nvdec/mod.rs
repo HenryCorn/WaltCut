@@ -15,8 +15,8 @@ pub mod ffi;
 #[cfg(test)]
 mod abi_tests;
 
-use filmcraft_codecs::hw::{NalCodec, NalStreamInfo};
-use filmcraft_codecs::{CodecError, DecodedFrame, Result, VideoDecoder};
+use waltcut_codecs::hw::{NalCodec, NalStreamInfo};
+use waltcut_codecs::{CodecError, DecodedFrame, Result, VideoDecoder};
 
 use crate::annexb::to_annex_b;
 use crate::biplanar::Geometry;
@@ -66,7 +66,7 @@ impl NvDecoder {
     }
 }
 
-fn frames(out: Vec<(i64, filmcraft_frame::VideoFrame)>) -> Vec<DecodedFrame> {
+fn frames(out: Vec<(i64, waltcut_frame::VideoFrame)>) -> Vec<DecodedFrame> {
     out.into_iter().map(|(pts, frame)| DecodedFrame { pts, frame, draft: false }).collect()
 }
 

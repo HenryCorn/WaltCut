@@ -7,9 +7,9 @@
 //! `metadata.label`, `metadata.section.<Clip|File>`.
 
 use egui::{Rect, RichText, Sense, vec2};
-use filmcraft_engine::panels::{Field, metadata_fields};
-use filmcraft_project::{ItemId, Label};
 use serde_json::json;
+use waltcut_engine::panels::{Field, metadata_fields};
+use waltcut_project::{ItemId, Label};
 
 use crate::FilmcraftApp;
 use crate::dock::PanelKind;

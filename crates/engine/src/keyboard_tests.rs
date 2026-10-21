@@ -4,8 +4,8 @@
 use super::*;
 use crate::shortcut_presets as presets;
 use crate::shortcuts::Chord;
-use filmcraft_project::ParamValue;
 use serde_json::json;
+use waltcut_project::ParamValue;
 
 fn demo() -> Session {
     let mut s = Session::default();
@@ -18,7 +18,7 @@ fn items(s: &Session, kind: TrackKind, idx: usize) -> Vec<(u64, Tick, Tick)> {
     s.active_sequence().unwrap().tracks(kind)[idx].items.iter().map(|i| (i.id.0, i.start, i.end())).collect()
 }
 
-fn clip(s: &Session, id: u64) -> filmcraft_project::TrackItem {
+fn clip(s: &Session, id: u64) -> waltcut_project::TrackItem {
     s.active_sequence().unwrap().find_item(ClipId(id)).unwrap().1.clone()
 }
 
@@ -293,7 +293,7 @@ fn text_layer_keys_change_size_leading_alignment_and_position() {
     s.execute("timeline.select", json!({"clips": [c]})).unwrap();
     let layer = |s: &Session| {
         let it = clip(s, c);
-        let idx = filmcraft_project::graphic::layer_indices(&it.effects);
+        let idx = waltcut_project::graphic::layer_indices(&it.effects);
         it.effects[*idx.last().unwrap()].clone()
     };
     let f = |s: &Session, p: &str| layer(s).params[p].value.as_f64().unwrap_or(f64::NAN);

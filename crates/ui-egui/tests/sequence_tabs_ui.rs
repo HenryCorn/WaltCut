@@ -4,11 +4,11 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_engine::project::ItemKind;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_engine::project::ItemKind;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -80,7 +80,7 @@ impl Driver {
         self.harness.state_mut()
     }
 
-    fn v1(&mut self, i: usize) -> filmcraft_engine::project::TrackItem {
+    fn v1(&mut self, i: usize) -> waltcut_engine::project::TrackItem {
         self.app().session.active_sequence().unwrap().video_tracks[0].items[i].clone()
     }
 }
@@ -91,7 +91,7 @@ impl Driver {
     }
 
     fn has_timeline(&mut self) -> bool {
-        self.app().ui.dock.contains(filmcraft_ui_egui::dock::PanelKind::Timeline)
+        self.app().ui.dock.contains(waltcut_ui_egui::dock::PanelKind::Timeline)
     }
 }
 
@@ -170,7 +170,7 @@ fn timeline_has_a_tab_per_open_sequence() {
     assert!(d.has_timeline(), "closing the last sequence keeps the Timeline panel");
     assert!(d.has("panel.tab.Timeline"));
     // reopening from the project brings it back, even if the panel itself was closed
-    d.app().ui.dock.close(filmcraft_ui_egui::dock::PanelKind::Timeline);
+    d.app().ui.dock.close(waltcut_ui_egui::dock::PanelKind::Timeline);
     d.frames(2);
     assert!(!d.has_timeline());
     d.exec("sequence.open", json!({"item": main}));

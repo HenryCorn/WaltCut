@@ -7,16 +7,16 @@
 //! coverage against a reference list.
 //!
 //! ```sh
-//! cargo run -p filmcraft-project --example effect_catalog
+//! cargo run -p waltcut-project --example effect_catalog
 //! ```
 
 use std::process::ExitCode;
 
-use filmcraft_project::vtransition::EFFECT_TOP_FOLDERS;
 use serde_json::json;
+use waltcut_project::vtransition::EFFECT_TOP_FOLDERS;
 
 fn main() -> ExitCode {
-    let items: Vec<serde_json::Value> = filmcraft_project::effect_defs()
+    let items: Vec<serde_json::Value> = waltcut_project::effect_defs()
         .iter()
         .filter(|d| d.category.first().is_some_and(|top| EFFECT_TOP_FOLDERS.contains(top)))
         .map(|d| json!({"id": d.id, "name": d.name, "kind": format!("{:?}", d.kind), "path": d.category}))

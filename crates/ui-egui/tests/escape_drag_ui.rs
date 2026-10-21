@@ -6,12 +6,12 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_engine::project_panel::FREEFORM_POS;
-use filmcraft_project::{BinEntry, ItemId};
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_engine::project_panel::FREEFORM_POS;
+use waltcut_project::{BinEntry, ItemId};
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,

@@ -1,6 +1,6 @@
 # FilmCraft on the web
 
-`apps/filmcraft-web` runs the same engine and egui UI as the desktop app in the browser: the
+`apps/waltcut-web` runs the same engine and egui UI as the desktop app in the browser: the
 workspace compiled to `wasm32-unknown-unknown`, started by eframe's web runner on WebGPU (WebGL2
 fallback). It is a static site: one `.wasm`, its `wasm-bindgen` JavaScript glue, `index.html`, an
 `AudioWorklet` script and an icon. Nothing is uploaded anywhere; media stay on the user's machine.
@@ -14,7 +14,7 @@ fallback). It is a static site: one `.wasm`, its `wasm-bindgen` JavaScript glue,
 | wasm-opt (optional) | any recent binaryen | `brew install binaryen`; used by `cargo xtask web` when found |
 
 ```sh
-cargo xtask web                 # release build → target/web/dist (index.html, filmcraft_web.js, filmcraft_web_bg.wasm, …)
+cargo xtask web                 # release build → target/web/dist (index.html, waltcut_web.js, waltcut_web_bg.wasm, …)
 cargo xtask web --dev           # unoptimised build (faster to compile, slow to run)
 cargo xtask web --serve 8765    # build, then serve dist on http://127.0.0.1:8765/
 ```
@@ -25,7 +25,7 @@ should be. Any static server works (`python3 -m http.server -d target/web/dist 8
 serve `.wasm` as `application/wasm` for streaming compilation.
 
 The web crate is empty on non-wasm targets, so `cargo test --workspace` and clippy are
-unaffected; `cargo xtask wasm` (part of `cargo xtask ci`) checks it, with `filmcraft-ui-egui`, for
+unaffected; `cargo xtask wasm` (part of `cargo xtask ci`) checks it, with `waltcut-ui-egui`, for
 `wasm32-unknown-unknown`.
 
 URL flags: `?empty` (no demo project), `?norecover` (don't reopen the auto-saved project),
@@ -37,14 +37,14 @@ If the app panics after start-up (or runs out of memory), `index.html` shows a "
 working" overlay with the panic message and a Reload button instead of a frozen canvas, and sets
 `window.filmcraftLoad.fatal`. Code the web build runs must not call `std::env::temp_dir`,
 `std::time::{Instant, SystemTime}::now`, `std::thread::sleep`/`spawn` or `std::process::id`: they
-panic on `wasm32-unknown-unknown` (use `filmcraft_engine::temp_dir`, `web_time`, or a `cfg`).
+panic on `wasm32-unknown-unknown` (use `waltcut_engine::temp_dir`, `web_time`, or a `cfg`).
 
 ## How the desktop pieces map to the browser
 
 | Desktop | Web |
 |---|---|
 | frame worker threads | `FrameServer::pump`: queued frame jobs run on the UI thread between egui frames, highest priority first, within a time budget (24 ms while playing, 40 ms otherwise) |
-| export on a worker thread | `filmcraft_export::Exporter`: the export advances one frame per step from `Session::pump_jobs`, 30 ms per UI frame; progress shows in the header like on the desktop |
+| export on a worker thread | `waltcut_export::Exporter`: the export advances one frame per step from `Session::pump_jobs`, 30 ms per UI frame; progress shows in the header like on the desktop |
 | `std::fs` (`FsServices`) | `fs::WebServices`: a virtual file table. Picked/dropped files are `File` handles (never copied); files the app writes are kept in memory and offered as downloads |
 | file dialogs | File System Access `showOpenFilePicker` where available, else `<input type=file>`; drop files anywhere on the page |
 | crash-recovery journal | OPFS: `recovery/snapshot.fcproj` every 5 s while there are unsaved changes, plus copies of imported media in `media/`; the next visit reopens the snapshot |
@@ -63,11 +63,11 @@ tracking) report an error on the web for now.
 
 ### Media reads
 
-Containers are opened through `Services::reader` (a `filmcraft_media::ByteReader`): MP4/MOV and
+Containers are opened through `Services::reader` (a `waltcut_media::ByteReader`): MP4/MOV and
 Matroska read their index at import and single samples afterwards, so a multi-gigabyte file is
 never loaded whole. Browser `Blob` reads are asynchronous, so `BlobReader` keeps a 384 MiB LRU cache
 of 1 MiB chunks: a read whose chunks are missing starts fetching them (plus three chunks of
-read-ahead) and fails with `WouldBlock`, setting `filmcraft_media::pending`. The frame server then
+read-ahead) and fails with `WouldBlock`, setting `waltcut_media::pending`. The frame server then
 drops that frame's result and retries the job after the bytes arrive (the fetch wakes the UI);
 the stepped exporter re-renders the frame; an import retries `file.import`. Before importing, the
 container index is prefetched (an MP4's `moov` box wherever it is, a small Matroska file whole).
@@ -101,7 +101,7 @@ until the first click or key press; until then playback runs on the wall clock.
 ### GPU
 
 eframe creates a WebGPU device when the browser has one, else WebGL2. FilmCraft's GPU compositor
-(`filmcraft-gpu`) is used on WebGPU; on WebGL2 frames are composited on the CPU. Check
+(`waltcut-gpu`) is used on WebGPU; on WebGL2 frames are composited on the CPU. Check
 `filmcraft.info().backend` and `.compositor`.
 
 ## `window.filmcraft`: the agent / test API
@@ -134,12 +134,12 @@ const {job} = await filmcraft.execute("file.exportMedia", {format: "h264", path:
 
 ## Browser test
 
-`apps/filmcraft-web/tests/smoke.mjs` drives headless Chrome over the DevTools protocol (Node ≥ 22,
+`apps/waltcut-web/tests/smoke.mjs` drives headless Chrome over the DevTools protocol (Node ≥ 22,
 no npm packages): load, demo playback, import of a generated MP4, playback, H.264 export
 (download). It writes screenshots and `report.json`:
 
 ```sh
 cargo xtask web --serve 8765 &
 ffmpeg -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i sine -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac target/web/dist/web-test.mp4
-node apps/filmcraft-web/tests/smoke.mjs --url http://127.0.0.1:8765/ --media web-test.mp4 --out target/web/smoke
+node apps/waltcut-web/tests/smoke.mjs --url http://127.0.0.1:8765/ --media web-test.mp4 --out target/web/smoke
 ```

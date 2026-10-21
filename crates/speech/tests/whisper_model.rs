@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use filmcraft_speech::{Options, Transcriber, models, word_error_rate};
+use waltcut_speech::{Options, Transcriber, models, word_error_rate};
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -72,7 +72,7 @@ fn tiny_model_transcribes_public_domain_speech() {
         eprintln!("SKIPPED: no speech samples in target/fixtures/speech");
         return;
     }
-    let w = filmcraft_speech::whisper::Whisper::load(&dir, "whisper-tiny").unwrap();
+    let w = waltcut_speech::whisper::Whisper::load(&dir, "whisper-tiny").unwrap();
     let opts = Options { language: Some("en".into()), diarize: false, ..Default::default() };
     let (mut errs, mut words) = (0.0, 0usize);
     for (p, reference) in samples.iter().take(8) {
@@ -83,7 +83,7 @@ fn tiny_model_transcribes_public_domain_speech() {
         errs += word_error_rate(reference, &hyp) * n as f64;
         words += n;
         // word times: in order, inside the audio
-        let end = filmcraft_speech::sample_tick(audio.len() as i64);
+        let end = waltcut_speech::sample_tick(audio.len() as i64);
         t.check().unwrap();
         assert!(t.words.iter().all(|x| x.end <= end), "{}", p.display());
     }

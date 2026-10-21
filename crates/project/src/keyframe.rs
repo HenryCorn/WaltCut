@@ -4,9 +4,9 @@
 //! keyframe governs the segment leaving it: Linear, Hold, Bezier (with influence/speed handles),
 //! Auto Bezier, Continuous Bezier, Ease In/Out (Bezier presets) — Premiere's temporal set.
 
-use filmcraft_geom::Vec2;
-use filmcraft_time::Tick;
 use serde::{Deserialize, Serialize};
+use waltcut_geom::Vec2;
+use waltcut_time::Tick;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ParamValue {

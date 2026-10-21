@@ -5,7 +5,7 @@
 //! outgoing side, in the incoming picture the incoming side, between them rolls.
 //!
 //! J/K/L and Space are routed to dynamic trimming / loop playback in `menus::invoke`; the engine
-//! state machine (`filmcraft_engine::trim`) is advanced here once per frame with the UI clock.
+//! state machine (`waltcut_engine::trim`) is advanced here once per frame with the UI clock.
 //!
 //! Automation ids: `trimMonitor.outgoing`, `trimMonitor.incoming`, `trimMonitor.roll`,
 //! `trimMonitor.outTimecode`, `trimMonitor.inTimecode`, `trimMonitor.outShift`,
@@ -14,10 +14,10 @@
 //! `trimMonitor.playAround`, `trimMonitor.exit`.
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_edit::Edge;
-use filmcraft_project::{ClipId, ItemKind, Sequence, Track, TrackId};
-use filmcraft_time::{Tick, TimeDisplay, format_time};
 use serde_json::{Value, json};
+use waltcut_edit::Edge;
+use waltcut_project::{ClipId, ItemKind, Sequence, Track, TrackId};
+use waltcut_time::{Tick, TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};
@@ -67,7 +67,7 @@ pub fn route_transport(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str) ->
 
 /// Paint the selected edit points that sit on `tr` as brackets at the clip edges.
 pub fn paint_edit_points(app: &FilmcraftApp, p: &egui::Painter, seq: &Sequence, tr: &Track, row: &Row, layout: &Layout) {
-    use filmcraft_engine::trim::{TrimKind, roll_pair};
+    use waltcut_engine::trim::{TrimKind, roll_pair};
     for ep in &app.session.state.edit_points {
         let mut marks = Vec::new(); // (clip on this track, out edge)
         if ep.kind == TrimKind::Roll
@@ -124,7 +124,7 @@ fn fit(area: Rect, w: f32, h: f32) -> Rect {
 /// Draw one side's frame (the clip's media at `media_time`).
 fn picture(app: &mut FilmcraftApp, ui: &mut egui::Ui, area: Rect, side: &Value, tex_name: &str) -> Rect {
     let t = app.tokens;
-    let item = filmcraft_project::ItemId(side["item"].as_u64().unwrap_or(0));
+    let item = waltcut_project::ItemId(side["item"].as_u64().unwrap_or(0));
     let Some(pi) = app.session.project.item(item) else { return area };
     let size = match &pi.kind {
         ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)).unwrap_or((0, 0)),
@@ -174,7 +174,7 @@ fn shift_text(frames: i64) -> String {
 /// The two-up Trim Monitor in the Program monitor's `rect`.
 pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
-    let info = filmcraft_engine::trim::monitor_info(&app.session);
+    let info = waltcut_engine::trim::monitor_info(&app.session);
     let Some(seq) = app.session.active_sequence() else { return };
     let rate = seq.settings.frame_rate;
     let df = seq.settings.drop_frame;
@@ -343,7 +343,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 
 /// A drag in the Trim Monitor: re-target the primary edit point to the dragged side, then trim.
 fn drag_trim(app: &mut FilmcraftApp, which: &str, frames: i64) {
-    use filmcraft_engine::trim::{TrimKind, sides};
+    use waltcut_engine::trim::{TrimKind, sides};
     let Some(seq) = app.session.active_sequence() else { return };
     let Some(ep) = app.session.state.edit_points.first().copied() else { return };
     let (out_c, in_c) = sides(seq, &ep);

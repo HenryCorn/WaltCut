@@ -17,7 +17,7 @@
 //! (unmapped effects, speed ramps, …). Exporters take a sequence of a project and never fail on
 //! unsupported features either; they record them in the report instead.
 //!
-//! All time math is exact on [`filmcraft_time::Tick`]s: document frame counts, SMPTE timecode and
+//! All time math is exact on [`waltcut_time::Tick`]s: document frame counts, SMPTE timecode and
 //! rational seconds (`1001/24000s`) map onto ticks without rounding for every broadcast rate.
 //!
 //! This crate is L2: it does no file I/O. Media references are strings (absolute paths, or paths
@@ -41,9 +41,9 @@ mod xml;
 
 use std::collections::{BTreeMap, HashMap};
 
-use filmcraft_project::{BinEntry, BinId, ClipId, ItemId, ItemKind, MarkerId, Project, TrackId, TransitionId};
-use filmcraft_time::{FrameRate, Tick};
 use serde::{Deserialize, Serialize};
+use waltcut_project::{BinEntry, BinId, ClipId, ItemId, ItemKind, MarkerId, Project, TrackId, TransitionId};
+use waltcut_time::{FrameRate, Tick};
 
 pub use common::{file_url_to_path, path_to_file_url, resolve_path};
 pub use comp::ExtractedMedia;
@@ -432,7 +432,7 @@ pub fn merge_into(target: &mut Project, fragment: Imported, bin: Option<BinId>) 
     let mut map_u64: HashMap<u64, u64> = HashMap::new();
     let mut fresh = |target: &mut Project, old: u64| *map_u64.entry(old).or_insert_with(|| target.alloc_id());
 
-    let mut new_items: BTreeMap<ItemId, filmcraft_project::ProjectItem> = BTreeMap::new();
+    let mut new_items: BTreeMap<ItemId, waltcut_project::ProjectItem> = BTreeMap::new();
     for (old, mut it) in frag.items {
         it.id = items[&old];
         it.created = it.id.0;
@@ -479,7 +479,7 @@ pub fn merge_into(target: &mut Project, fragment: Imported, bin: Option<BinId>) 
         }
         new_items.insert(it.id, it);
     }
-    fn remap_bin(b: &mut filmcraft_project::Bin, items: &HashMap<ItemId, ItemId>, target: &mut Project) {
+    fn remap_bin(b: &mut waltcut_project::Bin, items: &HashMap<ItemId, ItemId>, target: &mut Project) {
         for c in &mut b.children {
             match c {
                 BinEntry::Item(i) => *i = items[i],

@@ -1,7 +1,7 @@
 //! Smaller panels: History, Markers, Info (the Media Browser is `panels::media_browser`).
 
 use egui::{Align2, Color32, Rect, Sense, pos2, vec2};
-use filmcraft_time::{TimeDisplay, format_time};
+use waltcut_time::{TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::theme::Tokens;
@@ -52,17 +52,17 @@ pub fn history(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 
 /// The marker colours of the Markers panel filter (each chip stands for the labels that share its
 /// marker colour).
-pub const MARKER_FILTER: [filmcraft_project::Label; 7] = {
-    use filmcraft_project::Label::*;
+pub const MARKER_FILTER: [waltcut_project::Label; 7] = {
+    use waltcut_project::Label::*;
     [Green, Rose, Purple, Mango, Yellow, Blue, Teal]
 };
 
 /// A marker's Label menu. An explicit program target keeps panel focus and clip/project
 /// selections from routing colour changes to another item (#1143).
-pub(crate) fn marker_label_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, marker: &filmcraft_project::Marker, prefix: &str) {
+pub(crate) fn marker_label_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, marker: &waltcut_project::Marker, prefix: &str) {
     let label = crate::i18n::t("Label");
     let menu = ui.menu_button(label, |ui| {
-        for color in filmcraft_project::Label::ALL {
+        for color in waltcut_project::Label::ALL {
             let name = crate::i18n::t(color.name());
             let r = ui.selectable_label(color == marker.color, name);
             app.auto.add_response(&format!("{prefix}.color.{}", color.name()), &r, name);
@@ -124,11 +124,11 @@ pub fn markers(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             let name = if m.name.is_empty() { tl!("Marker") } else { &m.name };
             ui.painter().text(pos2(r.min.x + 16.0, r.min.y + 12.0), Align2::LEFT_CENTER, name, Tokens::ui(12.0), t.text);
             let mut tc = format_time(m.start, seq.settings.frame_rate, seq.settings.drop_frame, TimeDisplay::Timecode, 48000);
-            if m.duration > filmcraft_time::Tick::ZERO {
+            if m.duration > waltcut_time::Tick::ZERO {
                 let d = format_time(m.duration, seq.settings.frame_rate, seq.settings.drop_frame, TimeDisplay::Timecode, 48000);
                 tc = format!("{tc}  ({d})");
             }
-            if m.kind == filmcraft_project::MarkerKind::Chapter {
+            if m.kind == waltcut_project::MarkerKind::Chapter {
                 tc = tlf!("{tc}  Chapter", tc);
             }
             ui.painter().text(pos2(r.min.x + 16.0, r.min.y + 27.0), Align2::LEFT_CENTER, tc, Tokens::mono(11.0), t.hot_text);

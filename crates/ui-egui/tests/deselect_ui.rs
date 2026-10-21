@@ -5,11 +5,11 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::state::GfxEdit;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::state::GfxEdit;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -104,7 +104,7 @@ fn clicking_another_panel_ends_text_editing() {
     d.ok("ui.panel.show", json!({"panel": "Properties"}));
     let edit = |d: &mut Driver| {
         d.app().ui.gfx_edit = Some(GfxEdit { clip, layer: 0, caret: 0, anchor: 0 });
-        d.app().ui.focused = filmcraft_ui_egui::dock::PanelKind::Program;
+        d.app().ui.focused = waltcut_ui_egui::dock::PanelKind::Program;
         d.frames(3);
     };
     edit(&mut d);
@@ -141,7 +141,7 @@ fn empty_monitor_space_deselects_layers_and_masks() {
     d.exec("effects.apply", json!({"clips": [clip], "effect": "gaussian_blur"}));
     let fx = {
         let s = &d.harness.state().session;
-        let it = s.active_sequence().unwrap().find_item(filmcraft_project::ClipId(clip)).unwrap().1;
+        let it = s.active_sequence().unwrap().find_item(waltcut_project::ClipId(clip)).unwrap().1;
         it.effects.iter().position(|e| e.effect == "gaussian_blur").unwrap()
     };
     d.exec("masks.add", json!({"clip": clip, "effect": fx, "shape": "ellipse"}));

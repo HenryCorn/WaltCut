@@ -1,4 +1,4 @@
-# filmcraft-tts-text
+# waltcut-tts-text
 
 Text-to-speech text front end for FilmCraft (L2, phases P2a + P2b). Takes a
 narration script and returns plain spoken words, structured as tokens: `Word`,
@@ -6,7 +6,7 @@ narration script and returns plain spoken words, structured as tokens: `Word`,
 (`normalize`), and turns those words into Kokoro phoneme symbols (`phonemize`).
 
 ```rust
-use filmcraft_tts_text::{normalize, Lang, Token};
+use waltcut_tts_text::{normalize, Lang, Token};
 
 let tokens = normalize("Call 555-0134 by 3:30 p.m. on Oct. 7th, it's $3.50 (20% off)", Lang::EnUs)?;
 // → Call | five five five zero one three four | by | three thirty p m | on |

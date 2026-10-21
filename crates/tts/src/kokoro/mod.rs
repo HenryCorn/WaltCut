@@ -5,7 +5,7 @@
 //! `config.json` and the tensor names and shapes in the checkpoint. No reference code was read.
 //! Weights (Apache-2.0, hexgrad) are downloaded on first use and never bundled.
 //!
-//! [`Kokoro::speak`] takes Kokoro phonemes (from `filmcraft-tts-text`), at most
+//! [`Kokoro::speak`] takes Kokoro phonemes (from `waltcut-tts-text`), at most
 //! [`MAX_PHONEMES`] per call, and a voice pack.
 
 mod dsp;

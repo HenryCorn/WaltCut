@@ -11,10 +11,10 @@ use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -183,7 +183,7 @@ fn every_panel_opens_from_the_window_menu() {
 /// and closing every panel still leaves a dock that Window ▸ can reopen panels into.
 #[test]
 fn panel_menu_maximize_restores_and_an_empty_dock_reopens() {
-    use filmcraft_ui_egui::dock::{DockNode, PanelKind};
+    use waltcut_ui_egui::dock::{DockNode, PanelKind};
     let mut d = Driver::demo();
     let layout = d.app().ui.dock.clone();
     d.click("panel.menu.Program");
@@ -215,7 +215,7 @@ fn panel_menu_maximize_restores_and_an_empty_dock_reopens() {
 /// content the wheel leaves the tabs alone.
 #[test]
 fn wheel_over_a_tab_strip_switches_tabs() {
-    use filmcraft_ui_egui::dock::{DockNode, PanelKind};
+    use waltcut_ui_egui::dock::{DockNode, PanelKind};
     fn shown(d: &mut Driver) -> PanelKind {
         fn find(n: &DockNode) -> Option<PanelKind> {
             match n {
@@ -319,7 +319,7 @@ fn metadata_panel_edits_a_field_with_undo() {
     let mut d = Driver::demo();
     let item = d.app().session.project.items.values().filter(|i| i.as_media().is_some()).map(|i| i.id).min().unwrap();
     d.app().session.state.project_selection = vec![item];
-    d.app().ui.focused = filmcraft_ui_egui::dock::PanelKind::Project;
+    d.app().ui.focused = waltcut_ui_egui::dock::PanelKind::Project;
     d.ok("ui.menu.invoke", json!({"id": "window.panel.Metadata"}));
     d.ok("ui.set", json!({"focused": "Project"}));
     d.frames(3);
@@ -396,14 +396,14 @@ fn timecode_panel_rows_and_modes() {
         let q = d.app().session.active_sequence().unwrap();
         (q.duration(), q.settings.drop_frame, q.settings.frame_rate)
     };
-    let want = filmcraft_time::format_time(dur, rate, df, filmcraft_time::TimeDisplay::Timecode, 48000);
+    let want = waltcut_time::format_time(dur, rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
     assert_eq!(d.label("timecode.row.1"), want);
     // frames display and Remaining through ui.set
     d.ok("ui.set", json!({"panels": {"timecode": {"rows": [{"mode": "current", "display": "Frames"}, {"mode": "remaining"}]}}}));
     d.frames(2);
     let frame = rate.frame_at(d.app().session.playhead());
     assert_eq!(d.label("timecode.row.0"), frame.to_string());
-    let rem = filmcraft_time::format_time(dur - d.app().session.playhead(), rate, df, filmcraft_time::TimeDisplay::Timecode, 48000);
+    let rem = waltcut_time::format_time(dur - d.app().session.playhead(), rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
     assert_eq!(d.label("timecode.row.1"), rem);
     d.snapshot("panels-timecode", Some("timecode."));
     // right-click menu: Media Time
@@ -440,7 +440,7 @@ fn events_and_progress_panels() {
     assert!(d.app().session.log.entries.is_empty());
 
     // Progress: a running job with a Cancel button
-    let job = filmcraft_engine::Job {
+    let job = waltcut_engine::Job {
         id: 4242,
         label: "Export demo.mp4".into(),
         progress: Arc::new(Default::default()),
@@ -516,8 +516,8 @@ fn scopes_of_colour_bars() {
     let r = d.exec("scopes.read", json!({"scopes": ["vectorscopeYuv", "parade"], "columns": 8}));
     let peaks = r["vectorscopeYuv"]["peaks"].as_array().unwrap();
     let angles: Vec<f64> = peaks.iter().take(7).map(|p| p["angleDeg"].as_f64().unwrap()).collect();
-    for t in filmcraft_scopes::targets(filmcraft_scopes::Matrix::Bt709, 191.0 / 255.0) {
-        let a = filmcraft_scopes::angle_deg(t.cb, t.cr) as f64;
+    for t in waltcut_scopes::targets(waltcut_scopes::Matrix::Bt709, 191.0 / 255.0) {
+        let a = waltcut_scopes::angle_deg(t.cb, t.cr) as f64;
         assert!(angles.iter().any(|x| (x - a).abs() < 1.5), "{} at {a:.1}° not in {angles:?}", t.name);
     }
 }
@@ -574,7 +574,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
 }
 
 /// Select two different sources using the same Project-row and Timeline-clip clicks as an editor.
-fn inspector_selection_driver() -> (Driver, filmcraft_project::ItemId, filmcraft_project::ItemId, filmcraft_project::ClipId) {
+fn inspector_selection_driver() -> (Driver, waltcut_project::ItemId, waltcut_project::ItemId, waltcut_project::ClipId) {
     let mut d = Driver::demo();
     let seq = d.app().session.active_sequence().unwrap();
     let a = seq.video_tracks[0].items[0].item;
@@ -588,7 +588,7 @@ fn inspector_selection_driver() -> (Driver, filmcraft_project::ItemId, filmcraft
         .children
         .iter()
         .find_map(|entry| match entry {
-            filmcraft_project::BinEntry::Bin(bin) if bin.name == "Footage" => Some(bin.id.0),
+            waltcut_project::BinEntry::Bin(bin) if bin.name == "Footage" => Some(bin.id.0),
             _ => None,
         })
         .unwrap();
@@ -713,11 +713,11 @@ fn inspectors_follow_reselected_project_items_and_clear_without_stale_targets() 
 
 #[test]
 fn inspector_source_defaults_when_loading_an_older_ui_state() {
-    let ui = filmcraft_ui_egui::state::UiState::default();
+    let ui = waltcut_ui_egui::state::UiState::default();
     let mut saved = serde_json::to_value(&ui).unwrap();
     saved["panels"].as_object_mut().unwrap().remove("inspectorSource");
-    let restored: filmcraft_ui_egui::state::UiState = serde_json::from_value(saved).unwrap();
-    assert_eq!(restored.panels.inspector_source, filmcraft_ui_egui::panels::panel_state::InspectorSource::Project);
+    let restored: waltcut_ui_egui::state::UiState = serde_json::from_value(saved).unwrap();
+    assert_eq!(restored.panels.inspector_source, waltcut_ui_egui::panels::panel_state::InspectorSource::Project);
     assert_eq!(restored.panels.scopes, ui.panels.scopes);
 }
 
@@ -769,7 +769,7 @@ fn effects_are_indented_under_their_folders() {
     }
     d.frames(2);
     let preset = d.app().session.presets.all()[0].name.clone();
-    let lumetri = filmcraft_render::lumetri_presets::presets().into_iter().find(|p| p.folder == "Monochrome").unwrap().name;
+    let lumetri = waltcut_render::lumetri_presets::presets().into_iter().find(|p| p.folder == "Monochrome").unwrap().name;
     for (outer, inner) in [
         ("Video Effects", "Blur & Sharpen"),
         ("Blur & Sharpen", "Gaussian Blur"),

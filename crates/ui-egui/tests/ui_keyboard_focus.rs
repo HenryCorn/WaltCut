@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 use egui::{Event, Id, Key, Modifiers, vec2};
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::{
+use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::{
     FilmcraftApp,
     dock::{DockNode, PanelKind},
     state::Tool,
 };
-use serde_json::json;
 
 fn key(h: &mut Harness<'_, FilmcraftApp>, key: Key, modifiers: Modifiers) {
     for pressed in [true, false] {

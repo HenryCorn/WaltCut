@@ -117,7 +117,7 @@ mod tests {
     /// The panel shown twice, then the button pressed on the Type tool group and dragged by `by`
     /// within 0.1 s, well before a long press.
     fn press_and_drag_type(by: egui::Vec2) -> (FilmcraftApp, egui::Context) {
-        let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
+        let mut app = FilmcraftApp::new(waltcut_engine::Session::default());
         let ctx = egui::Context::default();
         crate::theme::install(&ctx, &app.tokens);
         frame(&mut app, &ctx, 0.0, vec![]);
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn a_right_click_on_a_grouped_tool_still_opens_its_flyout() {
-        let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
+        let mut app = FilmcraftApp::new(waltcut_engine::Session::default());
         let ctx = egui::Context::default();
         crate::theme::install(&ctx, &app.tokens);
         frame(&mut app, &ctx, 0.0, vec![]);
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn long_press_type_selects_vertical_without_selecting_on_release() {
-        let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
+        let mut app = FilmcraftApp::new(waltcut_engine::Session::default());
         let ctx = egui::Context::default();
         crate::theme::install(&ctx, &app.tokens);
         frame(&mut app, &ctx, 0.0, vec![]);
@@ -213,10 +213,10 @@ mod tests {
         }
         let edit = app.ui.gfx_edit.as_ref().unwrap();
         let sequence = app.session.active_sequence().unwrap();
-        let (_, item) = sequence.find_item(filmcraft_project::ClipId(edit.clip)).unwrap();
-        let effect_index = filmcraft_project::graphic::layer_indices(&item.effects)[edit.layer];
-        let layer = filmcraft_project::graphic::eval_layer(&item.effects[effect_index], filmcraft_time::Tick::ZERO, (1920, 1080)).unwrap();
-        let filmcraft_project::graphic::LayerContent::Text(text) = layer.content else { panic!("text layer expected") };
+        let (_, item) = sequence.find_item(waltcut_project::ClipId(edit.clip)).unwrap();
+        let effect_index = waltcut_project::graphic::layer_indices(&item.effects)[edit.layer];
+        let layer = waltcut_project::graphic::eval_layer(&item.effects[effect_index], waltcut_time::Tick::ZERO, (1920, 1080)).unwrap();
+        let waltcut_project::graphic::LayerContent::Text(text) = layer.content else { panic!("text layer expected") };
         assert!(text.vertical, "the actual monitor click dispatches the existing vertical text command");
     }
 }

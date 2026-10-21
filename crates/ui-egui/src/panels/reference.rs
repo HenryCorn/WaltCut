@@ -8,8 +8,8 @@
 //! mode), `reference.scopes.view.<kind>`. State: `ui.panels.reference`.
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
-use filmcraft_scopes::ScopeKind;
-use filmcraft_time::{Tick, TimeDisplay, format_time};
+use waltcut_scopes::ScopeKind;
+use waltcut_time::{Tick, TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};

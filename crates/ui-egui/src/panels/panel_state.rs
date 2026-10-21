@@ -2,9 +2,9 @@
 //! (`UiState::panels`). Plain serde, so agents read it with `ui.inspect` (`ui.panels`) and change
 //! it with `ui.set {"panels": {"scopes": {...}, "timecode": {...}, ...}}` (fields merged).
 
-use filmcraft_scopes::{Brightness, ColorSpace, ParadeType, Scale, ScopeKind, Targets, WaveformType};
-use filmcraft_time::TimeDisplay;
 use serde::{Deserialize, Serialize};
+use waltcut_scopes::{Brightness, ColorSpace, ParadeType, Scale, ScopeKind, Targets, WaveformType};
+use waltcut_time::TimeDisplay;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]

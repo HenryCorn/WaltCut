@@ -183,7 +183,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
     }
-    if filmcraft_engine::source_monitor::source_command(id) && targets_source(app, &params) && params.get("target").is_none() {
+    if waltcut_engine::source_monitor::source_command(id) && targets_source(app, &params) && params.get("target").is_none() {
         let object = params.as_object_mut().ok_or("command parameters must be an object")?;
         object.insert("target".into(), json!("source"));
     }
@@ -356,7 +356,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         "playhead.stepBack" | "playhead.stepForward" | "playhead.stepBack5" | "playhead.stepForward5" if targets_source(app, &params) => {
             app.stop_source();
             let item = app.session.state.source_item.ok_or("Open a Source clip first")?;
-            let view = filmcraft_engine::clip_ops::source_view(&app.session, item).ok_or("Source clip is unavailable")?;
+            let view = waltcut_engine::clip_ops::source_view(&app.session, item).ok_or("Source clip is unavailable")?;
             let count = if id.ends_with('5') { i64::from(app.session.prefs.playback.step_many_frames) } else { 1 };
             let direction = if id.contains("Back") { -1 } else { 1 };
             let time = if view.rate.frame_duration().0 == 0 {
@@ -457,18 +457,18 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         }
         // File ▸ Export ▸ AAF… / OMF… open their settings dialogs; with a path they export directly.
         "file.exportAaf" | "file.exportOmf" if params.get("path").is_none() => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             return crate::panels::interchange_export::open(app, ctx, id);
         }
         // File ▸ Export ▸ Media… opens the Export mode, like ⌘M (#382); with a path it exports directly.
         "file.exportMedia" if params.get("path").is_none() => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             app.ui.mode = Mode::Export;
             return Ok(json!({"mode": "export"}));
         }
         // Audio Gain from the menu or G opens the dialog; with params it applies directly.
         "clip.audioGain" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command("clip.audioGain").map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command("clip.audioGain").map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             if app.ui.audio_gain.mode.is_empty() {
                 app.ui.audio_gain.mode = "adjust".into();
             }
@@ -477,21 +477,21 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         }
         // Colour dialogs from the menus; with params the engine command applies directly.
         "clip.interpretFootage" if params.get("colorSpace").is_none() && params.get("pixelAspect").is_none() => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             crate::panels::color_dialogs::open_interpret(app, &params);
             return Ok(json!({"dialog": "interpretFootage"}));
         }
         // Remix Properties… from the menu opens the dialog; with params it applies directly.
         "clip.remix.properties" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             return crate::panels::remix::open(app, ctx);
         }
         // Add Tracks… from the menu opens the dialog (new tracks after the last ones, as Premiere
         // offers); with params it adds the tracks directly.
         "sequence.addTracks" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             let seq = app.session.active_sequence();
-            let count = |f: fn(&filmcraft_engine::project::Sequence) -> usize| seq.map_or(0, f);
+            let count = |f: fn(&waltcut_engine::project::Sequence) -> usize| seq.map_or(0, f);
             app.ui.add_tracks = crate::state::AddTracksDraft {
                 video_after: count(|q| q.video_tracks.len()),
                 audio_after: count(|q| q.audio_tracks.len()),
@@ -502,7 +502,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             return Ok(json!({"dialog": "addTracks"}));
         }
         "sequence.deleteTracks" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             app.ui.delete_tracks = Default::default();
             app.dialog = Some(crate::Dialog::DeleteTracks);
             return Ok(json!({"dialog": "deleteTracks"}));
@@ -510,7 +510,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         // Sequence Settings… from the menu opens the dialog; with params the engine command applies
         // them directly.
         "sequence.settings" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             crate::panels::sequence_settings::open(app);
             return Ok(json!({"dialog": "sequenceSettings"}));
         }
@@ -521,7 +521,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             return Ok(json!({"dialog": "newSequence"}));
         }
         "sequence.colorSettings" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
+            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             crate::panels::color_dialogs::open_sequence(app);
             return Ok(json!({"dialog": "sequenceColor"}));
         }
@@ -653,7 +653,7 @@ fn paste_clipboard_media(app: &mut FilmcraftApp, insert: bool) -> Option<Result<
     let paths = match media {
         crate::ClipboardMedia::Files(paths) => paths,
         crate::ClipboardMedia::Image { width, height, rgba } => match encode_png(width, height, rgba)
-            .and_then(|png| filmcraft_engine::paste_media::save_pasted_image(&mut app.session, &png).map_err(|e| e.to_string()))
+            .and_then(|png| waltcut_engine::paste_media::save_pasted_image(&mut app.session, &png).map_err(|e| e.to_string()))
         {
             Ok(path) => vec![path],
             Err(e) => return Some(Err(e)),
@@ -689,7 +689,7 @@ pub const MENUS: [&str; 9] = ["File", "Edit", "Clip", "Sequence", "Markers", "Gr
 
 /// Labels only the native macOS app menu shows, with no command in the menu tree behind them: the
 /// Settings submenu and the predefined Hide, Hide Others and Quit items. They are translated through
-/// the catalogs like menu labels (`apps/filmcraft/src/native_menu.rs`).
+/// the catalogs like menu labels (`apps/waltcut/src/native_menu.rs`).
 pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide FilmCraft", "Hide Others", "Quit FilmCraft"];
 
 pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
@@ -724,7 +724,7 @@ pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
 /// File ▸ Open Recent, after Open Project…: the recent projects (General ▸ `recentProjects`),
 /// newest first, then Clear Recent Files. Clear is always there, so the submenu exists (in the
 /// native menu too, built once at launch) before the first project is saved.
-fn open_recent(items: &mut Vec<MenuItem>, session: &filmcraft_engine::Session, tr: impl Fn(&str) -> String) {
+fn open_recent(items: &mut Vec<MenuItem>, session: &waltcut_engine::Session, tr: impl Fn(&str) -> String) {
     let Some(at) = items.iter().position(|it| it.id == "file.open") else { return };
     let path: Vec<String> = vec!["File".into(), "Open Recent".into()];
     let recent = &session.prefs.general.recent_projects;
@@ -746,7 +746,7 @@ pub fn recent_name(path: &str) -> String {
 /// built-in workspaces, nothing checked. Deterministic, so `cargo xtask parity` can measure it
 /// (`examples/menu_tree.rs` prints it as JSON).
 pub fn default_menu_items() -> Vec<MenuItem> {
-    let session = filmcraft_engine::Session::default();
+    let session = waltcut_engine::Session::default();
     let mut v = menu_items_for(&session);
     crate::panels::workspaces::default_menu(&mut v, &session);
     open_recent(&mut v, &session, str::to_string);
@@ -754,14 +754,14 @@ pub fn default_menu_items() -> Vec<MenuItem> {
 }
 
 /// Menu entries with their live shortcuts and enablement.
-pub fn menu_items_for(session: &filmcraft_engine::Session) -> Vec<MenuItem> {
+pub fn menu_items_for(session: &waltcut_engine::Session) -> Vec<MenuItem> {
     let mut out = Vec::new();
-    for c in filmcraft_engine::command_specs() {
+    for c in waltcut_engine::command_specs() {
         if c.menu.is_empty() {
             continue;
         }
         // Edit ▸ Label items carry the names from Settings ▸ Labels
-        let label = match c.id.strip_prefix("edit.label.").and_then(filmcraft_project::Label::from_name) {
+        let label = match c.id.strip_prefix("edit.label.").and_then(waltcut_project::Label::from_name) {
             Some(l) => session.prefs.labels.name(l),
             None => c.label.into(),
         };
@@ -802,7 +802,7 @@ pub fn menu_items_for(session: &filmcraft_engine::Session) -> Vec<MenuItem> {
 
 /// Shortcut text for menus in this OS's notation (`⇧⌘K` on macOS, `Ctrl+Shift+K` elsewhere).
 pub fn shortcut_text(s: &str) -> String {
-    use filmcraft_engine::shortcuts::{Chord, Platform};
+    use waltcut_engine::shortcuts::{Chord, Platform};
     Chord::parse(s).map(|c| c.display(Platform::current())).unwrap_or_else(|_| s.to_string())
 }
 
@@ -891,8 +891,8 @@ fn shifted_key(k: egui::Key) -> Option<egui::Key> {
 
 /// Frontend-owned commands, registered with the engine's shortcut set so they can be listed,
 /// rebound and resolved alongside engine commands (the `shortcuts.` commands).
-pub fn external_commands() -> Vec<filmcraft_engine::shortcuts::CommandInfo> {
-    use filmcraft_engine::shortcuts::CommandInfo;
+pub fn external_commands() -> Vec<waltcut_engine::shortcuts::CommandInfo> {
+    use waltcut_engine::shortcuts::CommandInfo;
     let mut v: Vec<CommandInfo> =
         UI_COMMANDS.iter().chain(crate::panels::keyboard::COMMANDS).map(|c| CommandInfo::new(c.id, c.label, c.menu, c.shortcut)).collect();
     for p in PanelKind::ALL {
@@ -953,7 +953,7 @@ fn menu_level(
     depth: usize,
     clicked: &mut Option<String>,
     auto: &mut crate::automation::Registry,
-    labels: &filmcraft_engine::settings::LabelPrefs,
+    labels: &waltcut_engine::settings::LabelPrefs,
 ) {
     let mut subs: Vec<&str> = Vec::new();
     for it in items {
@@ -976,13 +976,13 @@ fn menu_level(
 }
 
 /// Only Edit ▸ Label choices get a swatch. Other commands keep their usual menu layout.
-fn label_menu_swatch(id: &str, labels: &filmcraft_engine::settings::LabelPrefs) -> Option<egui::Color32> {
-    let label = id.strip_prefix("edit.label.").and_then(filmcraft_project::Label::from_name)?;
+fn label_menu_swatch(id: &str, labels: &waltcut_engine::settings::LabelPrefs) -> Option<egui::Color32> {
+    let label = id.strip_prefix("edit.label.").and_then(waltcut_project::Label::from_name)?;
     Some(label_color(labels, label))
 }
 
 /// The user's colour for label `l` (Preferences ▸ Labels), else the built-in one.
-pub fn label_color(labels: &filmcraft_engine::settings::LabelPrefs, l: filmcraft_project::Label) -> egui::Color32 {
+pub fn label_color(labels: &waltcut_engine::settings::LabelPrefs, l: waltcut_project::Label) -> egui::Color32 {
     let [r, g, b] = labels.rgb(l);
     egui::Color32::from_rgb(r, g, b)
 }
@@ -993,8 +993,8 @@ pub fn label_color(labels: &filmcraft_engine::settings::LabelPrefs, l: filmcraft
 pub fn label_choice(
     ui: &mut egui::Ui,
     auto: &mut crate::automation::Registry,
-    labels: &filmcraft_engine::settings::LabelPrefs,
-    l: filmcraft_project::Label,
+    labels: &waltcut_engine::settings::LabelPrefs,
+    l: waltcut_project::Label,
     prefix: &str,
 ) -> egui::Response {
     let name = labels.name(l);
@@ -1012,7 +1012,7 @@ fn paint_swatch(ui: &egui::Ui, row: egui::Rect, color: egui::Color32) {
     ui.painter().rect_stroke(rect, 2.0, egui::Stroke::new(1.0, ui.visuals().widgets.inactive.bg_stroke.color), egui::StrokeKind::Inside);
 }
 
-fn menu_entry(ui: &mut egui::Ui, it: &MenuItem, auto: &mut crate::automation::Registry, labels: &filmcraft_engine::settings::LabelPrefs) -> bool {
+fn menu_entry(ui: &mut egui::Ui, it: &MenuItem, auto: &mut crate::automation::Registry, labels: &waltcut_engine::settings::LabelPrefs) -> bool {
     // Checkmarks and label swatches each occupy the same left gutter.
     let swatch = label_menu_swatch(&it.id, labels);
     let label = if it.checked.is_some() || swatch.is_some() { format!("      {}", it.label) } else { it.label.clone() };
@@ -1045,8 +1045,8 @@ mod parse_shortcut_tests {
 
     #[test]
     fn edit_label_menu_swatch_uses_current_custom_palette() {
-        use filmcraft_engine::settings::{LabelPrefs, label_id};
-        use filmcraft_project::Label;
+        use waltcut_engine::settings::{LabelPrefs, label_id};
+        use waltcut_project::Label;
 
         let mut labels = LabelPrefs::default();
         let label = Label::Iris;
@@ -1110,7 +1110,7 @@ mod tests {
     fn hovering_another_title_switches_the_open_menu() {
         use egui_kittest::{Harness, kittest::Queryable};
 
-        let app = FilmcraftApp::new(filmcraft_engine::Session::default());
+        let app = FilmcraftApp::new(waltcut_engine::Session::default());
         let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(|ui, app| menu_bar(app, ui), app);
         harness.run_steps(3);
         // Nothing open: hovering a title does not open it.

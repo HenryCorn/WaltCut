@@ -13,9 +13,9 @@
 //! `essentialSound.browse.<Type>.<preset>`.
 
 use egui::{Align2, Color32, Painter, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::TrackItem;
-use filmcraft_project::essential::{self as es, AudioType, EssentialSound, Section, Slot};
 use serde_json::{Value, json};
+use waltcut_project::TrackItem;
+use waltcut_project::essential::{self as es, AudioType, EssentialSound, Section, Slot};
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -48,10 +48,10 @@ impl Ctx<'_> {
 
 pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
-    let clip_ids = filmcraft_engine::essential_sound::targets(&app.session, &Value::Null);
+    let clip_ids = waltcut_engine::essential_sound::targets(&app.session, &Value::Null);
     let items: Vec<TrackItem> =
         app.session.active_sequence().map(|seq| clip_ids.iter().filter_map(|c| seq.find_item(*c).map(|(_, i)| i.clone())).collect()).unwrap_or_default();
-    let presets = filmcraft_engine::essential_sound::presets(&app.session);
+    let presets = waltcut_engine::essential_sound::presets(&app.session);
     let tab = if app.ui.essential_sound_tab == "Browse" { "Browse" } else { "Edit" };
     let mut cx = Ctx { t, auto: &mut app.auto, actions: Vec::new(), clips: clip_ids.iter().map(|c| c.0).collect() };
     let painter = ui.painter().clone();

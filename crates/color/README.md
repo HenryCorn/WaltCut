@@ -1,4 +1,4 @@
-# filmcraft-color
+# waltcut-color
 
 Colour science for FilmCraft (layer L0, no workspace dependencies): Y'CbCr matrices, transfer
 functions, camera log curves, RGB gamuts, colour-managed input/output transforms with tone and
@@ -131,11 +131,11 @@ else the mastering peak, clamped to 203…10 000 cd/m²; without metadata 1000 c
   sizes 2–33, check exactness on affine LUTs and at grid nodes, and round-trip both formats.
 
 FilmCraft ships no LUT files. Its built-in looks and camera conversions are generated from code
-(`filmcraft-render`), and are written to disk only when the user exports them.
+(`waltcut-render`), and are written to disk only when the user exports them.
 
 ## Tests
 
-`cargo test -p filmcraft-color`: encode∘decode round trips for every curve (−1 % to 8× and over
+`cargo test -p waltcut-color`: encode∘decode round trips for every curve (−1 % to 8× and over
 the full signal range in both file ranges), published reference points (S-Log3 95/420/598, V-Log
 128/433/602, LogC3 18 % → 0.391, LogC4 18 % → 0.2784, Canon Log 2/3 18 % → 39.2 %/34.3 % IRE, Apple
 Log 18 % → 0.488, D-Log 0 → 0.0929), PQ/HLG reference white, EETF continuity/monotonicity and peak,

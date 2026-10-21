@@ -351,7 +351,7 @@ mod tests {
         let read = || r.1.load(std::sync::atomic::Ordering::SeqCst);
         let src = open_reader_within("a.wav", r.clone(), &[], &[], HEAD_LEN as u64).unwrap();
         assert_eq!(src.info().audio().unwrap().channels, 2);
-        assert_eq!(src.info().duration, filmcraft_time::Tick::from_units(20, 1));
+        assert_eq!(src.info().duration, waltcut_time::Tick::from_units(20, 1));
         assert_eq!(src.info().file_size, Some(size));
         let after_open = read();
         assert!(after_open <= HEAD_LEN as u64 + 64, "{after_open}");

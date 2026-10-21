@@ -1,10 +1,10 @@
 //! Decode speed on a 1080p High-profile stream (ignored by default; run with
-//! `cargo test --release -p filmcraft-h264 --test perf -- --ignored --nocapture`).
+//! `cargo test --release -p waltcut-h264 --test perf -- --ignored --nocapture`).
 
 mod common;
 
-use filmcraft_h264::Decoder;
 use std::time::Instant;
+use waltcut_h264::Decoder;
 
 fn bench(data: &[u8], threads: usize, iters: usize) -> (usize, f64) {
     let mut best = f64::MAX;

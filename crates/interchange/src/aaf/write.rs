@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use filmcraft_time::Tick;
+use waltcut_time::Tick;
 
 use super::ids::{META_DICTIONARY, ROOT, cls, ddef, def, path, pid};
 use super::store::{self, Auid, Obj, Value, rational, utf16z};
@@ -96,7 +96,7 @@ fn source_rate(s: &Source) -> (i64, i64) {
 }
 
 /// Serialise a composition document.
-pub(crate) fn write(doc: &Document, version: filmcraft_cfb::Version, report: &mut Report) -> Result<Vec<u8>> {
+pub(crate) fn write(doc: &Document, version: waltcut_cfb::Version, report: &mut Report) -> Result<Vec<u8>> {
     let comp = doc.compositions.first().ok_or(Error::Empty)?;
     let mut w = W { report, inexact: false };
     let mut seed = fnv(comp.name.as_bytes(), 0xCBF2_9CE4_8422_2325);

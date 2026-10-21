@@ -2,11 +2,11 @@
 
 use egui::{Event, Id, Key, Modifiers, PointerButton, Rect, pos2, vec2};
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::dock::{DockNode, PanelKind, SplitSize};
-use filmcraft_ui_egui::theme::ThemeKind;
 use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::dock::{DockNode, PanelKind, SplitSize};
+use waltcut_ui_egui::theme::ThemeKind;
 
 fn step(h: &mut Harness<'_, FilmcraftApp>) {
     h.step();

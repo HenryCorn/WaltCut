@@ -3,7 +3,7 @@
 //! coverage against a reference list.
 //!
 //! ```sh
-//! cargo run -p filmcraft-ui-egui --example menu_tree
+//! cargo run -p waltcut-ui-egui --example menu_tree
 //! ```
 
 use std::process::ExitCode;
@@ -12,7 +12,7 @@ use serde_json::json;
 
 fn main() -> ExitCode {
     let items: Vec<serde_json::Value> =
-        filmcraft_ui_egui::menus::default_menu_items().into_iter().map(|it| json!({"id": it.id, "label": it.label, "path": it.path})).collect();
+        waltcut_ui_egui::menus::default_menu_items().into_iter().map(|it| json!({"id": it.id, "label": it.label, "path": it.path})).collect();
     match serde_json::to_string_pretty(&items) {
         Ok(text) => {
             println!("{text}");

@@ -87,7 +87,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   shows a notice with Use Default Graphics; `--graphics default|dx12|software` picks a mode by
   hand. An explicit `WGPU_BACKEND` stays in charge. On Windows, a GPU that Vulkan lists through two
   installed versions of one driver (GPUs on different driver packages) draws with the newer one
-  instead of dying inside the stale one (`filmcraft_gpu::adapter`).
+  instead of dying inside the stale one (`waltcut_gpu::adapter`).
 - **Missing:** a launch that never fails, and CI that runs the gates.
 - **Evidence:** open issues: macOS 12 Monterey aborts on a missing VideoToolbox symbol (#468,
   #661, #655), Intel UHD graphics (`igvk64.dll`, #512), Windows 11 does not run or fails after setup
@@ -119,7 +119,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 
 ## G6. No real-world media corpus or workflow acceptance tests
 
-- **Done:** first scripted MCP workflows (#835, `apps/filmcraft-cli/tests/workflows.rs`): the
+- **Done:** first scripted MCP workflows (#835, `apps/waltcut-cli/tests/workflows.rs`): the
   `filmcraft-cli mcp` binary imports ffmpeg-made phone-like VFR H.264 + AAC MP4 and long-GOP
   H.264 Matroska with two audio tracks (AAC, AC-3), edits (extract, audio gain, title; ripple
   trims, colour matte, cross dissolve), exports H.264 MP4, and saves a project that a new process
@@ -144,7 +144,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   `--min` to fail below a presence threshold. Without a reference it prints our inventory only.
   `--area effects` and `--area transitions` (#831) measure the Effects panel the same way: the
   effects and transitions the engine's effect definitions list (`examples/effect_catalog.rs` in
-  `filmcraft-project`) against a reference of folder paths or bare names (default the local
+  `waltcut-project`) against a reference of folder paths or bare names (default the local
   `plan/premiere/effects.json` / `transitions.json`), placement by folder, Presets and the other
   area out of scope.
 - **Missing:** the other areas (commands, panels, preferences, formats), fidelity tiers (exact,

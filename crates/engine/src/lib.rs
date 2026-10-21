@@ -61,18 +61,18 @@ pub mod voiceover;
 
 use std::sync::Arc;
 
-use filmcraft_edit::EditCtx;
-use filmcraft_project::{ClipId, ItemId, Project, Sequence, TrackId, TrackKind};
-use filmcraft_time::{FrameRate, Tick, TimeRange};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use waltcut_edit::EditCtx;
+use waltcut_project::{ClipId, ItemId, Project, Sequence, TrackId, TrackKind};
+use waltcut_time::{FrameRate, Tick, TimeRange};
 
 pub use commands::{CommandSpec, command_specs, find as find_command};
-pub use filmcraft_export as export;
-pub use filmcraft_project as project;
-pub use filmcraft_render as render;
-pub use filmcraft_time as time;
 pub use media_pool::MediaPool;
+pub use waltcut_export as export;
+pub use waltcut_project as project;
+pub use waltcut_render as render;
+pub use waltcut_time as time;
 
 /// The OS temp folder; `/tmp` on wasm32, where `std::env::temp_dir()` panics ("no filesystem on
 /// this platform"). Use this instead of `std::env::temp_dir()` in any code the web build runs.
@@ -91,9 +91,9 @@ pub enum EngineError {
     #[error("no active sequence")]
     NoSequence,
     #[error("edit failed: {0}")]
-    Edit(#[from] filmcraft_edit::EditError),
+    Edit(#[from] waltcut_edit::EditError),
     #[error("media: {0}")]
-    Media(#[from] filmcraft_media::MediaError),
+    Media(#[from] waltcut_media::MediaError),
     #[error("{0}")]
     Other(String),
 }
@@ -117,7 +117,7 @@ pub trait Services: Send + Sync {
     }
     /// A random-access reader for a media file, so containers are opened without reading the
     /// whole file (web: `Blob` range reads). `None`: the host has none; media are read whole.
-    fn reader(&self, _path: &str) -> Option<std::io::Result<filmcraft_media::SharedReader>> {
+    fn reader(&self, _path: &str) -> Option<std::io::Result<waltcut_media::SharedReader>> {
         None
     }
     /// File names in a directory (image sequence detection). `None`: the host cannot list
@@ -127,7 +127,7 @@ pub trait Services: Send + Sync {
     }
     /// A loader the media pool keeps for reading files later (image sequence frames on demand).
     /// `None`: the frames are read when the sequence is opened.
-    fn file_loader(&self) -> Option<filmcraft_media::sequence::FrameLoader> {
+    fn file_loader(&self) -> Option<waltcut_media::sequence::FrameLoader> {
         None
     }
     /// Exports are encoded in memory and handed to [`Services::write_file`] (hosts without a
@@ -159,7 +159,7 @@ impl Services for FsServices {
     }
     fn write_file(&self, path: &str, data: &[u8]) -> std::io::Result<()> {
         // Atomic + durable: temp file in the same directory, fsync, rename, fsync the directory.
-        filmcraft_format::atomic_write(std::path::Path::new(path), data)
+        waltcut_format::atomic_write(std::path::Path::new(path), data)
     }
     fn file_size(&self, path: &str) -> std::io::Result<u64> {
         let m = std::fs::metadata(path)?;
@@ -169,13 +169,13 @@ impl Services for FsServices {
         let dir = if dir.is_empty() { "." } else { dir };
         Some(std::fs::read_dir(dir).map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect()))
     }
-    fn file_loader(&self) -> Option<filmcraft_media::sequence::FrameLoader> {
+    fn file_loader(&self) -> Option<waltcut_media::sequence::FrameLoader> {
         Some(std::sync::Arc::new(|p: &str| std::fs::read(p)))
     }
     /// Media are read in place from the open file: a clip costs its index, not its size.
     #[cfg(any(unix, windows))]
-    fn reader(&self, path: &str) -> Option<std::io::Result<filmcraft_media::SharedReader>> {
-        Some(filmcraft_media::reader::FileReader::open(std::path::Path::new(path)).map(|r| std::sync::Arc::new(r) as filmcraft_media::SharedReader))
+    fn reader(&self, path: &str) -> Option<std::io::Result<waltcut_media::SharedReader>> {
+        Some(waltcut_media::reader::FileReader::open(std::path::Path::new(path)).map(|r| std::sync::Arc::new(r) as waltcut_media::SharedReader))
     }
     fn list_entries(&self, dir: &str) -> Option<std::io::Result<Vec<media_browser::DirEntry>>> {
         Some(media_browser::std_list_entries(dir))
@@ -249,14 +249,14 @@ pub struct EffectSel {
 
 impl EffectSel {
     /// The selection of `effects[index]` of `clip`.
-    pub fn of(clip: ClipId, effects: &[filmcraft_project::EffectInstance], index: usize) -> Option<Self> {
+    pub fn of(clip: ClipId, effects: &[waltcut_project::EffectInstance], index: usize) -> Option<Self> {
         let id = &effects.get(index)?.effect;
         let instance = effects.iter().take(index).filter(|e| &e.effect == id).count();
         Some(Self { clip, effect: id.clone(), instance })
     }
 
     /// Where the selected effect is in the clip's `effects`.
-    pub fn index(&self, effects: &[filmcraft_project::EffectInstance]) -> Option<usize> {
+    pub fn index(&self, effects: &[waltcut_project::EffectInstance]) -> Option<usize> {
         effects.iter().enumerate().filter(|(_, e)| e.effect == self.effect).nth(self.instance).map(|(i, _)| i)
     }
 }
@@ -291,10 +291,10 @@ pub struct EditorState {
     /// sequence keeps its own. The frontend writes the active sequence's view here as it changes
     /// and takes a sequence's view from here when it becomes the active one.
     #[serde(default)]
-    pub timeline_views: std::collections::BTreeMap<ItemId, filmcraft_project::SequenceView>,
+    pub timeline_views: std::collections::BTreeMap<ItemId, waltcut_project::SequenceView>,
     /// Timeline clipboard (serialized track items with their relative track index).
     #[serde(skip)]
-    pub clipboard: Vec<(TrackKind, usize, filmcraft_project::TrackItem)>,
+    pub clipboard: Vec<(TrackKind, usize, waltcut_project::TrackItem)>,
     pub default_video_transition: String,
     pub default_audio_transition: String,
     /// Selected edit points (trim mode).
@@ -309,7 +309,7 @@ pub struct EditorState {
     /// Selected transitions (clicked in the Timeline): Effect Controls shows one, Delete removes
     /// them. Selecting clips clears it and selecting transitions clears the clip selection.
     #[serde(default)]
-    pub transition_selection: Vec<filmcraft_project::TransitionId>,
+    pub transition_selection: Vec<waltcut_project::TransitionId>,
     /// The selected gap (#648, #668): empty time on one track, clicked in the Timeline, from the
     /// end of a clip (or the sequence start) up to the next clip. Delete, Backspace and Ripple
     /// Delete close it. Selecting clips, transitions or edit points clears it, and so does an edit
@@ -338,7 +338,7 @@ pub struct EditorState {
     /// Audio Clip Mixer automation mode per audio track (track id → mode; missing = Read):
     /// Latch / Touch / Write record the clip Volume and Panner moves as clip keyframes.
     #[serde(default)]
-    pub clip_mixer_modes: std::collections::BTreeMap<u64, filmcraft_project::AutomationMode>,
+    pub clip_mixer_modes: std::collections::BTreeMap<u64, waltcut_project::AutomationMode>,
     /// Sequence ▸ Selection Follows Playhead: moving the playhead selects the clips under it on
     /// targeted tracks.
     #[serde(default)]
@@ -354,10 +354,10 @@ pub struct EditorState {
     pub copy_paste_sequence_markers: bool,
     /// Marker colours hidden in the Markers panel (Show All Marker Colors clears this).
     #[serde(default)]
-    pub hidden_marker_colors: Vec<filmcraft_project::Label>,
+    pub hidden_marker_colors: Vec<waltcut_project::Label>,
     /// Sequence markers copied with the clipboard clips (start relative to the copied range).
     #[serde(skip)]
-    pub clipboard_markers: Vec<filmcraft_project::Marker>,
+    pub clipboard_markers: Vec<waltcut_project::Marker>,
     /// The last Edit ▸ Find… (Find Next continues it).
     #[serde(default)]
     pub find: Option<project_tools::FindState>,
@@ -410,7 +410,7 @@ pub struct Session {
     /// Voice-over recording: the input device and the take in progress.
     pub voiceover: voiceover::VoiceOver,
     /// The last `tts.preview` result, for the host to play (Text to Speech ▸ Preview).
-    pub tts_preview: Option<Arc<filmcraft_tts::Audio>>,
+    pub tts_preview: Option<Arc<waltcut_tts::Audio>>,
     /// Synthesized narrations (`tts.render` fills it from a background job).
     pub tts_cache: narration::SynthCache,
     /// Dynamic (J/K/L) trimming and trim-mode loop playback in progress.
@@ -424,7 +424,7 @@ pub struct Session {
     /// AI re-style jobs whose frames still have to be placed ([`ai::poll`]).
     pub ai_jobs: Vec<ai::PendingRestyle>,
     /// Tests and embedders: use this backend instead of the configured provider.
-    pub restyler_override: Option<Arc<dyn filmcraft_genai::Restyler>>,
+    pub restyler_override: Option<Arc<dyn waltcut_genai::Restyler>>,
     /// Mask tracking jobs whose keyframes are still being written.
     pub mask_jobs: Vec<masks::PendingTrack>,
     /// Scene Edit Detection jobs whose results are applied when they finish.
@@ -439,7 +439,7 @@ pub struct Session {
     pub stepped: Vec<SteppedJob>,
     /// Speech recogniser for `transcript.generate` (None = the Whisper model named by the command,
     /// feature `whisper`). Hosts and tests install one here.
-    pub transcriber: Option<Arc<dyn filmcraft_speech::Transcriber>>,
+    pub transcriber: Option<Arc<dyn waltcut_speech::Transcriber>>,
     /// The Events panel log: failed commands, job results, auto-save errors, messages.
     pub log: panels::EventLog,
     /// Media Browser navigation (directory, back / forward history, selected files).
@@ -456,10 +456,10 @@ pub struct Session {
 /// An export advanced a batch at a time on the host's thread ([`Session::pump_jobs`]).
 pub struct SteppedJob {
     pub job: u64,
-    pub exporter: filmcraft_export::Exporter,
+    pub exporter: waltcut_export::Exporter,
     pub provider: media_pool::PoolProvider,
-    pub progress: Arc<filmcraft_export::Progress>,
-    pub result: Arc<std::sync::Mutex<Option<std::result::Result<filmcraft_export::Report, String>>>>,
+    pub progress: Arc<waltcut_export::Progress>,
+    pub result: Arc<std::sync::Mutex<Option<std::result::Result<waltcut_export::Report, String>>>>,
 }
 
 /// A background job with shared progress.
@@ -467,8 +467,8 @@ pub struct SteppedJob {
 pub struct Job {
     pub id: u64,
     pub label: String,
-    pub progress: Arc<filmcraft_export::Progress>,
-    pub result: Arc<std::sync::Mutex<Option<std::result::Result<filmcraft_export::Report, String>>>>,
+    pub progress: Arc<waltcut_export::Progress>,
+    pub result: Arc<std::sync::Mutex<Option<std::result::Result<waltcut_export::Report, String>>>>,
 }
 
 impl Job {
@@ -554,9 +554,9 @@ impl Session {
         let t0 = web_time::Instant::now();
         while let Some(j) = self.stepped.first_mut() {
             match j.exporter.step(&j.provider, &j.progress) {
-                Ok(filmcraft_export::Step::Progress) => {}
-                Ok(filmcraft_export::Step::Pending) => return true,
-                Ok(filmcraft_export::Step::Done(r)) => {
+                Ok(waltcut_export::Step::Progress) => {}
+                Ok(waltcut_export::Step::Pending) => return true,
+                Ok(waltcut_export::Step::Done(r)) => {
                     *j.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(Ok(r));
                     self.stepped.remove(0);
                 }
@@ -788,9 +788,9 @@ impl Session {
     }
 
     /// What is open, to store beside the project when it is saved.
-    pub fn project_view(&self) -> filmcraft_project::ProjectView {
+    pub fn project_view(&self) -> waltcut_project::ProjectView {
         let is_seq = |id: &ItemId| self.project.sequence(*id).is_some();
-        filmcraft_project::ProjectView {
+        waltcut_project::ProjectView {
             open_sequences: self.state.open_sequences.iter().copied().filter(is_seq).collect(),
             active_sequence: self.state.active_sequence.filter(is_seq),
             sequences: self.state.timeline_views.iter().filter(|(id, _)| is_seq(id)).map(|(id, v)| (*id, *v)).collect(),
@@ -803,7 +803,7 @@ impl Session {
     /// and numbers are brought into range (a playhead also lands on a frame of its sequence). A
     /// view without any open sequence leaves the project on its first sequence: a project saved
     /// by a session that never showed one (a script, the CLI) should not open on an empty Timeline.
-    pub fn restore_project_view(&mut self, view: filmcraft_project::ProjectView) {
+    pub fn restore_project_view(&mut self, view: waltcut_project::ProjectView) {
         let mut open: Vec<ItemId> = Vec::new();
         for id in view.open_sequences {
             if self.project.sequence(id).is_some() && !open.contains(&id) {
@@ -818,7 +818,7 @@ impl Session {
             view.sequences.into_iter().filter(|(id, _)| self.project.sequence(*id).is_some()).filter_map(|(id, v)| Some((id, v.checked()?))).collect();
         for (id, t) in view.playheads {
             if let Some(seq) = self.project.sequence(id) {
-                let t = t.clamp(Tick::ZERO, filmcraft_project::ProjectView::MAX_PLAYHEAD);
+                let t = t.clamp(Tick::ZERO, waltcut_project::ProjectView::MAX_PLAYHEAD);
                 self.state.playheads.insert(id, seq.settings.frame_rate.snap(t));
             }
         }
@@ -1049,7 +1049,7 @@ impl Session {
     /// into it or next to it, its track went, another sequence became the active one).
     fn drop_stale_gap(&mut self) {
         if let Some(g) = self.state.gap_selection
-            && !self.active_sequence().and_then(|q| q.track(g.track)).is_some_and(|tr| filmcraft_edit::through::track_gaps(tr).contains(&g.range))
+            && !self.active_sequence().and_then(|q| q.track(g.track)).is_some_and(|tr| waltcut_edit::through::track_gaps(tr).contains(&g.range))
         {
             self.state.gap_selection = None;
         }
@@ -1116,49 +1116,49 @@ impl Session {
     }
 
     /// The media source for an item (creating it on first use).
-    pub fn source(&self, item: ItemId) -> Option<filmcraft_media::SharedSource> {
+    pub fn source(&self, item: ItemId) -> Option<waltcut_media::SharedSource> {
         self.media.source_for(&self.project, item, &*self.services)
     }
 
     /// Render the active sequence at the playhead in its working colour space (HDR values kept;
     /// for scopes and analysis).
-    pub fn render_program_working(&self, scale: f32) -> Option<filmcraft_render::Image> {
+    pub fn render_program_working(&self, scale: f32) -> Option<waltcut_render::Image> {
         let seq = self.renderable_sequence(scale).ok()?;
         let provider = self.media.provider(self.project.clone(), self.services.clone());
-        let opts = filmcraft_render::RenderOptions { scale, working_output: true, ..Default::default() };
-        Some(filmcraft_render::render_sequence(&self.project, seq, self.playhead(), opts, &provider))
+        let opts = waltcut_render::RenderOptions { scale, working_output: true, ..Default::default() };
+        Some(waltcut_render::render_sequence(&self.project, seq, self.playhead(), opts, &provider))
     }
 
     /// Render the active sequence at the playhead (CPU reference path).
-    pub fn render_program(&self, scale: f32) -> Option<filmcraft_render::Image> {
+    pub fn render_program(&self, scale: f32) -> Option<waltcut_render::Image> {
         self.render_program_at(scale, self.playhead())
     }
 
     /// Render the active sequence at `t` (snapped to its frame, as the playhead would be) without
     /// moving the playhead (CPU reference path). `None` when there is no sequence or the frame
     /// cannot be rendered at `scale`; [`Session::try_render_program_at`] says why.
-    pub fn render_program_at(&self, scale: f32, t: Tick) -> Option<filmcraft_render::Image> {
+    pub fn render_program_at(&self, scale: f32, t: Tick) -> Option<waltcut_render::Image> {
         self.try_render_program_at(scale, t).ok()
     }
 
     /// [`Session::render_program_at`], with the reason when nothing can be rendered.
-    pub fn try_render_program_at(&self, scale: f32, t: Tick) -> Result<filmcraft_render::Image> {
+    pub fn try_render_program_at(&self, scale: f32, t: Tick) -> Result<waltcut_render::Image> {
         self.render_program_with(scale, t, &self.media.provider(self.project.clone(), self.services.clone()))
     }
 
     /// [`Session::try_render_program_at`], also naming the offline items the frame drew the slate
     /// for (#1054).
-    pub fn try_render_program_with_offline_at(&self, scale: f32, t: Tick) -> Result<(filmcraft_render::Image, Vec<media_pool::OfflineMedia>)> {
+    pub fn try_render_program_with_offline_at(&self, scale: f32, t: Tick) -> Result<(waltcut_render::Image, Vec<media_pool::OfflineMedia>)> {
         let provider = self.media.provider(self.project.clone(), self.services.clone()).recording();
         let img = self.render_program_with(scale, t, &provider)?;
         Ok((img, provider.offline_used()))
     }
 
-    fn render_program_with(&self, scale: f32, t: Tick, provider: &dyn filmcraft_render::SourceProvider) -> Result<filmcraft_render::Image> {
+    fn render_program_with(&self, scale: f32, t: Tick, provider: &dyn waltcut_render::SourceProvider) -> Result<waltcut_render::Image> {
         let seq = self.renderable_sequence(scale)?;
         let t = self.sequence_rate().snap(t.max(Tick::ZERO));
-        let opts = filmcraft_render::RenderOptions { scale, captions: true, ..Default::default() };
-        Ok(filmcraft_render::render_sequence(&self.project, seq, t, opts, provider))
+        let opts = waltcut_render::RenderOptions { scale, captions: true, ..Default::default() };
+        Ok(waltcut_render::render_sequence(&self.project, seq, t, opts, provider))
     }
 
     /// The active sequence, if a frame of it at `scale` is within the image size limits.
@@ -1168,10 +1168,10 @@ impl Session {
         if !scale.is_finite() || scale <= 0.0 {
             return Err(EngineError::Other(format!("render scale {scale} must be finite and positive")));
         }
-        let (w, h) = filmcraft_render::output_size(seq, scale);
+        let (w, h) = waltcut_render::output_size(seq, scale);
         let size = u32::try_from(w).ok().zip(u32::try_from(h).ok());
         let Some((w, h)) = size else { return Err(EngineError::Other("the requested render frame exceeds the image size limits".into())) };
-        filmcraft_project::validate_frame_size(w, h).map_err(|e| EngineError::Other(format!("cannot render a {w}x{h} frame: {e}")))?;
+        waltcut_project::validate_frame_size(w, h).map_err(|e| EngineError::Other(format!("cannot render a {w}x{h} frame: {e}")))?;
         Ok(id)
     }
 }
@@ -1180,7 +1180,7 @@ impl Session {
 /// In point, everything else at 0.
 pub fn media_start(p: &Project, id: ItemId) -> Tick {
     match p.item(id).map(|i| &i.kind) {
-        Some(filmcraft_project::ItemKind::Subclip { range, restrict_trims: true, .. }) => range.start,
+        Some(waltcut_project::ItemKind::Subclip { range, restrict_trims: true, .. }) => range.start,
         _ => Tick::ZERO,
     }
 }
@@ -1193,18 +1193,18 @@ pub fn media_duration(p: &Project, _pool: &MediaPool, id: ItemId) -> Option<Tick
     for _ in 0..=MAX_SUBCLIP_CHAIN {
         let it = p.item(id)?;
         return match &it.kind {
-            filmcraft_project::ItemKind::Media(m) => match m.info.kind {
-                filmcraft_media::MediaKind::Still | filmcraft_media::MediaKind::Synthetic => None,
+            waltcut_project::ItemKind::Media(m) => match m.info.kind {
+                waltcut_media::MediaKind::Still | waltcut_media::MediaKind::Synthetic => None,
                 _ => Some(m.info.duration),
             },
-            filmcraft_project::ItemKind::Sequence(s) => Some(s.duration()),
+            waltcut_project::ItemKind::Sequence(s) => Some(s.duration()),
             // a subclip that restricts trims ends at its Out point; otherwise its parent's media is the limit
-            filmcraft_project::ItemKind::Subclip { range, restrict_trims: true, .. } => Some(range.end()),
-            filmcraft_project::ItemKind::Subclip { parent, .. } => {
+            waltcut_project::ItemKind::Subclip { range, restrict_trims: true, .. } => Some(range.end()),
+            waltcut_project::ItemKind::Subclip { parent, .. } => {
                 id = *parent;
                 continue;
             }
-            filmcraft_project::ItemKind::AdjustmentLayer { .. } | filmcraft_project::ItemKind::Graphic { .. } | filmcraft_project::ItemKind::Drawing(_) => None,
+            waltcut_project::ItemKind::AdjustmentLayer { .. } | waltcut_project::ItemKind::Graphic { .. } | waltcut_project::ItemKind::Drawing(_) => None,
         };
     }
     None

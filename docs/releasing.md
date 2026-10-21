@@ -157,7 +157,7 @@ tree's layout with stub binaries on any OS (packaging-lint runs it).
 
 ### Web
 
-The web job builds `apps/filmcraft-web` with `cargo xtask web` (the `wasm-bindgen` CLI must match
+The web job builds `apps/waltcut-web` with `cargo xtask web` (the `wasm-bindgen` CLI must match
 the crate's version exactly, `WASM_BINDGEN` in `xtask/src/main.rs`) and zips the static site with
 `packaging/web/package.sh`. [`packaging/web/README.md`](../packaging/web/README.md) covers hosting.
 

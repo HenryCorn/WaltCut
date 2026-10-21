@@ -4,9 +4,9 @@
 mod common;
 
 use common::*;
-use filmcraft_matroska::*;
 use serde_json::Value;
 use std::path::Path;
+use waltcut_matroska::*;
 
 /// Compare every packet (file order) and stream parameter against ffprobe.
 fn compare(ffprobe: &Path, path: &Path) -> (MkvFile, Vec<Packet>) {
@@ -368,6 +368,6 @@ fn generate_fixtures() {
     let Some((ffmpeg, _)) = tools() else { return };
     for name in ALL_FIXTURES {
         let out = [fixture_dir().join(name)];
-        filmcraft_testkit::fixtures::generate_and_report(&format!("matroska/{name}"), &out, || fixture(&ffmpeg, name));
+        waltcut_testkit::fixtures::generate_and_report(&format!("matroska/{name}"), &out, || fixture(&ffmpeg, name));
     }
 }

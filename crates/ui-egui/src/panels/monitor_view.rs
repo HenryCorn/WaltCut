@@ -17,9 +17,9 @@
 //! `guides.save.*`, `guides.manage.*`.
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
-use filmcraft_project::ItemId;
-use filmcraft_time::{Tick, TimeDisplay, format_time};
 use serde_json::{Value, json};
+use waltcut_project::ItemId;
+use waltcut_time::{Tick, TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::dock::PanelKind;
@@ -90,8 +90,8 @@ fn frame_size(app: &FilmcraftApp, w: Which) -> Option<(u32, u32)> {
         Which::Source => {
             let pi = app.session.project.item(app.session.state.source_item?)?;
             match &pi.kind {
-                filmcraft_project::ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
-                filmcraft_project::ItemKind::Sequence(s) => Some((s.settings.width, s.settings.height)),
+                waltcut_project::ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
+                waltcut_project::ItemKind::Sequence(s) => Some((s.settings.width, s.settings.height)),
                 _ => Some((1920, 1080)),
             }
         }
@@ -106,7 +106,7 @@ pub fn pixel_aspect(app: &FilmcraftApp, w: Which) -> f64 {
         Which::Program => app.session.active_sequence().map(|q| q.settings.par),
         Which::Source => app.session.state.source_item.and_then(|i| app.session.project.source_par(i)),
     };
-    par.map_or(1.0, filmcraft_project::par_ratio)
+    par.map_or(1.0, waltcut_project::par_ratio)
 }
 
 /// Handle a `view.*` command (None for other ids).
@@ -270,7 +270,7 @@ fn save_template(app: &mut FilmcraftApp, w: Which, name: &str) -> Result<Value, 
     let guides = view(app, w).guides.clone();
     let mut next = app.session.prefs.clone();
     next.guides.templates.retain(|t| t.name != name);
-    next.guides.templates.push(filmcraft_engine::autosave::GuideTemplate { name: name.to_string(), guides });
+    next.guides.templates.push(waltcut_engine::autosave::GuideTemplate { name: name.to_string(), guides });
     app.session.set_prefs(next).map_err(|e| format!("saving preferences: {e}"))?;
     Ok(json!({"saved": name}))
 }
@@ -678,10 +678,10 @@ fn column_peak(peaks: &[(f32, f32)], shown: (Tick, Tick), f0: f64, f1: f64) -> (
 }
 
 /// Ticks per 48 kHz sample (the waveform peaks are 256-sample min/max pairs at 48 kHz).
-const TICKS_PER_SAMPLE_48K: f64 = filmcraft_time::TICKS_PER_SECOND as f64 / 48_000.0;
+const TICKS_PER_SAMPLE_48K: f64 = waltcut_time::TICKS_PER_SECOND as f64 / 48_000.0;
 
 /// Comparison View: the reference side's label, timecode and step / set buttons.
-pub fn compare_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, rate: filmcraft_time::FrameRate, drop_frame: bool) {
+pub fn compare_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, rate: waltcut_time::FrameRate, drop_frame: bool) {
     let t = app.tokens;
     let rf = Tick(app.ui.program.compare_ref.unwrap_or(app.session.playhead().0));
     let tc = format_time(rf, rate, drop_frame, TimeDisplay::Timecode, 48000);

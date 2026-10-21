@@ -10,11 +10,11 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::native_dialogs::FileDialog;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::native_dialogs::FileDialog;
 
 /// Dialogs the app asked for, with the sender that answers each.
 type Asked = Arc<Mutex<Vec<(FileDialog, Sender<Vec<String>>)>>>;

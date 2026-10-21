@@ -2,10 +2,10 @@
 //! every depth, lossless JPEG with every predictor), the processing maths against hand-computed
 //! values, CinemaDNG metadata, and hostile files.
 
-use filmcraft_dng::color::{D50, D65, bradford, inverse, mul, rec709_to_xyz, xy_to_xyz};
-use filmcraft_dng::tiff::tags;
-use filmcraft_dng::writer::{Compression, Layout, Options, Value, lj92, write};
-use filmcraft_dng::{Dng, Error, Timecode, decode, ljpeg, probe, sniff};
+use waltcut_dng::color::{D50, D65, bradford, inverse, mul, rec709_to_xyz, xy_to_xyz};
+use waltcut_dng::tiff::tags;
+use waltcut_dng::writer::{Compression, Layout, Options, Value, lj92, write};
+use waltcut_dng::{Dng, Error, Timecode, decode, ljpeg, probe, sniff};
 
 /// A deterministic pseudo-random sequence.
 fn noise(n: usize, bits: u32, seed: u32) -> Vec<u16> {

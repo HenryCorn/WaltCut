@@ -12,56 +12,56 @@ repository = "https://github.com/storytold/filmcraft"
 
 [workspace.dependencies]
 # internal
-filmcraft-time = { path = "crates/time" }
-filmcraft-geom = { path = "crates/geom" }
-filmcraft-color = { path = "crates/color" }
-filmcraft-bitstream = { path = "crates/bitstream" }
-filmcraft-isobmff = { path = "crates/isobmff" }
-filmcraft-avi = { path = "crates/avi" }
-filmcraft-matroska = { path = "crates/matroska" }
-filmcraft-mxf = { path = "crates/mxf" }
-filmcraft-cfb = { path = "crates/cfb" }
-filmcraft-mpegts = { path = "crates/mpegts" }
-filmcraft-mpeg2v = { path = "crates/mpeg2v" }
-filmcraft-ac3 = { path = "crates/ac3" }
-filmcraft-mpa = { path = "crates/mpa" }
-filmcraft-ogg = { path = "crates/ogg" }
-filmcraft-h264 = { path = "crates/h264" }
-filmcraft-hevc = { path = "crates/hevc" }
-filmcraft-vp8 = { path = "crates/vp8" }
-filmcraft-vp9 = { path = "crates/vp9" }
-filmcraft-prores = { path = "crates/prores" }
-filmcraft-dnx = { path = "crates/dnx" }
-filmcraft-apv = { path = "crates/apv" }
-filmcraft-dng = { path = "crates/dng" }
-filmcraft-av1 = { path = "crates/av1" }
-filmcraft-aac = { path = "crates/aac" }
-filmcraft-flac = { path = "crates/flac" }
-filmcraft-opus = { path = "crates/opus" }
-filmcraft-h264enc = { path = "crates/h264enc" }
-filmcraft-audio-dsp = { path = "crates/audio-dsp" }
-filmcraft-frame = { path = "crates/frame" }
-filmcraft-media = { path = "crates/media" }
-filmcraft-codecs = { path = "crates/codecs" }
-filmcraft-project = { path = "crates/project" }
-filmcraft-edit = { path = "crates/edit" }
-filmcraft-interchange = { path = "crates/interchange" }
-filmcraft-text = { path = "crates/text" }
-filmcraft-captions = { path = "crates/captions" }
-filmcraft-speech = { path = "crates/speech" }
-filmcraft-genai = { path = "crates/genai" }
-filmcraft-tts = { path = "crates/tts" }
-filmcraft-tts-text = { path = "crates/tts-text" }
-filmcraft-render = { path = "crates/render" }
-filmcraft-gpu = { path = "crates/gpu" }
-filmcraft-scopes = { path = "crates/scopes" }
-filmcraft-export = { path = "crates/export" }
-filmcraft-format = { path = "crates/format" }
-filmcraft-engine = { path = "crates/engine" }
-filmcraft-ui-egui = { path = "crates/ui-egui" }
-filmcraft-automation = { path = "crates/automation" }
-filmcraft-platform = { path = "crates/platform" }
-filmcraft-testkit = { path = "crates/testkit" }
+waltcut-time = { path = "crates/time" }
+waltcut-geom = { path = "crates/geom" }
+waltcut-color = { path = "crates/color" }
+waltcut-bitstream = { path = "crates/bitstream" }
+waltcut-isobmff = { path = "crates/isobmff" }
+waltcut-avi = { path = "crates/avi" }
+waltcut-matroska = { path = "crates/matroska" }
+waltcut-mxf = { path = "crates/mxf" }
+waltcut-cfb = { path = "crates/cfb" }
+waltcut-mpegts = { path = "crates/mpegts" }
+waltcut-mpeg2v = { path = "crates/mpeg2v" }
+waltcut-ac3 = { path = "crates/ac3" }
+waltcut-mpa = { path = "crates/mpa" }
+waltcut-ogg = { path = "crates/ogg" }
+waltcut-h264 = { path = "crates/h264" }
+waltcut-hevc = { path = "crates/hevc" }
+waltcut-vp8 = { path = "crates/vp8" }
+waltcut-vp9 = { path = "crates/vp9" }
+waltcut-prores = { path = "crates/prores" }
+waltcut-dnx = { path = "crates/dnx" }
+waltcut-apv = { path = "crates/apv" }
+waltcut-dng = { path = "crates/dng" }
+waltcut-av1 = { path = "crates/av1" }
+waltcut-aac = { path = "crates/aac" }
+waltcut-flac = { path = "crates/flac" }
+waltcut-opus = { path = "crates/opus" }
+waltcut-h264enc = { path = "crates/h264enc" }
+waltcut-audio-dsp = { path = "crates/audio-dsp" }
+waltcut-frame = { path = "crates/frame" }
+waltcut-media = { path = "crates/media" }
+waltcut-codecs = { path = "crates/codecs" }
+waltcut-project = { path = "crates/project" }
+waltcut-edit = { path = "crates/edit" }
+waltcut-interchange = { path = "crates/interchange" }
+waltcut-text = { path = "crates/text" }
+waltcut-captions = { path = "crates/captions" }
+waltcut-speech = { path = "crates/speech" }
+waltcut-genai = { path = "crates/genai" }
+waltcut-tts = { path = "crates/tts" }
+waltcut-tts-text = { path = "crates/tts-text" }
+waltcut-render = { path = "crates/render" }
+waltcut-gpu = { path = "crates/gpu" }
+waltcut-scopes = { path = "crates/scopes" }
+waltcut-export = { path = "crates/export" }
+waltcut-format = { path = "crates/format" }
+waltcut-engine = { path = "crates/engine" }
+waltcut-ui-egui = { path = "crates/ui-egui" }
+waltcut-automation = { path = "crates/automation" }
+waltcut-platform = { path = "crates/platform" }
+waltcut-testkit = { path = "crates/testkit" }
 
 # foundation
 thiserror = "2"
@@ -98,50 +98,50 @@ opt-level = 2
 opt-level = 1
 
 # Codec hot loops: debug-build tests (RFC/oracle vectors) are minutes slower below opt-level 3.
-[profile.dev.package.filmcraft-h264]
+[profile.dev.package.waltcut-h264]
 opt-level = 3
 
-[profile.dev.package.filmcraft-h264enc]
+[profile.dev.package.waltcut-h264enc]
 opt-level = 3
 
-[profile.dev.package.filmcraft-hevc]
+[profile.dev.package.waltcut-hevc]
 opt-level = 3
 
-[profile.dev.package.filmcraft-prores]
+[profile.dev.package.waltcut-prores]
 opt-level = 3
 
-[profile.dev.package.filmcraft-dnx]
+[profile.dev.package.waltcut-dnx]
 opt-level = 3
 
-[profile.dev.package.filmcraft-apv]
+[profile.dev.package.waltcut-apv]
 opt-level = 3
 
-[profile.dev.package.filmcraft-dng]
+[profile.dev.package.waltcut-dng]
 opt-level = 3
 
-[profile.dev.package.filmcraft-av1]
+[profile.dev.package.waltcut-av1]
 opt-level = 3
 
-[profile.dev.package.filmcraft-aac]
+[profile.dev.package.waltcut-aac]
 opt-level = 3
 
-[profile.dev.package.filmcraft-flac]
+[profile.dev.package.waltcut-flac]
 opt-level = 3
 
 # Audio effects: realtime-factor tests and long convolution / spectral runs.
-[profile.dev.package.filmcraft-audio-dsp]
+[profile.dev.package.waltcut-audio-dsp]
 opt-level = 3
 
-[profile.dev.package.filmcraft-mxf]
+[profile.dev.package.waltcut-mxf]
 opt-level = 3
 
-[profile.dev.package.filmcraft-opus]
+[profile.dev.package.waltcut-opus]
 opt-level = 3
 
-[profile.dev.package.filmcraft-vp8]
+[profile.dev.package.waltcut-vp8]
 opt-level = 3
 
-[profile.dev.package.filmcraft-vp9]
+[profile.dev.package.waltcut-vp9]
 opt-level = 3
 
 [profile.release]

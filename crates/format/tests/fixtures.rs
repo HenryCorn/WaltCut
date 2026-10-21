@@ -1,8 +1,8 @@
 //! Project files of the current schema open and round-trip; every earlier one is refused untouched.
 
-use filmcraft_format::{FormatError, LEGACY_RELEASE, SCHEMA_VERSION, decode, encode};
-use filmcraft_project::{ClipId, ItemId, ItemKind, Project};
-use filmcraft_time::Tick;
+use waltcut_format::{FormatError, LEGACY_RELEASE, SCHEMA_VERSION, decode, encode};
+use waltcut_project::{ClipId, ItemId, ItemKind, Project};
+use waltcut_time::Tick;
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)).unwrap()
@@ -44,7 +44,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 #[test]
 fn pre_reduction_project_is_refused_and_left_untouched() {
     let dir = std::env::temp_dir().join(format!("filmcraft-old-project-{}", std::process::id()));
-    let autosave = dir.join(filmcraft_format::autosave::AUTO_SAVE_DIR);
+    let autosave = dir.join(waltcut_format::autosave::AUTO_SAVE_DIR);
     std::fs::create_dir_all(&autosave).unwrap();
     let files = [dir.join("old.fcproj"), autosave.join("old-2026-10-01_10-00-00.fcproj"), dir.join("old (schema v1 backup).fcproj")];
     for f in &files {
@@ -62,8 +62,8 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
     let text = e.to_string();
     assert!(text.contains("earlier FilmCraft or WaltCut build") && text.contains(LEGACY_RELEASE) && text.contains("schema v15"), "{text}");
     // its auto-save sibling is not offered for recovery, and not pruned either
-    assert!(filmcraft_format::autosave::list_auto_saves(&autosave, "old").is_empty());
-    filmcraft_format::autosave::rotate(&autosave, "old", 1).unwrap();
+    assert!(waltcut_format::autosave::list_auto_saves(&autosave, "old").is_empty());
+    waltcut_format::autosave::rotate(&autosave, "old", 1).unwrap();
     assert_eq!(files.iter().map(|f| hash(f)).collect::<Vec<_>>(), before);
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -99,19 +99,19 @@ fn golden_audio_field_is_the_primary_stream_and_clips_default_to_zero() {
 fn hostile_audio_stream_counts_and_indices_are_repaired_not_rejected() {
     let mut p = golden();
     let seq = ItemId(21);
-    for bad in [filmcraft_media::MAX_AUDIO_STREAMS, usize::MAX] {
+    for bad in [waltcut_media::MAX_AUDIO_STREAMS, usize::MAX] {
         p.sequence_mut(seq).unwrap().audio_tracks[0].items[0].audio_stream = bad;
         let loaded = decode(&encode(&p, false)).unwrap().project;
         assert_eq!(loaded.sequence(seq).unwrap().audio_tracks[0].items[0].audio_stream, 0);
     }
-    p.sequence_mut(seq).unwrap().audio_tracks[0].items[0].audio_stream = filmcraft_media::MAX_AUDIO_STREAMS - 1;
+    p.sequence_mut(seq).unwrap().audio_tracks[0].items[0].audio_stream = waltcut_media::MAX_AUDIO_STREAMS - 1;
     let loaded = decode(&encode(&p, false)).unwrap().project;
-    assert_eq!(loaded.sequence(seq).unwrap().audio_tracks[0].items[0].audio_stream, filmcraft_media::MAX_AUDIO_STREAMS - 1, "in range: kept");
+    assert_eq!(loaded.sequence(seq).unwrap().audio_tracks[0].items[0].audio_stream, waltcut_media::MAX_AUDIO_STREAMS - 1, "in range: kept");
     let media = p.item_mut(ItemId(5)).unwrap().as_media_mut().unwrap();
     let stream = media.info.audio_streams[0].clone();
-    media.info.audio_streams.resize(filmcraft_media::MAX_AUDIO_STREAMS + 1, stream);
+    media.info.audio_streams.resize(waltcut_media::MAX_AUDIO_STREAMS + 1, stream);
     let loaded = decode(&encode(&p, false)).unwrap().project;
-    assert_eq!(loaded.item(ItemId(5)).unwrap().as_media().unwrap().info.audio_streams.len(), filmcraft_media::MAX_AUDIO_STREAMS);
+    assert_eq!(loaded.item(ItemId(5)).unwrap().as_media().unwrap().info.audio_streams.len(), waltcut_media::MAX_AUDIO_STREAMS);
 }
 
 /// Build a project with `n` clips (half video, half linked audio) on 4+4 tracks.
@@ -131,10 +131,10 @@ pub fn big_project(n: usize) -> Project {
     let mut vt = seq.video_tracks[0].clone();
     let mut at = seq.audio_tracks[0].clone();
     for k in 1..4 {
-        vt.id = filmcraft_project::TrackId(500 + k);
+        vt.id = waltcut_project::TrackId(500 + k);
         vt.name = format!("Video {}", k + 1);
         seq.video_tracks.push(vt.clone());
-        at.id = filmcraft_project::TrackId(600 + k);
+        at.id = waltcut_project::TrackId(600 + k);
         at.name = format!("Audio {}", k + 1);
         seq.audio_tracks.push(at.clone());
     }
@@ -185,7 +185,7 @@ fn large_project_roundtrip_and_timing() {
     let t0 = std::time::Instant::now();
     let dir = std::env::temp_dir().join(format!("filmcraft-big-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    filmcraft_format::atomic_write(&dir.join("big.fcproj"), &compact).unwrap();
+    waltcut_format::atomic_write(&dir.join("big.fcproj"), &compact).unwrap();
     let write_ms = t0.elapsed().as_secs_f64() * 1000.0;
     std::fs::remove_dir_all(&dir).unwrap();
     println!(

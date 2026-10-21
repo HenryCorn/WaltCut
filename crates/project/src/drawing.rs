@@ -8,10 +8,10 @@
 //!
 //! A drawing clip places the drawing on a video track like any other source, so Motion, Opacity,
 //! blend modes, masks and standard effects all apply. Strokes are plain data: the renderer
-//! rasterises them (`filmcraft_render::drawing`) and the UI paints its own live preview.
+//! rasterises them (`waltcut_render::drawing`) and the UI paints its own live preview.
 
-use filmcraft_time::{FrameRate, Tick};
 use serde::{Deserialize, Serialize};
+use waltcut_time::{FrameRate, Tick};
 
 /// The most samples one stroke may hold (a long, slow scribble at 240 Hz is a few thousand).
 pub const MAX_STROKE_POINTS: usize = 20_000;

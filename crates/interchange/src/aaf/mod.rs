@@ -2,7 +2,7 @@
 //!
 //! Written from the public AMWA specifications: *AAF Object Specification v1.1*, *AAF Low-Level
 //! Container Specification v1.0.1* (structured storage mapping, see [`store`]) and *AAF Edit
-//! Protocol v1.0*; the container is Microsoft's Compound File Binary format ([`filmcraft_cfb`]).
+//! Protocol v1.0*; the container is Microsoft's Compound File Binary format ([`waltcut_cfb`]).
 //!
 //! The exported file holds one top-level **CompositionMob** (Edit Protocol usage code
 //! "top level") with
@@ -37,8 +37,8 @@ mod read;
 pub(crate) mod store;
 mod write;
 
-use filmcraft_project::{ItemId, Project};
 use serde::{Deserialize, Serialize};
+use waltcut_project::{ItemId, Project};
 
 use crate::comp::{self, ExtractedMedia};
 use crate::essence::MediaOptions;
@@ -60,7 +60,7 @@ pub fn export(project: &Project, sequence: ItemId, opts: &AafOptions) -> Result<
     let mut report = Report::default();
     let name = opts.name.clone().or_else(|| project.item(sequence).map(|i| i.name.clone())).unwrap_or_else(|| "Sequence".into());
     let doc = comp::from_project(project, sequence, &name, &opts.media, comp::Nests::Compositions, &mut report)?;
-    let version = if opts.small_sectors { filmcraft_cfb::Version::V3 } else { filmcraft_cfb::Version::V4 };
+    let version = if opts.small_sectors { waltcut_cfb::Version::V3 } else { waltcut_cfb::Version::V4 };
     let bytes = write::write(&doc, version, &mut report)?;
     Ok((bytes, report))
 }
@@ -77,10 +77,10 @@ pub fn import(bytes: &[u8], opts: &ImportOptions) -> Result<(Imported, Vec<Extra
 /// Whether `bytes` look like an AAF file (a compound file whose root has the AAF root class or a
 /// `Header-2` storage).
 pub fn sniff(bytes: &[u8]) -> bool {
-    if !filmcraft_cfb::sniff(bytes) {
+    if !waltcut_cfb::sniff(bytes) {
         return false;
     }
-    match filmcraft_cfb::CompoundFile::open(bytes) {
+    match waltcut_cfb::CompoundFile::open(bytes) {
         Ok(cf) => cf.root().clsid == ids::ROOT || cf.find("Header-2").is_ok(),
         Err(_) => false,
     }

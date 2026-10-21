@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::voiceover::{Synthetic, SyntheticInput, cue_times};
-use filmcraft_time::TICKS_PER_SECOND;
 use serde_json::json;
+use waltcut_time::TICKS_PER_SECOND;
 
 fn sec(x: f64) -> i64 {
     (x * TICKS_PER_SECOND as f64) as i64
@@ -30,10 +30,10 @@ fn demo() -> (Session, String, usize) {
 
 fn mix(s: &Session, start: i64, n: usize) -> Vec<Vec<f32>> {
     let provider = s.media.provider(s.project.clone(), s.services.clone());
-    filmcraft_render::audio::mix_sequence(&s.project, s.active_sequence().unwrap(), start, n, &provider).channels
+    waltcut_render::audio::mix_sequence(&s.project, s.active_sequence().unwrap(), start, n, &provider).channels
 }
 
-fn track_clips(s: &Session, i: usize) -> Vec<filmcraft_project::TrackItem> {
+fn track_clips(s: &Session, i: usize) -> Vec<waltcut_project::TrackItem> {
     s.active_sequence().unwrap().audio_tracks[i].items.clone()
 }
 

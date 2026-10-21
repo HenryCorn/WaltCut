@@ -4,9 +4,9 @@ use crate::{
     FilmcraftApp,
     icons::{self, Icon},
 };
-use filmcraft_engine::keyboard::StillFormat;
-use filmcraft_engine::keyboard::{FrameExportTarget, frame_export_target};
 use serde_json::{Value, json};
+use waltcut_engine::keyboard::StillFormat;
+use waltcut_engine::keyboard::{FrameExportTarget, frame_export_target};
 
 #[derive(Clone)]
 struct Draft {
@@ -29,13 +29,13 @@ fn clean(name: &str) -> String {
 pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, params: &Value) -> Result<Value, String> {
     let target = frame_export_target(&app.session, params).map_err(|e| e.to_string())?;
     let (rate, drop_frame) = if target.source {
-        let view = filmcraft_engine::clip_ops::source_view(&app.session, target.item).ok_or("Source clip is unavailable")?;
+        let view = waltcut_engine::clip_ops::source_view(&app.session, target.item).ok_or("Source clip is unavailable")?;
         (view.rate, false)
     } else {
         let sequence = app.session.project.sequence(target.item).ok_or("Program sequence is unavailable")?;
         (sequence.settings.frame_rate, sequence.settings.drop_frame)
     };
-    let timecode = filmcraft_time::format_time(target.time, rate, drop_frame, filmcraft_time::TimeDisplay::Timecode, 48000);
+    let timecode = waltcut_time::format_time(target.time, rate, drop_frame, waltcut_time::TimeDisplay::Timecode, 48000);
     if target.source {
         app.stop_source();
     } else if app.playback.playing {
@@ -211,7 +211,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     }
     close |= crate::widgets::escape_closes(ctx);
     if browse && !close {
-        let folder = filmcraft_engine::export_tools::expand_home(d.folder.trim());
+        let folder = waltcut_engine::export_tools::expand_home(d.folder.trim());
         let ctx = ctx.clone();
         // into the dialog's stored draft, if it is still open when the folder comes back
         app.pick_ui(FileDialog::Folder { at: Some(folder) }, move |_, paths| {
@@ -235,7 +235,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         let ext = d.format.extension();
         let suffix = format!(".{ext}");
         let name = if stem.to_ascii_lowercase().ends_with(&suffix) { stem } else { format!("{stem}{suffix}") };
-        let folder = filmcraft_engine::export_tools::expand_home(d.folder.trim());
+        let folder = waltcut_engine::export_tools::expand_home(d.folder.trim());
         let path = std::path::Path::new(&folder).join(name).to_string_lossy().into_owned();
         let allowed = match app.session.services.file_size(&path) {
             Ok(_) => replace && d.replace.as_deref() == Some(path.as_str()),

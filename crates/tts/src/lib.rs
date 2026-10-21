@@ -23,7 +23,7 @@ use serde::Serialize;
 pub const SAMPLE_RATE: u32 = 24_000;
 /// Longest narration a voice produces, in seconds.
 pub const MAX_SECONDS: f64 = 30.0 * 60.0;
-/// Longest script accepted, in bytes (same as `filmcraft_project::narration::MAX_TEXT_BYTES`).
+/// Longest script accepted, in bytes (same as `waltcut_project::narration::MAX_TEXT_BYTES`).
 pub const MAX_TEXT_BYTES: usize = 64 * 1024;
 /// Pace limits.
 pub const MIN_PACE: f64 = 0.5;

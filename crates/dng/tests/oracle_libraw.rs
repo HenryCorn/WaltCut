@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use filmcraft_dng::Dng;
-use filmcraft_dng::writer::{Compression, Layout, Options, write};
+use waltcut_dng::Dng;
+use waltcut_dng::writer::{Compression, Layout, Options, write};
 
 fn tool() -> Option<String> {
     let t = std::env::var("FILMCRAFT_UNPROCESSED_RAW").unwrap_or_else(|_| "unprocessed_raw".into());

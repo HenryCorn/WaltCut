@@ -3,10 +3,10 @@
 //! to give the panels the whole window.
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::state::UiState;
 use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::state::UiState;
 
 const W: f32 = 1600.0;
 const H: f32 = 980.0;

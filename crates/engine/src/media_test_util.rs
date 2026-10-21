@@ -4,11 +4,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use filmcraft_media::generators::GeneratorSource;
-use filmcraft_media::{DemoScene, Generator, MediaSource};
-use filmcraft_project::{ItemId, ItemKind, Label, MediaClip, MediaRef, Project, SequenceSettings, TrackKind};
-use filmcraft_time::{FrameRate, Tick, TimeRange};
 use serde_json::json;
+use waltcut_media::generators::GeneratorSource;
+use waltcut_media::{DemoScene, Generator, MediaSource};
+use waltcut_project::{ItemId, ItemKind, Label, MediaClip, MediaRef, Project, SequenceSettings, TrackKind};
+use waltcut_time::{FrameRate, Tick, TimeRange};
 
 use crate::Session;
 
@@ -43,17 +43,17 @@ pub fn make_movie(path: &Path, scene: DemoScene, w: u32, h: u32, frames: i64) {
     let r = TimeRange::new(Tick::ZERO, dur);
     let mut v = p.make_track_item(item, TrackKind::Video, Tick::ZERO, r, rate).unwrap();
     for e in &mut v.effects {
-        filmcraft_project::resolve_auto_points(e, (w, h), (w, h));
+        waltcut_project::resolve_auto_points(e, (w, h), (w, h));
     }
     let a = p.make_track_item(item, TrackKind::Audio, Tick::ZERO, r, rate).unwrap();
     let q = p.sequence_mut(seq).unwrap();
     q.video_tracks[0].items.push(v);
     q.audio_tracks[0].items.push(a);
-    let fmt = if path.extension().is_some_and(|e| e == "mp4") { filmcraft_export::Format::H264 } else { filmcraft_export::Format::ProRes };
-    let settings = filmcraft_export::ExportSettings { format: fmt, path: path.to_string_lossy().into_owned(), bitrate_kbps: 4000, ..Default::default() };
-    let shared: filmcraft_media::SharedSource = Arc::new(src);
+    let fmt = if path.extension().is_some_and(|e| e == "mp4") { waltcut_export::Format::H264 } else { waltcut_export::Format::ProRes };
+    let settings = waltcut_export::ExportSettings { format: fmt, path: path.to_string_lossy().into_owned(), bitrate_kbps: 4000, ..Default::default() };
+    let shared: waltcut_media::SharedSource = Arc::new(src);
     let provider = move |id: ItemId| (id == item).then(|| shared.clone());
-    filmcraft_export::export(&Arc::new(p), seq, &settings, &provider, &Default::default()).unwrap();
+    waltcut_export::export(&Arc::new(p), seq, &settings, &provider, &Default::default()).unwrap();
 }
 
 /// A session with `files` imported and a sequence (sized like the first file) holding each file
@@ -75,7 +75,7 @@ pub fn session_with(files: &[&Path]) -> (Session, Vec<ItemId>, ItemId) {
         let range = TimeRange::new(Tick::ZERO, d);
         let mut vi = p.make_track_item(it, TrackKind::Video, at, range, rate).unwrap();
         for e in &mut vi.effects {
-            filmcraft_project::resolve_auto_points(e, (v.width, v.height), (v.width, v.height));
+            waltcut_project::resolve_auto_points(e, (v.width, v.height), (v.width, v.height));
         }
         let ai = p.make_track_item(it, TrackKind::Audio, at, range, rate).unwrap();
         let q = p.sequence_mut(seq).unwrap();

@@ -11,10 +11,10 @@ pub mod pool;
 
 use std::sync::Arc;
 
-use filmcraft_color::{ColorInfo, DecodeTable, Matrix, Range, linear_to_srgb_u8, normalize_c, normalize_y, srgb_u8_to_linear_table, to_linear, ycbcr_to_rgb};
-use filmcraft_time::Tick;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use waltcut_color::{ColorInfo, DecodeTable, Matrix, Range, linear_to_srgb_u8, normalize_c, normalize_y, srgb_u8_to_linear_table, to_linear, ycbcr_to_rgb};
+use waltcut_time::Tick;
 
 /// Chroma subsampling of planar Y'CbCr.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -508,7 +508,7 @@ impl VideoFrame {
         match &self.data {
             PixelData::Rgba8(d) => d.as_ref().clone(),
             PixelData::Yuv8 { planes, chroma, alpha: None }
-                if matches!(self.color.transfer, filmcraft_color::Transfer::Bt709 | filmcraft_color::Transfer::Srgb) =>
+                if matches!(self.color.transfer, waltcut_color::Transfer::Bt709 | waltcut_color::Transfer::Srgb) =>
             {
                 // Direct display path: Y'CbCr → R'G'B' without linearisation.
                 let (sx, sy) = chroma.shifts();

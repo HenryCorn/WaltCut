@@ -155,7 +155,7 @@ fn is_export_output(name: &str, file: &str, stem: &str, ext: &str) -> bool {
 
 /// Whether an export to a file with extension `ext` writes an image sequence (one still per frame).
 fn is_sequence_extension(ext: &str) -> bool {
-    use filmcraft_engine::export::Format;
+    use waltcut_engine::export::Format;
     Format::from_name(ext).is_some_and(Format::is_image_sequence)
 }
 

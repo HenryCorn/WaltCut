@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use filmcraft_captions::{Cue, Document, Format, WriteOptions, parse, write};
-use filmcraft_time::FrameRate;
+use waltcut_captions::{Cue, Document, Format, WriteOptions, parse, write};
+use waltcut_time::FrameRate;
 
 const TT: &str = "http://www.w3.org/ns/ttml";
 const META: &str = "http://www.w3.org/ns/ttml#metadata";

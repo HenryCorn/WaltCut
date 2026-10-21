@@ -1,9 +1,9 @@
 //! `edit.rippleDelete` on a clip whose sound edge was split (a J or an L cut): the clip and its
 //! sound go, and the later clips move up by one amount on every track.
 
-use filmcraft_project::ClipId;
-use filmcraft_time::Tick;
 use serde_json::json;
+use waltcut_project::ClipId;
+use waltcut_time::Tick;
 
 use crate::Session;
 

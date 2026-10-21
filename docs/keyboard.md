@@ -16,8 +16,8 @@ tables, no conflicts in FilmCraft Default or the Premiere preset, keys pressed i
 
 ## Keyboard-only commands (M3.12)
 
-Premiere has these as keys only (most are not in a menu). Modules: `filmcraft_engine::keyboard`
-(engine) and `filmcraft_ui_egui::panels::keyboard` (UI); their module docs list each id.
+Premiere has these as keys only (most are not in a menu). Modules: `waltcut_engine::keyboard`
+(engine) and `waltcut_ui_egui::panels::keyboard` (UI); their module docs list each id.
 
 | Group | Commands | Keys |
 |---|---|---|

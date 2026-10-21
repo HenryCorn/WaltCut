@@ -1,5 +1,5 @@
 [package]
-name = "filmcraft-automation"
+name = "waltcut-automation"
 description = "MCP server (rmcp) over the FilmCraft engine, plus a bridge to the running app's control channel"
 version.workspace = true
 edition.workspace = true
@@ -10,8 +10,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-filmcraft-engine = { workspace = true }
-filmcraft-time = { workspace = true }
+waltcut-engine = { workspace = true }
+waltcut-time = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

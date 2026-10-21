@@ -419,10 +419,10 @@ pub fn font_families() -> Vec<FontFamily> {
 /// egui visuals. Document names keep their glyphs in every interface language.
 pub fn install(ctx: &egui::Context, t: &Tokens) {
     let mut fonts = FontDefinitions::default();
-    fonts.font_data.insert("inter".into(), Arc::new(FontData::from_static(filmcraft_text::fonts::INTER_REGULAR)));
-    fonts.font_data.insert("inter-medium".into(), Arc::new(FontData::from_static(filmcraft_text::fonts::INTER_MEDIUM)));
-    fonts.font_data.insert("inter-semibold".into(), Arc::new(FontData::from_static(filmcraft_text::fonts::INTER_SEMIBOLD)));
-    fonts.font_data.insert("jbmono".into(), Arc::new(FontData::from_static(filmcraft_text::fonts::JETBRAINS_MONO_REGULAR)));
+    fonts.font_data.insert("inter".into(), Arc::new(FontData::from_static(waltcut_text::fonts::INTER_REGULAR)));
+    fonts.font_data.insert("inter-medium".into(), Arc::new(FontData::from_static(waltcut_text::fonts::INTER_MEDIUM)));
+    fonts.font_data.insert("inter-semibold".into(), Arc::new(FontData::from_static(waltcut_text::fonts::INTER_SEMIBOLD)));
+    fonts.font_data.insert("jbmono".into(), Arc::new(FontData::from_static(waltcut_text::fonts::JETBRAINS_MONO_REGULAR)));
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "inter".into());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "jbmono".into());
     fonts.families.insert(FontFamily::Name("semibold".into()), vec!["inter-semibold".into(), "inter".into()]);
@@ -437,7 +437,7 @@ pub fn install(ctx: &egui::Context, t: &Tokens) {
 }
 
 /// Name of the egui font for a craft-fonts entry.
-fn craft_font_name(f: &filmcraft_text::fonts::CraftFont) -> String {
+fn craft_font_name(f: &waltcut_text::fonts::CraftFont) -> String {
     format!("craft:{} {}", f.family, f.style)
 }
 
@@ -445,7 +445,7 @@ fn craft_font_name(f: &filmcraft_text::fonts::CraftFont) -> String {
 /// of every font family, after the app's own fonts: BIZ UDPGothic first (bold before regular in
 /// the "semibold" and "medium" families), then the other Japanese faces.
 fn add_craft_fonts(fonts: &mut FontDefinitions) {
-    let jpan: Vec<_> = filmcraft_text::fonts::craft_japanese().collect();
+    let jpan: Vec<_> = waltcut_text::fonts::craft_japanese().collect();
     for f in &jpan {
         fonts.font_data.insert(craft_font_name(f), Arc::new(FontData::from_static(f.bytes)));
     }
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn the_default_highlight_leaves_the_theme_blues_as_designed() {
-        let default = filmcraft_engine::settings::parse_hex(filmcraft_engine::settings::DEFAULT_HIGHLIGHT);
+        let default = waltcut_engine::settings::parse_hex(waltcut_engine::settings::DEFAULT_HIGHLIGHT);
         for k in [ThemeKind::Dark, ThemeKind::Medium, ThemeKind::Light] {
             assert_eq!(highlight_blues(&Tokens::for_kind(k).with_appearance(default, false)), highlight_blues(&Tokens::for_kind(k)), "{k:?}");
         }
@@ -607,10 +607,10 @@ mod tests {
     #[test]
     fn chinese_names_render_in_every_theme_and_font_family() {
         const CHINESE: &str = "中文旁白音乐声轨测试简体汉语繁體漢語车";
-        filmcraft_text::fonts::scan_system();
-        let available = filmcraft_text::fonts::all_faces()
+        waltcut_text::fonts::scan_system();
+        let available = waltcut_text::fonts::all_faces()
             .iter()
-            .any(|f| matches!(f.info.origin, "system" | filmcraft_text::fonts::CRAFT_ORIGIN) && CHINESE.chars().all(|c| f.has_char(c)));
+            .any(|f| matches!(f.info.origin, "system" | waltcut_text::fonts::CRAFT_ORIGIN) && CHINESE.chars().all(|c| f.has_char(c)));
         if !available {
             eprintln!("SKIPPED: no craft-fonts or installed Chinese font");
             return;
@@ -641,8 +641,8 @@ mod tests {
     #[test]
     fn korean_text_renders_with_an_installed_korean_font() {
         const KOREAN: &str = "한국어 입력 테스트";
-        filmcraft_text::fonts::scan_system();
-        let available = filmcraft_text::fonts::all_faces().iter().any(|f| f.info.origin == "system" && KOREAN.chars().all(|c| f.has_char(c)));
+        waltcut_text::fonts::scan_system();
+        let available = waltcut_text::fonts::all_faces().iter().any(|f| f.info.origin == "system" && KOREAN.chars().all(|c| f.has_char(c)));
         if !available {
             eprintln!("SKIPPED: no installed Korean font");
             return;
@@ -668,7 +668,7 @@ mod tests {
     /// first), and Japanese text gets real glyphs, not the replacement box.
     #[test]
     fn japanese_renders_with_craft_fonts() {
-        if filmcraft_text::fonts::craft_japanese().next().is_none() {
+        if waltcut_text::fonts::craft_japanese().next().is_none() {
             eprintln!("SKIPPED: built without craft-fonts (set CRAFT_FONTS_DIR to run)");
             return;
         }
@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn works_without_craft_fonts() {
         let ctx = installed();
-        let n = filmcraft_text::fonts::craft_japanese().count() + crate::cjk::craft_fonts().count() + crate::rtl::craft_fonts().count();
+        let n = waltcut_text::fonts::craft_japanese().count() + crate::cjk::craft_fonts().count() + crate::rtl::craft_fonts().count();
         ctx.fonts_mut(|fonts| {
             let defs = fonts.definitions().clone();
             assert_eq!(defs.font_data.keys().filter(|k| k.starts_with("craft:")).count(), n);

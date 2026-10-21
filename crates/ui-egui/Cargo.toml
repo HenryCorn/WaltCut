@@ -1,5 +1,5 @@
 [package]
-name = "filmcraft-ui-egui"
+name = "waltcut-ui-egui"
 description = "The FilmCraft egui frontend (swappable): panels, docking, timeline, monitors, control channel"
 version.workspace = true
 edition.workspace = true
@@ -11,21 +11,21 @@ workspace = true
 
 [dependencies]
 craft-ui = { workspace = true }
-filmcraft-time = { workspace = true }
-filmcraft-geom = { workspace = true }
-filmcraft-color = { workspace = true }
-filmcraft-frame = { workspace = true }
-filmcraft-media = { workspace = true }
-filmcraft-project = { workspace = true }
-filmcraft-tts = { workspace = true }
-filmcraft-edit = { workspace = true }
-filmcraft-render = { workspace = true }
-filmcraft-text = { workspace = true }
-filmcraft-audio-dsp = { workspace = true }
-filmcraft-engine = { workspace = true }
-filmcraft-export = { workspace = true }
-filmcraft-gpu = { workspace = true }
-filmcraft-scopes = { workspace = true }
+waltcut-time = { workspace = true }
+waltcut-geom = { workspace = true }
+waltcut-color = { workspace = true }
+waltcut-frame = { workspace = true }
+waltcut-media = { workspace = true }
+waltcut-project = { workspace = true }
+waltcut-tts = { workspace = true }
+waltcut-edit = { workspace = true }
+waltcut-render = { workspace = true }
+waltcut-text = { workspace = true }
+waltcut-audio-dsp = { workspace = true }
+waltcut-engine = { workspace = true }
+waltcut-export = { workspace = true }
+waltcut-gpu = { workspace = true }
+waltcut-scopes = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit"] }
 serde = { workspace = true }
@@ -47,11 +47,11 @@ cpu-time = "1"
 
 [dev-dependencies]
 pollster = "0.4"
-filmcraft-codecs = { workspace = true }
+waltcut-codecs = { workspace = true }
 # the bench registers OS hardware decoders as the desktop app does (dev-dependency only: ui-egui
 # itself stays OS-independent and web-portable)
-filmcraft-platform = { workspace = true }
-filmcraft-interchange = { workspace = true }
+waltcut-platform = { workspace = true }
+waltcut-interchange = { workspace = true }
 egui_kittest = { workspace = true, features = ["eframe", "wgpu"] }
 
 # build.rs bakes contributors/contributors.json into the binary (About ▸ Contributors).

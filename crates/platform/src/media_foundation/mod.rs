@@ -35,8 +35,8 @@ mod stream;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use filmcraft_codecs::hw::{NalCodec, StreamInfo};
-use filmcraft_codecs::{CodecError, DecodedFrame, Result, VideoDecoder};
+use waltcut_codecs::hw::{NalCodec, StreamInfo};
+use waltcut_codecs::{CodecError, DecodedFrame, Result, VideoDecoder};
 
 use self::gpu::{Gpu, Readback, SurfaceFormat};
 use self::mft::{MfApi, Mft, Poll};
@@ -50,8 +50,8 @@ const MAX_OUTPUTS_PER_CALL: usize = 4096;
 
 /// The stream description of a sample entry this backend could take (`avcC` / `hvcC` / `vpcC` /
 /// `av1C`), or `None` for other codecs and unreadable configuration records.
-pub fn stream_info(entry: &filmcraft_isobmff::SampleEntry) -> Option<StreamInfo> {
-    use filmcraft_codecs::hw::{FrameStreamInfo, NalStreamInfo};
+pub fn stream_info(entry: &waltcut_isobmff::SampleEntry) -> Option<StreamInfo> {
+    use waltcut_codecs::hw::{FrameStreamInfo, NalStreamInfo};
     match NalStreamInfo::from_entry(entry) {
         Some(r) => r.ok().map(StreamInfo::Nal),
         None => FrameStreamInfo::from_entry(entry)?.ok().map(StreamInfo::Frame),

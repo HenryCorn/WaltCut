@@ -21,10 +21,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use filmcraft_project::{Bin, BinEntry, BinId, ItemId, ItemKind, MediaRef, Project, ProjectItem, TrackKind};
-use filmcraft_time::{Tick, TimeDisplay, format_time};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use waltcut_project::{Bin, BinEntry, BinId, ItemId, ItemKind, MediaRef, Project, ProjectItem, TrackKind};
+use waltcut_time::{Tick, TimeDisplay, format_time};
 
 use crate::commands::{CommandSpec, always, bad, bool_p, f64_p, item_p, str_p, u64_p};
 use crate::{Result, Session};
@@ -302,7 +302,7 @@ pub enum SortKey {
     Text(String),
 }
 
-fn media_of<'a>(p: &'a Project, it: &'a ProjectItem) -> Option<&'a filmcraft_project::MediaClip> {
+fn media_of<'a>(p: &'a Project, it: &'a ProjectItem) -> Option<&'a waltcut_project::MediaClip> {
     match &it.kind {
         ItemKind::Media(m) => Some(m),
         ItemKind::Subclip { parent, .. } => p.item(*parent).and_then(|x| x.as_media()),
@@ -402,7 +402,7 @@ pub fn cell(p: &Project, it: &ProjectItem, column: &str) -> (String, SortKey) {
         ),
         "Audio Codec" => text(media.and_then(|m| m.info.audio()).map(|a| a.codec.clone()).unwrap_or_default()),
         "Color Space" => text(match (media.and_then(|m| m.info.video.as_ref().map(|v| (m, v))), &it.kind) {
-            (Some((m, v)), _) => m.interpret.color_space.unwrap_or_else(|| filmcraft_color::ColorSpace::from_info(&v.color)).label().to_string(),
+            (Some((m, v)), _) => m.interpret.color_space.unwrap_or_else(|| waltcut_color::ColorSpace::from_info(&v.color)).label().to_string(),
             (None, ItemKind::Sequence(q)) => q.settings.color.working.label().to_string(),
             _ => String::new(),
         }),

@@ -3,10 +3,10 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -78,7 +78,7 @@ fn ctrl_plus_does_what_ctrl_equals_does_and_the_interface_zoom_can_be_reset() {
     let mut d = Driver::demo();
     let clip = d.app().session.active_sequence().unwrap().video_tracks[0].items[0].id.0;
     d.click(&format!("timeline.clip.{clip}"));
-    assert_eq!(d.app().ui.focused, filmcraft_ui_egui::dock::PanelKind::Timeline);
+    assert_eq!(d.app().ui.focused, waltcut_ui_egui::dock::PanelKind::Timeline);
     let zoom = d.harness.ctx.zoom_factor();
     let height = d.app().ui.timeline.video_track_h;
     d.press(egui::Key::Plus, egui::Modifiers::COMMAND);

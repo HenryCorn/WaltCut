@@ -1,9 +1,9 @@
 //! Individual linked-clip selection and deletion (#680, #1163).
 
 use crate::Session;
-use filmcraft_project::ClipId;
-use filmcraft_time::Tick;
 use serde_json::json;
+use waltcut_project::ClipId;
+use waltcut_time::Tick;
 
 fn paired_sequence() -> (Session, [(ClipId, ClipId); 2]) {
     let mut s = Session::default();

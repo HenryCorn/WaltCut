@@ -259,7 +259,7 @@ mod tests {
     }
 
     /// Network: a frame-sized upload to a server that reads the whole body. Run with
-    /// `cargo test -p filmcraft-genai --features cloud -- --ignored`.
+    /// `cargo test -p waltcut-genai --features cloud -- --ignored`.
     #[cfg(feature = "cloud")]
     #[test]
     #[ignore]

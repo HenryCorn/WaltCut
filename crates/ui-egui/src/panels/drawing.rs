@@ -8,11 +8,11 @@
 //! in green.
 
 use egui::{Color32, Pos2, Rect, Sense, Stroke as EStroke, pos2, vec2};
-use filmcraft_geom::{Affine, Vec2};
-use filmcraft_project::drawing::{Brush, Drawing, Stroke};
-use filmcraft_project::{ClipId, TrackItem};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use waltcut_geom::{Affine, Vec2};
+use waltcut_project::drawing::{Brush, Drawing, Stroke};
+use waltcut_project::{ClipId, TrackItem};
 
 use crate::FilmcraftApp;
 
@@ -103,7 +103,7 @@ impl Mapping {
         let src = app.session.project.source_size(item.item)?;
         let par = app.session.project.source_par(item.item);
         let mt = item.effect_time_at(app.session.playhead());
-        let motion = filmcraft_render::motion_matrix(seq, item, src, par, mt);
+        let motion = waltcut_render::motion_matrix(seq, item, src, par, mt);
         let (sx, sy) = (pic.width() as f64 / frame.0.max(1) as f64, pic.height() as f64 / frame.1.max(1) as f64);
         // canvas → sequence frame (Motion) → picture → screen; `then_apply` applies its argument first
         let to_screen = Affine::translate(pic.min.x as f64, pic.min.y as f64).then_apply(&Affine::scale(sx, sy)).then_apply(&motion);
@@ -165,10 +165,10 @@ fn paint_cel(painter: &egui::Painter, map: &Mapping, strokes: &[Stroke], tint: O
 
 /// The drawing clip the Brush tool paints on, with its drawing.
 fn target(app: &FilmcraftApp) -> Option<(ClipId, TrackItem, Drawing)> {
-    let clip = filmcraft_engine::drawing::target_clip(&app.session, &Value::Null)?;
+    let clip = waltcut_engine::drawing::target_clip(&app.session, &Value::Null)?;
     let seq = app.session.active_sequence()?;
     let (_, it) = seq.find_item(clip)?;
-    let (_, d) = filmcraft_engine::drawing::drawing_of(&app.session, seq, clip)?;
+    let (_, d) = waltcut_engine::drawing::drawing_of(&app.session, seq, clip)?;
     Some((clip, it.clone(), d.clone()))
 }
 
@@ -268,7 +268,7 @@ pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, fra
     };
     let Some(map) = Mapping::new(app, &item, pic, frame) else { return };
     let painter = ui.painter().with_clip_rect(pic);
-    let f = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - filmcraft_time::Tick(1)));
+    let f = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
     let f = d.frame_at(f);
     if app.ui.brush.onion {
         let (prev, next) = d.neighbours(f);
@@ -319,7 +319,7 @@ pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, fra
             for p in moves {
                 let (x, y) = map.canvas(p);
                 let far = l.points.last().is_none_or(|q| (q[0] - x).hypot(q[1] - y) * map.scale >= 0.75);
-                if far && l.points.len() < filmcraft_project::drawing::MAX_STROKE_POINTS {
+                if far && l.points.len() < waltcut_project::drawing::MAX_STROKE_POINTS {
                     l.points.push([x, y, pr]);
                 }
             }

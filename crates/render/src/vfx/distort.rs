@@ -1,7 +1,7 @@
 //! Distort and Transform effects (geometry).
 
-use filmcraft_project::EffectInstance;
 use rayon::prelude::*;
+use waltcut_project::EffectInstance;
 
 use super::*;
 use crate::effects::{warp, warp_opt};

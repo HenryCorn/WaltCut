@@ -696,8 +696,8 @@ impl Shortcuts {
     fn persist(&self) {
         let Some(dir) = self.presets_dir() else { return };
         let f = self.file(&self.preset, self.modified);
-        if let Err(e) = std::fs::create_dir_all(&dir)
-            .and_then(|_| filmcraft_format::atomic_write(&dir.join(ACTIVE_FILE), &serde_json::to_vec_pretty(&f).unwrap_or_default()))
+        if let Err(e) =
+            std::fs::create_dir_all(&dir).and_then(|_| waltcut_format::atomic_write(&dir.join(ACTIVE_FILE), &serde_json::to_vec_pretty(&f).unwrap_or_default()))
         {
             log::warn!("saving keyboard shortcuts: {e}");
         }
@@ -1084,7 +1084,7 @@ fn write_file(path: &Path, f: &PresetFile) -> std::result::Result<(), String> {
     if let Some(d) = path.parent() {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
-    filmcraft_format::atomic_write(path, &serde_json::to_vec_pretty(f).unwrap_or_default()).map_err(|e| format!("{}: {e}", path.display()))
+    waltcut_format::atomic_write(path, &serde_json::to_vec_pretty(f).unwrap_or_default()).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 // ------------------------------------------------------------------ commands

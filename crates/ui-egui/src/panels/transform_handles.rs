@@ -15,10 +15,10 @@
 //! `program.transform.rotate.<n>` (just outside corner `n`), `program.transform.anchor`.
 
 use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_geom::{Affine, Vec2};
-use filmcraft_project::{ClipId, EffectDef, EffectInstance, TrackItem};
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_geom::{Affine, Vec2};
+use waltcut_project::{ClipId, EffectDef, EffectInstance, TrackItem};
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::panels::graphics::{frame_to_screen, handle_points, unscale};
@@ -138,9 +138,9 @@ fn within(points: [Pos2; 8], view: Rect) -> [Pos2; 8] {
 fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<Placement> {
     let seq = app.session.active_sequence()?;
     let project = &app.session.project;
-    let size = filmcraft_render::source_size(project, it.item).unwrap_or(frame);
+    let size = waltcut_render::source_size(project, it.item).unwrap_or(frame);
     let view = frame_to_screen(pic, frame);
-    let motion = view.then_apply(&filmcraft_render::motion_matrix(seq, it, size, filmcraft_render::source_par(project, it.item), mt));
+    let motion = view.then_apply(&waltcut_render::motion_matrix(seq, it, size, waltcut_render::source_par(project, it.item), mt));
     // "auto" points (NaN) are where the render puts them
     let point = |id: &str, auto: Vec2| {
         let v = e.param(id).map_or(auto, |p| p.vec2_at(mt));
@@ -152,7 +152,7 @@ fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, p
     let (outer, to_screen, position, anchor) = if e.effect == "transform" {
         let (anchor, position) = (point("anchor", centre), point("position", centre));
         let (sh, sw) = (height / 100.0, if uniform { height } else { width } / 100.0);
-        // as the render places it (`filmcraft_render::gpufx`, "transform")
+        // as the render places it (`waltcut_render::gpufx`, "transform")
         let axis = e.f64_at("skew_axis", mt);
         let shear = Affine { c: e.f64_at("skew", mt).to_radians().tan(), ..Affine::IDENTITY };
         let skew = Affine::rotate_deg(axis).then_apply(&shear).then_apply(&Affine::rotate_deg(-axis));
@@ -385,8 +385,8 @@ fn clip_under(app: &FilmcraftApp, pic: Rect, frame: (u32, u32), p: Pos2) -> Opti
     let view = frame_to_screen(pic, frame);
     let project = &app.session.project;
     seq.video_tracks.iter().rev().filter(|tr| tr.enabled).filter_map(|tr| tr.item_at(t)).filter(|it| it.enabled).find_map(|it| {
-        let size = filmcraft_render::source_size(project, it.item).unwrap_or(frame);
-        let m = view.then_apply(&filmcraft_render::motion_matrix(seq, it, size, filmcraft_render::source_par(project, it.item), it.source_time_at(t)));
+        let size = waltcut_render::source_size(project, it.item).unwrap_or(frame);
+        let m = view.then_apply(&waltcut_render::motion_matrix(seq, it, size, waltcut_render::source_par(project, it.item), it.source_time_at(t)));
         inside(&quad_of(&m, size), p).then_some(it.id)
     })
 }

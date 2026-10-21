@@ -9,10 +9,10 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -154,9 +154,9 @@ fn click_selects_a_transition_and_delete_removes_it() {
     assert_eq!(q["selection"], json!([]), "a transition replaces the clip selection");
     // Effect Controls shows it: duration as timecode, its alignment, Reverse
     let (num, den) = d.rate();
-    let rate = filmcraft_engine::time::FrameRate { num, den };
+    let rate = waltcut_engine::time::FrameRate { num, den };
     let frames = c.duration / frame_ticks((num, den));
-    assert_eq!(d.label("effectControls.transition.duration"), filmcraft_engine::time::format_timecode_frames(frames, rate, false));
+    assert_eq!(d.label("effectControls.transition.duration"), waltcut_engine::time::format_timecode_frames(frames, rate, false));
     assert_eq!(d.label("effectControls.transition.alignment"), "Center at Cut");
     assert_eq!(d.label("effectControls.transition.reverse"), "false");
     d.snapshot("transition-selected");
@@ -270,7 +270,7 @@ fn transition_settings_in_effect_controls() {
     d.click("effectControls.transition.param.direction.option.0");
     assert_eq!(d.transition(id).unwrap()["params"]["direction"], json!({"Choice": 0}));
     d.click("effectControls.transition.reset");
-    let def = filmcraft_engine::project::vtransition::find_transition("push", filmcraft_engine::project::EffectKind::VideoTransition).unwrap();
+    let def = waltcut_engine::project::vtransition::find_transition("push", waltcut_engine::project::EffectKind::VideoTransition).unwrap();
     let want = serde_json::to_value(&def.instance().params.get("direction").unwrap().value).unwrap();
     assert_eq!(d.transition(id).unwrap()["params"]["direction"], want, "Reset puts Push's own defaults back");
 }
@@ -308,10 +308,10 @@ fn transition_timeline_in_effect_controls() {
     assert_eq!(s1, c.start, "the start stays where it was");
     assert_eq!((d1 - c.duration) % frame, 0, "by whole frames");
     let (num, den) = d.rate();
-    let rate = filmcraft_engine::time::FrameRate { num, den };
+    let rate = waltcut_engine::time::FrameRate { num, den };
     assert_eq!(
         d.label("effectControls.transition.duration"),
-        filmcraft_engine::time::format_timecode_frames(d1 / frame, rate, false),
+        waltcut_engine::time::format_timecode_frames(d1 / frame, rate, false),
         "the Duration field follows"
     );
     // its middle: slide it left (more than egui's click tolerance)

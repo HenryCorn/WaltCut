@@ -4,13 +4,13 @@ use craft_ui::docking::{Action, Placement, Zone};
 use egui::{Event, Modifiers, PointerButton, Rect, pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::{
+use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_ui_egui::{
     FilmcraftApp,
     dock::{self, DockNode, Layout, PanelKind, SplitSize},
     menus,
 };
-use serde_json::json;
 
 fn layout() -> Layout {
     Layout {
@@ -381,14 +381,14 @@ fn catalog_docking_action_supports_resize_reorder_and_floating_geometry() {
         Action::Float { panel: PanelKind::Info, rect: [20.0, 40.0, 300.0, 200.0] },
         Action::MoveFloating { panel: PanelKind::Info, rect: [45.0, 65.0, 330.0, 240.0] },
     ] {
-        filmcraft_ui_egui::menus::invoke(&mut app, &ctx, "window.dockAction", json!({"action": action})).unwrap();
+        waltcut_ui_egui::menus::invoke(&mut app, &ctx, "window.dockAction", json!({"action": action})).unwrap();
     }
     assert_eq!(app.ui.floating[0].rect, [45.0, 65.0, 330.0, 240.0]);
     let DockNode::Split { size, .. } = &app.ui.dock else { panic!("split lost") };
     assert_eq!(*size, SplitSize::FixedA(360.0));
     let before = json!({"dock": app.ui.dock, "floating": app.ui.floating});
     assert!(
-        filmcraft_ui_egui::menus::invoke(
+        waltcut_ui_egui::menus::invoke(
             &mut app,
             &ctx,
             "window.dockAction",
@@ -475,17 +475,17 @@ fn narration_selection_reveals_covered_floating_tts_once_without_editing_the_pro
         .iter()
         .flat_map(|track| &track.items)
         .find(|clip| {
-            session.project.item(clip.item).and_then(|item| item.as_media()).is_some_and(|media| media.info.kind == filmcraft_media::MediaKind::AudioOnly)
+            session.project.item(clip.item).and_then(|item| item.as_media()).is_some_and(|media| media.info.kind == waltcut_media::MediaKind::AudioOnly)
         })
         .unwrap()
         .clone();
-    let narration = filmcraft_project::Narration {
+    let narration = waltcut_project::Narration {
         text: "Synthetic narration behind an overlapping pane".into(),
         language: "en-US".into(),
-        voice: filmcraft_tts::default_voice_id().into(),
-        pitch: filmcraft_project::VocalPitch::Default,
+        voice: waltcut_tts::default_voice_id().into(),
+        pitch: waltcut_project::VocalPitch::Default,
         pace: 1.2,
-        speech_duration: filmcraft_time::Tick::ZERO,
+        speech_duration: waltcut_time::Tick::ZERO,
     };
     std::sync::Arc::make_mut(&mut session.project).narrations.insert(clip.item, narration.clone());
     let project = session.project.clone();

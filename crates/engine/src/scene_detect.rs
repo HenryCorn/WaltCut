@@ -4,7 +4,7 @@
 //! createSubclips=false, generateMarkers=false, wait=false}` analyses the selected timeline video
 //! clips in a background job (`jobs.list` shows the progress, `jobs.cancel` stops it without
 //! changing anything). Every sequence frame of each clip is decoded at reduced size and compared
-//! with the previous one ([`filmcraft_render::scene`]). When the job finishes, the results are
+//! with the previous one ([`waltcut_render::scene`]). When the job finishes, the results are
 //! applied in one undo step ("Scene Edit Detection"):
 //!
 //! - **Apply a cut at each detected cut point**: the clip (and its linked audio) is cut at the
@@ -16,10 +16,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use filmcraft_project::{ClipId, ItemId, ItemKind, Label, Marker, MarkerId, MarkerKind, TrackKind};
-use filmcraft_render::scene::{SceneDetector, SceneOptions};
-use filmcraft_time::{Tick, TimeRange};
 use serde_json::{Value, json};
+use waltcut_project::{ClipId, ItemId, ItemKind, Label, Marker, MarkerId, MarkerKind, TrackKind};
+use waltcut_render::scene::{SceneDetector, SceneOptions};
+use waltcut_time::{Tick, TimeRange};
 
 use crate::commands::{CommandSpec, bad, bool_p, clips_p, f64_p, has_seq, u64_p};
 use crate::{EngineError, Result, Session};
@@ -82,7 +82,7 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 /// The media item a clip shows (a subclip resolves to its parent: subclip clips use the parent's
 /// media time).
-fn media_root(p: &filmcraft_project::Project, item: ItemId) -> Option<ItemId> {
+fn media_root(p: &waltcut_project::Project, item: ItemId) -> Option<ItemId> {
     p.resolve_media(item).map(|(root, _, _)| root)
 }
 
@@ -90,7 +90,7 @@ struct Work {
     clip: ClipId,
     name: String,
     media_item: ItemId,
-    src: filmcraft_media::SharedSource,
+    src: waltcut_media::SharedSource,
     scale: f32,
     /// (timeline time, media time) of every sequence frame of the clip.
     frames: Vec<(Tick, Tick)>,
@@ -156,7 +156,7 @@ fn detect(s: &mut Session, p: &Value) -> Result<Value> {
                     err = Some("stopped".to_string());
                     break 'clips;
                 }
-                match w.src.video_frame(filmcraft_media::FrameRequest { time: *mt, scale: w.scale }) {
+                match w.src.video_frame(waltcut_media::FrameRequest { time: *mt, scale: w.scale }) {
                     Ok(f) => {
                         det.push_rgba(&f.to_rgba8(), f.width as usize, f.height as usize);
                     }
@@ -191,7 +191,7 @@ fn detect(s: &mut Session, p: &Value) -> Result<Value> {
             Some(e) => Err(e),
             None => {
                 *lock(&out) = Some(found);
-                Ok(filmcraft_export::Report {
+                Ok(waltcut_export::Report {
                     path: String::new(),
                     frames: done,
                     seconds: secs,
@@ -265,7 +265,7 @@ fn apply_results(s: &mut Session, seq_id: ItemId, apply: SceneApply, results: Ve
                 let min = pr.sequence(seq_id).map(|q| q.settings.frame_rate.frame_duration()).unwrap_or(Tick(1));
                 let mut next = pr.next_id;
                 let q = pr.sequence_mut(seq_id).ok_or(EngineError::NoSequence)?;
-                let mut ctx = filmcraft_edit::EditCtx { next_id: &mut next, media_duration: &durations, media_start: &|_| Tick::ZERO, min_duration: min };
+                let mut ctx = waltcut_edit::EditCtx { next_id: &mut next, media_duration: &durations, media_start: &|_| Tick::ZERO, min_duration: min };
                 // latest cut first: the left piece keeps the clip's id for the earlier cuts
                 for (t, _) in r.cuts.iter().rev() {
                     let link = q.find_item(r.clip).and_then(|(_, it)| it.link);
@@ -273,7 +273,7 @@ fn apply_results(s: &mut Session, seq_id: ItemId, apply: SceneApply, results: Ve
                     if let Some(l) = link {
                         items.extend(q.all_tracks().flat_map(|tr| tr.items.iter()).filter(|it| it.link == Some(l) && it.id != r.clip).map(|it| it.id));
                     }
-                    filmcraft_edit::razor_items(q, &items, *t, &mut ctx);
+                    waltcut_edit::razor_items(q, &items, *t, &mut ctx);
                 }
                 pr.next_id = next;
                 pr.sequence(seq_id).ok_or(EngineError::NoSequence)?.check().map_err(EngineError::Other)?;

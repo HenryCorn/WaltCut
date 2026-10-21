@@ -8,12 +8,12 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_project::{ClipId, Interpolation, Param};
-use filmcraft_time::Tick;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_project::{ClipId, Interpolation, Param};
+use waltcut_time::Tick;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -427,7 +427,7 @@ fn marquee_selects_keyframes_across_property_rows() {
     d.shot("keyframes-marquee-selected");
 }
 
-fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<filmcraft_ui_egui::state::KeyframeRef> {
+fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<waltcut_ui_egui::state::KeyframeRef> {
     specs
         .iter()
         .map(|(param, seconds)| {
@@ -435,7 +435,7 @@ fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<filmcraf
             d.exec("effects.addKeyframe", json!({"clip":clip.id,"effect":"motion","param":param}));
             let session = &d.harness.state().session;
             let it = session.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1;
-            filmcraft_ui_egui::state::KeyframeRef {
+            waltcut_ui_egui::state::KeyframeRef {
                 clip: clip.id,
                 effect: it.effects.iter().position(|e| e.effect == "motion").unwrap(),
                 param: (*param).into(),
@@ -446,7 +446,7 @@ fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<filmcraf
         .collect()
 }
 
-fn key_id(d: &Driver, key: &filmcraft_ui_egui::state::KeyframeRef) -> String {
+fn key_id(d: &Driver, key: &waltcut_ui_egui::state::KeyframeRef) -> String {
     let it = d.harness.state().session.active_sequence().unwrap().find_item(ClipId(key.clip)).unwrap().1;
     let mask = key.mask.map_or_else(String::new, |m| format!("mask{m}."));
     format!("effectControls.{}.{mask}{}.keyframe.{}", it.effects[key.effect].effect, key.param, key.time.0)
@@ -456,7 +456,7 @@ fn center(rect: [f64; 4]) -> egui::Pos2 {
     egui::pos2((rect[0] + rect[2] / 2.0) as f32, (rect[1] + rect[3] / 2.0) as f32)
 }
 
-fn select_keys(d: &mut Driver, keys: &[filmcraft_ui_egui::state::KeyframeRef]) {
+fn select_keys(d: &mut Driver, keys: &[waltcut_ui_egui::state::KeyframeRef]) {
     for (i, key) in keys.iter().enumerate() {
         let id = key_id(d, key);
         d.rect(&id);
@@ -584,7 +584,7 @@ fn effect_and_mask_keyframes_move_together_without_crossing_parameters() {
         }
         d.exec("effects.addKeyframe", p);
         let it = d.harness.state().session.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1;
-        keys.push(filmcraft_ui_egui::state::KeyframeRef {
+        keys.push(waltcut_ui_egui::state::KeyframeRef {
             clip: clip.id,
             effect: it.effects.iter().position(|e| e.effect == "opacity").unwrap(),
             param: "opacity".into(),

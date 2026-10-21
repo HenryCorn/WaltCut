@@ -1,9 +1,9 @@
 //! Decode/encode throughput. Run with
-//! `cargo test --release -p filmcraft-prores --test perf -- --ignored --nocapture`.
+//! `cargo test --release -p waltcut-prores --test perf -- --ignored --nocapture`.
 
 mod common;
-use filmcraft_prores::*;
 use std::time::Instant;
+use waltcut_prores::*;
 
 /// A 1080p frame whose HQ encoding uses the full nominal rate (detailed, noisy content).
 fn busy_1080p(chroma: ChromaFormat) -> Frame {

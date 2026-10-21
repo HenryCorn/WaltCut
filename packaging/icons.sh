@@ -26,7 +26,7 @@ grep -q 'viewBox="-62.14' "$MAC" || { echo "error: unexpected viewBox in $SVG" >
 render() { resvg -w "$2" -h "$2" "$1" "$3" </dev/null; }
 
 render "$SVG" 1024 "$DIR/filmcraft-1024.png"
-# Runtime window/Dock icon on macOS (apps/filmcraft/src/main.rs embeds it).
+# Runtime window/Dock icon on macOS (apps/waltcut/src/main.rs embeds it).
 render "$MAC" 512 "$DIR/filmcraft-macos-512.png"
 
 # Linux hicolor theme. Windows and Linux use the full-bleed tile.
@@ -38,7 +38,7 @@ mkdir -p "$DIR/hicolor/scalable/apps"
 cp "$DIR/filmcraft-small.svg" "$DIR/hicolor/scalable/apps/$APP_ID.svg"
 
 # Web app favicon and loading image.
-render "$SVG" 128 "$ROOT/apps/filmcraft-web/web/favicon.png"
+render "$SVG" 128 "$ROOT/apps/waltcut-web/web/favicon.png"
 
 # Windows .ico.
 ICO_PNGS=()

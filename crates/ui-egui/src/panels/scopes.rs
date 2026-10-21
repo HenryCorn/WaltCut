@@ -1,7 +1,7 @@
 //! Lumetri Scopes: Vectorscope YUV / HLS, Histogram, Parade (RGB / YUV / RGB-White) and Waveform
 //! (RGB / Luma / YC / YC no Chroma) of the Program frame, in a grid when several are shown.
 //!
-//! The maths is in `filmcraft-scopes` (count grids from the decimated frame); this module turns
+//! The maths is in `waltcut-scopes` (count grids from the decimated frame); this module turns
 //! them into textures (cached per frame and settings) and draws the graticules, labels and the
 //! panel chrome: the footer (colour space, wrench, Clamp Signal, 8 Bit / Float / HDR) and the
 //! settings menu (wrench or right-click: Presets, the scopes, Waveform / Parade Type, Colour
@@ -17,7 +17,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
-use filmcraft_scopes::{self as sc, Brightness, ColorSpace, ParadeType, Params, Scale, ScopeKind, Signal, Targets, WaveformType};
+use waltcut_scopes::{self as sc, Brightness, ColorSpace, ParadeType, Params, Scale, ScopeKind, Signal, Targets, WaveformType};
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};
@@ -66,7 +66,7 @@ pub fn frame_signal(app: &mut FilmcraftApp, ctx: &egui::Context, slot: &str, fra
         return Some(ScopeFrame { signal: s.clone(), key, pq: *p, space });
     }
     let fresh = if pq {
-        filmcraft_engine::scopes::scope_signal(&app.session, rate.tick_of(frame), 0.125, true)
+        waltcut_engine::scopes::scope_signal(&app.session, rate.tick_of(frame), 0.125, true)
     } else {
         let fkey = FrameKey { target: Target::Sequence(seq_id), frame, size: 250, revision: rev, draft: false };
         let project = app.session.project.clone();

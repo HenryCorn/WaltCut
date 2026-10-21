@@ -2,7 +2,7 @@
 //! effect definitions). Drag onto a clip or edit point; double-click applies to the selection.
 //!
 //! Lumetri Presets: each preset row has a thumbnail (our Lumetri on the procedural preview
-//! picture, `filmcraft_render::lumetri_presets`); double-click (or right-click ▸ Apply to Selected
+//! picture, `waltcut_render::lumetri_presets`); double-click (or right-click ▸ Apply to Selected
 //! Clips, `effects.presetMenu.apply`) applies it (`lumetri.applyPreset`), and dragging it onto a
 //! Timeline clip applies it to that clip (rows and grid cells alike).
 //! When the panel is wide (maximized), clicking a Lumetri Presets folder shows its presets as a
@@ -33,9 +33,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(body).id_salt("fx-body"));
     bui.set_clip_rect(body);
     let filter = q.to_lowercase();
-    let defs = filmcraft_project::effect_defs();
+    let defs = waltcut_project::effect_defs();
     // folder tree: top-level categories in Premiere's order
-    let tops = filmcraft_project::vtransition::EFFECT_TOP_FOLDERS;
+    let tops = waltcut_project::vtransition::EFFECT_TOP_FOLDERS;
     let mut apply: Option<String> = None;
     let mut lumetri_apply: Option<String> = None;
     let mut preset_action: Option<(String, String)> = None;
@@ -68,7 +68,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             }
             // Sub-folders in definition order; loose items (no sub-folder, e.g. Audio Effects ▸
             // Balance / Mute / Volume) come last, outside any folder.
-            let sub = |d: &filmcraft_project::EffectDef| d.category.get(1).copied().unwrap_or("");
+            let sub = |d: &waltcut_project::EffectDef| d.category.get(1).copied().unwrap_or("");
             let mut subs: Vec<&str> = items.iter().map(|d| sub(d)).collect();
             subs.dedup();
             subs.sort_by_key(|s| s.is_empty());
@@ -90,7 +90,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     // inside the top folder, or inside its sub-folder
                     let x = r.min.x + tree_x(if s.is_empty() { 1 } else { 2 }) + 30.0;
                     let icon_r = Rect::from_center_size(pos2(x - 12.0, r.center().y), vec2(13.0, 13.0));
-                    let is_tr = matches!(d.kind, filmcraft_project::EffectKind::VideoTransition | filmcraft_project::EffectKind::AudioTransition);
+                    let is_tr = matches!(d.kind, waltcut_project::EffectKind::VideoTransition | waltcut_project::EffectKind::AudioTransition);
                     ui.painter().rect_stroke(icon_r, 2.0, egui::Stroke::new(1.0, t.text_dim), egui::StrokeKind::Inside);
                     if is_tr {
                         ui.painter().line_segment([icon_r.left_bottom(), icon_r.right_top()], egui::Stroke::new(1.0, t.text_dim));
@@ -193,28 +193,23 @@ fn apply_menu(app: &mut FilmcraftApp, resp: &egui::Response) -> bool {
 }
 
 /// A preset's thumbnail texture (rendered once per size, cached by name).
-fn preset_texture(app: &mut FilmcraftApp, ctx: &egui::Context, p: &filmcraft_render::lumetri_presets::LumetriPreset, w: usize) -> egui::TextureId {
+fn preset_texture(app: &mut FilmcraftApp, ctx: &egui::Context, p: &waltcut_render::lumetri_presets::LumetriPreset, w: usize) -> egui::TextureId {
     let name = format!("lumetri-preset-{}-{w}", p.name);
     if let Some((id, _)) = app.texture_existing(&name) {
         return id;
     }
     let h = (w * 9 / 16).max(1);
-    let img = filmcraft_render::lumetri_presets::thumbnail(p, w, h);
+    let img = waltcut_render::lumetri_presets::thumbnail(p, w, h);
     let rgba = crate::frames::Rgba { w: img.w, h: img.h, px: img.over_black_rgba8() };
-    let key = crate::frames::FrameKey {
-        target: crate::frames::Target::Item(filmcraft_project::ItemId(u64::MAX)),
-        frame: 0,
-        size: w as u32,
-        revision: 0,
-        draft: false,
-    };
+    let key =
+        crate::frames::FrameKey { target: crate::frames::Target::Item(waltcut_project::ItemId(u64::MAX)), frame: 0, size: w as u32, revision: 0, draft: false };
     app.texture_for(ctx, &name, key, &rgba)
 }
 
 /// The Lumetri Presets folder of the tree: sub-folders and preset rows with thumbnails. Returns
 /// the preset to apply (double-click).
 fn lumetri_rows(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> Option<String> {
-    use filmcraft_render::lumetri_presets as lp;
+    use waltcut_render::lumetri_presets as lp;
     let t = app.tokens;
     let top = "Lumetri Presets";
     let presets: Vec<lp::LumetriPreset> = lp::presets().into_iter().filter(|p| crate::i18n::matches_query(p.name, filter)).collect();
@@ -271,7 +266,7 @@ fn lumetri_rows(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> Opti
 /// The wide Effects panel's thumbnail grid of the selected Lumetri Presets folder. Returns the
 /// preset to apply (double-click).
 fn preset_grid(app: &mut FilmcraftApp, ui: &mut egui::Ui, area: Rect) -> Option<String> {
-    use filmcraft_render::lumetri_presets as lp;
+    use waltcut_render::lumetri_presets as lp;
     let t = app.tokens;
     let folder = app.ui.lumetri_grid_folder.clone()?;
     app.auto.add("effects.presetGrid", area, &folder);

@@ -8,11 +8,11 @@ use std::time::{Duration, Instant};
 
 use egui::CursorIcon;
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_engine::autosave::AutosaveConfig;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_engine::autosave::AutosaveConfig;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,

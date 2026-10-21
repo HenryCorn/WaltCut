@@ -58,7 +58,7 @@ echo "==> FilmCraft $VERSION for macOS ($ARCH), identity: $IDENTITY, notarize: $
 if [ "$SKIP_BUILD" = 0 ]; then
   args=()
   for t in "${TARGETS[@]}"; do args+=(--target "$t"); done
-  (cd "$ROOT" && cargo build --release --locked -p filmcraft -p filmcraft-cli "${args[@]}")
+  (cd "$ROOT" && cargo build --release --locked -p waltcut -p waltcut-cli "${args[@]}")
 fi
 
 rm -rf "$WORK"
