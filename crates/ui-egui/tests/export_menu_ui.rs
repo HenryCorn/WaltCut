@@ -85,14 +85,7 @@ fn tmp(name: &str) -> std::path::PathBuf {
 }
 
 /// Every File ▸ Export entry whose command needs a path, and the extension it saves.
-const SAVED: [(&str, &str); 6] = [
-    ("file.exportEdl", "edl"),
-    ("file.exportFcp7Xml", "xml"),
-    ("file.exportFcpxml", "fcpxml"),
-    ("file.exportOtio", "otio"),
-    ("file.exportAle", "ale"),
-    ("file.exportSelectionProject", "fcproj"),
-];
+const SAVED: [(&str, &str); 1] = [("file.exportSelectionProject", "fcproj")];
 
 #[test]
 fn file_export_entries_ask_for_the_destination() {

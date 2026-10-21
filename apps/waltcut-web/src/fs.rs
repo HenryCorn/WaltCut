@@ -28,7 +28,7 @@ pub const CHUNK: u64 = 1 << 20;
 const READ_AHEAD: u64 = 3;
 /// Bytes of cached chunks kept (least recently used evicted).
 pub const CACHE_BUDGET: usize = 384 << 20;
-/// Largest Blob `read_file` will load whole (captions, interchange documents, projects).
+/// Largest Blob `read_file` will load whole (projects).
 const WHOLE_FILE_MAX: u64 = 256 << 20;
 
 enum Entry {

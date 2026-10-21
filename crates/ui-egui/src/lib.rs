@@ -266,15 +266,8 @@ const SCREENSHOT_SETTLE_MAX_S: f64 = 5.0;
 
 /// Export entries that run from the menus through the save panel: command, filter label,
 /// extension.
-pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 7] = [
-    ("markers.exportCsv", "Marker report (CSV)", "csv"),
-    ("file.exportEdl", "EDL", "edl"),
-    ("file.exportFcp7Xml", "Final Cut Pro XML", "xml"),
-    ("file.exportFcpxml", "FCPXML", "fcpxml"),
-    ("file.exportOtio", "OpenTimelineIO", "otio"),
-    ("file.exportAle", "Avid Log Exchange", "ale"),
-    ("file.exportSelectionProject", "FilmCraft Project", "fcproj"),
-];
+pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 2] =
+    [("markers.exportCsv", "Marker report (CSV)", "csv"), ("file.exportSelectionProject", "FilmCraft Project", "fcproj")];
 
 pub struct FilmcraftApp {
     pub session: Session,
@@ -1297,13 +1290,8 @@ impl FilmcraftApp {
     pub fn file_dialog(&mut self, id: &str, params: &Value) -> Result<Value, String> {
         match id {
             "file.import" => {
-                let exts: Vec<&str> = waltcut_media::VIDEO_EXTENSIONS
-                    .iter()
-                    .chain(waltcut_media::AUDIO_EXTENSIONS)
-                    .chain(waltcut_media::STILL_EXTENSIONS)
-                    .chain(&["srt", "vtt", "scc", "edl", "xml", "fcpxml", "otio", "aaf", "omf"])
-                    .copied()
-                    .collect();
+                let exts: Vec<&str> =
+                    waltcut_media::VIDEO_EXTENSIONS.iter().chain(waltcut_media::AUDIO_EXTENSIONS).chain(waltcut_media::STILL_EXTENSIONS).copied().collect();
                 let bin = params.get("bin").cloned();
                 self.pick(FileDialog::open_files(&exts), move |app, paths| {
                     if paths.is_empty() {
@@ -1356,7 +1344,7 @@ impl FilmcraftApp {
         }
     }
 
-    /// File ▸ Export ▸ EDL…, Final Cut Pro XML… etc. from the menus (#382): ask where to save, then
+    /// File ▸ Export entries that save a file, from the menus (#382): ask where to save, then
     /// run the command with that `path` and the rest of `params`.
     fn export_save_dialog(&mut self, id: &str, filter: &str, ext: &str, params: &Value) -> Result<Value, String> {
         waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&self.session))?;
@@ -1366,7 +1354,6 @@ impl FilmcraftApp {
         // Timelines are named after the sequence; a selection must not suggest the open project's file.
         let sequence = self.session.state.active_sequence.and_then(|s| self.session.project.item(s)).map(|i| i.name.clone());
         let stem = match id {
-            "file.exportAle" => self.session.project.name.clone(),
             "file.exportSelectionProject" => format!("{} selection", self.session.project.name),
             _ => sequence.unwrap_or_else(|| self.session.project.name.clone()),
         };

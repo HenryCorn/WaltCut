@@ -26,7 +26,7 @@ impl FakeFs {
         for f in [
             "/home/me/Movies/shot_0001.png",
             "/home/me/Movies/shot_0002.png",
-            "/home/me/Movies/edit.edl",
+            "/home/me/Movies/edit.fcproj",
             "/home/me/Movies/clip.mov",
             "/home/me/Movies/CLIP.MOV",
         ] {
@@ -100,7 +100,7 @@ fn listing_puts_folders_first_and_hides_unsupported_files() {
     assert_eq!(l["dir"], "/home/me");
     assert_eq!(names(&l), ["Movies"]);
     let l = s.execute("mediaBrowser.list", json!({"path": "/home/me/Movies"})).unwrap();
-    assert_eq!(names(&l), ["Selects", "A-interview.wav", "b-roll.wav", "CLIP.MOV", "clip.mov", "edit.edl", "shot_0001.png", "shot_0002.png"]);
+    assert_eq!(names(&l), ["Selects", "A-interview.wav", "b-roll.wav", "CLIP.MOV", "clip.mov", "edit.fcproj", "shot_0001.png", "shot_0002.png"]);
     let e = &l["entries"][0];
     assert_eq!((e["isDir"].as_bool(), e["kind"].as_str()), (Some(true), Some("folder")));
     let shot = l["entries"].as_array().unwrap().iter().find(|e| e["name"] == "shot_0001.png").unwrap();
@@ -121,7 +121,7 @@ fn file_type_filter() {
     // the setting persists and applies by default
     s.execute("mediaBrowser.settings", json!({"fileTypes": "project"})).unwrap();
     let l = s.execute("mediaBrowser.list", json!({"path": "/home/me/Movies"})).unwrap();
-    assert_eq!(names(&l), ["Selects", "edit.edl"]);
+    assert_eq!(names(&l), ["Selects", "edit.fcproj"]);
     assert!(s.execute("mediaBrowser.settings", json!({"fileTypes": "docx"})).is_err());
     assert!(s.execute("mediaBrowser.settings", json!({"view": "cards"})).is_err());
     s.execute("mediaBrowser.settings", json!({"view": "thumbnails", "columns": ["size", "Frame Rate"]})).unwrap();
@@ -275,7 +275,7 @@ fn probe_and_columns() {
     assert_eq!(media_browser::column_text(e, "Media Type", None), "Audio");
     assert_eq!(media_browser::column_text(e, "Date Modified", None), "2023-11-14 22:13");
     // not media: cached as such
-    assert!(media_browser::probe(&mut s, "/home/me/Movies/edit.edl").is_none());
+    assert!(media_browser::probe(&mut s, "/home/me/Movies/edit.fcproj").is_none());
 }
 
 #[test]
@@ -316,13 +316,4 @@ fn probing_large_unstreamable_files_does_not_read_them_whole() {
     let r = s.execute("file.import", json!({"paths": [wav.to_string_lossy()]})).unwrap();
     assert_eq!(r["items"].as_array().unwrap().len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
-}
-
-/// #1292: an Avid Log Exchange file is something FilmCraft writes (File ▸ Export), not a project
-/// it can import, so the browser doesn't list it with the project files.
-#[test]
-fn ale_logs_are_not_offered_for_import() {
-    assert_eq!(media_browser::kind_of("clips.ale"), None);
-    assert!(!media_browser::extensions().contains(&"ale"));
-    assert_eq!(media_browser::kind_of("cut.edl"), Some("project"));
 }

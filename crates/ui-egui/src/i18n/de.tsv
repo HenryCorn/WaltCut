@@ -19,7 +19,6 @@
 # Lumetri highlights = Lichter, shadows = Tiefen, midtones = Mitteltöne. Keys: Shift = Umschalt,
 # Option = Wahl, Ctrl = Strg.
 
-	AAF…	AAF…
 	About FilmCraft	Über FilmCraft
 	Add Audio Submix Track	Audio-Submix-Spur hinzufügen
 	Add Chapter Marker…	Kapitelmarker hinzufügen…
@@ -61,7 +60,6 @@
 	Audio…	Audio…
 	Auto Save…	Automatisch speichern…
 	Automate to Sequence…	Automatisch in Sequenz einfügen…
-	Avid Log Exchange…	Avid Log Exchange…
 	Bars and Tone…	Farbbalken und Ton…
 	Bin	Ablage
 	Bin From Selection	Ablage aus Auswahl
@@ -118,7 +116,6 @@
 	Distribute Vertically	Vertikal verteilen
 	Duplicate	Duplizieren
 	Dynamic Audio Waveforms	Dynamische Audio-Wellenformen
-	EDL…	EDL…
 	Edit	Bearbeiten
 	Edit Offline…	Offline bearbeiten…
 	Edit Original	Original bearbeiten
@@ -138,7 +135,6 @@
 	Export Markers as CSV…	Marker als CSV exportieren…
 	Extract	Extrahieren
 	Extract Audio	Audio extrahieren
-	FCPXML…	FCPXML…
 	Field Options…	Halbbildoptionen…
 	File	Datei
 	File…	Datei…
@@ -146,7 +142,6 @@
 	FilmCraft Help…	FilmCraft-Hilfe…
 	FilmCraft on GitHub	FilmCraft auf GitHub
 	FilmCraft on getartcraft.com	FilmCraft auf getartcraft.com
-	Final Cut Pro XML…	Final Cut Pro XML…
 	Find Next	Weitersuchen
 	Find…	Suchen…
 	Fit	Einpassen
@@ -238,12 +233,10 @@
 	Next in Sequence	Nächste in der Sequenz
 	Next in Track	Nächste in der Spur
 	Normalize Mix Track…	Mix-Spur normalisieren…
-	OMF…	OMF…
 	Offline File…	Offline-Datei…
 	Open Project…	Projekt öffnen…
 	Open Recent	Zuletzt geöffnete Dateien
 	Clear Recent Files	Zuletzt geöffnete Dateien leeren
-	OpenTimelineIO…	OpenTimelineIO…
 	Optical Flow	Optischer Fluss
 	Overwrite	Überschreiben
 	Paste	Einfügen
@@ -470,9 +463,6 @@
 	SMPTE HD bars with 1 kHz reference tone	SMPTE-HD-Farbbalken mit 1-kHz-Referenzton
 	Community	Community
 	Join us on Discord	Komm zu uns auf Discord
-	OMF Export Settings	OMF-Exporteinstellungen
-	AAF Export Settings	AAF-Exporteinstellungen
-	OMF Title:	OMF-Titel:
 	Mixdown video	Video abmischen
 	Audio:	Audio:
 	Encapsulate	Kapseln
@@ -2673,7 +2663,6 @@
 	Flash Cue Marker	Flash-Cue-Marker
 	System Compatibility Report	Systemkompatibilitätsbericht
 	no GPU adapter: the CPU compositor is used	kein GPU-Adapter: der CPU-Compositor wird verwendet
-	Avid Log Exchange	Avid Log Exchange
 	FilmCraft Project	FilmCraft-Projekt
 	{name} Selection.fcproj	{name} Auswahl.fcproj
 	{name} (Simplified)	{name} (vereinfacht)

@@ -9,7 +9,6 @@
 //! | `file.saveAsTemplate` | File ▸ Save as Template… (`file.templates`, `file.newProjectFromTemplate`) |
 //! | `file.importFromMediaBrowser` | File ▸ Import from Media Browser (⌥⌘I) |
 //! | `file.exportSelectionProject` | File ▸ Export ▸ Selection as FilmCraft Project… |
-//! | `file.exportAle` | File ▸ Export ▸ Avid Log Exchange… |
 //! | `file.mediaPropertiesFile` / `file.mediaProperties` | File ▸ Get Media File Properties for ▸ File… / Selection… (⇧⌘H) |
 //! | `file.projectSettings.general` / `.scratchDisks` | File ▸ Project Settings ▸ General… / Scratch Disks… |
 //! | `edit.find` / `edit.findNext` | Edit ▸ Find… (⌘F) / Find Next |
@@ -130,7 +129,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             has_project_selection,
             export_selection,
         ),
-        spec("file.exportAle", "Avid Log Exchange…", &["File", "Export"], None, r#"{"path":str,"items":[id]?}"#, has_loggable, export_ale),
         query("file.mediaPropertiesFile", "File…", &["File", "Get Media File Properties for"], None, r#"{"path":str}"#, always, media_properties_file),
         query(
             "file.mediaProperties",
@@ -226,7 +224,7 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         (At::Before("file.closeProject"), vec!["file.close"]),
         (At::After("file.closeProject"), vec!["file.closeAllProjects", "file.closeAllOtherProjects"]),
         (At::After("file.saveCopy"), vec!["file.saveAsTemplate"]),
-        (At::After("file.exportEdl"), vec!["file.exportSelectionProject", "file.exportAle", "file.exportOtio", "file.exportFcp7Xml", "file.exportFcpxml"]),
+        (At::After("file.exportMedia"), vec!["file.exportSelectionProject"]),
         (
             At::Before("file.projectManager"),
             vec![
@@ -393,9 +391,6 @@ fn is_offline(s: &Session, id: ItemId) -> bool {
 }
 fn has_offline_selection(s: &Session) -> std::result::Result<(), String> {
     if targets(s, &Value::Null).iter().any(|i| is_offline(s, *i)) { Ok(()) } else { Err("select an offline clip".into()) }
-}
-fn has_loggable(s: &Session) -> std::result::Result<(), String> {
-    if s.project.items.keys().any(|i| media_of(&s.project, *i).is_some()) { Ok(()) } else { Err("the project has no clips to log".into()) }
 }
 fn can_automate(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
@@ -792,24 +787,6 @@ fn export_selection(s: &mut Session, p: &Value) -> Result<Value> {
     sub.root.name = name;
     s.services.write_file(&path, &waltcut_format::encode(&sub, false)).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     Ok(json!({"path": path, "items": keep.iter().map(|i| i.0).collect::<Vec<_>>()}))
-}
-
-fn export_ale(s: &mut Session, p: &Value) -> Result<Value> {
-    let path = str_p(p, "path").ok_or_else(|| bad("file.exportAle", "need `path`"))?.to_string();
-    let mut items: Vec<ItemId> = match p.get("items").and_then(Value::as_array) {
-        Some(a) => a.iter().filter_map(|v| v.as_u64().map(ItemId)).collect(),
-        None => s.state.project_selection.clone(),
-    };
-    if items.is_empty() {
-        // the whole project, in Project panel order
-        s.project.root.all_items(&mut items);
-    }
-    let doc = waltcut_interchange::ale::export_items(&s.project, &items);
-    if doc.rows.is_empty() {
-        return Err(EngineError::Other("none of the items is a clip that can be logged".into()));
-    }
-    s.services.write_file(&path, waltcut_interchange::ale::write(&doc).as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
-    Ok(json!({"path": path, "clips": doc.rows.len()}))
 }
 
 // ---------------------------------------------------------------------------------------------
