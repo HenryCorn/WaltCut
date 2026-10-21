@@ -1,6 +1,18 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 reviews:
   auto_review:
+    enabled: true
+    drafts: false
     # Dependabot bumps are checked by CI; skip CodeRabbit reviews on them.
     ignore_usernames:
       - "dependabot[bot]"
+  path_instructions:
+    - path: "crates/**/*.rs"
+      instructions: |
+        Review Rust changes against AGENTS.md: production code must not panic, use unsafe, or
+        trust file, media, UI, CLI, or control-channel input. Check that errors are propagated,
+        arithmetic and indexing are bounded, and background work reports failures.
+    - path: ".github/workflows/**"
+      instructions: |
+        Check least-privilege permissions, untrusted pull-request input, action pinning or
+        versioning, and whether required checks can be skipped or cancelled unsafely.

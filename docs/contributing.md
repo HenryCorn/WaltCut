@@ -1,4 +1,7 @@
-# Contributing
+# Contributing to WaltCut
+
+WaltCut is a fork of FilmCraft focused on drawing and 2D animation. The Rust workspace retains its
+upstream `filmcraft-*` crate and package names to keep upstream integration practical.
 
 Read [AGENTS.md](../AGENTS.md) first. Its rules on assets, clean-room code and licences are
 absolute and override everything here. Then read [architecture.md](architecture.md) and the README
@@ -147,7 +150,19 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
 - When a milestone lands, update its row in [roadmap.md](roadmap.md) (status, what's done, estimates), the summary in `ROADMAP.md`, and the parity doc and [gaps.md](gaps.md) entry it moves, with their "Last updated" lines and revision history.
 - AI agents end commit messages with the attribution line their environment requires.
 
-## 5. Parallel work (several agents or worktrees)
+## 5. Pull requests and repository checks
+
+Open pull requests against `main` from a short-lived branch named for the work. Link the issue,
+explain the user-visible change, and report relevant local checks in the pull request description.
+The repository CI workflow runs `cargo xtask ci` on Linux, macOS, and Windows for every pull
+request and push to `main`; all platform checks must pass before merge.
+
+CodeRabbit is configured to review pull requests when its GitHub integration is enabled. Its
+findings are advisory; resolve review conversations and follow the project's safety and licensing
+rules. Do not commit secrets, generated build output, or assets without the attribution required by
+[AGENTS.md](../AGENTS.md).
+
+## 6. Parallel work (several agents or worktrees)
 
 ```sh
 git worktree add ../filmcraft-hevc -b hevc-work
@@ -161,7 +176,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 - Test fixtures always go to `<repo>/target/fixtures/`, whatever `CARGO_TARGET_DIR` says.
 - `.mcp.json` points at `target/release/filmcraft-cli`. With a custom target dir, use your own path.
 
-## 6. How to add…
+## 7. How to add…
 
 ### A command
 
