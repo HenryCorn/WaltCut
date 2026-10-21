@@ -46,10 +46,16 @@ jobs:
           rs_lines=$(git ls-files -z '*.rs' | xargs -0 cat | wc -l | tr -d ' ')
 
           t0=$(now)
-          cargo build --release -p filmcraft
+          # the app package is `filmcraft` before the crate rename (#2) and `waltcut` after it
+          pkg=filmcraft
+          cargo metadata --no-deps --format-version 1 | jq -e '.packages[] | select(.name == "waltcut")' > /dev/null && pkg=waltcut
+          cargo build --release -p "$pkg"
           build_status=$?
           build_secs=$(( $(now) - t0 ))
-          bin_bytes=$(stat -f %z target/release/filmcraft 2>/dev/null || echo 0)
+          # the binary keeps its name until the product rename
+          bin=target/release/waltcut
+          [ -f "$bin" ] || bin=target/release/filmcraft
+          bin_bytes=$(stat -f %z "$bin" 2>/dev/null || echo 0)
 
           t0=$(now)
           cargo test --workspace --release --no-fail-fast

@@ -14,9 +14,9 @@
 
 use egui::text::LayoutJob;
 use egui::{Align2, Color32, CornerRadius, FontId, Rect, RichText, Sense, Stroke, StrokeKind, TextFormat, pos2, vec2};
-use filmcraft_engine::shortcuts::{APPLICATION, Chord, KEYS, Mods, PANELS, Platform};
 use serde::Serialize;
 use serde_json::{Value, json};
+use waltcut_engine::shortcuts::{APPLICATION, Chord, KEYS, Mods, PANELS, Platform};
 
 use crate::FilmcraftApp;
 use crate::native_dialogs::FileDialog;
@@ -77,7 +77,7 @@ fn label_of(app: &FilmcraftApp, id: &str) -> String {
         .shortcuts
         .command(id)
         .map(|c| c.label)
-        .or_else(|| filmcraft_engine::find_command(id).map(|c| c.label.to_string()))
+        .or_else(|| waltcut_engine::find_command(id).map(|c| c.label.to_string()))
         .map_or_else(|| id.to_string(), |l| crate::i18n::t(&l).to_string())
 }
 

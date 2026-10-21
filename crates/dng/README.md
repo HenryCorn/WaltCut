@@ -1,4 +1,4 @@
-# filmcraft-dng
+# waltcut-dng
 
 Clean-room DNG and CinemaDNG camera RAW decoder in pure Rust. Layer L0: depends only on
 `thiserror` and (optional, feature `threads`, default on) `rayon`. Builds for
@@ -26,13 +26,13 @@ when it is installed, never linked.
 ## API
 
 ```rust
-if filmcraft_dng::sniff(&bytes) {
-    let dng = filmcraft_dng::Dng::parse(&bytes)?;
+if waltcut_dng::sniff(&bytes) {
+    let dng = waltcut_dng::Dng::parse(&bytes)?;
     let info = dng.info()?;     // size after crop, bits, CFA or LinearRaw, frame rate, time code, camera, reel
     let raw = dng.raw()?;       // the stored samples (u16), bit-exact
     let img = dng.develop()?;   // linear Rec. 709 RGBA f32 (alpha 1), info.width × info.height
 }
-let img = filmcraft_dng::decode(&bytes)?; // parse + develop
+let img = waltcut_dng::decode(&bytes)?; // parse + develop
 ```
 
 `writer` (feature `writer`, tests only) writes synthetic DNGs: uncompressed at any depth or

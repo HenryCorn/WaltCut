@@ -1,8 +1,8 @@
-//! # filmcraft-automation
+//! # waltcut-automation
 //!
 //! The FilmCraft MCP server (official `rmcp` SDK, stdio transport).
 //!
-//! * **Headless** mode drives an in-process [`filmcraft_engine::Session`]: every engine command,
+//! * **Headless** mode drives an in-process [`waltcut_engine::Session`]: every engine command,
 //!   project/sequence inspection and frame rendering (PNG) — no window needed.
 //! * **Bridge** mode forwards to a running desktop app over the JSON-lines control channel
 //!   (`filmcraft --control <port>`), so agents can also inspect, screenshot, click, drag, scroll
@@ -22,7 +22,7 @@ pub enum AutomationError {
     #[error("{0}")]
     BadRequest(String),
     #[error(transparent)]
-    Engine(#[from] filmcraft_engine::EngineError),
+    Engine(#[from] waltcut_engine::EngineError),
     #[error("bridge: {0}")]
     Bridge(String),
     #[error("app: {0}")]

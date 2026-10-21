@@ -1,12 +1,12 @@
-//! Drawing clips: rasterising pen strokes (`filmcraft_project::drawing`).
+//! Drawing clips: rasterising pen strokes (`waltcut_project::drawing`).
 //!
 //! Each stroke is a chain of round-capped segments whose radius follows the pen pressure. A stroke's
 //! coverage is the *maximum* over its segments (not their sum), so the overlapping joints of a slow,
 //! dense stroke don't build up darker blobs; strokes then composite over one another in paint order.
 //! The eraser removes coverage from what is already painted in the cel.
 
-use filmcraft_geom::{Affine, Vec2};
-use filmcraft_project::drawing::{Brush, Stroke};
+use waltcut_geom::{Affine, Vec2};
+use waltcut_project::drawing::{Brush, Stroke};
 
 use crate::graphics::premul_linear;
 use crate::image::Image;
@@ -132,7 +132,7 @@ fn paint_stroke(s: &Stroke, m: &Affine, k: f32, img: &mut Image) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use filmcraft_project::drawing::StrokePoint;
+    use waltcut_project::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32, f32)], size: f32) -> Stroke {
         Stroke { brush, color: [1.0, 1.0, 1.0, 1.0], size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect() }

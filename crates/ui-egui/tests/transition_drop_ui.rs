@@ -1,10 +1,10 @@
 //! Transition drag feedback: actual span and edge, no edit until release, one undo step.
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
 use egui_kittest::Harness;
-use filmcraft_engine::{Session, commands::preview_transition};
-use filmcraft_project::TrackKind;
-use filmcraft_ui_egui::FilmcraftApp;
 use serde_json::json;
+use waltcut_engine::{Session, commands::preview_transition};
+use waltcut_project::TrackKind;
+use waltcut_ui_egui::FilmcraftApp;
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
     let ctx = h.ctx.clone();

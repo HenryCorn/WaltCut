@@ -3,8 +3,8 @@
 //! picture, new identity) without an undo step, a file still being written is tried again, and
 //! the background look does the same.
 
-use filmcraft_media::DemoScene;
 use serde_json::json;
+use waltcut_media::DemoScene;
 
 use crate::Session;
 use crate::media_test_util::{frame_rgba, make_movie, psnr, session_with, tmp_dir};

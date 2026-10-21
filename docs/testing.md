@@ -2,8 +2,8 @@
 
 ```sh
 cargo test --workspace                          # everything; oracle tests skip without ffmpeg
-cargo test -p filmcraft-h264                    # one crate
-cargo test --release -p filmcraft-hevc          # codec tests are much faster in release
+cargo test -p waltcut-h264                    # one crate
+cargo test --release -p waltcut-hevc          # codec tests are much faster in release
 cargo xtask ci                                  # all gates (fmt, clippy, tests, layers, assets, wasm)
 cargo xtask fixtures                            # pre-generate the ffmpeg fixture matrix
 FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
@@ -45,17 +45,17 @@ Commit `*.proptest-regressions` files so failing cases are re-run.
 ffmpeg and ffprobe are **external processes** used to generate fixtures and to check results. They
 are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
 
-- The tools are found by `filmcraft-testkit` (a dev-dependency-only crate, `crates/testkit`), in
+- The tools are found by `waltcut-testkit` (a dev-dependency-only crate, `crates/testkit`), in
   this order: `FILMCRAFT_FFMPEG` / `FILMCRAFT_FFPROBE` (explicit paths; a wrong path is an error),
   then every directory on `PATH` (`ffmpeg` and `ffmpeg.exe`), then well-known install directories
   (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `C:\ffmpeg\bin`, …).
 - If a tool is missing the test prints `SKIPPED (<test>): ffmpeg not found …` and passes. Set
   **`FILMCRAFT_REQUIRE_ORACLES=1`** (CI) to make every such skip a failure. In new tests use
-  `let ff = filmcraft_testkit::require_ffmpeg!();` (also `require_ffprobe!`, `require_oracles!`).
+  `let ff = waltcut_testkit::require_ffmpeg!();` (also `require_ffprobe!`, `require_oracles!`).
 - Some oracles need a recent ffmpeg: the APV tests (`crates/apv/tests/oracle.rs`) skip when
   `ffmpeg -formats` does not list `apv` (ffmpeg ≥ 8.0), naming the detected version.
 - Fixtures are generated on first use into `<workspace>/target/fixtures/<crate>/`
-  (`filmcraft_testkit::fixtures_dir`; independent of `CARGO_TARGET_DIR`, so agents with private
+  (`waltcut_testkit::fixtures_dir`; independent of `CARGO_TARGET_DIR`, so agents with private
   target dirs share them; `FILMCRAFT_FIXTURES_DIR` overrides the root) and reused afterwards.
   Generators write to a per-process/thread temporary name (`testkit::temp_path`) and rename it into
   place, so concurrent tests never see half-written files. Delete the directory to regenerate.
@@ -123,7 +123,7 @@ Each codec README has the full fixture matrix and the measured results.
 
 ## 3. Rendering: CPU reference and GPU parity
 
-- The CPU compositor in `filmcraft-render` is the reference. Its tests check computed values
+- The CPU compositor in `waltcut-render` is the reference. Its tests check computed values
   (opacity blends, dissolve midpoints, Motion placement, ½-resolution against downsampled full
   resolution) and that `render::plan` matches `render_sequence`.
 - `crates/gpu/src/tests.rs` composites the same frame plan (a YUV layer plus a transformed,
@@ -140,7 +140,7 @@ Each codec README has the full fixture matrix and the measured results.
   management: S-Log3/S-Gamut3.Cine footage interpreted into Rec. 709 (`log_to_rec709`) and
   Rec. 2100 PQ footage tone mapped into Rec. 709 (`hdr_tone_map`; the footage is demo frames
   re-encoded by the test's `Encoded` source). Each frame is compared
-  with `crates/golden/goldens/<scene>.png` by `filmcraft_testkit::golden`:
+  with `crates/golden/goldens/<scene>.png` by `waltcut_testkit::golden`:
   **PSNR ≥ 45 dB, max abs ≤ 12, 99th-percentile per-pixel max channel difference ≤ 2** (8-bit
   sRGB levels; `Tolerance::RENDER`). On failure the actual frame and a ×8 difference image go to
   `<workspace>/target/golden-failures/`. Six `vfx_*` scenes cover the M5.11 effects (Corner Pin over Turbulent
@@ -155,10 +155,10 @@ Each codec README has the full fixture matrix and the measured results.
   from both, the output is finite and deterministic (also on 1×1 / odd sizes and NaN progress), every
   parameter visibly changes the picture, and every direction differs. Golden *fingerprints* (4×4 mean
   RGB grid at p = 0.25/0.5/0.75, ±4 levels) live in `src/transitions/goldens.txt`; re-bless with
-  `FILMCRAFT_BLESS=1 cargo test -p filmcraft-render golden_fingerprints` and review the diff.
-  `FILMCRAFT_TRANSITION_SHEETS=<dir> cargo test -p filmcraft-render contact_sheets -- --ignored`
+  `FILMCRAFT_BLESS=1 cargo test -p waltcut-render golden_fingerprints` and review the diff.
+  `FILMCRAFT_TRANSITION_SHEETS=<dir> cargo test -p waltcut-render contact_sheets -- --ignored`
   writes one contact-sheet PNG per folder for eyeballing (never commit them).
-- **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p filmcraft-golden` rewrites the references (and
+- **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
   References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
   and every one needs its sidecar and index row (`cargo xtask assets`). Look at a re-blessed PNG
@@ -223,9 +223,9 @@ the Export button and the header's Quick Export popup (`export-*.png` snapshots)
 Lumetri Input/Look LUT menus and section switches, the Interpret Footage ▸ Color Management and
 Sequence Color Management dialogs, and the HDR scopes of a PQ sequence.
 
-Colour science tests: `filmcraft-color` (curve round trips and published reference values per
+Colour science tests: `waltcut-color` (curve round trips and published reference values per
 camera log curve, BT.709/BT.2087 matrices, BT.2390 EETF, gamut mapping, LUT tetrahedral vs a
-brute-force barycentric reference, `.cube`/`.3dl` round trips), `filmcraft-gpu`
+brute-force barycentric reference, `.cube`/`.3dl` round trips), `waltcut-gpu`
 (`gpu_lut_matches_cpu_tetrahedral`: WGSL vs CPU, max |Δ| ≈ 2e-7), `render::colorman`,
 `render::color_match`, engine `color_tests.rs`, and `export::tests::hdr_exports_signal_pq_and_hlg`
 (PQ/HLG exports read back by our demuxer and by ffprobe: `color_transfer`, `color_primaries`,
@@ -235,7 +235,7 @@ Not covered headless: `ui.screenshot` (needs a real viewport), the wgpu monitor 
 runs the CPU texture path), audio output, and wall-clock playback advance (kittest frames do not
 advance real time). Playing sound is covered without a device: `play_ahead` tests drive the
 mixed-ahead ring with a wall-clock device (order, underruns stay in time, mixer panic, stop), and
-`cargo run --release -p filmcraft-ui-egui --example bench_audio -- <project.fcproj>` plays a real
+`cargo run --release -p waltcut-ui-egui --example bench_audio -- <project.fcproj>` plays a real
 project's sequences through a simulated 48 kHz device and counts dropouts, mixing in the callback
 (`direct`, as before) against mixing ahead (`ahead`). Use `Driver` for new UI regressions: `d.exec(command, params)`,
 `d.ok(method, params)`, `d.frames(n)`.
@@ -245,7 +245,7 @@ project's sequences through a simulated 48 kHz device and counts dropouts, mixin
 For visual work, drive the real app:
 
 ```sh
-cargo run --release -p filmcraft -- --control 9876
+cargo run --release -p waltcut -- --control 9876
 ```
 
 Then script it over the control channel or MCP: run commands, click by automation id,
@@ -258,12 +258,12 @@ engine behaviour without a window.
 
 | Benchmark | Command |
 |---|---|
-| H.264 decode, 1080p, threads sweep | `cargo test --release -p filmcraft-h264 --test perf -- --ignored --nocapture` |
-| HEVC decode, 1080p / 2160p | `cargo test --release -p filmcraft-hevc --test perf -- --ignored --nocapture` |
-| ProRes decode/encode | `cargo test --release -p filmcraft-prores --test perf -- --ignored --nocapture` |
-| Encoder speed / PSNR / bitrate | `cargo run --release -p filmcraft-h264enc --example h264enc_synth -- …` |
-| Decode a real file through the media stack | `cargo run --release -p filmcraft-cli -- bench-decode file.mp4 --frames 120` |
-| Coding-tool coverage of the fixtures | `cargo test --release -p filmcraft-h264 --test conformance coverage_report -- --ignored --nocapture` (same for `hevc`) |
+| H.264 decode, 1080p, threads sweep | `cargo test --release -p waltcut-h264 --test perf -- --ignored --nocapture` |
+| HEVC decode, 1080p / 2160p | `cargo test --release -p waltcut-hevc --test perf -- --ignored --nocapture` |
+| ProRes decode/encode | `cargo test --release -p waltcut-prores --test perf -- --ignored --nocapture` |
+| Encoder speed / PSNR / bitrate | `cargo run --release -p waltcut-h264enc --example h264enc_synth -- …` |
+| Decode a real file through the media stack | `cargo run --release -p waltcut-cli -- bench-decode file.mp4 --frames 120` |
+| Coding-tool coverage of the fixtures | `cargo test --release -p waltcut-h264 --test conformance coverage_report -- --ignored --nocapture` (same for `hevc`) |
 | **Whole-app suite**: decode fps per codec, playback, scrubbing, timeline UI, export, project save/open, peak RSS | `cargo xtask bench` ([performance.md](performance.md)) |
 
 `cargo xtask bench` (the example `crates/ui-egui/examples/bench/`) runs six sections, each in its
@@ -291,7 +291,7 @@ performance table, with machine and thread count. Headline numbers go in
 sequences headlessly through the Program monitor's own frame scheduler: the `FrameServer` worker
 pool, `schedule_playback` (prefetch order and stale-job dropping), its caches, and the
 `PlaybackMeter` that counts shown/dropped frames in the app. On the GPU path it also composites
-each plan with `filmcraft-gpu`, as the monitor does on the UI thread.
+each plan with `waltcut-gpu`, as the monitor does on the UI thread.
 
 ```sh
 cargo xtask bench-playback                                   # every scenario, GPU path, Full and Half
@@ -354,5 +354,5 @@ core) must run at least 4x realtime in release builds (1x in debug). On Unix it 
 thread's CPU time, so it runs with the rest of the suite. Hosts without a per-thread CPU clock
 (Windows) fall back to wall time, which depends on load, so there it is ignored by default; run it
 explicitly with
-`cargo test --release -p filmcraft-render --lib perf_24_tracks_3_effects_realtime_factor -- --ignored --nocapture`
+`cargo test --release -p waltcut-render --lib perf_24_tracks_3_effects_realtime_factor -- --ignored --nocapture`
 and record the machine with the result.

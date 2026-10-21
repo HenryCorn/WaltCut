@@ -1,5 +1,5 @@
 //! Decode throughput and per-stage breakdown (ignored; run with
-//! `cargo test --release -p filmcraft-av1 --test perf -- --ignored --nocapture`).
+//! `cargo test --release -p waltcut-av1 --test perf -- --ignored --nocapture`).
 //!
 //! The machine may be busy (other builds), so single-threaded work is also measured with the
 //! thread CPU clock, which is robust to load; wall-clock figures are printed next to the load
@@ -7,8 +7,8 @@
 
 mod common;
 use common::*;
-use filmcraft_av1::{DecodeStats, Decoder, Stage};
 use std::time::Instant;
+use waltcut_av1::{DecodeStats, Decoder, Stage};
 
 fn thread_cpu_secs() -> Option<f64> {
     #[cfg(unix)]

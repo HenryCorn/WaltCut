@@ -6,9 +6,9 @@
 //! `timeline.captionTrack.C1.*`).
 
 use egui::{Align2, Color32, CursorIcon, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::{CaptionTrack, ClipId, Sequence};
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_project::{CaptionTrack, ClipId, Sequence};
+use waltcut_time::Tick;
 
 use super::timeline::Layout;
 use crate::FilmcraftApp;
@@ -43,7 +43,7 @@ fn drag_state(ctx: &egui::Context) -> Option<(u64, u8, i64)> {
     ctx.data(|d| d.get_temp::<(u64, u8, i64)>(drag_id()))
 }
 
-fn block_rect(c: &filmcraft_project::Caption, row: Rect, layout: &Layout, drag: Option<(u64, u8, i64)>) -> Rect {
+fn block_rect(c: &waltcut_project::Caption, row: Rect, layout: &Layout, drag: Option<(u64, u8, i64)>) -> Rect {
     let (mut s, mut e) = (c.start, c.end());
     if let Some((id, g, d)) = drag.filter(|d| d.0 == c.id.0) {
         let _ = id;
@@ -147,7 +147,7 @@ pub fn paint(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, area: Re
                 p.rect_stroke(r, 3.0, Stroke::new(1.0, t.clip_selected_border), StrokeKind::Inside);
             }
             if r.width() > 14.0 {
-                let text = filmcraft_project::plain_text(&c.text).replace('\n', " ");
+                let text = waltcut_project::plain_text(&c.text).replace('\n', " ");
                 // in reading order; Arabic and Hebrew start at the block's right edge
                 crate::rtl::paint_line(
                     &p.with_clip_rect(r.shrink2(vec2(4.0, 0.0)).intersect(lane)),
@@ -192,9 +192,9 @@ fn interact_block(
     app: &mut FilmcraftApp,
     ui: &mut egui::Ui,
     tr: &CaptionTrack,
-    c: &filmcraft_project::Caption,
+    c: &waltcut_project::Caption,
     r: Rect,
-    rate: filmcraft_time::FrameRate,
+    rate: waltcut_time::FrameRate,
     actions: &mut Vec<(String, Value)>,
 ) {
     let ctx = ui.ctx().clone();

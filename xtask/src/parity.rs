@@ -216,8 +216,8 @@ pub fn run(root: &Path, args: &[&str]) -> Result<(), String> {
 /// the `effect_catalog` example.
 fn dump_ours(area: Area) -> Result<String, String> {
     let (package, example) = match area {
-        Area::Menus => ("filmcraft-ui-egui", "menu_tree"),
-        Area::Effects | Area::Transitions => ("filmcraft-project", "effect_catalog"),
+        Area::Menus => ("waltcut-ui-egui", "menu_tree"),
+        Area::Effects | Area::Transitions => ("waltcut-project", "effect_catalog"),
     };
     let mut cmd = Command::new(env!("CARGO"));
     cmd.args(["run", "-q", "-p", package, "--example", example]).stderr(Stdio::inherit());

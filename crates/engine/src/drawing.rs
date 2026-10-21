@@ -1,15 +1,15 @@
 //! Drawing commands: frame-by-frame animation layers drawn over the picture
-//! (`filmcraft_project::drawing`).
+//! (`waltcut_project::drawing`).
 //!
 //! A drawing clip is targeted by `clip`, else the selected drawing clip, else the topmost drawing
 //! clip under the playhead. Frames are drawing frames (0 = the clip's first source frame) and come
 //! from `frame`, else from the timeline time in `time` / `timecode` / `seconds`, else the playhead.
 //! Every stroke is one undo step.
 
-use filmcraft_project::drawing::{self, Brush, Cel, Drawing, Stroke, StrokePoint};
-use filmcraft_project::{ClipId, ItemId, ItemKind, Sequence};
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_project::drawing::{self, Brush, Cel, Drawing, Stroke, StrokePoint};
+use waltcut_project::{ClipId, ItemId, ItemKind, Sequence};
+use waltcut_time::Tick;
 
 use crate::commands::{CommandSpec, always, bad, bool_p, f64_p, has_seq, str_p, time_p, u64_p};
 use crate::{EngineError, Result, Session};
@@ -121,7 +121,7 @@ fn new_drawing(s: &mut Session, p: &Value) -> Result<Value> {
     let name = str_p(p, "name").unwrap_or("Drawing").to_string();
     let item_name = name.clone();
     let clip = crate::graphics::place_video_clip(s, ID, &name, &placement, "New Drawing", Vec::new(), move |pr, (w, h, rate)| {
-        let src = pr.add_item(&item_name, filmcraft_project::Label::Mango, ItemKind::Drawing(std::sync::Arc::new(Drawing::new(w, h, rate))), None);
+        let src = pr.add_item(&item_name, waltcut_project::Label::Mango, ItemKind::Drawing(std::sync::Arc::new(Drawing::new(w, h, rate))), None);
         (src, rate.snap_nearest(Tick::from_seconds_f64(seconds)).max(rate.frame_duration()))
     })?;
     let item = s.active_sequence().and_then(|q| q.find_item(clip)).map(|(_, it)| it.item.0);

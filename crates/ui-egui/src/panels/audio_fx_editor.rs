@@ -15,10 +15,10 @@
 use std::collections::HashMap;
 
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
-use filmcraft_project::{ClipId, EffectInstance, ParamKind, ParamValue, TrackId};
-use filmcraft_time::Tick;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use waltcut_project::{ClipId, EffectInstance, ParamKind, ParamValue, TrackId};
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::theme::Tokens;
@@ -141,7 +141,7 @@ impl Ed<'_> {
                     _ => ParamValue::Float(*v),
                 };
             } else if let Some(d) = e.def().and_then(|d| d.param(k)) {
-                let mut p = filmcraft_project::Param::new(d.default.clone());
+                let mut p = waltcut_project::Param::new(d.default.clone());
                 p.value = ParamValue::Float(*v);
                 e.params.insert(k.clone(), p);
             }
@@ -285,7 +285,7 @@ fn response_plot(ui: &mut egui::Ui, ed: &mut Ed, size: egui::Vec2, range: f64) -
         d += step;
     }
     // curve from the DSP
-    if let Some(dsp) = filmcraft_render::audio_fx::configured(&ed.preview(), ed.mt, 48000) {
+    if let Some(dsp) = waltcut_render::audio_fx::configured(&ed.preview(), ed.mt, 48000) {
         let pts: Vec<Pos2> = (0..=240)
             .filter_map(|i| {
                 let x = r.min.x + r.width() * i as f32 / 240.0;
@@ -372,9 +372,9 @@ fn graphic(ui: &mut egui::Ui, ed: &mut Ed) {
         _ => 30,
     };
     let labels: &[&str] = match n {
-        10 => &filmcraft_project::effect::GEQ10_LABELS,
-        20 => &filmcraft_project::effect::GEQ20_LABELS,
-        _ => &filmcraft_project::effect::GEQ30_LABELS,
+        10 => &waltcut_project::effect::GEQ10_LABELS,
+        20 => &waltcut_project::effect::GEQ20_LABELS,
+        _ => &waltcut_project::effect::GEQ30_LABELS,
     };
     let w = (n as f32 * 26.0).max(420.0);
     response_plot(ui, ed, vec2(w, 140.0), 24.0);
@@ -438,7 +438,7 @@ fn transfer_plot(ui: &mut egui::Ui, ed: &mut Ed, size: f32, band: usize, auto: S
         p.line_segment([map(lo, d), map(0.0, d)], Stroke::new(1.0, ed.t.plot_grid));
     }
     p.line_segment([map(lo, lo), map(0.0, 0.0)], Stroke::new(1.0, ed.t.plot_axis));
-    if let Some(dsp) = filmcraft_render::audio_fx::configured(&ed.preview(), ed.mt, 48000) {
+    if let Some(dsp) = waltcut_render::audio_fx::configured(&ed.preview(), ed.mt, 48000) {
         let pts: Vec<Pos2> = (0..=120)
             .filter_map(|i| {
                 let x = lo + -lo * i as f64 / 120.0;

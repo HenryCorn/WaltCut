@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use filmcraft_frame::{Chroma, PixelData, VideoFrame, pool};
+use waltcut_frame::{Chroma, PixelData, VideoFrame, pool};
 
 /// A mapped biplanar surface: a luma plane followed by interleaved chroma, `stride` bytes per row.
 pub struct Biplanar<'a> {
@@ -25,7 +25,7 @@ pub struct Geometry {
     pub crop: (u32, u32, u32, u32),
     /// Significant bits per sample: 8 (NV12) or 10 (P010).
     pub bits: u32,
-    pub color: filmcraft_color::ColorInfo,
+    pub color: waltcut_color::ColorInfo,
     pub par: (u32, u32),
 }
 
@@ -78,7 +78,7 @@ pub fn to_frame(src: &Biplanar, g: &Geometry) -> Result<VideoFrame, String> {
         }
         PixelData::Yuv16 { planes: [Arc::new(yp), Arc::new(u), Arc::new(v)], chroma: Chroma::C420, bits: g.bits, alpha: None }
     };
-    Ok(VideoFrame { width: w as u32, height: h as u32, data, color: g.color, par: g.par, pts: filmcraft_time::Tick::ZERO })
+    Ok(VideoFrame { width: w as u32, height: h as u32, data, color: g.color, par: g.par, pts: waltcut_time::Tick::ZERO })
 }
 
 #[cfg(test)]
@@ -86,7 +86,7 @@ mod tests {
     use super::*;
 
     fn geometry(crop: (u32, u32, u32, u32), bits: u32) -> Geometry {
-        Geometry { crop, bits, color: filmcraft_color::ColorInfo::REC709, par: (1, 1) }
+        Geometry { crop, bits, color: waltcut_color::ColorInfo::REC709, par: (1, 1) }
     }
 
     #[test]

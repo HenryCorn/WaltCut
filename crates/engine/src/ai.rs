@@ -14,10 +14,10 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use filmcraft_genai::{Picture, Provider, ProviderSettings, RestyleRequest, Restyler};
-use filmcraft_project::{ItemId, TrackKind};
-use filmcraft_time::{Tick, TimeRange};
 use serde_json::{Value, json};
+use waltcut_genai::{Picture, Provider, ProviderSettings, RestyleRequest, Restyler};
+use waltcut_project::{ItemId, TrackKind};
+use waltcut_time::{Tick, TimeRange};
 
 use crate::commands::{CommandSpec, always, bad, bool_p, f64_p, has_seq, str_p, u64_p};
 use crate::{EngineError, Result, Session};
@@ -85,7 +85,7 @@ fn setup(s: &mut Session, p: &Value) -> Result<Value> {
     }
     if let Some(ep) = str_p(p, "endpoint") {
         let ep = ep.trim().trim_matches('/');
-        filmcraft_genai::fal::check_endpoint(ep).map_err(|e| bad(ID, e.to_string()))?;
+        waltcut_genai::fal::check_endpoint(ep).map_err(|e| bad(ID, e.to_string()))?;
         prefs.ai.fal_endpoint = ep.to_string();
     }
     if let Some(key) = str_p(p, "apiKey") {
@@ -126,7 +126,7 @@ fn status(s: &mut Session, _: &Value) -> Result<Value> {
         "providerLabel": st.provider.label(),
         "endpoint": st.fal_endpoint,
         "key": key,
-        "models": filmcraft_genai::fal::PRESETS.iter().map(|(e, l)| json!({"endpoint": e, "label": l})).collect::<Vec<_>>(),
+        "models": waltcut_genai::fal::PRESETS.iter().map(|(e, l)| json!({"endpoint": e, "label": l})).collect::<Vec<_>>(),
         "ready": s.restyler_override.is_some() || st.restyler().is_ok(),
         "cloud": cfg!(feature = "ai-cloud"),
     }))
@@ -230,21 +230,21 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
                 }
                 let first = c * concurrency;
                 *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Frame {} of {n}", first + 1);
-                let opts = filmcraft_render::RenderOptions { scale, ..Default::default() };
+                let opts = waltcut_render::RenderOptions { scale, ..Default::default() };
                 let mut pictures = Vec::new();
                 for t in chunk {
-                    let img = filmcraft_render::render_sequence(&project, seq_id, *t, opts, &provider);
-                    let png = filmcraft_export::encode_png(img.over_black_rgba8(), img.w as u32, img.h as u32).map_err(|e| e.to_string())?;
+                    let img = waltcut_render::render_sequence(&project, seq_id, *t, opts, &provider);
+                    let png = waltcut_export::encode_png(img.over_black_rgba8(), img.w as u32, img.h as u32).map_err(|e| e.to_string())?;
                     pictures.push(Picture { png, width: img.w as u32, height: img.h as u32 });
                 }
                 let results: Vec<std::result::Result<Option<Vec<u8>>, String>> = std::thread::scope(|sc| {
                     let handles: Vec<_> = pictures.iter().map(|pic| sc.spawn(|| backend.restyle(pic, &req))).collect();
                     handles
                         .into_iter()
-                        .map(|h| match h.join().unwrap_or_else(|_| Err(filmcraft_genai::GenError::Provider("worker panicked".into()))) {
+                        .map(|h| match h.join().unwrap_or_else(|_| Err(waltcut_genai::GenError::Provider("worker panicked".into()))) {
                             Ok(b) => Ok(Some(b)),
                             // a blocked frame is skipped: the previous one is held longer
-                            Err(filmcraft_genai::GenError::Filtered) => Ok(None),
+                            Err(waltcut_genai::GenError::Filtered) => Ok(None),
                             Err(e) => Err(e.to_string()),
                         })
                         .collect()
@@ -271,7 +271,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
         })();
         let secs = t0.elapsed().as_secs_f64();
         let report =
-            filmcraft_export::Report { path: dir.to_string_lossy().to_string(), frames: 0, seconds: secs, bytes: 0, render_fps: 0.0, extra_files: Vec::new() };
+            waltcut_export::Report { path: dir.to_string_lossy().to_string(), frames: 0, seconds: secs, bytes: 0, render_fps: 0.0, extra_files: Vec::new() };
         let r = match r {
             Ok(done) => {
                 *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Restyled {done} of {n} frame(s)");
@@ -338,9 +338,9 @@ fn place(s: &mut Session, pj: &PendingRestyle, outs: &[(Tick, String)]) -> Resul
             ti.scale_to_frame = true;
             clips.push(ti);
         }
-        let track_id = filmcraft_project::TrackId(pr.alloc_id());
+        let track_id = waltcut_project::TrackId(pr.alloc_id());
         let q = pr.sequence_mut(seq_id).ok_or(EngineError::NoSequence)?;
-        let mut track = filmcraft_project::Track::new(track_id, TrackKind::Video, format!("AI Restyle {}", q.video_tracks.len() + 1));
+        let mut track = waltcut_project::Track::new(track_id, TrackKind::Video, format!("AI Restyle {}", q.video_tracks.len() + 1));
         st.selection = clips.iter().map(|c| c.id).collect();
         track.items = clips;
         track.sort();

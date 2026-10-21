@@ -3,9 +3,9 @@
 //! and each sequence's playhead). Premiere's tab behaviour was observed in Premiere Pro 26.5.2.
 
 use super::*;
-use filmcraft_project::SequenceView;
-use filmcraft_time::TICKS_PER_SECOND;
 use serde_json::json;
+use waltcut_project::SequenceView;
+use waltcut_time::TICKS_PER_SECOND;
 
 /// The demo project with two more sequences open: tabs [main, b, c], `c` active.
 fn three_tabs() -> (Session, [ItemId; 3]) {
@@ -203,7 +203,7 @@ fn a_damaged_view_in_a_project_file_is_cleaned_up_or_ignored() {
         ids
     });
     assert_eq!(t.state.playheads[&c], Tick::ZERO);
-    assert_eq!(t.state.playheads[&b], rate(b).snap(filmcraft_project::ProjectView::MAX_PLAYHEAD));
+    assert_eq!(t.state.playheads[&b], rate(b).snap(waltcut_project::ProjectView::MAX_PLAYHEAD));
     assert_eq!(t.state.playheads[&main], rate(main).snap(Tick(TICKS_PER_SECOND + 1)));
 
     // not a view at all: the project opens as it does without one

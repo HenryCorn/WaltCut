@@ -1,9 +1,9 @@
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_time::{FrameRate, Tick};
-use filmcraft_ui_egui::{FilmcraftApp, dock::PanelKind, menus};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
+use waltcut_engine::Session;
+use waltcut_time::{FrameRate, Tick};
+use waltcut_ui_egui::{FilmcraftApp, dock::PanelKind, menus};
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
     let ctx = h.ctx.clone();
@@ -16,18 +16,18 @@ fn step(h: &mut Harness<'static, FilmcraftApp>) {
 fn harness() -> Harness<'static, FilmcraftApp> {
     let mut s = Session::default();
     s.execute("file.newSequence", json!({"name":"Program clip","width":128,"height":72,"fps":24})).unwrap();
-    let item = filmcraft_engine::demo::add_generator(
+    let item = waltcut_engine::demo::add_generator(
         Arc::make_mut(&mut s.project),
         &s.media,
-        filmcraft_media::generators::GeneratorSource::new(
-            filmcraft_media::Generator::Demo(filmcraft_media::DemoScene::Aurora),
+        waltcut_media::generators::GeneratorSource::new(
+            waltcut_media::Generator::Demo(waltcut_media::DemoScene::Aurora),
             128,
             72,
             FrameRate::FPS_24,
             Tick::from_seconds_f64(5.0),
         ),
         "Source clip",
-        filmcraft_project::Label::Iris,
+        waltcut_project::Label::Iris,
         None,
     );
     s.execute("source.open", json!({"item":item.0})).unwrap();
@@ -278,7 +278,7 @@ fn clicking_outside_dismisses_without_export_and_dropdowns_stay_open() {
         assert_eq!(h.state().auto.elements.iter().find(|e| e.id == "exportFrame.depth").unwrap().label, "16 Bit");
         click(&mut h, "header.mode.export");
         assert!(!has(&h, "exportFrame.name"));
-        assert_eq!(h.state().ui.mode, filmcraft_ui_egui::state::Mode::Export);
+        assert_eq!(h.state().ui.mode, waltcut_ui_egui::state::Mode::Export);
         assert_eq!(h.state().session.project.items.len(), count);
     }
     let mut h = harness();

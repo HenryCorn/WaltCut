@@ -6,11 +6,11 @@ use std::rc::Rc;
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::graphics_notice::GraphicsNotice;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::graphics_notice::GraphicsNotice;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -115,9 +115,9 @@ fn a_reset_that_cannot_be_saved_says_why_and_keeps_the_button() {
 fn the_notice_follows_the_interface_language() {
     let notice = GraphicsNotice::new("software rendering", Box::new(|| Ok(())));
     let mut d = Driver::new(Some(notice));
-    d.app().ui.language = filmcraft_ui_egui::i18n::Language::Es;
+    d.app().ui.language = waltcut_ui_egui::i18n::Language::Es;
     d.frames(3);
     assert_eq!(d.label("graphics.notice"), "Modo gráfico seguro: procesamiento por software");
     assert_eq!(d.label("graphics.notice.reset"), "Usar gráficos predeterminados");
-    filmcraft_ui_egui::i18n::set_current(filmcraft_ui_egui::i18n::Language::En);
+    waltcut_ui_egui::i18n::set_current(waltcut_ui_egui::i18n::Language::En);
 }

@@ -12,10 +12,10 @@
 //! - loudness range: ±0.5 LU;
 //! - true peak: ±0.2 dB (both are 4× oversampling estimates with different interpolators).
 
-use filmcraft_audio_dsp::loudness::LoudnessMeter;
 use std::f64::consts::PI;
 use std::path::Path;
 use std::process::Command;
+use waltcut_audio_dsp::loudness::LoudnessMeter;
 
 const TOL_MS: f64 = 0.1;
 const TOL_I: f64 = 0.1;
@@ -93,11 +93,11 @@ struct Report {
 /// Measure `chans` with both meters and check the tolerances. `tp_truth`: the analytic true peak
 /// (dBTP) when known; it then replaces ffmpeg as the true-peak reference.
 fn compare(ff: &Path, name: &'static str, chans: &[Vec<f32>], sr: u32, tp_truth: Option<f64>) -> Report {
-    let dir = filmcraft_testkit::fixtures_dir("audio-dsp/loudness");
+    let dir = waltcut_testkit::fixtures_dir("audio-dsp/loudness");
     let wav = dir.join(format!("{name}_{sr}.wav"));
-    let tmp = filmcraft_testkit::temp_path(&wav);
+    let tmp = waltcut_testkit::temp_path(&wav);
     let refs: Vec<&[f32]> = chans.iter().map(|c| c.as_slice()).collect();
-    filmcraft_testkit::wav::write_f32(&tmp, &refs, sr).unwrap();
+    waltcut_testkit::wav::write_f32(&tmp, &refs, sr).unwrap();
     let frames = ffmpeg_ebur128(ff, &tmp);
     let _ = std::fs::remove_file(&tmp);
     let (per, meter) = ours(chans, sr);
@@ -227,7 +227,7 @@ fn concat(parts: &[Vec<f32>]) -> Vec<f32> {
 
 #[test]
 fn loudness_matches_ffmpeg_ebur128() {
-    let ff = filmcraft_testkit::require_ffmpeg!();
+    let ff = waltcut_testkit::require_ffmpeg!();
     let sr = 48_000;
     let mut reports = Vec::new();
 

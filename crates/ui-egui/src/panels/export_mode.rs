@@ -21,14 +21,14 @@
 //! `quickExport.go`, `quickExport.close`.
 
 use egui::{Align2, Color32, Rect, Sense, pos2, vec2};
-use filmcraft_engine::export::presets::{DEFAULT_PRESET, preset_key};
-use filmcraft_engine::export::{
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use waltcut_engine::export::presets::{DEFAULT_PRESET, preset_key};
+use waltcut_engine::export::{
     AudioCodec, BitrateMode, ExportSettings, ExrCompression, FieldOrder, Format, GpuRendering, H264Profile, HardwareEncoding, Multiplexer, MxfVideoCodec,
     Placement, SampleFormat, Scaling, TextOverlay, builtin_presets, format_bytes,
 };
-use filmcraft_engine::time::{FrameRate, Tick};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use waltcut_engine::time::{FrameRate, Tick};
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};
@@ -63,7 +63,7 @@ pub struct ExportUi {
 
 impl Default for ExportUi {
     fn default() -> Self {
-        let preset = filmcraft_engine::export::presets::find_builtin(DEFAULT_PRESET).map(|p| p.settings).unwrap_or_default();
+        let preset = waltcut_engine::export::presets::find_builtin(DEFAULT_PRESET).map(|p| p.settings).unwrap_or_default();
         ExportUi {
             preset: DEFAULT_PRESET.into(),
             settings: preset,
@@ -131,7 +131,7 @@ pub fn apply_preset(app: &mut FilmcraftApp, name: &str) -> bool {
 /// Full output path of the current settings.
 pub fn output_path(ex: &ExportUi) -> String {
     let name = if ex.file_name.trim().is_empty() { "Export" } else { ex.file_name.trim() };
-    let dir = filmcraft_engine::export_tools::expand_home(ex.location.trim());
+    let dir = waltcut_engine::export_tools::expand_home(ex.location.trim());
     let file = format!("{name}.{}", ex.settings.extension());
     if dir.is_empty() { file } else { std::path::Path::new(&dir).join(file).to_string_lossy().to_string() }
 }
@@ -154,7 +154,7 @@ fn sync_sequence(app: &mut FilmcraftApp) {
         app.ui.export.for_sequence = Some(seq.0);
     }
     if app.ui.export.location.is_empty() {
-        app.ui.export.location = filmcraft_engine::export_tools::default_export_dir(&app.session).to_string_lossy().to_string();
+        app.ui.export.location = waltcut_engine::export_tools::default_export_dir(&app.session).to_string_lossy().to_string();
     }
 }
 
@@ -519,7 +519,7 @@ fn settings_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             }
         });
         row(ui, &t, tl!("Format"), |ui| {
-            let labels: Vec<(String, bool)> = Format::ALL.iter().map(|f| (f.label().to_string(), filmcraft_engine::export::available(*f))).collect();
+            let labels: Vec<(String, bool)> = Format::ALL.iter().map(|f| (f.label().to_string(), waltcut_engine::export::available(*f))).collect();
             if let Some(i) = combo(ui, &mut reg, "export.format", ex.settings.format.label(), &labels, ui.available_width() - 4.0) {
                 let f = Format::ALL[i];
                 if f != ex.settings.format {
@@ -699,7 +699,7 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
                     row(ui, t, tl!("Encoder"), |ui| ui.label(tl!("Hardware (AV1 has no software encoder)")));
                 } else {
                     // the hardware encoder writes Main (8-bit 4:2:0), or Main 10 for HDR sequences where it can; level chosen by the encoder
-                    let label = match (filmcraft_engine::export::hdr_available(Format::Hevc), seq_hdr && !s.sdr) {
+                    let label = match (waltcut_engine::export::hdr_available(Format::Hevc), seq_hdr && !s.sdr) {
                         (true, true) => tl!("Main 10 (10-bit, HDR)"),
                         (true, false) => tl!("Main (8-bit; Main 10 for HDR sequences)"),
                         (false, _) => tl!("Main (8-bit)"),
@@ -736,7 +736,7 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
             });
             if s.bitrate_mode == BitrateMode::Crf {
                 row(ui, t, tl!("Quality (CRF)"), |ui| {
-                    let mut crf = if s.crf.is_finite() { f64::from(s.crf) } else { f64::from(filmcraft_engine::export::DEFAULT_CRF) };
+                    let mut crf = if s.crf.is_finite() { f64::from(s.crf) } else { f64::from(waltcut_engine::export::DEFAULT_CRF) };
                     if drag(ui, reg, "export.video.crf", &mut crf, 0.0..=51.0, 0.1, "", 0) {
                         s.crf = crf.round() as f32;
                     }
@@ -845,7 +845,7 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
         }
         _ => {}
     }
-    // Composite the picture on the GPU (filmcraft-gpu) instead of the CPU reference renderer;
+    // Composite the picture on the GPU (waltcut-gpu) instead of the CPU reference renderer;
     // Auto falls back to the CPU wherever the GPU cannot render the frame.
     row(ui, t, tl!("GPU Rendering"), |ui| {
         let mut on = s.gpu_rendering == GpuRendering::Auto;
@@ -1024,7 +1024,7 @@ fn effects_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: 
 
 pub(crate) const RANGES: [(&str, &str); 4] = [("entire", "Entire Source"), ("inOut", "Source In/Out"), ("workArea", "Work Area"), ("custom", "Custom")];
 
-fn preview_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq_id: filmcraft_engine::project::ItemId) {
+fn preview_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq_id: waltcut_engine::project::ItemId) {
     let t = app.tokens;
     let mut reg = Reg::default();
     let Some(q) = app.session.active_sequence().cloned() else { return };
@@ -1169,7 +1169,7 @@ fn preview_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq_id:
 }
 
 /// The export range in sequence ticks (for the summary).
-fn range_ticks(ex: &ExportUi, q: &filmcraft_engine::project::Sequence) -> (Tick, Tick) {
+fn range_ticks(ex: &ExportUi, q: &waltcut_engine::project::Sequence) -> (Tick, Tick) {
     let fd = q.settings.frame_rate.frame_duration();
     let end = q.duration().max(fd);
     match ex.range.as_str() {
@@ -1388,7 +1388,7 @@ fn quick_file(app: &FilmcraftApp, path: &str, seq_name: &str, ext: &str) -> Opti
         }
         Some(n) => format!("{n}.{ext}"),
     };
-    let dir = dir.map(std::path::Path::to_path_buf).unwrap_or_else(|| filmcraft_engine::export_tools::default_export_dir(&app.session));
+    let dir = dir.map(std::path::Path::to_path_buf).unwrap_or_else(|| waltcut_engine::export_tools::default_export_dir(&app.session));
     Some(dir.join(file).to_string_lossy().to_string())
 }
 

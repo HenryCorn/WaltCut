@@ -33,7 +33,7 @@
 
 use std::collections::BTreeMap;
 
-use filmcraft_time::{FrameRate, fields_to_frames, frames_to_fields};
+use waltcut_time::{FrameRate, fields_to_frames, frames_to_fields};
 
 use crate::cea608::with_parity;
 use crate::{Cue, Document, Error, Result, scc};
@@ -318,7 +318,7 @@ fn schedule_708(doc: &Document) -> BTreeMap<i64, Vec<(bool, u8, u8)>> {
         let win = (i % 2) as u8;
         let s = scc::frame_of(c.start).max(cursor);
         let e = scc::frame_of(c.end);
-        let rows = scc::wrap_rows(&filmcraft_project::plain_text(&c.text));
+        let rows = scc::wrap_rows(&waltcut_project::plain_text(&c.text));
         let load = packets(&load_atoms(win, &rows), &mut seq);
         let mut f = (s - load.len() as i64).max(cursor);
         let mut last = f;

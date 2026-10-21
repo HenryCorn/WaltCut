@@ -7,13 +7,13 @@ use std::sync::{
 
 use egui::{Event, Id, Key, Modifiers, vec2};
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::{
+use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::{
     FilmcraftApp,
     control::ControlRequest,
     dock::{DockNode, PanelKind, SplitSize},
 };
-use serde_json::{Value, json};
 
 struct Driver {
     h: Harness<'static, FilmcraftApp>,
@@ -189,7 +189,7 @@ fn isolation_preserves_close_and_screenshot_delivery_without_claiming_os_focus()
     assert_eq!(raw.viewports[&egui::ViewportId::ROOT].events, vec![egui::ViewportEvent::Close]);
     assert!(matches!(raw.events.as_slice(), [Event::Screenshot { .. }, Event::ModifiersChanged(Modifiers::NONE)]));
     assert!(raw.hovered_files.is_empty() && raw.dropped_files.is_empty());
-    let state = filmcraft_ui_egui::control::inspect(d.h.state(), &ctx);
+    let state = waltcut_ui_egui::control::inspect(d.h.state(), &ctx);
     assert_eq!(state["input"]["nativeWindowFocused"], false);
 }
 
@@ -215,7 +215,7 @@ fn focus_reports_real_widget_ownership_and_rejects_bad_targets_without_changing_
     ] {
         let (request, _) = ControlRequest::new("ui.focus", params);
         let ctx = d.h.ctx.clone();
-        let filmcraft_ui_egui::control::Outcome::Done(result) = filmcraft_ui_egui::control::handle(d.h.state_mut(), &ctx, &request) else {
+        let waltcut_ui_egui::control::Outcome::Done(result) = waltcut_ui_egui::control::handle(d.h.state_mut(), &ctx, &request) else {
             panic!("bad focus target must fail immediately");
         };
         assert_eq!(result["ok"], false, "{result}");

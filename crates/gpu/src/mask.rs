@@ -1,7 +1,7 @@
 //! GPU mask coverage and masked-effect mixing (WGSL compute), the counterpart of
-//! [`filmcraft_render::mask`]. Tested for parity with the CPU path.
+//! [`waltcut_render::mask`]. Tested for parity with the CPU path.
 
-use filmcraft_render::mask::FlatMask;
+use waltcut_render::mask::FlatMask;
 
 pub struct GpuMask {
     device: wgpu::Device,

@@ -1,10 +1,10 @@
 //! Decode speed (ignored by default; run with
-//! `cargo test --release -p filmcraft-hevc --test perf -- --ignored --nocapture`).
+//! `cargo test --release -p waltcut-hevc --test perf -- --ignored --nocapture`).
 
 mod common;
 
-use filmcraft_hevc::Decoder;
 use std::time::Instant;
+use waltcut_hevc::Decoder;
 
 fn bench(data: &[u8], threads: usize, iters: usize) -> (usize, f64) {
     let mut best = f64::MAX;

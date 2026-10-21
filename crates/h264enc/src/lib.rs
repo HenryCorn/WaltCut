@@ -7,7 +7,7 @@
 //! - Slice-parallel encoding with rayon (feature `threads`, on by default).
 //!
 //! ```no_run
-//! use filmcraft_h264enc::{Encoder, EncoderConfig, RateControl, YuvFrame};
+//! use waltcut_h264enc::{Encoder, EncoderConfig, RateControl, YuvFrame};
 //! let mut cfg = EncoderConfig::new(1280, 720, 30, 1);
 //! cfg.rate = RateControl::Crf(20.0);
 //! let mut enc = Encoder::new(cfg).unwrap();
@@ -885,7 +885,7 @@ impl Encoder {
             }
             if !self.sei_sent {
                 self.sei_sent = true;
-                let text = format!("filmcraft-h264enc {} - clean-room H.264 encoder - options: {}", env!("CARGO_PKG_VERSION"), self.options());
+                let text = format!("waltcut-h264enc {} - clean-room H.264 encoder - options: {}", env!("CARGO_PKG_VERSION"), self.options());
                 nals.push(nal::nal(0, NAL_SEI, &nal::sei_user_data_rbsp(&text)));
                 if self.cfg.mastering_display.is_some() || self.cfg.content_light.is_some() {
                     nals.push(nal::nal(0, NAL_SEI, &nal::sei_hdr_rbsp(self.cfg.mastering_display.as_ref(), self.cfg.content_light)));

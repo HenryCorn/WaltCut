@@ -1,7 +1,7 @@
 //! Keyboard-only UI commands from Premiere's default keyboard (M3.12): frame maximize / full
 //! screen, panel cycling, monitor zoom, track heights, Project panel and Text panel keyboard
 //! navigation, play-to-Out variants. The project-changing keyboard commands are engine commands
-//! (`filmcraft_engine::keyboard`); these only change what the UI shows.
+//! (`waltcut_engine::keyboard`); these only change what the UI shows.
 //!
 //! | Id | Premiere command | Default key (scope) |
 //! |---|---|---|
@@ -28,7 +28,7 @@ use serde_json::{Value, json};
 use crate::FilmcraftApp;
 use crate::dock::PanelKind;
 use crate::menus::UiCommand;
-use filmcraft_engine::project_panel::ViewMode;
+use waltcut_engine::project_panel::ViewMode;
 
 /// Keyboard-only view state.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -302,16 +302,16 @@ fn play_range(app: &mut FilmcraftApp, preroll: bool) -> Result<Value, String> {
     let fd = seq.settings.frame_rate.frame_duration();
     let end = seq.mark_out.map(|o| o + fd).unwrap_or(seq.duration());
     let start = if preroll {
-        let i = seq.mark_in.unwrap_or(filmcraft_time::Tick::ZERO);
-        let pre = filmcraft_time::Tick::from_seconds_f64(app.session.prefs.playback.preroll_seconds);
-        (i - pre).max(filmcraft_time::Tick::ZERO)
+        let i = seq.mark_in.unwrap_or(waltcut_time::Tick::ZERO);
+        let pre = waltcut_time::Tick::from_seconds_f64(app.session.prefs.playback.preroll_seconds);
+        (i - pre).max(waltcut_time::Tick::ZERO)
     } else {
         app.session.playhead()
     };
-    let stop = if preroll { end + filmcraft_time::Tick::from_seconds_f64(app.session.prefs.playback.postroll_seconds) } else { end };
+    let stop = if preroll { end + waltcut_time::Tick::from_seconds_f64(app.session.prefs.playback.postroll_seconds) } else { end };
     // Plain marked playback includes Out but stops after its frame. Extended
     // preroll/postroll playback retains its existing boundary behavior.
-    let rest_at = if preroll { None } else { Some(seq.mark_out.unwrap_or((end - fd).max(filmcraft_time::Tick::ZERO))) };
+    let rest_at = if preroll { None } else { Some(seq.mark_out.unwrap_or((end - fd).max(waltcut_time::Tick::ZERO))) };
     app.session.set_playhead(start);
     app.play(1.0);
     app.playback.stop_at = Some(stop);
@@ -363,7 +363,7 @@ fn begin_text_editing(app: &mut FilmcraftApp) -> Result<Value, String> {
 // ------------------------------------------------------------------ Project panel
 
 /// Items as the Project panel lists them (its shown tab, in display order).
-fn panel_items(app: &FilmcraftApp) -> Vec<filmcraft_project::ItemId> {
+fn panel_items(app: &FilmcraftApp) -> Vec<waltcut_project::ItemId> {
     crate::panels::project::visible_items(app, crate::panels::project::shown_inst(app))
 }
 
@@ -446,7 +446,7 @@ fn project_panel(app: &mut FilmcraftApp, op: &str) -> Result<Value, String> {
             }
         }
     } as usize;
-    let mut new_sel: Vec<filmcraft_project::ItemId> = if extend {
+    let mut new_sel: Vec<waltcut_project::ItemId> = if extend {
         let anchor = sel.first().and_then(|s| items.iter().position(|i| i == s)).unwrap_or(target);
         let (a, b) = (anchor.min(target), anchor.max(target));
         let mut v: Vec<_> = items[a..=b].to_vec();
@@ -480,16 +480,16 @@ fn text_panel(app: &mut FilmcraftApp, op: &str) -> Result<Value, String> {
             _ => Ok(Value::Null),
         };
     }
-    let words = filmcraft_engine::transcript::sequence_words(&app.session);
+    let words = waltcut_engine::transcript::sequence_words(&app.session);
     if words.is_empty() {
         return Err("the sequence has no transcript".into());
     }
     let n = words.len();
-    let paras = filmcraft_edit::transcript::paragraphs(&words, filmcraft_time::Tick::from_seconds_f64(1.5));
+    let paras = waltcut_edit::transcript::paragraphs(&words, waltcut_time::Tick::from_seconds_f64(1.5));
     let para_of = |i: usize| paras.iter().position(|p| p.contains(&i)).unwrap_or(0);
     // a selection left over from a longer transcript (e.g. after `transcript.extract` over the control channel) counts as none, as when drawing
     let (anchor, cur) = app.ui.transcript_sel.filter(|(a, b)| *a < n && *b < n).unwrap_or_else(|| {
-        let i = filmcraft_edit::transcript::word_at(&words, app.session.playhead()).unwrap_or(0);
+        let i = waltcut_edit::transcript::word_at(&words, app.session.playhead()).unwrap_or(0);
         (i, i)
     });
     let line = |i: usize, d: i64| -> usize {
@@ -530,10 +530,10 @@ mod transcript_selection_tests {
 
     #[test]
     fn prev_word_after_the_transcript_shrank_under_the_selection_does_not_panic() {
-        let mut session = filmcraft_engine::Session::default();
+        let mut session = waltcut_engine::Session::default();
         session.execute("file.openDemoProject", json!({})).unwrap();
         let a = session.active_sequence().unwrap().audio_tracks[0].items[0].clone();
-        let tk = |s: f64| a.source_in.0 + (s * filmcraft_time::TICKS_PER_SECOND as f64) as i64;
+        let tk = |s: f64| a.source_in.0 + (s * waltcut_time::TICKS_PER_SECOND as f64) as i64;
         let words: Vec<Value> = ["one", "two", "three", "four"]
             .iter()
             .enumerate()
@@ -545,7 +545,7 @@ mod transcript_selection_tests {
         app.ui.transcript_sel = Some((3, 3));
         // the transcript shrinks behind the panel's back, as with `transcript.extract` over the control channel
         app.session.execute("transcript.extract", json!({"from": 0, "to": 1})).unwrap();
-        assert_eq!(filmcraft_engine::transcript::sequence_words(&app.session).len(), 2);
+        assert_eq!(waltcut_engine::transcript::sequence_words(&app.session).len(), 2);
         let r = super::text_panel(&mut app, "prevWord").unwrap();
         let (sa, sb) = app.ui.transcript_sel.unwrap();
         assert!(sa < 2 && sb < 2, "selection {sa}..{sb} outside the 2-word transcript");

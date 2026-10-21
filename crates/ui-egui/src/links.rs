@@ -141,7 +141,7 @@ mod tests {
         use std::rc::Rc;
         let opened: Rc<RefCell<Vec<String>>> = Rc::default();
         let rec = opened.clone();
-        let mut app = crate::FilmcraftApp::new(filmcraft_engine::Session::default());
+        let mut app = crate::FilmcraftApp::new(waltcut_engine::Session::default());
         app.hooks.open_url = Some(Box::new(move |u: &str| {
             rec.borrow_mut().push(u.to_string());
             Ok(())
@@ -169,7 +169,7 @@ mod tests {
     /// The failed-link dialog shows the address until it is closed, and Copy copies it.
     #[test]
     fn failed_link_dialog_keeps_the_address_until_closed() {
-        let mut app = crate::FilmcraftApp::new(filmcraft_engine::Session::default());
+        let mut app = crate::FilmcraftApp::new(waltcut_engine::Session::default());
         app.hooks.open_url = Some(Box::new(|_: &str| Err("no browser".into())));
         let ctx = egui::Context::default();
         let time = std::cell::Cell::new(0.0);
@@ -219,7 +219,7 @@ mod tests {
             assert!(hint.contains(url) && hint.contains("web browser"), "{id}: {hint}");
         }
         assert!(menu_hint("help.filmcraftHelp").unwrap().contains(crate::panels::keyboard::HELP_URL));
-        let help_items: Vec<String> = crate::menus::menu_items(&crate::FilmcraftApp::new(filmcraft_engine::Session::default()))
+        let help_items: Vec<String> = crate::menus::menu_items(&crate::FilmcraftApp::new(waltcut_engine::Session::default()))
             .into_iter()
             .filter(|it| it.path.first().map(String::as_str) == Some("Help"))
             .map(|it| it.id)

@@ -17,14 +17,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use filmcraft_geom::Vec2;
-use filmcraft_media::{DemoScene, Generator, MediaKind};
-use filmcraft_project::{
+use roxmltree::Node;
+use waltcut_geom::Vec2;
+use waltcut_media::{DemoScene, Generator, MediaKind};
+use waltcut_project::{
     BinId, ClipId, EffectInstance, Interpolation, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, Param, ParamValue, Project, Sequence,
     TrackItem, TrackKind, Transition, TransitionAlign, TransitionId, effect::find_effect_by_name, find_effect,
 };
-use filmcraft_time::{FrameRate, Tick, format_timecode_frames};
-use roxmltree::Node;
+use waltcut_time::{FrameRate, Tick, format_timecode_frames};
 
 use crate::common::{
     Builder, MediaSpec, base_item, db_to_gain, empty_sequence, file_name, frames_round, gain_to_db, item_media, item_path, kind_from_ext, label_from, on_frame,
@@ -605,7 +605,7 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
                 }
             }
             _ => {
-                let def = filmcraft_project::find_effect(id).filter(|d| !d.intrinsic).or_else(|| find_effect_by_name(name).filter(|d| !d.intrinsic));
+                let def = waltcut_project::find_effect(id).filter(|d| !d.intrinsic).or_else(|| find_effect_by_name(name).filter(|d| !d.intrinsic));
                 let Some(def) = def else {
                     self.report.warn(format!("effect \"{name}\" is not supported and was skipped"));
                     return;
@@ -928,7 +928,7 @@ impl Exp<'_, '_> {
         self.written_seqs.insert(id);
     }
 
-    fn write_transition(&mut self, tr: &Transition, kind: TrackKind, rate: FrameRate, t: &filmcraft_project::Track) {
+    fn write_transition(&mut self, tr: &Transition, kind: TrackKind, rate: FrameRate, t: &waltcut_project::Track) {
         if !on_frame(rate, tr.start) || !on_frame(rate, tr.duration) {
             self.report.warn("sub-frame transition positions were rounded to frames");
         }

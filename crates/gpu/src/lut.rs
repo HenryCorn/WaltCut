@@ -1,7 +1,7 @@
 //! GPU 3D LUT application (WGSL compute, tetrahedral interpolation), the counterpart of
-//! [`filmcraft_color::Lut3d::apply`]. Tested for parity with the CPU path.
+//! [`waltcut_color::Lut3d::apply`]. Tested for parity with the CPU path.
 
-use filmcraft_color::Lut3d;
+use waltcut_color::Lut3d;
 
 pub struct GpuLut {
     device: wgpu::Device,

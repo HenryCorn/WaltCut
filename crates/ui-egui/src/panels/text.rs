@@ -8,9 +8,9 @@
 //! the selection marks In/Out and can be extracted or lifted (`transcript.*` commands).
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::{CaptionAlign, CaptionAnchor, CaptionFormat};
-use filmcraft_time::{TimeDisplay, format_time};
 use serde_json::{Value, json};
+use waltcut_project::{CaptionAlign, CaptionAnchor, CaptionFormat};
+use waltcut_time::{TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -108,7 +108,7 @@ fn captions(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     let rate = seq.settings.frame_rate;
     let df = seq.settings.drop_frame;
-    let tc = |x: filmcraft_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
+    let tc = |x: waltcut_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
     // the track shown: the one holding the first selected caption, else C1
     let sel = app.session.state.caption_selection.clone();
     let track_idx = sel.first().and_then(|c| seq.caption_tracks.iter().position(|tr| tr.caption(*c).is_some())).unwrap_or(0);
@@ -287,10 +287,10 @@ fn captions(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 /// A text layer of a graphic clip in the active sequence, for the Graphics tab.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GraphicText {
-    pub clip: filmcraft_project::ClipId,
+    pub clip: waltcut_project::ClipId,
     /// The layer's number among the clip's layers (what `graphics.set` / `graphics.selectLayer` take).
     pub layer: usize,
-    pub start: filmcraft_time::Tick,
+    pub start: waltcut_time::Tick,
     /// The track's label (`V2`).
     pub track: String,
     /// The layer's own name, when it has one.
@@ -299,14 +299,14 @@ pub struct GraphicText {
     /// The timeline time the text was read at (the playhead, or the clip's start when the
     /// playhead is outside the clip): an edit is written there, so keyframed text changes the
     /// value that is shown.
-    pub at: filmcraft_time::Tick,
+    pub at: waltcut_time::Tick,
 }
 
 /// Every text layer of every graphic clip in `seq`, in timeline order (then lower tracks first,
 /// then paint order), with its text at `at` when that falls in the clip (Source Text keyframes
 /// hold), else at the clip's first frame.
-pub fn graphic_texts(seq: &filmcraft_project::Sequence, at: filmcraft_time::Tick) -> Vec<GraphicText> {
-    use filmcraft_project::graphic::{TEXT_LAYER, layer_indices};
+pub fn graphic_texts(seq: &waltcut_project::Sequence, at: waltcut_time::Tick) -> Vec<GraphicText> {
+    use waltcut_project::graphic::{TEXT_LAYER, layer_indices};
     let mut out = Vec::new();
     for (ti, track) in seq.video_tracks.iter().enumerate() {
         for it in &track.items {
@@ -315,11 +315,11 @@ pub fn graphic_texts(seq: &filmcraft_project::Sequence, at: filmcraft_time::Tick
             for (layer, ei) in layer_indices(&it.effects).into_iter().enumerate() {
                 let Some(e) = it.effects.get(ei).filter(|e| e.effect == TEXT_LAYER) else { continue };
                 let text = match e.param("text").map(|p| p.value_at(mt)) {
-                    Some(filmcraft_project::ParamValue::Text(s)) => s,
+                    Some(waltcut_project::ParamValue::Text(s)) => s,
                     _ => String::new(),
                 };
                 let name = match e.param("name").map(|p| p.value.clone()) {
-                    Some(filmcraft_project::ParamValue::Text(n)) if !n.trim().is_empty() => Some(n),
+                    Some(waltcut_project::ParamValue::Text(n)) if !n.trim().is_empty() => Some(n),
                     _ => None,
                 };
                 out.push((ti, GraphicText { clip: it.id, layer, start: it.start, track: format!("V{}", ti + 1), name, text, at: t }));
@@ -340,7 +340,7 @@ fn graphics(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         return;
     };
     let (rate, df) = (seq.settings.frame_rate, seq.settings.drop_frame);
-    let tc = |x: filmcraft_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
+    let tc = |x: waltcut_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
     let ph = app.session.playhead();
     let entries = graphic_texts(seq, ph);
     let mut actions: Vec<(String, Value)> = Vec::new();
@@ -457,7 +457,7 @@ pub fn caption_properties(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect)
     let track_idx = seq.caption_tracks.iter().position(|tr| tr.id == track_id).unwrap_or(0);
     let track_name = seq.caption_tracks.get(track_idx).map(|tr| tr.name.as_str()).unwrap_or_default();
     let (rate, df) = (seq.settings.frame_rate, seq.settings.drop_frame);
-    let tc = |x: filmcraft_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
+    let tc = |x: waltcut_time::Tick| format_time(x, rate, df, TimeDisplay::Timecode, 48_000);
     let mut actions: Vec<(String, Value)> = Vec::new();
     let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(14.0, 8.0))).id_salt("props-caption"));
     let (hr, _) = bui.allocate_exact_size(vec2(bui.available_width(), 30.0), Sense::hover());
@@ -583,7 +583,7 @@ fn transcript(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let list = Rect::from_min_max(pos2(rect.min.x + 6.0, bar.max.y + 8.0), pos2(rect.max.x - 6.0, rect.max.y - 4.0));
     ui.painter().rect_filled(list, 3.0, t.app_bg);
     let ph = app.session.playhead();
-    let current = filmcraft_edit::transcript::word_at(words, ph);
+    let current = waltcut_edit::transcript::word_at(words, ph);
     let paras = &content.paragraphs;
     let rate = app.session.sequence_rate();
     let df = app.session.active_sequence().is_some_and(|q| q.settings.drop_frame);
@@ -627,7 +627,7 @@ fn transcript(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 }
 
 fn filmcraft_speech_available(app: &FilmcraftApp) -> bool {
-    app.session.transcriber.is_some() || filmcraft_engine::transcript::speech_available()
+    app.session.transcriber.is_some() || waltcut_engine::transcript::speech_available()
 }
 
 fn style_strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, track_idx: usize, actions: &mut Vec<(String, Value)>) {
@@ -637,11 +637,11 @@ fn style_strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, track_idx: us
     child.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         let r = egui::ComboBox::from_id_salt(("caption-font", tr.id.0)).selected_text(&st.font).width(130.0).height(400.0).show_ui(ui, |ui| {
-            if !filmcraft_text::fonts::system_scanned() {
-                filmcraft_text::fonts::scan_system();
+            if !waltcut_text::fonts::system_scanned() {
+                waltcut_text::fonts::scan_system();
             }
             // names starting with '.' are macOS-private system faces (UI/fallback fonts, some without a space glyph)
-            for (f, _) in filmcraft_text::families().into_iter().filter(|(f, _)| !f.starts_with('.')) {
+            for (f, _) in waltcut_text::families().into_iter().filter(|(f, _)| !f.starts_with('.')) {
                 let resp = ui.selectable_label(f.eq_ignore_ascii_case(&st.font), &f);
                 // An edge row may be only partly visible; automation must click its visible portion.
                 let visible = resp.rect.intersect(ui.clip_rect());

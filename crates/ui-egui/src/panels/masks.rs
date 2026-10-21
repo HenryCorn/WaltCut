@@ -10,10 +10,10 @@
 //! `program.mask.roundness`, `program.maskPen`.
 
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
-use filmcraft_geom::{Affine, Vec2};
-use filmcraft_project::{ClipId, EffectInstance, MaskMode, MaskPath, MaskVertex, TrackItem};
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_geom::{Affine, Vec2};
+use waltcut_project::{ClipId, EffectInstance, MaskMode, MaskPath, MaskVertex, TrackItem};
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -24,7 +24,7 @@ const ROW_H: f32 = 22.0;
 /// Whether an effect instance takes masks (video effects and Opacity; not Motion or graphic layers).
 pub fn maskable(e: &EffectInstance) -> bool {
     let Some(d) = e.def() else { return false };
-    d.kind == filmcraft_project::EffectKind::Video && (!d.intrinsic || e.effect == "opacity") && !filmcraft_project::graphic::is_layer(e)
+    d.kind == waltcut_project::EffectKind::Video && (!d.intrinsic || e.effect == "opacity") && !waltcut_project::graphic::is_layer(e)
 }
 
 /// Mask rows under an effect in Effect Controls.
@@ -76,11 +76,11 @@ pub(crate) fn effect_rows(
             }
         }
     }
-    let defs = filmcraft_project::mask::mask_param_defs();
+    let defs = waltcut_project::mask::mask_param_defs();
     for (k, m) in e.masks.iter().enumerate() {
         let key = format!("mask:{}:{}:{}", clip.0, idx, k);
         let open = !app.ui.collapsed_fx.contains(&key);
-        let selected = app.session.state.selected_mask == Some(filmcraft_engine::masks::MaskSel { clip, effect: idx, mask: k });
+        let selected = app.session.state.selected_mask == Some(waltcut_engine::masks::MaskSel { clip, effect: idx, mask: k });
         let (r, resp) = ui.allocate_exact_size(vec2(body.width(), ROW_H), Sense::click());
         if selected {
             ui.painter().rect_filled(crate::panels::effect_controls::row_fill(r), 0.0, t.row_selected);
@@ -179,8 +179,8 @@ const LEFT: egui::PointerButton = egui::PointerButton::Primary;
 /// Clip pixels → screen points for the clip's current Motion and the monitor picture rect.
 fn clip_to_screen(app: &FilmcraftApp, it: &TrackItem, mt: Tick, pic: Rect, frame: (u32, u32)) -> Option<Affine> {
     let seq = app.session.active_sequence()?;
-    let size = filmcraft_render::source_size(&app.session.project, it.item).unwrap_or(frame);
-    let motion = filmcraft_render::motion_matrix(seq, it, size, filmcraft_render::source_par(&app.session.project, it.item), mt);
+    let size = waltcut_render::source_size(&app.session.project, it.item).unwrap_or(frame);
+    let motion = waltcut_render::motion_matrix(seq, it, size, waltcut_render::source_par(&app.session.project, it.item), mt);
     let view = Affine::translate(pic.min.x as f64, pic.min.y as f64)
         .then_apply(&Affine::scale(pic.width() as f64 / frame.0 as f64, pic.height() as f64 / frame.1 as f64));
     Some(view.then_apply(&motion))
@@ -691,7 +691,7 @@ fn pen_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, frame: (u32
         app.ui.mask_pen = None;
         let r = app
             .session
-            .execute("masks.add", json!({"clip": draft.clip, "effect": draft.effect, "shape": "bezier", "path": filmcraft_engine::masks::path_to_json(&path)}));
+            .execute("masks.add", json!({"clip": draft.clip, "effect": draft.effect, "shape": "bezier", "path": waltcut_engine::masks::path_to_json(&path)}));
         if let Err(e) = r {
             app.ui.status = e.to_string();
         } else {
@@ -710,7 +710,7 @@ fn open_polyline(path: &MaskPath, to_screen: &Affine) -> Vec<Pos2> {
     }
     for [p0, c1, c2, p3] in path.segments() {
         for k in 1..=16 {
-            out.push(sp(to_screen, filmcraft_project::mask::cubic(p0, c1, c2, p3, k as f64 / 16.0)));
+            out.push(sp(to_screen, waltcut_project::mask::cubic(p0, c1, c2, p3, k as f64 / 16.0)));
         }
     }
     out
@@ -759,7 +759,7 @@ pub fn path_value(app: &mut FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, effec
     let Some(e) = it.effects.get(effect) else { return };
     let Some(m) = e.masks.get(k) else { return };
     let base = format!("effectControls.{}.mask{k}", e.effect);
-    let target = filmcraft_engine::masks::MaskSel { clip, effect, mask: k };
+    let target = waltcut_engine::masks::MaskSel { clip, effect, mask: k };
     let running = app.session.mask_jobs.iter().find(|j| j.target == target).map(|j| j.job);
     for (icon, dir, frames, id, tip) in [
         (Icon::TrackMaskBack, "backward", None, "back", tl!("Track selected mask backward")),
@@ -793,7 +793,7 @@ pub fn path_value(app: &mut FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, effec
     app.auto.add(&format!("{base}.trackMethod"), r, "Tracking method");
     let resp = resp.on_hover_text(tlf!("Tracking method: {method}", method = crate::i18n::t(m.track_method.label())));
     egui::Popup::menu(&resp).show(|ui| {
-        for tm in filmcraft_project::TrackMethod::ALL {
+        for tm in waltcut_project::TrackMethod::ALL {
             if ui.selectable_label(tm == m.track_method, crate::i18n::t(tm.label())).clicked() {
                 actions.push(("masks.set".into(), json!({"clip": clip.0, "effect": effect, "mask": k, "trackMethod": tm.label()})));
             }

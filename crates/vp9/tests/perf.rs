@@ -1,10 +1,10 @@
 //! Decode speed (ignored by default; run with
-//! `cargo test --release -p filmcraft-vp9 --test perf -- --ignored --nocapture`).
+//! `cargo test --release -p waltcut-vp9 --test perf -- --ignored --nocapture`).
 
 mod common;
 
-use filmcraft_vp9::Decoder;
 use std::time::Instant;
+use waltcut_vp9::Decoder;
 
 fn bench(frames: &[&[u8]], threads: usize, iters: usize) -> (usize, f64) {
     let mut best = f64::MAX;

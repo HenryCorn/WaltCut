@@ -4,12 +4,12 @@ use std::sync::mpsc::{Sender, channel};
 
 use egui::pos2;
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_project::ClipId;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::panels::timeline::Drag;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_project::ClipId;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::panels::timeline::Drag;
 
 const DUNES: &str = "Desert_Dunes.mp4";
 

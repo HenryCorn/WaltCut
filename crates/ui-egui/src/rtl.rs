@@ -19,8 +19,8 @@ use std::sync::{Arc, OnceLock};
 
 use egui::epaint::text::{ByteIndex, LayoutJob, LayoutSection, TextFormat};
 use egui::{Color32, FontData, FontDefinitions, FontId, Galley, Painter, Rect, Vec2, pos2};
-use filmcraft_text::fonts::{CraftFont, Face};
 use unicode_bidi::{BidiClass, BidiInfo, bidi_class};
+use waltcut_text::fonts::{CraftFont, Face};
 
 /// A right-to-left script: its ISO 15924 code (as in the craft-fonts manifest), letters a face
 /// must cover, and installed families to prefer, best first.
@@ -56,7 +56,7 @@ const SCRIPTS: &[Script] = &[
 
 /// The craft-fonts faces for right-to-left scripts (empty unless built with `CRAFT_FONTS_DIR`).
 pub(crate) fn craft_fonts() -> impl Iterator<Item = &'static CraftFont> {
-    filmcraft_text::fonts::CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| SCRIPTS.iter().any(|x| x.code == *s)))
+    waltcut_text::fonts::CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| SCRIPTS.iter().any(|x| x.code == *s)))
 }
 
 /// Installed faces for the scripts craft-fonts does not cover, looked up once per process (native
@@ -71,8 +71,8 @@ fn system_fonts() -> &'static [(String, Arc<FontData>)] {
         if missing.is_empty() {
             return Vec::new();
         }
-        filmcraft_text::fonts::scan_system();
-        let faces: Vec<_> = filmcraft_text::fonts::all_faces().into_iter().filter(|f| f.info.origin == "system" && !f.info.italic).collect();
+        waltcut_text::fonts::scan_system();
+        let faces: Vec<_> = waltcut_text::fonts::all_faces().into_iter().filter(|f| f.info.origin == "system" && !f.info.italic).collect();
         let by_weight = |f: &&Arc<Face>| f.info.weight.abs_diff(400);
         let mut chosen: Vec<&Arc<Face>> = Vec::new();
         let mut out = Vec::new();

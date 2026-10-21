@@ -3,8 +3,8 @@
 //! presets keep loading), plus the derived values (output size, rate, bitrate) and the estimated
 //! file size.
 
-use filmcraft_time::{FrameRate, Tick};
 use serde::{Deserialize, Serialize};
+use waltcut_time::{FrameRate, Tick};
 
 use crate::{ExportSettings, Format};
 
@@ -75,7 +75,7 @@ pub enum HardwareEncoding {
     Auto,
 }
 
-/// Whether the picture of an export may be composited on the GPU (`filmcraft-gpu`'s off-screen
+/// Whether the picture of an export may be composited on the GPU (`waltcut-gpu`'s off-screen
 /// compositor) instead of the CPU reference renderer. Auto = use the GPU when the app registered
 /// a GPU frame renderer and the machine has an adapter; the CPU result is the fallback either
 /// way. On an effects-heavy edit it exports 2.4× (1080p) to 3.2× (4K) faster, and a single plain
@@ -509,7 +509,7 @@ impl ExportSettings {
     pub fn supports_alpha(&self) -> bool {
         match self.format {
             Format::PngSequence | Format::TiffSequence | Format::TgaSequence | Format::ExrSequence => true,
-            Format::ProRes => crate::prores_profile(&self.prores_profile).chroma() == filmcraft_prores::ChromaFormat::Yuv444,
+            Format::ProRes => crate::prores_profile(&self.prores_profile).chroma() == waltcut_prores::ChromaFormat::Yuv444,
             _ => false,
         }
     }
@@ -616,9 +616,9 @@ impl ExportSettings {
             }
             Format::Apv => {
                 let bpp = match crate::apv_profile(&self.apv_profile) {
-                    filmcraft_apv::Profile::P422_12 => 3.6,
-                    filmcraft_apv::Profile::P444_10 => 4.2,
-                    filmcraft_apv::Profile::P444_12 | filmcraft_apv::Profile::P4444_10 | filmcraft_apv::Profile::P4444_12 => 5.0,
+                    waltcut_apv::Profile::P422_12 => 3.6,
+                    waltcut_apv::Profile::P444_10 => 4.2,
+                    waltcut_apv::Profile::P444_12 | waltcut_apv::Profile::P4444_10 | waltcut_apv::Profile::P4444_12 => 5.0,
                     _ => 3.0,
                 };
                 px * fps * bpp
@@ -707,7 +707,7 @@ impl ExportSettings {
                     v += &format!(", keyframe every {} frames", r.keyint);
                 }
                 Format::ProRes => {
-                    use filmcraft_prores::Profile;
+                    use waltcut_prores::Profile;
                     v += match crate::prores_profile(&self.prores_profile) {
                         Profile::Proxy => ", ProRes 422 Proxy",
                         Profile::Lt => ", ProRes 422 LT",

@@ -54,7 +54,7 @@ modules:
         CARGO_HOME: /run/build/filmcraft/cargo
         CARGO_NET_OFFLINE: 'true'
     build-commands:
-      - cargo --offline build --release --locked -p filmcraft -p filmcraft-cli
+      - cargo --offline build --release --locked -p waltcut -p waltcut-cli
       - install -Dm755 target/release/filmcraft /app/bin/filmcraft
       # The headless CLI and its stdio MCP server, as in the release bundle (#346).
       - install -Dm755 target/release/filmcraft-cli /app/bin/filmcraft-cli

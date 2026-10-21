@@ -4,12 +4,12 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_engine::shortcut_presets as presets;
-use filmcraft_engine::shortcuts::{PREMIERE_PRESET, Platform};
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_engine::shortcut_presets as presets;
+use waltcut_engine::shortcuts::{PREMIERE_PRESET, Platform};
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -73,22 +73,22 @@ impl Driver {
 
 /// Ids added for keyboard parity (engine + UI).
 fn new_ids() -> Vec<String> {
-    let mut v: Vec<String> = filmcraft_engine::keyboard::commands().iter().map(|c| c.id.to_string()).collect();
-    v.extend(filmcraft_ui_egui::panels::keyboard::COMMANDS.iter().map(|c| c.id.to_string()));
+    let mut v: Vec<String> = waltcut_engine::keyboard::commands().iter().map(|c| c.id.to_string()).collect();
+    v.extend(waltcut_ui_egui::panels::keyboard::COMMANDS.iter().map(|c| c.id.to_string()));
     v
 }
 
 #[test]
 fn premiere_table_has_no_dangling_ids_or_new_conflicts() {
-    let ui: Vec<String> = filmcraft_ui_egui::menus::external_commands().into_iter().map(|c| c.id).collect();
+    let ui: Vec<String> = waltcut_ui_egui::menus::external_commands().into_iter().map(|c| c.id).collect();
     for (id, keys, panel) in presets::premiere() {
-        assert!(filmcraft_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "Premiere table: `{id}` ({keys} {panel}) is not a command");
+        assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "Premiere table: `{id}` ({keys} {panel}) is not a command");
     }
     for (id, _, _) in presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL) {
-        assert!(filmcraft_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "panel table: `{id}` is not a command");
+        assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "panel table: `{id}` is not a command");
     }
     let mut s = Session::default();
-    s.shortcuts.register_external(filmcraft_ui_egui::menus::external_commands());
+    s.shortcuts.register_external(waltcut_ui_egui::menus::external_commands());
     let new = new_ids();
     for preset in [None, Some(PREMIERE_PRESET)] {
         if let Some(p) = preset {
@@ -140,7 +140,7 @@ fn new_keys_work_in_the_app() {
 
     // Shift+` maximizes the focused frame, again restores it
     d.key("Shift+`");
-    assert_eq!(d.app().ui.keys.maximized, Some(filmcraft_ui_egui::dock::PanelKind::Timeline));
+    assert_eq!(d.app().ui.keys.maximized, Some(waltcut_ui_egui::dock::PanelKind::Timeline));
     let r = d.ok("ui.elements", json!({"prefix": "panel."}));
     let frames: Vec<&Value> = r.as_array().unwrap().iter().filter(|e| e["id"].as_str().is_some_and(|i| !i["panel.".len()..].contains('.'))).collect();
     assert_eq!(frames.len(), 1, "only the maximized panel is laid out: {r}");
@@ -156,12 +156,12 @@ fn new_keys_work_in_the_app() {
 
     // Ctrl+Shift+. cycles panel focus
     d.key("Ctrl+Shift+.");
-    assert_ne!(d.app().ui.focused, filmcraft_ui_egui::dock::PanelKind::Timeline);
+    assert_ne!(d.app().ui.focused, waltcut_ui_egui::dock::PanelKind::Timeline);
 
     // Project panel: Down moves the selection; Shift+\ toggles the view
     d.focus("Project");
     // the Icon view shows a bin's clips (sub-bins are folder cards): open the first bin in place
-    let bin = d.app().session.project.root.children.iter().find_map(|e| if let filmcraft_project::BinEntry::Bin(b) = e { Some(b.id.0) } else { None }).unwrap();
+    let bin = d.app().session.project.root.children.iter().find_map(|e| if let waltcut_project::BinEntry::Bin(b) = e { Some(b.id.0) } else { None }).unwrap();
     d.ok("ui.menu.invoke", json!({"id": "projectPanel.openBin", "params": {"bin": bin, "how": "inPlace"}}));
     d.exec("project.select", json!({"items": []}));
     d.key("Down");

@@ -28,8 +28,8 @@ See [docs/animation.md](docs/animation.md) for the full workflow and current lim
 This fork retains the upstream Cargo package names for now:
 
 ```sh
-cargo run --release -p filmcraft
-cargo run --release -p filmcraft-cli -- commands
+cargo run --release -p waltcut
+cargo run --release -p waltcut-cli -- commands
 ```
 
 See [docs/contributing.md](docs/contributing.md) for Rust setup and build details, and

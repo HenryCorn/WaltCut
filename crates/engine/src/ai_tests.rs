@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use filmcraft_genai::{GenError, Picture, RestyleRequest, Restyler};
 use serde_json::json;
+use waltcut_genai::{GenError, Picture, RestyleRequest, Restyler};
 
 use crate::Session;
 
@@ -18,7 +18,7 @@ impl Restyler for Fake {
     fn name(&self) -> &str {
         "fake"
     }
-    fn restyle(&self, picture: &Picture, req: &RestyleRequest) -> filmcraft_genai::Result<Vec<u8>> {
+    fn restyle(&self, picture: &Picture, req: &RestyleRequest) -> waltcut_genai::Result<Vec<u8>> {
         assert!(picture.png.starts_with(b"\x89PNG"), "the frame is sent as PNG");
         assert!(picture.width > 0 && picture.height > 0);
         assert_eq!(req.prompt, "oil painting");
@@ -29,7 +29,7 @@ impl Restyler for Fake {
         if n >= self.fail_from {
             return Err(GenError::Provider("out of credit".into()));
         }
-        Ok(filmcraft_export::encode_png([255, 0, 0, 255].repeat(16), 4, 4).unwrap())
+        Ok(waltcut_export::encode_png([255, 0, 0, 255].repeat(16), 4, 4).unwrap())
     }
 }
 
@@ -41,7 +41,7 @@ fn session(fail_from: usize) -> (Session, Arc<Fake>) {
     (s, fake)
 }
 
-fn ai_track(s: &Session) -> &filmcraft_project::Track {
+fn ai_track(s: &Session) -> &waltcut_project::Track {
     s.active_sequence().unwrap().video_tracks.iter().find(|t| t.name.starts_with("AI Restyle")).expect("an AI Restyle track")
 }
 

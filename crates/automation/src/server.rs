@@ -3,7 +3,6 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use base64::Engine as _;
-use filmcraft_engine::Session;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock as Content};
@@ -11,6 +10,7 @@ use rmcp::{ErrorData as McpError, ServerHandler, ServiceExt, tool, tool_handler,
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
 
 use crate::{AutomationError, BridgeClient, png_rgba};
 
@@ -435,7 +435,7 @@ impl FilmcraftMcp {
                 let r = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, AutomationError> {
                     let g = s.lock().unwrap_or_else(PoisonError::into_inner);
                     // read-only: render at `seconds` without moving the playhead (#114)
-                    let t = p.seconds.map_or_else(|| g.playhead(), filmcraft_time::Tick::from_seconds_f64);
+                    let t = p.seconds.map_or_else(|| g.playhead(), waltcut_time::Tick::from_seconds_f64);
                     let (w, h) =
                         g.active_sequence().map(|q| (q.settings.width, q.settings.height)).ok_or_else(|| AutomationError::Other("no sequence".into()))?;
                     let scale = render_scale(max, w, h);

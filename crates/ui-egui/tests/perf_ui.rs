@@ -6,11 +6,11 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::frames::{FrameKey, Target};
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::frames::{FrameKey, Target};
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -179,7 +179,7 @@ fn a_newer_revision_keeps_the_frame_being_rendered() {
     // the clip with Lumetri Color at full resolution: tens of milliseconds on the CPU
     let seq = app.session.state.active_sequence.unwrap();
     let rate = app.session.active_sequence().unwrap().settings.frame_rate;
-    let frame = rate.frame_at(filmcraft_time::Tick::from_seconds_f64(15.0));
+    let frame = rate.frame_at(waltcut_time::Tick::from_seconds_f64(15.0));
     let key = |revision| FrameKey { target: Target::Sequence(seq), frame, size: 1000, revision, draft: false };
     let project = app.session.project.clone();
     idle();

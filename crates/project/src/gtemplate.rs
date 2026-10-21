@@ -35,9 +35,9 @@
 //! The built-in templates ([`builtin_templates`]) are original designs made for FilmCraft in code
 //! (no image, font or template files), under the project licence.
 
-use filmcraft_geom::Vec2;
-use filmcraft_time::{TICKS_PER_SECOND, Tick};
 use serde::{Deserialize, Serialize};
+use waltcut_geom::Vec2;
+use waltcut_time::{TICKS_PER_SECOND, Tick};
 
 use crate::effect::EffectInstance;
 use crate::graphic::{self, new_shape_layer, new_text_layer};

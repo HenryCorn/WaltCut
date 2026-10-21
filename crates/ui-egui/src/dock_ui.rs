@@ -214,7 +214,7 @@ impl FilmcraftApp {
                     self.session
                         .project
                         .item(*id)
-                        .filter(|item| matches!(item.kind, filmcraft_project::ItemKind::Sequence(_)))
+                        .filter(|item| matches!(item.kind, waltcut_project::ItemKind::Sequence(_)))
                         .map(|item| (id.0, item.name.clone()))
                 })
                 .collect(),

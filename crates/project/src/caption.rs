@@ -8,8 +8,8 @@
 //! Caption text is kept as written (lines separated by `\n`, inline `<i>`/`<b>`/`<u>` tags and
 //! WebVTT cue settings preserved) so files round-trip; renderers strip markup for display.
 
-use filmcraft_time::{Tick, TimeRange};
 use serde::{Deserialize, Serialize};
+use waltcut_time::{Tick, TimeRange};
 
 use crate::{ClipId, TrackId};
 

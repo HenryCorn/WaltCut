@@ -8,9 +8,9 @@
 //! that is dragged instead of waiting for the mouse to rest.
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::ItemKind;
-use filmcraft_time::{Tick, TimeDisplay, format_time};
 use serde_json::json;
+use waltcut_project::ItemKind;
+use waltcut_time::{Tick, TimeDisplay, format_time};
 
 use crate::FilmcraftApp;
 use crate::frames::{FrameKey, Target};
@@ -64,7 +64,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
                 return;
             };
             let Some(pi) = app.session.project.item(item) else { return };
-            let Some(view) = filmcraft_engine::clip_ops::source_view(&app.session, item) else { return };
+            let Some(view) = waltcut_engine::clip_ops::source_view(&app.session, item) else { return };
             // a subclip shows its parent media's frames
             let size = match app.session.project.item(view.media).map(|i| &i.kind) {
                 Some(ItemKind::Media(m)) => m.info.video.as_ref().map(|v| (v.width, v.height)).unwrap_or((0, 0)),
@@ -516,7 +516,7 @@ struct EyedropperPick {
     key: FrameKey,
     time: Tick,
     /// The project with the armed effect switched off, so a colour that effect keys out can be picked.
-    project: std::sync::Arc<filmcraft_project::Project>,
+    project: std::sync::Arc<waltcut_project::Project>,
 }
 
 /// Output scale of the frame an eyedropper samples (half size is plenty and quick to render).
@@ -526,7 +526,7 @@ const EYEDROPPER_SCALE: f32 = 0.5;
 /// takes a crosshair and a click fills that parameter with the colour under the pointer. The colour is
 /// read from a render of the sequence at the playhead with the armed effect switched off (an Ultra Key
 /// has already removed the green it is asked to key); Esc disarms.
-fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, pic: Rect, target: Target, rate: filmcraft_time::FrameRate, time: Tick) {
+fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, pic: Rect, target: Target, rate: waltcut_time::FrameRate, time: Tick) {
     let Some(armed) = app.ui.eyedropper.clone() else { return };
     let ctx = ui.ctx().clone();
     let pending_id = egui::Id::new("eyedropper-pending");
@@ -546,7 +546,7 @@ fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, 
         let uv = (((pos.x - pic.min.x) / pic.width()).clamp(0.0, 1.0), ((pos.y - pic.min.y) / pic.height()).clamp(0.0, 1.0));
         let mut project = (*app.session.project).clone();
         if let Some(e) =
-            project.sequence_mut(seq).and_then(|q| q.find_item_mut(filmcraft_project::ClipId(armed.clip))).and_then(|(_, it)| it.effects.get_mut(armed.effect))
+            project.sequence_mut(seq).and_then(|q| q.find_item_mut(waltcut_project::ClipId(armed.clip))).and_then(|(_, it)| it.effects.get_mut(armed.effect))
         {
             e.enabled = false;
         }
@@ -663,7 +663,7 @@ fn follow_playhead(app: &mut FilmcraftApp, which: Which, origin: Tick, end: Tick
 /// The zoom scroll bar under the time ruler. Its thumb is the part of the clip or sequence
 /// (`origin..end`) the ruler shows: drag a handle at either end to zoom, the middle to scroll, or
 /// press beside the thumb to bring it there. A thumb filling the bar shows all of it.
-fn time_zoom_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, which: Which, origin: Tick, end: Tick, rate: filmcraft_time::FrameRate) {
+fn time_zoom_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, which: Which, origin: Tick, end: Tick, rate: waltcut_time::FrameRate) {
     let t = app.tokens;
     let prefix = if which == Which::Program { "program" } else { "source" };
     let len = end.0.saturating_sub(origin.0);
@@ -753,7 +753,7 @@ fn mini_timeline(
     origin: Tick,
     time: Tick,
     end: Tick,
-    rate: filmcraft_time::FrameRate,
+    rate: waltcut_time::FrameRate,
     mark_in: Option<Tick>,
     mark_out: Option<Tick>,
 ) {
@@ -830,7 +830,7 @@ fn mini_timeline(
     // markers: the sequence's (Program), the clip's or the subclip's inherited ones (Source)
     let markers = match which {
         Which::Program => app.session.active_sequence().map(|q| q.markers.clone()),
-        Which::Source => app.session.state.source_item.and_then(|i| filmcraft_engine::clip_ops::source_view(&app.session, i)).map(|v| v.markers),
+        Which::Source => app.session.state.source_item.and_then(|i| waltcut_engine::clip_ops::source_view(&app.session, i)).map(|v| v.markers),
     };
     if let Some(markers) = markers {
         for m in markers.iter().filter(|m| shows(m.start)) {
@@ -1115,7 +1115,7 @@ pub fn source_panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
 
 fn source_nav(app: &mut FilmcraftApp, cmd: &str) {
     let Some(item) = app.session.state.source_item else { return };
-    let Some(v) = filmcraft_engine::clip_ops::source_view(&app.session, item) else { return };
+    let Some(v) = waltcut_engine::clip_ops::source_view(&app.session, item) else { return };
     let rate = v.rate;
     let cur = app.session.state.source_playhead;
     let t = match cmd {

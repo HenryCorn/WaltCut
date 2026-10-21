@@ -12,8 +12,8 @@
 //! does not check handles when applying one, so here a transition may cover at most the clips it
 //! joins: from the outgoing clip's start to the incoming clip's end.
 
-use filmcraft_project::{Sequence, Track, Transition, TransitionAlign, TransitionId};
-use filmcraft_time::Tick;
+use waltcut_project::{Sequence, Track, Transition, TransitionAlign, TransitionId};
+use waltcut_time::Tick;
 
 use crate::{Edge, EditError, Result};
 
@@ -204,8 +204,8 @@ pub fn remove(seq: &mut Sequence, ids: &[TransitionId]) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use filmcraft_project::{ClipId, ItemId, Label, Project, SequenceSettings, TrackItem, find_effect};
-    use filmcraft_time::FrameRate;
+    use waltcut_project::{ClipId, ItemId, Label, Project, SequenceSettings, TrackItem, find_effect};
+    use waltcut_time::FrameRate;
 
     const R: FrameRate = FrameRate::FPS_24;
 

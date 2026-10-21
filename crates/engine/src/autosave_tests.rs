@@ -184,7 +184,7 @@ fn scan_keeps_snapshot_when_session_metadata_is_unreadable() {
     let root = autosave::recovery_root(&d);
     let sess = root.join("123-1");
     std::fs::create_dir_all(&sess).unwrap();
-    let snap = filmcraft_format::encode(&filmcraft_project::Project::default(), false);
+    let snap = waltcut_format::encode(&waltcut_project::Project::default(), false);
     std::fs::write(sess.join("snapshot.fcproj"), snap).unwrap();
     std::fs::write(sess.join("session.json"), b"not json {").unwrap();
     let found = autosave::scan_candidates(&d, None);
@@ -206,9 +206,9 @@ fn recovery_ignores_snapshots_of_an_earlier_schema_and_keeps_them() {
     for dir in [&old, &current] {
         std::fs::create_dir_all(dir).unwrap();
     }
-    let bytes = filmcraft_format::encode(&filmcraft_project::Project::default(), false);
+    let bytes = waltcut_format::encode(&waltcut_project::Project::default(), false);
     let earlier =
-        String::from_utf8(bytes.clone()).unwrap().replacen(&format!("\"schema_version\":{}", filmcraft_format::SCHEMA_VERSION), "\"schema_version\":15", 1);
+        String::from_utf8(bytes.clone()).unwrap().replacen(&format!("\"schema_version\":{}", waltcut_format::SCHEMA_VERSION), "\"schema_version\":15", 1);
     assert_ne!(earlier.as_bytes(), bytes.as_slice(), "the snapshot was rewritten as schema 15");
     std::fs::write(old.join("snapshot.fcproj"), &earlier).unwrap();
     std::fs::write(current.join("snapshot.fcproj"), &bytes).unwrap();

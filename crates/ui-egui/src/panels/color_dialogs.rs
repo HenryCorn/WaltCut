@@ -4,8 +4,8 @@
 //! `colorDialog.working.<id>`, `colorDialog.wideGamut`, `colorDialog.autoToneMap`,
 //! `colorDialog.ok`, `colorDialog.cancel`.
 
-use filmcraft_color::{ColorSpace, WorkingSpace};
 use serde_json::{Value, json};
+use waltcut_color::{ColorSpace, WorkingSpace};
 
 use crate::FilmcraftApp;
 use crate::state::ColorDialog;
@@ -34,7 +34,7 @@ pub fn open_interpret(app: &mut FilmcraftApp, params: &Value) {
 }
 
 pub fn open_sequence(app: &mut FilmcraftApp) {
-    let c = app.session.active_sequence().map(|q| q.settings.color).unwrap_or(filmcraft_color::ColorPipeline::REC709);
+    let c = app.session.active_sequence().map(|q| q.settings.color).unwrap_or(waltcut_color::ColorPipeline::REC709);
     app.ui.color_dialog = Some(ColorDialog::Sequence { working_space: c.working.id().into(), wide_gamut: c.wide_gamut, auto_tone_map: c.auto_tone_map });
 }
 

@@ -11,7 +11,7 @@ the control channel and MCP agents can do the same.
   schema v9). It lists **words** with media-time bounds (`Tick`s), an optional speaker index and a
   confidence, plus the speaker names and the language. Because the times are media time, the
   transcript stays valid however the clip is trimmed, moved, sped up or reused.
-- The **sequence transcript** is derived, never stored (`filmcraft_edit::transcript::sequence_words`):
+- The **sequence transcript** is derived, never stored (`waltcut_edit::transcript::sequence_words`):
   audio tracks are read top first; a word is heard through the first enabled clip whose range
   covers the word's midpoint (duplicates of the same dialogue on lower tracks read once); disabled,
   reversed and frame-hold clips contribute nothing.
@@ -40,12 +40,12 @@ the control channel and MCP agents can do the same.
 Recognition goes through the `Transcriber` trait (`crates/speech`). The built-in recogniser is
 OpenAI's Whisper, run in pure Rust on [candle](https://github.com/huggingface/candle) on the CPU,
 with timestamp decoding, language detection and word times from cross-attention alignment (see the
-`filmcraft_speech::whisper` module docs). Speakers are labelled by clustering per-chunk MFCC
-statistics (`filmcraft_speech::diarize`); no model is involved.
+`waltcut_speech::whisper` module docs). Speakers are labelled by clustering per-chunk MFCC
+statistics (`waltcut_speech::diarize`); no model is involved.
 
 Both are **optional features**, off by default and never built for the web:
 
-- `whisper` (on `filmcraft-speech`, `filmcraft-engine`, and the `filmcraft` / `filmcraft-cli`
+- `whisper` (on `waltcut-speech`, `waltcut-engine`, and the `filmcraft` / `filmcraft-cli`
   apps, where it also enables downloads): candle inference.
 - `download` (`speech-download` on the engine): HTTPS downloads with rustls + RustCrypto and the
   operating system's certificate verifier.
@@ -61,7 +61,7 @@ install any recogniser in `Session::transcriber`, which enables transcription in
 ### Models
 
 Weights are **never** bundled or committed. They are downloaded on request into
-`<data dir>/models/<id>/` (see `filmcraft_engine::autosave::default_data_dir`), each file pinned to a
+`<data dir>/models/<id>/` (see `waltcut_engine::autosave::default_data_dir`), each file pinned to a
 revision of OpenAI's Hugging Face repositories and checked against its SHA-256:
 
 | Id | Languages | Licence |

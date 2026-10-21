@@ -6,10 +6,10 @@ use std::rc::Rc;
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::{ClipboardMedia, FilmcraftApp};
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::{ClipboardMedia, FilmcraftApp};
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,

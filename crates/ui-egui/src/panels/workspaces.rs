@@ -139,11 +139,11 @@ pub fn menu(app: &FilmcraftApp, items: &mut Vec<MenuItem>) {
 
 /// The same submenu without a running app: the built-in workspaces in English, none checked
 /// (`menus::default_menu_items`).
-pub fn default_menu(items: &mut Vec<MenuItem>, session: &filmcraft_engine::Session) {
+pub fn default_menu(items: &mut Vec<MenuItem>, session: &waltcut_engine::Session) {
     splice(items, &dock::WorkspacePrefs::default(), session, None, str::to_string);
 }
 
-fn splice(items: &mut Vec<MenuItem>, prefs: &dock::WorkspacePrefs, session: &filmcraft_engine::Session, current: Option<&str>, tr: impl Fn(&str) -> String) {
+fn splice(items: &mut Vec<MenuItem>, prefs: &dock::WorkspacePrefs, session: &waltcut_engine::Session, current: Option<&str>, tr: impl Fn(&str) -> String) {
     let is_ws = |it: &MenuItem| it.path.len() == 2 && it.path[0] == "Window" && it.path[1] == "Workspaces";
     let Some(at) = items.iter().position(is_ws) else { return };
     let actions: Vec<MenuItem> =

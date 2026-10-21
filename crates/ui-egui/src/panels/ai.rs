@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use filmcraft_engine::ai::CONFIRM_ABOVE_FRAMES;
+use waltcut_engine::ai::CONFIRM_ABOVE_FRAMES;
 
 use crate::FilmcraftApp;
 

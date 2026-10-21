@@ -6,11 +6,11 @@ use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::control::ControlRequest;
-use filmcraft_ui_egui::dock::{DockNode, PanelKind, SplitSize};
-use filmcraft_ui_egui::{AudioOut, FilmcraftApp};
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::control::ControlRequest;
+use waltcut_ui_egui::dock::{DockNode, PanelKind, SplitSize};
+use waltcut_ui_egui::{AudioOut, FilmcraftApp};
 
 type Fill = Box<dyn FnMut(&mut [f32], usize) + Send>;
 

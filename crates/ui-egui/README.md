@@ -38,7 +38,7 @@ translated label and its English source, including Unicode capitals. Project con
 and preference values retain their original values. Engine errors, CLI and MCP messages remain
 English. Ukrainian and Russian currently cover the core menus; they fall back to English elsewhere.
 
-Verification: `cargo test -p filmcraft-ui-egui` checks catalog syntax, duplicate keys, placeholders,
+Verification: `cargo test -p waltcut-ui-egui` checks catalog syntax, duplicate keys, placeholders,
 literal/menu/registry coverage and UI behaviour; `cargo xtask ci` runs the workspace gates. Visual
 checks use the control channel to switch language and capture the resulting panels.
 

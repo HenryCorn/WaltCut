@@ -121,7 +121,7 @@ fn ok_cancel(app: &mut FilmcraftApp, ui: &mut egui::Ui, close: &mut bool) -> boo
 }
 
 fn metadata_display(app: &mut FilmcraftApp, ui: &mut egui::Ui, columns: &mut Vec<String>, filter: &mut String, run: &mut Option<(String, Value)>) {
-    let all = filmcraft_engine::project_panel::all_columns(&app.session.project);
+    let all = waltcut_engine::project_panel::all_columns(&app.session.project);
     ui.horizontal(|ui| {
         ui.label(tl!("Show:"));
         let r = ui.add(egui::TextEdit::singleline(filter).hint_text(tl!("Search fields")).desired_width(220.0));
@@ -200,7 +200,7 @@ fn manage_presets(app: &mut FilmcraftApp, ui: &mut egui::Ui, selected: &mut usiz
     let presets = app.session.prefs.project_panel.presets.clone();
     egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
         ui.set_min_width(300.0);
-        for i in 0..filmcraft_engine::project_panel::PRESET_SLOTS {
+        for i in 0..waltcut_engine::project_panel::PRESET_SLOTS {
             let p = presets.get(i).cloned().flatten();
             let label = match &p {
                 Some(p) => format!("{}. {}", i + 1, p.name),

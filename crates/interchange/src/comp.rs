@@ -10,12 +10,12 @@
 
 use std::collections::HashMap;
 
-use filmcraft_media::MediaKind;
-use filmcraft_project::{
+use waltcut_media::MediaKind;
+use waltcut_project::{
     AudioChannels, ClipId, Interpolation, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, MediaRef, Param, ParamValue, Project, Sequence,
     Track, TrackItem, TrackKind, Transition, TransitionAlign, TransitionId, find_effect,
 };
-use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick};
+use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick};
 
 use crate::common::{Builder, MediaSpec, base_item, db_to_gain, file_name, file_stem, gain_to_db, param, set_param, settings_for, transition_effect};
 use crate::essence::{EssenceData, EssenceKey, MediaOptions};
@@ -791,7 +791,7 @@ pub(crate) fn to_project(doc: Document, opts: &ImportOptions, report: &mut Repor
 fn build_sequence(
     b: &mut Builder,
     comp: &Composition,
-    settings: filmcraft_project::SequenceSettings,
+    settings: waltcut_project::SequenceSettings,
     sources: &[Source],
     item_of: &HashMap<usize, ItemId>,
     report: &mut Report,
@@ -914,7 +914,7 @@ fn build_track(b: &mut Builder, track: &mut Track, kind: TrackKind, t: &CTrack, 
         };
         let audio = kind == TrackKind::Audio;
         let effect = match find_effect(effect) {
-            Some(d) if d.kind == if audio { filmcraft_project::EffectKind::AudioTransition } else { filmcraft_project::EffectKind::VideoTransition } => {
+            Some(d) if d.kind == if audio { waltcut_project::EffectKind::AudioTransition } else { waltcut_project::EffectKind::VideoTransition } => {
                 d.instance()
             }
             _ => transition_effect(effect, audio, report),

@@ -8,10 +8,10 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -190,7 +190,7 @@ fn add_tracks_dialog_offers_amount_placement_and_type() {
     let [v, a, s] = d.tracks();
     assert_eq!((v.len(), a.len(), s.len()), (4, 4, 0));
     assert_eq!((v[3].as_str(), a[3].as_str()), ("Video 4", "Audio 4"));
-    assert_eq!(d.app().session.active_sequence().unwrap().audio_tracks[3].channels, filmcraft_engine::project::AudioChannels::Stereo);
+    assert_eq!(d.app().session.active_sequence().unwrap().audio_tracks[3].channels, waltcut_engine::project::AudioChannels::Stereo);
     // one undo step for the whole dialog
     d.exec("edit.undo", json!({}));
     assert_eq!(d.tracks(), before);
@@ -240,7 +240,7 @@ fn add_tracks_dialog_places_and_types_the_new_tracks() {
     let q = d.app().session.active_sequence().unwrap().clone();
     assert!(q.video_tracks[1].items.is_empty() && q.video_tracks[2].items.is_empty(), "the new tracks are after Video 1");
     assert_eq!(q.video_tracks[3].items[0].id, on_v2, "what was on Video 2 moved up to Video 4");
-    use filmcraft_engine::project::AudioChannels;
+    use waltcut_engine::project::AudioChannels;
     assert_eq!((q.audio_tracks[0].channels, q.audio_tracks[0].items.len()), (AudioChannels::Mono, 0));
     assert_eq!(q.submix_tracks[0].channels, AudioChannels::Surround51);
 
@@ -570,7 +570,7 @@ fn sequence_settings_dialog_applies_in_one_undo_step() {
         let q = d.app().session.active_sequence().unwrap();
         let m = q.video_tracks.iter().flat_map(|t| &t.items).find_map(|i| i.effect("motion")).unwrap().clone();
         match (&m.param("position").unwrap().value, &m.param("scale").unwrap().value) {
-            (filmcraft_engine::project::ParamValue::Vec2(p), filmcraft_engine::project::ParamValue::Float(s)) => (p.x, p.y, *s),
+            (waltcut_engine::project::ParamValue::Vec2(p), waltcut_engine::project::ParamValue::Float(s)) => (p.x, p.y, *s),
             _ => panic!("Motion has a point and a number"),
         }
     };
@@ -592,7 +592,7 @@ fn sequence_settings_dialog_applies_in_one_undo_step() {
     d.click("sequenceSettings.ok");
     assert!(d.ids("sequenceSettings.").is_empty(), "dialog closed");
     let st = d.app().session.active_sequence().unwrap().settings.clone();
-    assert_eq!((st.width, st.height, st.frame_rate), (1280, 720, filmcraft_engine::time::FrameRate::FPS_29_97));
+    assert_eq!((st.width, st.height, st.frame_rate), (1280, 720, waltcut_engine::time::FrameRate::FPS_29_97));
     assert!(st.drop_frame && st.max_render_quality);
     let (x1, y1, s1) = motion(&mut d);
     let k = 2.0 / 3.0;
@@ -669,7 +669,7 @@ fn new_sequence_opens_its_dialog() {
     let id = d.app().session.state.active_sequence.unwrap();
     assert_eq!(d.app().session.project.item(id).unwrap().name, "Shorts", "the new sequence is the open one");
     let q = d.app().session.active_sequence().unwrap().clone();
-    assert_eq!((q.settings.width, q.settings.height, q.settings.frame_rate), (1080, 1920, filmcraft_engine::time::FrameRate::FPS_30));
+    assert_eq!((q.settings.width, q.settings.height, q.settings.frame_rate), (1080, 1920, waltcut_engine::time::FrameRate::FPS_30));
     assert_eq!((q.video_tracks.len(), q.audio_tracks.len()), (2, 4));
     d.exec("edit.undo", json!({}));
     assert_eq!(sequences(&mut d), n0, "one undo step");
@@ -703,11 +703,11 @@ fn timeline_marker_label_edits_only_the_clicked_marker_and_is_undoable() {
     d.right_marker(target, false);
     assert!(d.ids("timeline.markerMenu.").contains(&"timeline.markerMenu.label".into()), "a marker needs its own Label menu");
     d.click("timeline.markerMenu.label");
-    assert_eq!(d.ids("timeline.markerMenu.color.").len(), filmcraft_project::Label::ALL.len());
+    assert_eq!(d.ids("timeline.markerMenu.color.").len(), waltcut_project::Label::ALL.len());
     d.snapshot("marker-colour-menu", "timeline.markerMenu.");
     d.click("timeline.markerMenu.color.Blue");
     let mut expected = before.clone();
-    expected.markers.iter_mut().find(|m| m.id.0 == target).unwrap().color = filmcraft_project::Label::Blue;
+    expected.markers.iter_mut().find(|m| m.id.0 == target).unwrap().color = waltcut_project::Label::Blue;
     let actual = d.app().session.active_sequence().unwrap().clone();
     assert_eq!(serde_json::to_value(&actual).unwrap(), serde_json::to_value(&expected).unwrap(), "only the chosen marker changes, not a selected clip");
     assert_eq!(d.app().session.history.undo.len(), undo + 1);
@@ -734,9 +734,9 @@ fn a_range_marker_band_opens_its_menu_and_keeps_the_marker_identity() {
     d.click("timeline.markerMenu.label");
     d.click("timeline.markerMenu.color.Yellow");
     let mut expected = before;
-    expected.markers.iter_mut().find(|m| m.id.0 == target).unwrap().color = filmcraft_project::Label::Yellow;
+    expected.markers.iter_mut().find(|m| m.id.0 == target).unwrap().color = waltcut_project::Label::Yellow;
     let actual = d.app().session.active_sequence().unwrap();
-    assert_eq!(actual.markers.iter().find(|m| m.id.0 == other).unwrap().color, filmcraft_project::Label::Rose);
+    assert_eq!(actual.markers.iter().find(|m| m.id.0 == other).unwrap().color, waltcut_project::Label::Rose);
     assert_eq!(
         serde_json::to_value(actual).unwrap(),
         serde_json::to_value(&expected).unwrap(),
@@ -758,11 +758,11 @@ fn markers_panel_label_refreshes_the_colour_filter_in_both_themes() {
         d.ok("ui.click", json!({"id":format!("markers.row.{target}"),"button":"right"}));
         d.frames(3);
         d.click("markers.menu.label");
-        assert_eq!(d.ids("markers.menu.color.").len(), filmcraft_project::Label::ALL.len());
+        assert_eq!(d.ids("markers.menu.color.").len(), waltcut_project::Label::ALL.len());
         d.snapshot(&format!("marker-panel-label-{theme}"), "markers.menu.");
         let undo = d.app().session.history.undo.len();
         d.click("markers.menu.color.Blue");
-        assert_eq!(d.app().session.active_sequence().unwrap().markers[0].color, filmcraft_project::Label::Blue);
+        assert_eq!(d.app().session.active_sequence().unwrap().markers[0].color, waltcut_project::Label::Blue);
         assert_eq!(d.app().session.history.undo.len(), undo + 1);
         assert!(d.ids("markers.row.").is_empty(), "the newly blue marker follows the existing filter");
         d.exec("edit.undo", json!({}));
@@ -794,7 +794,7 @@ fn timeline_clip_label_is_disabled_without_a_selected_clip() {
     assert_eq!(enabled(&mut d), json!(true));
     d.click("timeline.clipMenu.edit.label");
     d.click("timeline.clipMenu.label.Blue");
-    assert_eq!(d.app().session.active_sequence().unwrap().find_item(clip).unwrap().1.label, filmcraft_project::Label::Blue);
+    assert_eq!(d.app().session.active_sequence().unwrap().find_item(clip).unwrap().1.label, waltcut_project::Label::Blue);
     assert!(d.app().session.active_sequence().unwrap().markers.is_empty());
 }
 

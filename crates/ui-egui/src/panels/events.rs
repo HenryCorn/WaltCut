@@ -6,8 +6,8 @@
 //! `progress.cancel.<id>`, `progress.showFinished`. State: `ui.panels.events` / `ui.panels.progress`.
 
 use egui::{Align2, Color32, Rect, RichText, Sense, Stroke, pos2, vec2};
-use filmcraft_engine::panels::{Level, LogEntry};
 use serde_json::json;
+use waltcut_engine::panels::{Level, LogEntry};
 
 use crate::FilmcraftApp;
 use crate::theme::Tokens;

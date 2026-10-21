@@ -224,7 +224,7 @@ pub(crate) fn exr(rgba: &[u8], w: u32, h: u32, alpha: bool, compression: ExrComp
     out.extend_from_slice(&hd);
     let table_at = out.len();
     out.resize(table_at + chunks * 8, 0);
-    let lin = filmcraft_color::srgb_u8_to_linear_table();
+    let lin = waltcut_color::srgb_u8_to_linear_table();
     let opaque: [u16; 256] = std::array::from_fn(|i| half(lin[i]));
     let row = w as usize * 4;
     let wn = w as usize;
@@ -518,11 +518,11 @@ mod tests {
     /// light, premultiplied alpha, rows top to bottom; in every compression.
     #[test]
     fn exr_decodes_in_ffmpeg() {
-        let Some(ffmpeg) = filmcraft_testkit::ffmpeg_or_skip("OpenEXR stills") else { return };
+        let Some(ffmpeg) = waltcut_testkit::ffmpeg_or_skip("OpenEXR stills") else { return };
         let (px, w, h) = picture();
-        let dir = filmcraft_testkit::fixtures::workspace_root().join("target").join("export-tests").join(format!("exr-{}", std::process::id()));
+        let dir = waltcut_testkit::fixtures::workspace_root().join("target").join("export-tests").join(format!("exr-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let lin = filmcraft_color::srgb_u8_to_linear_table();
+        let lin = waltcut_color::srgb_u8_to_linear_table();
         for c in ExrCompression::ALL {
             for alpha in [false, true] {
                 let path = dir.join(format!("f{alpha}-{c:?}.exr"));

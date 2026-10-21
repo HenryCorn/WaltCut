@@ -26,10 +26,10 @@
 //! `workingSpace` (+ `workingSpace.option.<id>`), `wideGamut`, `autoToneMap`; VR Properties:
 //! `vr.projection`, `vr.layout`, `vr.horizontal`, `vr.vertical`; `ok`, `cancel`.
 
-use filmcraft_color::WorkingSpace;
-use filmcraft_project::{AudioChannels, SequenceSettings};
-use filmcraft_time::FrameRate;
 use serde_json::{Map, Value, json};
+use waltcut_color::WorkingSpace;
+use waltcut_project::{AudioChannels, SequenceSettings};
+use waltcut_time::FrameRate;
 
 use crate::FilmcraftApp;
 use crate::i18n::t;
@@ -176,7 +176,7 @@ fn aspect(w: u32, h: u32) -> String {
 
 /// The width a `w` x `h` frame with `par` pixels shows at, in square pixels (rounded).
 fn display_width(w: u32, h: u32, par: (u32, u32)) -> u32 {
-    let dw = filmcraft_project::conformed_size((w, h), par, (1, 1)).0.round();
+    let dw = waltcut_project::conformed_size((w, h), par, (1, 1)).0.round();
     if dw >= f64::from(u32::MAX) { u32::MAX } else { dw.max(0.0) as u32 }
 }
 
@@ -331,10 +331,10 @@ fn general(ui: &mut egui::Ui, d: &mut SequenceSettingsDraft, cur: &SequenceSetti
     });
     section(ui, "Video", |ui| {
         row(ui, label_w, "Frame Size:", true, |ui| {
-            let w = ui.add(crate::widgets::number_drag(&mut d.width).range(1..=filmcraft_project::MAX_FRAME_SIDE).speed(1.0));
+            let w = ui.add(crate::widgets::number_drag(&mut d.width).range(1..=waltcut_project::MAX_FRAME_SIDE).speed(1.0));
             elems.push(("sequenceSettings.width".into(), w.rect, d.width.to_string()));
             ui.label(tl!("horizontal"));
-            let h = ui.add(crate::widgets::number_drag(&mut d.height).range(1..=filmcraft_project::MAX_FRAME_SIDE).speed(1.0));
+            let h = ui.add(crate::widgets::number_drag(&mut d.height).range(1..=waltcut_project::MAX_FRAME_SIDE).speed(1.0));
             elems.push(("sequenceSettings.height".into(), h.rect, d.height.to_string()));
             ui.label(tl!("vertical"));
             // the display aspect: 1440 x 1080 with 4:3 pixels is 16:9

@@ -5,10 +5,10 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 /// The tests run one at a time: fault injection (`inject_job_panics`) is process-wide, so frame
 /// workers of a parallel test would consume the injected panics.
@@ -25,7 +25,7 @@ struct Driver {
 
 impl Driver {
     fn demo() -> Self {
-        filmcraft_ui_egui::crash::install(None);
+        waltcut_ui_egui::crash::install(None);
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let (tx, rx) = channel();
@@ -88,7 +88,7 @@ fn frame_worker_survives_a_panicking_job_and_keeps_rendering() {
     let jobs_before = d.frame_stats()["jobs"].as_u64().unwrap_or(0);
     let workers = d.harness.state().frames.workers() as u32;
     // more faults than there are workers: before the fix every worker died and nothing rendered
-    filmcraft_ui_egui::frames::inject_job_panics(workers + 2);
+    waltcut_ui_egui::frames::inject_job_panics(workers + 2);
     for t in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0] {
         d.ok("engine.execute", json!({"command": "playhead.set", "params": {"seconds": t}}));
         d.settle();
@@ -125,7 +125,7 @@ fn a_ui_panic_shows_an_error_window_and_the_app_keeps_running() {
 #[test]
 fn tiny_windows_and_squeezed_panels_do_not_panic() {
     let _serial = serial();
-    filmcraft_ui_egui::crash::install(None);
+    waltcut_ui_egui::crash::install(None);
     for (w, h) in [(120.0, 80.0), (300.0, 200.0), (60.0, 40.0), (900.0, 560.0)] {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");

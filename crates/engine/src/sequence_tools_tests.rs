@@ -1,8 +1,8 @@
 //! Sequence / Markers menu commands (`sequence_tools`).
 
 use super::*;
-use filmcraft_project::{AudioChannels, Label, MarkerKind, TrackKind};
 use serde_json::json;
+use waltcut_project::{AudioChannels, Label, MarkerKind, TrackKind};
 
 fn demo() -> Session {
     let mut s = Session::default();
@@ -602,14 +602,14 @@ fn selection_follows_playhead() {
 fn go_to_in_out_without_marks_go_to_the_sequence_ends() {
     let mut s = demo();
     let end = s.active_sequence().unwrap().duration();
-    let mid = filmcraft_time::Tick(end.0 / 2);
+    let mid = waltcut_time::Tick(end.0 / 2);
     s.execute("playhead.set", json!({"time": mid.0})).unwrap();
     s.execute("markers.goToIn", json!({})).unwrap();
-    assert_eq!(s.playhead(), filmcraft_time::Tick::ZERO, "the start");
+    assert_eq!(s.playhead(), waltcut_time::Tick::ZERO, "the start");
     s.execute("markers.goToOut", json!({})).unwrap();
     assert_eq!(s.playhead(), end, "the end");
     // with marks, the marks
-    let at = filmcraft_time::Tick(end.0 / 4);
+    let at = waltcut_time::Tick(end.0 / 4);
     s.execute("playhead.set", json!({"time": at.0})).unwrap();
     s.execute("markers.markIn", json!({})).unwrap();
     s.execute("playhead.set", json!({"time": mid.0})).unwrap();

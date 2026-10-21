@@ -1,8 +1,8 @@
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_time::Tick;
-use filmcraft_ui_egui::FilmcraftApp;
 use serde_json::json;
+use waltcut_engine::Session;
+use waltcut_time::Tick;
+use waltcut_ui_egui::FilmcraftApp;
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
     let ctx = h.ctx.clone();
@@ -98,7 +98,7 @@ fn unmarked_clip_drags_full_length_without_creating_marks() {
     let c = &s.active_sequence().unwrap().video_tracks[0].items[0];
     assert_eq!(c.source_in, Tick::ZERO);
     assert_eq!(c.duration, s.active_sequence().unwrap().settings.frame_rate.snap_nearest(Tick::from_seconds_f64(18.0)));
-    let m = s.project.item(filmcraft_engine::project::ItemId(5)).unwrap().as_media().unwrap();
+    let m = s.project.item(waltcut_engine::project::ItemId(5)).unwrap().as_media().unwrap();
     assert!(m.mark_in.is_none() && m.mark_out.is_none());
 }
 
@@ -113,9 +113,9 @@ fn audio_file_drag_places_only_audio() {
 
 #[test]
 fn clear_in_out_shortcut_addresses_the_focused_monitor_and_is_undoable() {
-    use filmcraft_engine::clip_ops::source_view;
-    use filmcraft_engine::project::ItemId;
-    use filmcraft_ui_egui::dock::PanelKind;
+    use waltcut_engine::clip_ops::source_view;
+    use waltcut_engine::project::ItemId;
+    use waltcut_ui_egui::dock::PanelKind;
     let mut h = harness(5);
     let start = Tick::from_seconds_f64(1.0);
     let out = Tick::from_seconds_f64(3.0);
@@ -157,13 +157,13 @@ fn clear_in_out_shortcut_addresses_the_focused_monitor_and_is_undoable() {
 
 fn marked_harness() -> Harness<'static, FilmcraftApp> {
     let mut h = harness(5);
-    let view = filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap();
+    let view = waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap();
     h.state_mut().session.execute("project.setMarks", json!({"item":5,"in":view.rate.tick_of(48).0,"out":view.rate.tick_of(95).0})).unwrap();
     step(&mut h);
     h
 }
-fn marked_range(h: &Harness<'static, FilmcraftApp>) -> filmcraft_time::TimeRange {
-    filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap().selected_range()
+fn marked_range(h: &Harness<'static, FilmcraftApp>) -> waltcut_time::TimeRange {
+    waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap().selected_range()
 }
 #[test]
 fn range_handles_preview_then_commit_one_undo_step() {
@@ -177,7 +177,7 @@ fn range_handles_preview_then_commit_one_undo_step() {
         pointer(&mut h, to, None);
         assert_eq!(h.state().session.project.to_json(), before, "{id} must preview without editing");
         assert!(
-            filmcraft_ui_egui::panels::source_range::preview(h.state(), &h.ctx).is_some(),
+            waltcut_ui_egui::panels::source_range::preview(h.state(), &h.ctx).is_some(),
             "{id}: from={from:?}, source_time={:?}, playhead={:?}",
             h.state().session.state.source_playhead,
             h.state().auto.find("source.playhead")
@@ -240,7 +240,7 @@ fn range_move_clamps_to_media_bounds_and_keeps_duration() {
         pointer(&mut h, to, None);
         pointer(&mut h, to, Some(false));
         let after = marked_range(&h);
-        let view = filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap();
+        let view = waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap();
         assert_eq!(after.duration, before.duration);
         assert!(after.start >= view.start && after.end() <= view.end);
     }
@@ -260,7 +260,7 @@ fn chord(h: &mut Harness<'static, FilmcraftApp>, key: egui::Key, shift: bool, pr
 }
 #[test]
 fn source_marker_navigation_and_clear_shortcuts_leave_program_alone() {
-    use filmcraft_ui_egui::dock::PanelKind;
+    use waltcut_ui_egui::dock::PanelKind;
     let mut h = marked_harness();
     h.state_mut().ui.focused = PanelKind::Source;
     let before = h.state().session.active_sequence().unwrap().clone();
@@ -269,20 +269,20 @@ fn source_marker_navigation_and_clear_shortcuts_leave_program_alone() {
     assert_eq!(h.state().session.state.source_playhead, marked_range(&h).start);
     assert_eq!(h.state().session.playhead(), program_time);
     chord(&mut h, egui::Key::M, false, false);
-    assert_eq!(filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap().markers.len(), 1);
+    assert_eq!(waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap().markers.len(), 1);
     assert_eq!(h.state().session.active_sequence().unwrap(), &before);
     chord(&mut h, egui::Key::I, true, true);
-    assert!(filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap().mark_in.is_none());
+    assert!(waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap().mark_in.is_none());
     chord(&mut h, egui::Key::O, true, true);
-    assert!(filmcraft_engine::clip_ops::source_view(&h.state().session, filmcraft_engine::project::ItemId(5)).unwrap().mark_out.is_none());
+    assert!(waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap().mark_out.is_none());
     assert_eq!(h.state().session.active_sequence().unwrap(), &before);
     assert_eq!(h.state().session.playhead(), program_time);
 }
 
 #[test]
 fn program_range_handles_share_behavior_and_leave_source_marks_alone() {
-    use filmcraft_engine::{clip_ops::source_view, project::ItemId};
-    use filmcraft_ui_egui::dock::PanelKind;
+    use waltcut_engine::{clip_ops::source_view, project::ItemId};
+    use waltcut_ui_egui::dock::PanelKind;
     for id in ["program.range.in", "program.range.out", "program.range.body"] {
         let mut h = marked_harness();
         h.state_mut()
@@ -345,7 +345,7 @@ fn program_range_draft_cancels_when_active_sequence_changes() {
 
 #[test]
 fn playhead_scrubs_above_full_range_and_trim_handles_in_both_monitors() {
-    use filmcraft_ui_egui::dock::PanelKind;
+    use waltcut_ui_egui::dock::PanelKind;
     for source in [true, false] {
         let mut h = harness(5);
         if !source {

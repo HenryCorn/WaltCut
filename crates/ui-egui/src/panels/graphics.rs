@@ -23,12 +23,12 @@
 
 use crate::widgets::CenteredDialog as _;
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_geom::{Affine, Vec2};
-use filmcraft_project::graphic::{self, LayerContent, LayerSpec, eval_layer, layer_display_name, layer_indices};
-use filmcraft_project::{ClipId, EffectInstance, ItemKind, ParamValue, TrackItem};
-use filmcraft_render::graphic_clip::{layer_local_bounds, layer_matrix, text_layout};
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_geom::{Affine, Vec2};
+use waltcut_project::graphic::{self, LayerContent, LayerSpec, eval_layer, layer_display_name, layer_indices};
+use waltcut_project::{ClipId, EffectInstance, ItemKind, ParamValue, TrackItem};
+use waltcut_render::graphic_clip::{layer_local_bounds, layer_matrix, text_layout};
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -113,7 +113,7 @@ pub fn visible_layers(app: &FilmcraftApp, pic: Rect, frame: (u32, u32)) -> Vec<L
         let Some(ItemKind::Graphic { width, height, .. }) = app.session.project.item(it.item).map(|p| &p.kind) else { continue };
         let size = (*width, *height);
         let mt = it.source_time_at(t);
-        let base = screen.then_apply(&filmcraft_render::motion_matrix(seq, it, size, None, mt));
+        let base = screen.then_apply(&waltcut_render::motion_matrix(seq, it, size, None, mt));
         let idx = layer_indices(&it.effects);
         for (li, &ei) in idx.iter().enumerate().rev() {
             if let Some(spec) = eval_layer(&it.effects[ei], mt, size).filter(|s| s.enabled) {
@@ -135,7 +135,7 @@ fn canvas_target(app: &FilmcraftApp, pic: Rect, frame: (u32, u32)) -> (Option<Cl
         && let Some(seq) = app.session.active_sequence()
         && let Some(ItemKind::Graphic { width, height, .. }) = app.session.project.item(it.item).map(|p| &p.kind)
     {
-        let m = screen.then_apply(&filmcraft_render::motion_matrix(seq, &it, (*width, *height), None, it.source_time_at(t)));
+        let m = screen.then_apply(&waltcut_render::motion_matrix(seq, &it, (*width, *height), None, it.source_time_at(t)));
         return (Some(c), m);
     }
     (None, screen)
@@ -145,7 +145,7 @@ fn to_canvas(m: &Affine, p: Pos2) -> Vec2 {
     m.inverse().map(|i| i.apply(Vec2::new(p.x as f64, p.y as f64))).unwrap_or_default()
 }
 
-fn text_of(spec: &LayerSpec) -> Option<&filmcraft_project::graphic::TextProps> {
+fn text_of(spec: &LayerSpec) -> Option<&waltcut_project::graphic::TextProps> {
     match &spec.content {
         LayerContent::Text(t) => Some(t),
         _ => None,
@@ -413,7 +413,7 @@ impl HandleDrag {
 }
 
 /// Paragraph text: wrapped in a box (vertical text never is).
-fn is_paragraph(t: &filmcraft_project::graphic::TextProps) -> bool {
+fn is_paragraph(t: &waltcut_project::graphic::TextProps) -> bool {
     t.box_width > 0.0 && !t.vertical
 }
 
@@ -1688,11 +1688,11 @@ pub fn properties(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 ParamValue::Text(f) => f,
                 _ => String::new(),
             };
-            let fams = filmcraft_text::families();
+            let fams = waltcut_text::families();
             let (_, mut vui) = cx.row(ui, tl!("Font"));
             let r = egui::ComboBox::from_id_salt(("gfx-font", clip.0, l)).selected_text(&family).width(170.0).height(400.0).show_ui(&mut vui, |ui| {
-                if !filmcraft_text::fonts::system_scanned() {
-                    filmcraft_text::fonts::scan_system();
+                if !waltcut_text::fonts::system_scanned() {
+                    waltcut_text::fonts::scan_system();
                 }
                 for (f, _) in &fams {
                     if ui.selectable_label(*f == family, f).clicked() {

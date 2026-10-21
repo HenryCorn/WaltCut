@@ -166,7 +166,7 @@ impl<W: Write + Seek> MkvWriter<W> {
         let info_pos = base + out.len() as u64;
         let mut info = Vec::new();
         el_uint(&mut info, TIMESTAMP_SCALE, opts.timestamp_scale);
-        el_str(&mut info, MUXING_APP, "filmcraft-matroska");
+        el_str(&mut info, MUXING_APP, "waltcut-matroska");
         el_str(&mut info, WRITING_APP, &opts.writing_app);
         if let Some(t) = &opts.title {
             el_str(&mut info, TITLE, t);

@@ -6,11 +6,11 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_engine::project::ItemId;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_engine::project::ItemId;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -141,7 +141,7 @@ fn import_image_sequence_from_the_file_menu_and_media_browser() {
     assert_eq!(r["imageSequences"][0]["frames"], 5);
     let id = ItemId(r["items"][0].as_u64().unwrap());
     let kind = d.app().session.project.item(id).unwrap().as_media().unwrap().info.kind;
-    assert_eq!(kind, filmcraft_media::MediaKind::ImageSequence);
+    assert_eq!(kind, waltcut_media::MediaKind::ImageSequence);
     // Media Browser ▸ Import as Image Sequence (the selection, from frame 3)
     d.exec("mediaBrowser.select", json!({"paths": [paths[2]]}));
     let r = d.ok("ui.menu.invoke", json!({"id": "file.importFromMediaBrowser", "params": {"imageSequence": true}}));
@@ -209,7 +209,7 @@ fn project_settings_dialog() {
     }
     d.ok(
         "ui.set",
-        json!({"menuDialog": {"titleSafe": [15.0, 12.0], "renderer": filmcraft_engine::project_tools::RENDERER_SOFTWARE, "captured": "/tmp/fc-captured"}}),
+        json!({"menuDialog": {"titleSafe": [15.0, 12.0], "renderer": waltcut_engine::project_tools::RENDERER_SOFTWARE, "captured": "/tmp/fc-captured"}}),
     );
     d.click("projectSettings.tab.ingest");
     assert!(d.has("projectSettings.ingest.enabled"));
@@ -217,9 +217,9 @@ fn project_settings_dialog() {
     assert!(!d.dialog_open());
     let st = d.app().session.project.settings.clone();
     assert_eq!(st.title_safe, (15.0, 12.0));
-    assert_eq!(st.renderer, filmcraft_engine::project_tools::RENDERER_SOFTWARE);
+    assert_eq!(st.renderer, waltcut_engine::project_tools::RENDERER_SOFTWARE);
     assert_eq!(st.scratch.captured.as_deref(), Some("/tmp/fc-captured"));
-    assert!(filmcraft_ui_egui::panels::menu_dialogs::software_renderer(d.app()));
+    assert!(waltcut_ui_egui::panels::menu_dialogs::software_renderer(d.app()));
 }
 
 #[test]
@@ -276,8 +276,8 @@ fn clip_and_sequence_dialogs() {
 fn color_matte_dialog_picks_and_changes_the_color() {
     let mut d = Driver::new();
     let matte_color = |d: &mut Driver, id: u64| match &d.app().session.project.item(ItemId(id)).unwrap().kind {
-        filmcraft_engine::project::ItemKind::Media(m) => match &m.media {
-            filmcraft_engine::project::MediaRef::Generator(filmcraft_media::Generator::ColorMatte { color }) => filmcraft_color::to_hex(*color),
+        waltcut_engine::project::ItemKind::Media(m) => match &m.media {
+            waltcut_engine::project::MediaRef::Generator(waltcut_media::Generator::ColorMatte { color }) => waltcut_color::to_hex(*color),
             g => panic!("not a matte: {g:?}"),
         },
         _ => panic!("not media"),

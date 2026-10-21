@@ -13,9 +13,9 @@
 //! `tts.download`, `tts.download.confirm`, `tts.download.cancel`.
 
 use egui::{Align2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use filmcraft_project::{ClipId, VocalPitch};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use waltcut_project::{ClipId, VocalPitch};
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -60,7 +60,7 @@ impl Default for TtsDraft {
         TtsDraft {
             text: String::new(),
             language: "en-US".into(),
-            voice: if natural_installed() { "kokoro-heart".into() } else { filmcraft_tts::default_voice_id().into() },
+            voice: if natural_installed() { "kokoro-heart".into() } else { waltcut_tts::default_voice_id().into() },
             pitch: VocalPitch::Default,
             pace: 1.0,
             advanced_open: true,
@@ -80,7 +80,7 @@ impl TtsDraft {
 
 /// The natural voice package is downloaded.
 fn natural_installed() -> bool {
-    filmcraft_engine::transcript::models_dir().as_deref().is_some_and(filmcraft_tts::catalog::installed)
+    waltcut_engine::transcript::models_dir().as_deref().is_some_and(waltcut_tts::catalog::installed)
 }
 
 /// State of job `id`: `None` while running, else its result.
@@ -162,7 +162,7 @@ fn poll(app: &mut FilmcraftApp) {
 
 /// The selected narration clip and its item, if any.
 fn selected_narration(app: &FilmcraftApp) -> Option<(ClipId, u64)> {
-    let clip = filmcraft_engine::narration::target_clip(&app.session, &serde_json::Value::Null)?;
+    let clip = waltcut_engine::narration::target_clip(&app.session, &serde_json::Value::Null)?;
     let item = app.session.active_sequence()?.find_item(clip)?.1.item;
     Some((clip, item.0))
 }
@@ -175,7 +175,7 @@ pub fn follow_selection(app: &mut FilmcraftApp) {
     match sel {
         Some((clip, item)) if app.ui.tts.loaded_from != Some((clip.0, item)) => {
             let first_time = app.ui.tts.loaded_from.map(|(c, _)| c) != Some(clip.0);
-            if let Some(n) = app.session.project.narrations.get(&filmcraft_project::ItemId(item)).cloned() {
+            if let Some(n) = app.session.project.narrations.get(&waltcut_project::ItemId(item)).cloned() {
                 let d = &mut app.ui.tts;
                 d.text = n.text;
                 d.language = n.language;
@@ -207,9 +207,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let painter = ui.painter().clone();
     painter.rect_filled(rect, 0.0, t.panel_bg);
-    let models = filmcraft_engine::transcript::models_dir();
-    let voices = filmcraft_tts::voices_in(models.as_deref());
-    let installed = models.as_deref().is_some_and(filmcraft_tts::catalog::installed);
+    let models = waltcut_engine::transcript::models_dir();
+    let voices = waltcut_tts::voices_in(models.as_deref());
+    let installed = models.as_deref().is_some_and(waltcut_tts::catalog::installed);
     let busy = app.ui.tts.pending.is_some();
     let download = app
         .ui
@@ -243,9 +243,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         });
         ui.add_space(6.0);
         label(ui, &t, "Language");
-        let lang_name = filmcraft_tts::LANGUAGES.iter().find(|(id, _)| *id == d.language).map_or(d.language.as_str(), |(_, n)| n);
+        let lang_name = waltcut_tts::LANGUAGES.iter().find(|(id, _)| *id == d.language).map_or(d.language.as_str(), |(_, n)| n);
         let cb = egui::ComboBox::from_id_salt("tts-language").selected_text(lang_name).width(w).show_ui(ui, |ui| {
-            for (id, name) in filmcraft_tts::LANGUAGES {
+            for (id, name) in waltcut_tts::LANGUAGES {
                 if ui.selectable_label(d.language == *id, *name).clicked() {
                     d.language = id.to_string();
                 }
@@ -268,7 +268,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             }
         });
         auto.add("tts.voice", visible(ui, cb.response.rect), "Voice");
-        let natural = filmcraft_tts::catalog::find(&d.voice).is_some();
+        let natural = waltcut_tts::catalog::find(&d.voice).is_some();
         if natural && !installed {
             ui.add_space(6.0);
             egui::Frame::new().fill(t.field_bg).stroke(egui::Stroke::new(1.0, t.field_border)).corner_radius(4.0).inner_margin(8.0).show(ui, |ui| {
@@ -284,13 +284,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                         }
                     }
                     None if d.confirm_download => {
-                        let mb = filmcraft_tts::catalog::size() as f64 / 1e6;
+                        let mb = waltcut_tts::catalog::size() as f64 / 1e6;
                         ui.label(egui::RichText::new(format!("Download the natural voices? {mb:.0} MB, once.")).color(t.text).size(12.0).strong());
                         ui.label(
                             egui::RichText::new(format!(
                                 "From {} and github.com/cmusphinx/cmudict (pronunciations). Licence: {}. Every file is checked against a pinned SHA-256.",
-                                filmcraft_tts::catalog::SOURCE,
-                                filmcraft_tts::catalog::LICENSE
+                                waltcut_tts::catalog::SOURCE,
+                                waltcut_tts::catalog::LICENSE
                             ))
                             .color(t.text_dim)
                             .size(11.0),
@@ -309,7 +309,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     }
                     None => {
                         ui.label(egui::RichText::new("Natural voices need a one-time download.").color(t.text).size(11.5));
-                        let b = ui.button(format!("Download natural voices ({:.0} MB)…", filmcraft_tts::catalog::size() as f64 / 1e6));
+                        let b = ui.button(format!("Download natural voices ({:.0} MB)…", waltcut_tts::catalog::size() as f64 / 1e6));
                         auto.add("tts.download", visible(ui, b.rect), "Download natural voices");
                         if b.clicked() {
                             d.confirm_download = true;
@@ -346,7 +346,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             ui.add_space(10.0);
             label(ui, &t, "Pace");
             ui.spacing_mut().slider_width = w - 56.0;
-            let s = ui.add(egui::Slider::new(&mut d.pace, filmcraft_tts::MIN_PACE..=filmcraft_tts::MAX_PACE).step_by(0.05).fixed_decimals(2).suffix("×"));
+            let s = ui.add(egui::Slider::new(&mut d.pace, waltcut_tts::MIN_PACE..=waltcut_tts::MAX_PACE).step_by(0.05).fixed_decimals(2).suffix("×"));
             auto.add("tts.pace", visible(ui, s.rect), "Pace");
             let (r, _) = ui.allocate_exact_size(vec2(w - 56.0, 14.0), Sense::hover());
             for (x, l) in [(0.0, "0.5×"), (1.0 / 3.0, "1×"), (1.0, "2×")] {
@@ -367,7 +367,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     if !d.text.is_empty() && !d.text.ends_with(' ') {
                         d.text.push(' ');
                     }
-                    d.text.push_str(filmcraft_tts::script::PAUSE_MARKER);
+                    d.text.push_str(waltcut_tts::script::PAUSE_MARKER);
                     d.text.push(' ');
                 }
             });
@@ -377,7 +377,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             .hint_text("Type what you want the voice to say")
             .desired_width(w)
             .desired_rows(8)
-            .char_limit(filmcraft_tts::MAX_TEXT_BYTES);
+            .char_limit(waltcut_tts::MAX_TEXT_BYTES);
         let r = ui.add(te);
         auto.add("tts.text", visible(ui, r.rect), "Text");
     });
@@ -385,8 +385,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     // footer: Preview | Save
     let fy = rect.max.y - FOOTER_H + 10.0;
     let half = (rect.width() - PAD * 2.0 - 10.0) / 2.0;
-    let natural = filmcraft_tts::catalog::find(&d.voice).is_some();
-    let can_say = filmcraft_tts::check_text(&d.text).is_ok() && (!natural || installed) && !busy;
+    let natural = waltcut_tts::catalog::find(&d.voice).is_some();
+    let can_say = waltcut_tts::check_text(&d.text).is_ok() && (!natural || installed) && !busy;
     let pr = Rect::from_min_size(pos2(rect.min.x + PAD, fy), vec2(half, 28.0));
     if button(ui, &t, pr, Icon::Play, if busy { "Synthesizing…" } else { "Preview" }, false, can_say, "tts-preview").clicked() && can_say {
         actions.push(Action::Run("tts.preview", d.params(), true));

@@ -16,7 +16,7 @@
 //! - Long subtitles continue in extension blocks; user-data (`EBN 0xFE`) and comment blocks are
 //!   skipped.
 
-use filmcraft_time::{FrameRate, Tick, fields_to_frames, frames_to_fields};
+use waltcut_time::{FrameRate, Tick, fields_to_frames, frames_to_fields};
 
 use crate::{Cue, Document, Error, Result};
 

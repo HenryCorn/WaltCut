@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use crate::FilmcraftApp;
 
 pub fn stats(app: &FilmcraftApp) -> Value {
-    let mut v = filmcraft_engine::perf::stats(&app.session);
+    let mut v = waltcut_engine::perf::stats(&app.session);
     let (shown, dropped) = app.playback.meter.counts();
     let (images, image_bytes, plans, plan_bytes) = app.frames.cache_entries();
     v["playback"] = json!({

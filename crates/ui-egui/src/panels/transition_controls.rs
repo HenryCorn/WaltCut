@@ -23,11 +23,11 @@
 //! the dialog's `transitionDuration.value`, `.ok`, `.cancel`.
 
 use egui::{Align2, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
-use filmcraft_edit::Edge;
-use filmcraft_edit::transitions::{self as trn, Alignment};
-use filmcraft_project::{ParamKind, ParamValue, Transition, TransitionId};
-use filmcraft_time::{FrameRate, Tick};
 use serde_json::{Value, json};
+use waltcut_edit::Edge;
+use waltcut_edit::transitions::{self as trn, Alignment};
+use waltcut_project::{ParamKind, ParamValue, Transition, TransitionId};
+use waltcut_time::{FrameRate, Tick};
 
 use crate::FilmcraftApp;
 use crate::state::TransitionDurationDraft;
@@ -62,7 +62,7 @@ pub fn selected(app: &FilmcraftApp) -> Option<TransitionId> {
 }
 
 fn timecode(frames: f64, rate: FrameRate, drop_frame: bool) -> String {
-    filmcraft_time::format_timecode_frames(frames.round() as i64, rate, drop_frame)
+    waltcut_time::format_timecode_frames(frames.round() as i64, rate, drop_frame)
 }
 
 /// A duration field in frames that reads and takes timecode (or a frame count, or, when the text is
@@ -73,7 +73,7 @@ fn duration_field(ui: &mut egui::Ui, frames: &mut i64, max: i64, rate: FrameRate
         match s.trim().parse::<i64>() {
             Ok(n) => Some(n as f64),
             // timecode first: `1.00` is a second there, not one
-            Err(_) => filmcraft_time::parse_timecode(s, rate, drop_frame, 0).ok().map(|n| n as f64).or_else(|| crate::calc::eval(s, current)),
+            Err(_) => waltcut_time::parse_timecode(s, rate, drop_frame, 0).ok().map(|n| n as f64).or_else(|| crate::calc::eval(s, current)),
         }
     }))
 }
@@ -390,7 +390,7 @@ fn paint_ruler(p: &egui::Painter, ruler: Rect, view: (Tick, Tick), rate: FrameRa
             let x = x_of(ruler, view, rate.tick_of(f));
             p.line_segment([pos2(x, base_y - h), pos2(x, base_y)], Stroke::new(1.0, t.tl_ruler_tick));
             if labelled && f >= 0 {
-                let label = filmcraft_time::format_time(rate.tick_of(f), rate, drop_frame, filmcraft_time::TimeDisplay::Timecode, 48000);
+                let label = waltcut_time::format_time(rate.tick_of(f), rate, drop_frame, waltcut_time::TimeDisplay::Timecode, 48000);
                 p.text(pos2(x, ruler.min.y + 7.0), Align2::CENTER_CENTER, label, Tokens::ui(10.0), t.tl_ruler_text);
             }
             f = f.saturating_add(step);

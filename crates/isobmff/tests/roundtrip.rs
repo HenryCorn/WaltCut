@@ -1,8 +1,8 @@
 //! Property tests: write with our muxers, read back, compare sample tables and bytes.
 
-use filmcraft_isobmff::*;
 use proptest::prelude::*;
 use std::io::Cursor;
+use waltcut_isobmff::*;
 
 #[derive(Clone, Debug)]
 struct S {

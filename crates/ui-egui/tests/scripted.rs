@@ -11,10 +11,10 @@
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use filmcraft_engine::Session;
-use filmcraft_ui_egui::FilmcraftApp;
-use filmcraft_ui_egui::control::ControlRequest;
 use serde_json::{Value, json};
+use waltcut_engine::Session;
+use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
@@ -212,7 +212,7 @@ fn effects_panel_lists_the_premiere_transition_folders() {
     d.ok("ui.panel.show", json!({"panel": "Effects"}));
     d.frames(3);
     let folders = d.element_ids("effects.folder.");
-    for f in filmcraft_project::vtransition::VIDEO_TRANSITION_FOLDERS {
+    for f in waltcut_project::vtransition::VIDEO_TRANSITION_FOLDERS {
         assert!(folders.contains(&format!("effects.folder.Video Transitions/{f}")), "{f}: {folders:?}");
     }
     assert!(folders.iter().any(|f| f == "effects.folder.Legacy"), "{folders:?}");
@@ -390,7 +390,7 @@ impl Driver {
             self.frames(1);
         }
         let img = self.harness.render().expect("render");
-        let png = filmcraft_ui_egui::control::encode_png(img.as_raw(), img.width(), img.height()).expect("png");
+        let png = waltcut_ui_egui::control::encode_png(img.as_raw(), img.width(), img.height()).expect("png");
         let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ui-screenshots");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join(format!("{name}.png"));
@@ -401,7 +401,7 @@ impl Driver {
 }
 
 /// Renders the Trim Monitor and the Keyboard Shortcuts dialog to PNGs for visual review (needs a
-/// GPU): `cargo test -p filmcraft-ui-egui --test scripted -- --ignored screenshots`.
+/// GPU): `cargo test -p waltcut-ui-egui --test scripted -- --ignored screenshots`.
 #[test]
 #[ignore]
 fn screenshots() {

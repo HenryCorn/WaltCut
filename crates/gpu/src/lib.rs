@@ -1,30 +1,30 @@
 //! The wgpu compositor.
 //!
-//! Executes a [`FramePlan`](filmcraft_render::plan::FramePlan) on the GPU: every layer's source is
+//! Executes a [`FramePlan`](waltcut_render::plan::FramePlan) on the GPU: every layer's source is
 //! uploaded as textures (Y/Cb/Cr planes stay YUV — conversion to linear RGB happens per pixel in
 //! the shader), drawn as a transformed quad with premultiplied "over" blending into a Rgba16Float
 //! accumulator, then resolved over black into an sRGB `Rgba8UnormSrgb` texture that the UI
 //! registers as a native texture. Uploads are cached by pixel-buffer identity, so a paused frame or
 //! a still costs nothing.
 //!
-//! Every blend mode of [`filmcraft_render::Blend`] runs here. Normal and Dissolve (whose per-pixel
+//! Every blend mode of [`waltcut_render::Blend`] runs here. Normal and Dissolve (whose per-pixel
 //! pattern is the CPU's 64-bit hash, reproduced in WGSL) use fixed-function "over" blending. The
 //! other 25 modes need the colour under the layer: before such a layer is drawn, the accumulator
 //! region under its quad is copied into a backdrop texture, and the fragment shader composites
-//! with the CPU reference's math (`filmcraft_render::blend::composite`: sRGB-encoded straight
+//! with the CPU reference's math (`waltcut_render::blend::composite`: sRGB-encoded straight
 //! colour, W3C formulas, back to linear) and writes the result. Only those layers pay the copy.
 //!
-//! A layer carrying standard effects ([`filmcraft_render::plan::LayerFx`]) goes through the
+//! A layer carrying standard effects ([`waltcut_render::plan::LayerFx`]) goes through the
 //! effect stage ([`fx`]) first: its source is drawn into an `Rgba32Float` working image, the
 //! effects run as compute passes in WGSL with the CPU reference's math
-//! (`filmcraft_render::gpufx::FxOp::apply`), and the result is drawn like any RGBA layer. Layers
+//! (`waltcut_render::gpufx::FxOp::apply`), and the result is drawn like any RGBA layer. Layers
 //! without effects take the single draw above.
 //!
 //! Layers that need converting before upload (linear f32 RGBA from CPU-rendered layers, 16-bit
 //! YUV such as ProRes) are converted to half floats by [`prepare`], which frame workers run off the
 //! UI thread; [`GpuCompositor::composite_prepared`] then only copies bytes into textures.
 //!
-//! The CPU plan executor (`filmcraft_render::plan::execute_cpu`) is the oracle; tests compare.
+//! The CPU plan executor (`waltcut_render::plan::execute_cpu`) is the oracle; tests compare.
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
@@ -33,10 +33,10 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
-use filmcraft_color::{Matrix, Range, Transfer};
-use filmcraft_frame::{Chroma, PixelData, VideoFrame};
-use filmcraft_render::Blend;
-use filmcraft_render::plan::{FramePlan, PlanLayer, PlanStep};
+use waltcut_color::{Matrix, Range, Transfer};
+use waltcut_frame::{Chroma, PixelData, VideoFrame};
+use waltcut_render::Blend;
+use waltcut_render::plan::{FramePlan, PlanLayer, PlanStep};
 
 pub mod adapter;
 pub mod export_renderer;
@@ -607,7 +607,7 @@ impl GpuCompositor {
         })
     }
 
-    fn uniforms(src: &SrcInfo, m: &filmcraft_geom::Affine, opacity: f32, blend: Blend, out: (u32, u32)) -> [f32; UNIFORM_FLOATS] {
+    fn uniforms(src: &SrcInfo, m: &waltcut_geom::Affine, opacity: f32, blend: Blend, out: (u32, u32)) -> [f32; UNIFORM_FLOATS] {
         let (kr, kb) = src.color.matrix.kr_kb();
         let bits_scale = src.code_levels / 256.0; // 2^(bits - 8), independent of texture encoding
         let (yo, ys, co, cs) = match (src.color.range, src.kind) {
@@ -630,10 +630,10 @@ impl GpuCompositor {
         // colour management (q0..q5), stage by stage as `InputTransform::apply`
         let q = src.input.map_or([0.0; 24], |p| {
             let curve = match p.curve {
-                filmcraft_color::GpuCurve::Sdr => 0.0,
-                filmcraft_color::GpuCurve::Linear => 1.0,
-                filmcraft_color::GpuCurve::Pq => 2.0,
-                filmcraft_color::GpuCurve::Hlg => 3.0,
+                waltcut_color::GpuCurve::Sdr => 0.0,
+                waltcut_color::GpuCurve::Linear => 1.0,
+                waltcut_color::GpuCurve::Pq => 2.0,
+                waltcut_color::GpuCurve::Hlg => 3.0,
             };
             let (hl, hk) = p.hlg.unwrap_or(([0.0; 3], 0.0));
             let mx = p.matrix.unwrap_or([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
@@ -642,7 +642,7 @@ impl GpuCompositor {
             let on = |b: bool| if b { 1.0 } else { 0.0 };
             #[rustfmt::skip]
             let q = [
-                1.0, curve, hk, filmcraft_color::REFERENCE_WHITE_NITS as f32,
+                1.0, curve, hk, waltcut_color::REFERENCE_WHITE_NITS as f32,
                 hl[0], hl[1], hl[2], on(p.matrix.is_some()),
                 mx[0][0], mx[0][1], mx[0][2], on(p.tone.is_some()),
                 mx[1][0], mx[1][1], mx[1][2], sp,
@@ -726,7 +726,7 @@ impl GpuCompositor {
                     None => VideoFrame::rgba_f32(img.w as u32, img.h as u32, img.px.clone()),
                 };
                 owned =
-                    [PlanLayer { frame: Arc::new(frame), matrix: filmcraft_geom::Affine::IDENTITY, opacity: 1.0, blend: Blend::Normal, fx: None, input: None }];
+                    [PlanLayer { frame: Arc::new(frame), matrix: waltcut_geom::Affine::IDENTITY, opacity: 1.0, blend: Blend::Normal, fx: None, input: None }];
                 (img.w as u32, img.h as u32, &owned[..])
             }
             FramePlan::Composite { width, height, steps } => return self.composite_steps(*width, *height, steps, prep),
@@ -749,7 +749,7 @@ impl GpuCompositor {
                 if self.fx.is_some() && lfx.size.0.max(lfx.size.1) <= max_side {
                     return None;
                 }
-                let img = filmcraft_render::plan::effect_image(&l.frame, lfx);
+                let img = waltcut_render::plan::effect_image(&l.frame, lfx);
                 Some(PlanLayer::new(Arc::new(VideoFrame::rgba_f32(img.w as u32, img.h as u32, img.px)), l.matrix, l.opacity, l.blend))
             })
             .collect();
@@ -793,7 +793,7 @@ impl GpuCompositor {
                     // the source drawn onto the working image (box-decimated by n, as the CPU decodes)
                     let n = lfx.decimation.max(1) as f64;
                     let mut su =
-                        Self::uniforms(&src, &filmcraft_geom::Affine::scale(1.0 / n, 1.0 / n), 1.0, Blend::Normal, (lfx.size.0.max(1), lfx.size.1.max(1)));
+                        Self::uniforms(&src, &waltcut_geom::Affine::scale(1.0 / n, 1.0 / n), 1.0, Blend::Normal, (lfx.size.0.max(1), lfx.size.1.max(1)));
                     // Effect sources use the working pixel center, avoiding interpolated vertex coordinates.
                     su[26] = n as f32;
                     let sbuf = self.uniform_buffer(&su);
@@ -829,7 +829,7 @@ impl GpuCompositor {
                     let m = match &l.fx {
                         Some(lfx) => {
                             let n = 1.0 / lfx.decimation.max(1) as f64;
-                            l.matrix.then_apply(&filmcraft_geom::Affine::scale(n, n))
+                            l.matrix.then_apply(&waltcut_geom::Affine::scale(n, n))
                         }
                         None => l.matrix,
                     };
@@ -935,7 +935,7 @@ impl GpuCompositor {
         if steps.iter().any(|s| matches!(s, PlanStep::Transition { effect, .. } if effect.effect != "push")) {
             self.cpu_transitions += 1;
             let plan = FramePlan::Composite { width, height, steps: steps.to_vec() };
-            return self.composite_prepared(&FramePlan::Image(filmcraft_render::plan::execute_cpu(&plan)), None);
+            return self.composite_prepared(&FramePlan::Image(waltcut_render::plan::execute_cpu(&plan)), None);
         }
         let empty = FramePlan::Layers { width, height, layers: Vec::new() };
         let (canvas, dims) = self.render_plan(&empty, None, true, false);
@@ -983,13 +983,13 @@ impl GpuCompositor {
     /// Run the effect stage of a layer alone: `frame` decoded into its working image and `fx`
     /// applied, read back as linear premultiplied RGBA f32 (what `LayerFx` ops produce on the
     /// CPU from the same frame). None when the working image does not fit in a texture.
-    pub fn effect_image(&mut self, frame: &VideoFrame, fx: &filmcraft_render::plan::LayerFx) -> Option<(u32, u32, Vec<f32>)> {
+    pub fn effect_image(&mut self, frame: &VideoFrame, fx: &waltcut_render::plan::LayerFx) -> Option<(u32, u32, Vec<f32>)> {
         let key = self.upload(frame, None);
         let src = self.src_info(frame, key)?;
         let views = self.uploads.get(&key)?.views.clone();
         let n = fx.decimation.max(1) as f64;
         let (w, h) = (fx.size.0.max(1), fx.size.1.max(1));
-        let mut su = Self::uniforms(&src, &filmcraft_geom::Affine::scale(1.0 / n, 1.0 / n), 1.0, Blend::Normal, (w, h));
+        let mut su = Self::uniforms(&src, &waltcut_geom::Affine::scale(1.0 / n, 1.0 / n), 1.0, Blend::Normal, (w, h));
         // Same integer source-grid mapping as the composited effect path.
         su[26] = n as f32;
         let sbuf = self.uniform_buffer(&su);
@@ -1096,7 +1096,7 @@ impl GpuCompositor {
         export_renderer::timing::add_map_wait(t.elapsed());
         let t = std::time::Instant::now();
         let (width, row) = (w as usize, row as usize);
-        let mut out = filmcraft_frame::pool::take_f32_overwritten(width.checked_mul(h as usize)?.checked_mul(4)?);
+        let mut out = waltcut_frame::pool::take_f32_overwritten(width.checked_mul(h as usize)?.checked_mul(4)?);
         let data = slice.get_mapped_range().ok()?;
         // every row must be there: the pooled output holds stale values until written
         let converted = out.chunks_exact_mut(width * 4).enumerate().all(|(y, dst)| {
@@ -1167,9 +1167,9 @@ struct SrcInfo {
     alpha: f32,
     chroma: (u32, u32),
     size: (u32, u32),
-    color: filmcraft_color::ColorInfo,
+    color: waltcut_color::ColorInfo,
     /// Colour management beyond the default decode (a Y'CbCr layer's [`PlanLayer::input`]).
-    input: Option<filmcraft_color::GpuInputParams>,
+    input: Option<waltcut_color::GpuInputParams>,
 }
 
 /// Floats in a layer's uniform block (`U` in `composite.wgsl`: 13 vec4).

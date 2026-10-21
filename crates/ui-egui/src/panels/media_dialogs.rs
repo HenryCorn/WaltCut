@@ -56,7 +56,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     if !empty {
         return None;
     }
-    let enabled = |app: &FilmcraftApp, id: &str| filmcraft_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session));
+    let enabled = |app: &FilmcraftApp, id: &str| waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session));
     match id {
         "media.linkMedia" => {
             let r = app.session.execute("media.linkMedia", json!({})).map_err(|e| e.to_string());
@@ -75,13 +75,13 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
         })),
         "media.createProxies" => Some(enabled(app, id).map(|_| {
             let items = app.session.state.project_selection.iter().map(|i| i.0).collect();
-            app.ui.create_proxies = Some(ProxyDraft { items, preset: filmcraft_engine::proxies::DEFAULT_PROXY_PRESET.into(), destination: String::new() });
+            app.ui.create_proxies = Some(ProxyDraft { items, preset: waltcut_engine::proxies::DEFAULT_PROXY_PRESET.into(), destination: String::new() });
             json!({"dialog": "createProxies"})
         })),
         "media.attachProxies" | "media.reconnectFullRes" => {
             let item = app.session.state.project_selection.first().copied();
             let Some(item) = item else { return Some(Err("select a clip in the Project panel".into())) };
-            let exts: Vec<&str> = filmcraft_media::VIDEO_EXTENSIONS.to_vec();
+            let exts: Vec<&str> = waltcut_media::VIDEO_EXTENSIONS.to_vec();
             let hint = RelinkHint { command: id.to_string(), params: json!({"item": item.0}) };
             let id = id.to_string();
             Some(app.pick(FileDialog::Relink { exts: exts.iter().map(|e| e.to_string()).collect(), hint }, move |app, paths| {
@@ -113,7 +113,7 @@ fn missing_list(app: &FilmcraftApp) -> Vec<(u64, String, String, String, &'stati
         .filter_map(|id| {
             let it = app.session.project.item(*id)?;
             let m = it.as_media()?;
-            let filmcraft_project::MediaRef::File { path } = &m.media else { return None };
+            let waltcut_project::MediaRef::File { path } = &m.media else { return None };
             let fname = path.rsplit(['/', '\\']).next().unwrap_or(path).to_string();
             Some((id.0, it.name.clone(), fname, path.clone(), if m.offline { tl!("Offline") } else { tl!("Missing") }))
         })
@@ -134,8 +134,8 @@ fn preview_texture(app: &FilmcraftApp, ctx: &egui::Context, path: &str) -> Optio
         return t;
     }
     let tex = app.session.media.open_file(path, &*app.session.services).ok().and_then(|src| {
-        let t = filmcraft_time::Tick(src.info().duration.0 / 3);
-        let f = src.video_frame(filmcraft_media::FrameRequest { time: t, scale: 0.25 }).ok()?;
+        let t = waltcut_time::Tick(src.info().duration.0 / 3);
+        let f = src.video_frame(waltcut_media::FrameRequest { time: t, scale: 0.25 }).ok()?;
         let img = egui::ColorImage::from_rgba_unmultiplied([f.width as usize, f.height as usize], &f.to_rgba8());
         Some(ctx.load_texture(format!("link-preview-{path}"), img, egui::TextureOptions::LINEAR))
     });
@@ -334,7 +334,7 @@ fn link_media(app: &mut FilmcraftApp, ctx: &egui::Context) {
         }
         Some("locate") => {
             let exts: Vec<&str> =
-                filmcraft_media::VIDEO_EXTENSIONS.iter().chain(filmcraft_media::AUDIO_EXTENSIONS).chain(filmcraft_media::STILL_EXTENSIONS).copied().collect();
+                waltcut_media::VIDEO_EXTENSIONS.iter().chain(waltcut_media::AUDIO_EXTENSIONS).chain(waltcut_media::STILL_EXTENSIONS).copied().collect();
             let mut params = match_params(&d);
             params["item"] = json!(item);
             let hint = RelinkHint { command: "media.relink".into(), params };
@@ -425,7 +425,7 @@ fn create_proxies(app: &mut FilmcraftApp, ctx: &egui::Context) {
             ui.label(tlf!("{n} clip(s) selected.", n = d.items.len()));
             ui.add_space(4.0);
             ui.label(RichText::new(tl!("Format and size")).strong());
-            for p in filmcraft_engine::proxies::PRESETS.iter().filter(|p| p.proxy) {
+            for p in waltcut_engine::proxies::PRESETS.iter().filter(|p| p.proxy) {
                 let r = ui.radio(d.preset == p.id, p.label);
                 push(&mut elems, format!("proxies.preset.{}", p.id), &r, p.label);
                 if r.clicked() {
@@ -526,7 +526,7 @@ fn project_manager(app: &mut FilmcraftApp, ctx: &egui::Context) {
             }
             if d.mode == "consolidate" {
                 ui.indent("pm-presets", |ui| {
-                    for p in filmcraft_engine::proxies::PRESETS.iter().filter(|p| !p.proxy) {
+                    for p in waltcut_engine::proxies::PRESETS.iter().filter(|p| !p.proxy) {
                         let r = ui.radio(d.preset == p.id, p.label);
                         push(&mut elems, format!("pm.preset.{}", p.id), &r, p.label);
                         if r.clicked() {

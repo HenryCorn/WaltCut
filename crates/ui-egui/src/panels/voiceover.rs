@@ -13,10 +13,10 @@
 
 use crate::widgets::CenteredDialog as _;
 use egui::{Align2, Color32, Rect, RichText, Sense, Stroke, pos2, vec2};
-use filmcraft_engine::voiceover::VoiceOverPrefs;
-use filmcraft_project::TrackId;
-use filmcraft_time::Tick;
 use serde_json::{Value, json};
+use waltcut_engine::voiceover::VoiceOverPrefs;
+use waltcut_project::TrackId;
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::icons::{self, Icon};
@@ -135,11 +135,11 @@ pub fn on_stop(app: &mut FilmcraftApp) {
 }
 
 /// Countdown cue beeps of the recording in progress, for an output at `sr`: (start sample, tone).
-pub fn cues(s: &filmcraft_engine::Session, sr: u32) -> (Vec<i64>, Vec<f32>) {
+pub fn cues(s: &waltcut_engine::Session, sr: u32) -> (Vec<i64>, Vec<f32>) {
     match &s.voiceover.rec {
         Some(rec) if s.prefs.voice_over.countdown_sound_cues => {
-            let at = filmcraft_engine::voiceover::cue_times(rec.capture_start, rec.record_start).into_iter().map(|t| t.to_units_floor(sr as i64)).collect();
-            (at, filmcraft_engine::voiceover::cue_tone(sr))
+            let at = waltcut_engine::voiceover::cue_times(rec.capture_start, rec.record_start).into_iter().map(|t| t.to_units_floor(sr as i64)).collect();
+            (at, waltcut_engine::voiceover::cue_tone(sr))
         }
         _ => (Vec::new(), Vec::new()),
     }
@@ -169,7 +169,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, p: &Value) -
                 None => None,
                 Some(v) => {
                     let seq = app.session.active_sequence()?;
-                    match filmcraft_engine::mixer::strip_ref(seq, v) {
+                    match waltcut_engine::mixer::strip_ref(seq, v) {
                         Some(t) => Some(t.0),
                         None => return Some(Err(format!("no audio track {v}"))),
                     }

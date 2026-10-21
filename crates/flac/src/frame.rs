@@ -1,7 +1,7 @@
 //! Writing one frame (RFC 9639 §9): header with CRC-8, one subframe per channel, zero padding to a
 //! byte, CRC-16.
 
-use filmcraft_bitstream::BitWriter;
+use waltcut_bitstream::BitWriter;
 
 use crate::crc::{crc8, crc16};
 use crate::predict::{Residual, Subframe};

@@ -1,8 +1,8 @@
 //! #855: a rolling edit on a linked A/V cut must move the sound cut with the picture.
 
-use filmcraft_project::ClipId;
-use filmcraft_time::Tick;
 use serde_json::json;
+use waltcut_project::ClipId;
+use waltcut_time::Tick;
 
 use crate::Session;
 

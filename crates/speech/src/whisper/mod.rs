@@ -31,7 +31,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use candle_core::Tensor;
-use filmcraft_project::{Transcript, Word};
+use waltcut_project::{Transcript, Word};
 
 use crate::{Options, ProgressFn, SpeechError, Transcriber, sample_tick};
 use model::{Config, Model};
