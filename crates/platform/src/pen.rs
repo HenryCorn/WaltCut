@@ -17,6 +17,7 @@ static PRESSURE: AtomicU32 = AtomicU32::new(0);
 static TABLET: AtomicBool = AtomicBool::new(false);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 
+#[cfg(any(test, target_os = "macos"))]
 fn record(tablet: bool, pressure: f32) {
     TABLET.store(tablet, Ordering::Relaxed);
     let p = if pressure.is_finite() { pressure.clamp(0.0, 1.0) } else { 1.0 };
