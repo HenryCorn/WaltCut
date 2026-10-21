@@ -4345,30 +4345,14 @@ fn write_project(s: &mut Session, path: &str, adopt: bool) -> Result<Value> {
     // what is open (sequence tabs, how each is shown) goes into the file beside the project
     let view = s.project_view();
     let bytes = filmcraft_format::encode_with_view(&s.project, Some(&view), false);
-    let mut backup = None;
-    if adopt && s.path.as_deref() == Some(path) && s.loaded_schema < filmcraft_format::SCHEMA_VERSION {
-        let b = schema_backup_path(path, s.loaded_schema);
-        if s.services.read_file(&b).is_err()
-            && let Ok(old) = s.services.read_file(path)
-        {
-            s.services.write_file(&b, &old).map_err(|e| EngineError::Other(format!("{b}: {e}")))?;
-            backup = Some(b);
-        }
-    }
     s.services.write_file(path, &bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     if adopt {
         s.path = Some(path.to_string());
         s.previews_follow_path();
         s.note_recent_project();
         s.saved_revision = s.revision;
-        s.loaded_schema = filmcraft_format::SCHEMA_VERSION;
     }
-    Ok(json!({"path": path, "bytes": bytes.len(), "ms": t0.elapsed().as_secs_f64() * 1000.0, "backup": backup}))
-}
-
-fn schema_backup_path(path: &str, schema: u32) -> String {
-    let stem = path.strip_suffix(".fcproj").unwrap_or(path);
-    format!("{stem} (schema v{schema} backup).fcproj")
+    Ok(json!({"path": path, "bytes": bytes.len(), "ms": t0.elapsed().as_secs_f64() * 1000.0}))
 }
 
 /// Make `proj` the session's project (fresh history, media pool and editor state).
@@ -4394,7 +4378,6 @@ fn install_project(s: &mut Session, proj: filmcraft_project::Project, path: Opti
     s.revision += 1;
     // A recovered project is unsaved: its saved revision is one that never existed.
     s.saved_revision = if clean { s.revision } else { 0 };
-    s.loaded_schema = filmcraft_format::SCHEMA_VERSION;
     s.events.push(crate::Event::ProjectChanged { revision: s.revision });
     crate::project_tools::warn_untrusted_scratch(s);
 }
@@ -4402,7 +4385,7 @@ fn install_project(s: &mut Session, proj: filmcraft_project::Project, path: Opti
 fn open_project(s: &mut Session, path: &str) -> Result<Value> {
     let bytes = s.services.read_file(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     let loaded = filmcraft_format::decode(&bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
-    let (from, migrated) = (loaded.schema_version, loaded.migrated());
+    let schema = loaded.schema_version;
     install_project(s, loaded.project, Some(path.to_string()), true);
     if let Some(view) = loaded.view.filter(|_| s.prefs.timeline.restore_open_sequences) {
         s.restore_project_view(view);
@@ -4412,12 +4395,8 @@ fn open_project(s: &mut Session, path: &str) -> Result<Value> {
         s.events.push(crate::Event::OpenSequence(seq));
     }
     s.note_recent_project();
-    s.loaded_schema = from;
-    if migrated {
-        s.toast(format!("Upgraded project from schema v{from} to v{}; the original is kept as a backup when you save", filmcraft_format::SCHEMA_VERSION));
-    }
     let missing = crate::relink::on_open(s);
-    Ok(json!({"path": path, "schemaVersion": from, "migrated": migrated, "missingMedia": missing}))
+    Ok(json!({"path": path, "schemaVersion": schema, "missingMedia": missing}))
 }
 
 /// Load a recovery candidate (newest when `id` is None) as the current, unsaved project.

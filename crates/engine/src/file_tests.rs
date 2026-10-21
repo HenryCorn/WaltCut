@@ -47,28 +47,25 @@ fn saved_file_is_versioned_and_save_copy_keeps_state() {
 }
 
 #[test]
-fn legacy_project_opens_and_first_save_keeps_a_backup() {
+fn earlier_schema_project_is_refused_and_never_touched() {
     let d = temp_dir("legacy");
-    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../format/tests/fixtures/v1-edit.fcproj");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../format/tests/fixtures/v15-edit.fcproj");
     let path = d.join("old.fcproj");
-    std::fs::copy(&fixture, &path).unwrap();
+    let original = std::fs::read(&fixture).unwrap();
+    std::fs::write(&path, &original).unwrap();
     let p = path.to_string_lossy().to_string();
-    let mut s = Session::default();
-    let r = s.execute("file.open", json!({"path": p})).unwrap();
-    assert_eq!(r["schemaVersion"], 1);
-    assert_eq!(r["migrated"], true);
-    assert_eq!(s.project.name, "Legacy Edit");
-    assert!(s.drain_events().iter().any(|e| matches!(e, Event::Toast { message, .. } if message.contains("Upgraded"))));
-    let r = s.execute("file.save", json!({})).unwrap();
-    let backup = r["backup"].as_str().unwrap().to_string();
-    assert!(backup.ends_with("old (schema v1 backup).fcproj"), "{backup}");
-    assert_eq!(std::fs::read(&backup).unwrap(), std::fs::read(&fixture).unwrap());
-    let v: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let mut s = demo();
+    let before = (s.project.clone(), s.path.clone());
+    let e = s.execute("file.open", json!({"path": p})).unwrap_err().to_string();
+    assert!(e.contains("earlier FilmCraft or WaltCut build") && e.contains("v0.0.1-legacy"), "{e}");
+    assert_eq!((s.project.clone(), s.path.clone()), before, "the open project stays as it was");
+    assert_eq!(std::fs::read(&path).unwrap(), original, "the refused file is byte for byte unchanged");
+    let names: Vec<_> = std::fs::read_dir(&d).unwrap().filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+    assert_eq!(names, ["old.fcproj"], "no backup or temp file appeared beside it");
+    // a project saved by this build opens, and a file from the future is refused clearly
+    s.execute("file.saveAs", json!({"path": p.replace("old.", "new.")})).unwrap();
+    let mut v: Value = serde_json::from_slice(&std::fs::read(p.replace("old.", "new.")).unwrap()).unwrap();
     assert_eq!(v["schema_version"], filmcraft_format::SCHEMA_VERSION);
-    // Second save: no new backup.
-    assert!(s.execute("file.save", json!({})).unwrap()["backup"].is_null());
-    // A file from the future is refused clearly.
-    let mut v = v;
     v["schema_version"] = json!(filmcraft_format::SCHEMA_VERSION + 1);
     std::fs::write(&path, serde_json::to_vec(&v).unwrap()).unwrap();
     let e = Session::default().execute("file.open", json!({"path": p})).unwrap_err().to_string();

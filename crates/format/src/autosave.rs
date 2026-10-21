@@ -3,7 +3,9 @@
 //! Auto-saves go to an `Auto-Save` folder next to the project, named
 //! `<project name>-YYYY-MM-DD_HH-MM-SS.fcproj` (local wall-clock time). After each write the oldest
 //! files of that project beyond the "Maximum Project Versions" limit are deleted. Only files whose
-//! name is exactly `<name>-<timestamp>.fcproj` are ever touched.
+//! name is exactly `<name>-<timestamp>.fcproj` and that were written in the current schema are ever
+//! listed or touched: an auto-save from an earlier build can't be opened here, so it is neither
+//! offered nor pruned.
 
 use std::fs;
 use std::io;
@@ -70,7 +72,7 @@ fn is_stamp(s: &str) -> bool {
         })
 }
 
-/// Auto-saves of project `name` in `dir`, oldest first.
+/// Auto-saves of project `name` in `dir` that this build can open, oldest first.
 pub fn list_auto_saves(dir: &Path, name: &str) -> Vec<PathBuf> {
     let prefix = format!("{}-", file_stem(name));
     let Ok(rd) = fs::read_dir(dir) else { return Vec::new() };
@@ -79,7 +81,7 @@ pub fn list_auto_saves(dir: &Path, name: &str) -> Vec<PathBuf> {
         .filter_map(|e| {
             let f = e.file_name().to_string_lossy().into_owned();
             let stamp = f.strip_prefix(&prefix)?.strip_suffix(".fcproj")?;
-            is_stamp(stamp).then(|| (stamp.to_string(), e.path()))
+            (is_stamp(stamp) && crate::is_current_file(&e.path())).then(|| (stamp.to_string(), e.path()))
         })
         .collect();
     v.sort();
@@ -132,13 +134,15 @@ mod tests {
 
     #[test]
     fn rotation_keeps_newest_and_ignores_other_files() {
+        let current = format!(r#"{{"format":"filmcraft.project","schema_version":{},"project":{{}}}}"#, crate::SCHEMA_VERSION);
+        let earlier = format!(r#"{{"format":"filmcraft.project","schema_version":{},"project":{{}}}}"#, crate::SCHEMA_VERSION - 1);
         let d = std::env::temp_dir().join(format!("filmcraft-rotate-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         for i in 0..7 {
-            write_auto_save(&d, "Cut", 1_790_000_000 + i * 60, 0, b"{}", 5).unwrap();
+            write_auto_save(&d, "Cut", 1_790_000_000 + i * 60, 0, current.as_bytes(), 5).unwrap();
         }
         // Another project whose name starts with the same prefix, and an unrelated file.
-        fs::write(d.join("Cut-Two-2026-01-01_00-00-00.fcproj"), b"{}").unwrap();
+        fs::write(d.join("Cut-Two-2026-01-01_00-00-00.fcproj"), &current).unwrap();
         fs::write(d.join("notes.txt"), b"keep").unwrap();
         let left = list_auto_saves(&d, "Cut");
         assert_eq!(left.len(), 5);
@@ -146,8 +150,18 @@ mod tests {
         assert!(left[4].to_string_lossy().ends_with(&format!("Cut-{}.fcproj", timestamp(1_790_000_360, 0))));
         assert_eq!(list_auto_saves(&d, "Cut-Two").len(), 1);
         assert!(d.join("notes.txt").exists());
+        // Auto-saves from an earlier schema (older than every current one) are not listed and
+        // not counted, and rotation leaves them on disk, byte for byte.
+        let old: Vec<_> = (0..3).map(|i| d.join(format!("Cut-2020-01-01_00-00-0{i}.fcproj"))).collect();
+        for f in &old {
+            fs::write(f, &earlier).unwrap();
+        }
+        assert_eq!(list_auto_saves(&d, "Cut").len(), 5);
         rotate(&d, "Cut", 2).unwrap();
         assert_eq!(list_auto_saves(&d, "Cut").len(), 2);
+        for f in &old {
+            assert_eq!(fs::read(f).unwrap(), earlier.as_bytes(), "{}", f.display());
+        }
         assert_eq!(list_auto_saves(&d, "Cut-Two").len(), 1);
         fs::remove_dir_all(&d).unwrap();
     }

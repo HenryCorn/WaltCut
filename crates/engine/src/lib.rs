@@ -401,9 +401,6 @@ pub struct Session {
     pub prefs_path: Option<std::path::PathBuf>,
     /// Auto-save ring + crash-recovery journal (native frontends start it; None = off).
     pub persistence: Option<autosave::Persistence>,
-    /// Schema version of the file at `path` as found on disk (older = upgraded on load; the first
-    /// save over it keeps a backup of the original).
-    pub loaded_schema: u32,
     /// Render preview files + render-bar segments (shared with the frontend's frame workers).
     pub previews: Arc<previews::PreviewStore>,
     /// Audio Track Mixer automation pass in progress.
@@ -523,7 +520,6 @@ impl Session {
             prefs: Default::default(),
             prefs_path: None,
             persistence: None,
-            loaded_schema: filmcraft_format::SCHEMA_VERSION,
             previews: Arc::new(previews::PreviewStore::temp()),
             mixrec: Default::default(),
             mcrec: Default::default(),
