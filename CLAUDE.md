@@ -19,6 +19,7 @@ FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor target
 - **Everything is a command** (`crates/engine`): id, label, menu path, shortcut, params, enabled(), run(). UI, CLI, control channel and MCP all dispatch by id.
 - **Everything is agent-drivable:** every interactive widget registers an automation id; UI state is serde so the control channel can read/set it.
 - **Quality gates** before every commit: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo xtask layers`, `cargo xtask assets`, `cargo xtask wasm` (checks L0–L4 crates). `cargo xtask ci` runs them all.
+- **Disk:** `target/debug` grows to ~100 GB over a session and has filled the disk. After each task run `cargo xtask tidy --apply --if-over 30` (dry run without `--apply`; `--fixtures` also removes generated media). Build with `CARGO_INCREMENTAL=0` when space is tight.
 - **Commits:** one task id per commit (`M2.4: CABAC residual decoding`). Only green states. End messages with the attribution line required by the environment.
 
 ## Running and looking at the app

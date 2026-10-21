@@ -20,6 +20,7 @@
 
 mod ico;
 mod parity;
+mod tidy;
 mod version;
 
 use std::process::{Command, ExitCode};
@@ -491,6 +492,10 @@ fn main() -> ExitCode {
         "wasm" => wasm(),
         "assets" => assets(),
         "fixtures" => fixtures(&std::env::args().skip(2).collect::<Vec<_>>()),
+        "tidy" => {
+            let rest: Vec<String> = std::env::args().skip(2).collect();
+            tidy::run(&root(), &rest.iter().map(String::as_str).collect::<Vec<_>>())
+        }
         "ci" => ci(),
         "bench" => bench(),
         "bench-playback" => bench_playback(),
@@ -508,7 +513,7 @@ fn main() -> ExitCode {
             ico::run(&rest.iter().map(String::as_str).collect::<Vec<_>>())
         }
         _ => Err(
-            "usage: cargo xtask <layers|assets|wasm|web [--dev] [--serve PORT]|fixtures [crate…]|parity [--area menus|effects|transitions] [--reference FILE] [--out FILE] [--min PERCENT]|ico OUT IN…|version [set X.Y.Z]|ci|bench [args]|bench-playback [args]>"
+            "usage: cargo xtask <layers|assets|wasm|tidy [--apply] [--fixtures]|web [--dev] [--serve PORT]|fixtures [crate…]|parity [--area menus|effects|transitions] [--reference FILE] [--out FILE] [--min PERCENT]|ico OUT IN…|version [set X.Y.Z]|ci|bench [args]|bench-playback [args]>"
                 .into(),
         ),
     };
