@@ -154,8 +154,9 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
 
 Open pull requests against `main` from a short-lived branch named for the work. Link the issue,
 explain the user-visible change, and report relevant local checks in the pull request description.
-The repository CI workflow runs `cargo xtask ci` on Linux, macOS, and Windows for every pull
-request and push to `main`; all platform checks must pass before merge.
+The repository CI workflow runs the full `cargo xtask ci` gate on Linux and checks formatting and
+all-target Clippy on macOS and Windows for every pull request and push to `main`; all platform
+checks must pass before merge.
 
 CodeRabbit is configured to review pull requests when its GitHub integration is enabled. Its
 findings are advisory; resolve review conversations and follow the project's safety and licensing

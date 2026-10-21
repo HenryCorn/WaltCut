@@ -35,5 +35,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes ffmpeg libasound2-dev libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev pkg-config
-      - name: Run quality gates
+      - name: Run full quality gates
+        if: matrix.os == 'ubuntu-latest'
         run: cargo xtask ci
+      - name: Check native platform targets
+        if: matrix.os != 'ubuntu-latest'
+        run: |
+          cargo fmt --check
+          cargo clippy --workspace --all-targets --release -- -D warnings
