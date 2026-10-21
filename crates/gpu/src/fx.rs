@@ -51,7 +51,6 @@ const OP_VFLIP: u32 = 27;
 const OP_MIRROR: u32 = 28;
 const OP_OFFSET: u32 = 29;
 const OP_VIDEO_LIMITER: u32 = 30;
-const OP_LUMETRI: u32 = 31;
 
 type Target = (wgpu::Texture, wgpu::TextureView);
 
@@ -185,65 +184,6 @@ fn steps(op: &FxOp) -> Vec<Step> {
         }
         FxOp::VideoLimiter { max, comp, axis, warn, warning_color } => {
             out.push(step(OP_VIDEO_LIMITER, [*axis, *warn as u32, 0, 0], &[*max, *comp, warning_color[0], warning_color[1], warning_color[2]]));
-        }
-        FxOp::Lumetri {
-            gains,
-            exposure,
-            contrast,
-            hl,
-            sh,
-            wh,
-            bl,
-            sat,
-            creative_on,
-            faded,
-            vib,
-            st,
-            ht,
-            vignette_on,
-            va,
-            vmid,
-            vround,
-            vfeather,
-            aspect,
-            ..
-        } => {
-            let ge = [gains[0] * exposure, gains[1] * exposure, gains[2] * exposure];
-            let b0 = -bl * 0.15;
-            let w0 = 1.0 - wh * 0.15;
-            let sh_k = sh * 0.35;
-            let hl_k = hl * 0.35;
-            let vround_aspect = waltcut_render::gpufx::lumetri_vignette_aspect(*aspect, *vround);
-            let st_k = [(st[0] - 0.5) * 0.3, (st[1] - 0.5) * 0.3, (st[2] - 0.5) * 0.3];
-            let ht_k = [(ht[0] - 0.5) * 0.3, (ht[1] - 0.5) * 0.3, (ht[2] - 0.5) * 0.3];
-
-            let p = [
-                ge[0],
-                ge[1],
-                ge[2],
-                b0,
-                w0,
-                sh_k,
-                hl_k,
-                *contrast,
-                *faded,
-                *sat,
-                *vib,
-                *va,
-                *vmid,
-                *vfeather,
-                vround_aspect,
-                0.0,
-                st_k[0],
-                st_k[1],
-                st_k[2],
-                0.0,
-                ht_k[0],
-                ht_k[1],
-                ht_k[2],
-                0.0,
-            ];
-            out.push(step(OP_LUMETRI, [*creative_on as u32, *vignette_on as u32, 0, 0], &p));
         }
     }
     out

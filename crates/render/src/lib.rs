@@ -12,7 +12,6 @@
 pub mod audio;
 pub mod audio_fx;
 pub mod blend;
-pub mod color_match;
 pub mod colorman;
 pub mod drawing;
 pub mod effects;
@@ -21,8 +20,6 @@ pub mod gpufx;
 pub mod graphic_clip;
 pub mod graphics;
 pub mod image;
-pub mod lumetri_presets;
-pub mod luts;
 pub mod mask;
 pub mod mixer;
 pub mod multicam;
@@ -278,10 +275,8 @@ fn adjustment_layer(project: &Project, seq: &Sequence, item: &TrackItem, t: Tick
         seconds: (t - item.start).seconds(),
         timecode: tc,
         clip_name: &item.name,
-        project: Some(project),
         env: None,
         frame_rate: seq.settings.frame_rate.as_f64(),
-        working: seq.settings.color.working,
     };
     for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic)) {
         mask::apply_effect(&mut adj, e, &cx);
@@ -512,10 +507,8 @@ pub(crate) fn item_layer_ex(
             seconds: (t - item.start).seconds(),
             timecode: tc,
             clip_name: &item.name,
-            project: Some(project),
             env: Some(&env),
             frame_rate: seq.settings.frame_rate.as_f64(),
-            working: seq.settings.color.working,
         };
         for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)) {
             if waltcut_media::cancel::cancelled() {
@@ -724,8 +717,6 @@ pub fn arc_source(s: impl waltcut_media::MediaSource + 'static) -> SharedSource 
 mod tests;
 
 #[cfg(test)]
-mod lumetri_hdr_tests;
-
 #[cfg(test)]
 #[path = "adjustment_tests.rs"]
 mod adjustment_tests;

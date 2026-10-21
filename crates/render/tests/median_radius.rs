@@ -9,17 +9,7 @@ use waltcut_render::image::Image;
 use waltcut_time::Tick;
 
 fn cx() -> FxCtx<'static> {
-    FxCtx {
-        t: Tick::ZERO,
-        px_scale: 1.0,
-        seconds: 0.0,
-        timecode: "00:00:01:00",
-        clip_name: "x",
-        project: None,
-        env: None,
-        frame_rate: 24.0,
-        working: waltcut_color::WorkingSpace::Rec709,
-    }
+    FxCtx { t: Tick::ZERO, px_scale: 1.0, seconds: 0.0, timecode: "00:00:01:00", clip_name: "x", env: None, frame_rate: 24.0 }
 }
 
 fn green_stripe() -> Image {

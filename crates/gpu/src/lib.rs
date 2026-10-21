@@ -41,11 +41,9 @@ use waltcut_render::plan::{FramePlan, PlanLayer, PlanStep};
 pub mod adapter;
 pub mod export_renderer;
 pub mod fx;
-pub mod lut;
 pub mod mask;
 mod transition;
 pub use export_renderer::ExportRenderer;
-pub use lut::GpuLut;
 pub use mask::GpuMask;
 
 /// Output texture format: gamma-encoded RGBA8 (what egui expects of native textures); the resolve

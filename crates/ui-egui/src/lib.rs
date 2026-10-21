@@ -866,9 +866,6 @@ impl FilmcraftApp {
                 self.ui.status = e;
             }
         }
-        if name == "Color" {
-            self.ui.show_scopes = false;
-        }
     }
 
     pub fn show_panel(&mut self, p: PanelKind) {
@@ -884,14 +881,12 @@ impl FilmcraftApp {
         }
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
-                PanelKind::LumetriColor | PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
+                PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
                 PanelKind::Source
                 | PanelKind::EffectControls
                 | PanelKind::AudioClipMixer
                 | PanelKind::Metadata
-                | PanelKind::LumetriScopes
                 | PanelKind::AudioTrackMixer
-                | PanelKind::ReferenceMonitor
                 | PanelKind::Timecode => PanelKind::Source,
                 _ => PanelKind::Project,
             };

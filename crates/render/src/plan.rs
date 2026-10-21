@@ -417,10 +417,8 @@ fn push_item(
                 seconds: (t - item.start).seconds(),
                 timecode: tc,
                 clip_name: &item.name,
-                project: Some(project),
                 env: None,
                 frame_rate: seq.settings.frame_rate.as_f64(),
-                working: seq.settings.color.working,
             };
             let ops: Option<Vec<FxOp>> = chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect();
             if let Some(ops) = ops {

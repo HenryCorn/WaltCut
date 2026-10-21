@@ -19,7 +19,6 @@ FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails 
 | Scripted UI | `crates/ui-egui/tests/scripted.rs` | headless app (egui_kittest) driven over the control channel: razor/undo, insert, apply effect, playback, click by automation id (§4) |
 | Monitor view / Graphics menu | `crates/ui-egui/tests/view_ui.rs`, `crates/engine/src/graphics_tests.rs` | View menu items and checkmarks, playback/paused resolution, channel / comparison / multi-camera / waveform display modes, magnification and Hand-tool panning, guides dragged from the rulers (move, lock, remove, Add Guide…, templates in the preferences), snapping a graphic to the frame centre and a guide; align to frame / as group / to selection, distribute (centres and gaps), arrange, select next/previous graphic and layer, reset parameters / duration, vertical text, New Layer from file (`FILMCRAFT_UI_SHOTS=<dir>` writes `view-*.png`) |
 | Settings | `crates/engine/src/settings_tests.rs`, `crates/ui-egui/tests/settings_ui.rs` | schema keys and defaults, persistence in the data directory, v1 → v2 migration and repair of bad values, validation, per-category reset; each wired setting (still / transition durations, step many, label defaults and colours, media scaling, timebase, recent projects, media cache policy, output mapping, smart quotes, auto-transcribe); the dialog: every category from its command and Cmd+,, edits by automation id, OK / Cancel / Escape / Reset…, theme, label names in Edit ▸ Label, tooltips, frame cache (`FILMCRAFT_UI_SHOTS=<dir>` writes `settings-*.png`) |
-| Scopes and panels (M8.9 / M12.6) | `crates/scopes/src/tests.rs`, `crates/engine/src/{scopes,panels}_tests.rs`, `crates/ui-egui/tests/panels_ui.rs` | scope maths on generated frames (flat colours → exact histogram bins, ramps → waveform row = code value, 75 % bars → parade levels and vectorscope target cells for BT.601/709/2020, HLS hue angles, YC chroma, Clamp Signal, decimation, NaN); `scopes.read` on a colour matte (exact bins, 78.43 %) and on Bars and Tone (the six targets); metadata edits (one undo step, read-only fields refused, saved in the project), the event log (failed / disabled commands, repeats, jobs started / finished / failed / cancelled); every panel from Window ▸, the scopes' wrench menu, presets, five-scope grid, typing into a Metadata field, Timecode rows and modes, Events filter / Clear All, Progress cancel, Reference Monitor park / gang / scopes (`FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` writes `panels-*.png`); `perf_scopes_at_1080p` (ignored) times each scope |
 | Keyframe navigator and Effect Controls ruler | `crates/engine/src/tests.rs` (`add_keyframe_toggles_the_keyframe_at_the_playhead`), `crates/ui-egui/tests/keyframes_ui.rs`, `lane_tests` in `crates/ui-egui/src/panels/effect_controls.rs` | `effects.addKeyframe` adds a keyframe at the playhead or removes the one there (the value falls back to the remaining keyframes; undo, redo, parameters that name nothing); headless: the Properties diamond turns animation on, adds and removes the keyframe at the playhead (Scale 50 % → 100 % again), its ◀ ▶ arrows and Effect Controls' step between keyframes, Crop is applied before its first keyframe; a click on the Effect Controls time ruler and a drag of the playhead's handle move the playhead, and no playhead is drawn off the clip; ruler labels are sequence timecode, and clip times, frame rates and panel widths at their limits don't panic (`FILMCRAFT_UI_SHOTS=<dir>` writes `keyframes-*.png`) |
 | Golden images | `crates/golden/tests/golden.rs` | CPU renders vs committed PNGs; GPU vs CPU on the same scenes (§3) |
 | Engine / command | `crates/engine/src/tests.rs` | run commands on the demo project, assert the sequence, undo/redo, disabled cases |
@@ -133,7 +132,7 @@ Each codec README has the full fixture matrix and the measured results.
 - **Golden images** (`crates/golden`, a test-only crate): `tests/golden.rs` builds small procedural
   projects (demo-generator footage, bars, no media files) at 320×180 and renders one frame of each
   through the CPU compositor: Motion transform + opacity, four blend modes (Multiply, Screen,
-  Overlay, Difference), Gaussian Blur, Lumetri basic correction, Crop, Cross Dissolve at 50 %, Dip
+  Overlay, Difference), Gaussian Blur, Crop, Cross Dissolve at 50 %, Dip
   to Black at 25 %, Wipe at 50 %, Timecode / Clip Name burn-in text, graphic clips (also a built-in
   graphics template with overridden properties and per-character styles with a pinned box), and colour
   management: S-Log3/S-Gamut3.Cine footage interpreted into Rec. 709 (`log_to_rec709`) and
@@ -219,8 +218,7 @@ delete), the queue panel (Send to Queue, Up/Down, Cancel, Start, Retry, Clear) w
 the Export button and the header's Quick Export popup (`export-*.png` snapshots).
 
 `crates/ui-egui/tests/color_ui.rs` drives colour features the same way (`color-*.png` snapshots):
-Lumetri Input/Look LUT menus and section switches, the Interpret Footage ▸ Color Management and
-Sequence Color Management dialogs, and the HDR scopes of a PQ sequence.
+the Interpret Footage ▸ Color Management and Sequence Color Management dialogs.
 
 Colour science tests: `waltcut-color` (curve round trips and published reference values per
 camera log curve, BT.709/BT.2087 matrices, BT.2390 EETF, gamut mapping, LUT tetrahedral vs a
@@ -305,7 +303,7 @@ cargo xtask bench-playback --json target/bench-playback.json # machine-readable 
 | `stack3-blend` | `stack3` with V2 in Screen and V3 in Overlay (blend modes on the GPU) |
 | `h264-2160` | one 2160p23.976 H.264 clip |
 | `demo` | the built-in demo project (procedural footage, transitions, effects) |
-| `after-preview` | 1080p H.264 + Lumetri/Sharpen/Levels/Tint: a live play, Render Effects In to Out, then two plays of the green segment |
+| `after-preview` | 1080p H.264 + Sharpen/Levels/Tint: a live play, Render Effects In to Out, then two plays of the green segment |
 | `seek-storm` | 40 jumps to random frames 150 ms apart (scrubbing), time until the exact frame shows |
 
 Options: `--res full,half,quarter`, `--cpu` (CPU compositor + texture conversion instead of the

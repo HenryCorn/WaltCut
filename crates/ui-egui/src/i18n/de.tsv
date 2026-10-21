@@ -94,7 +94,6 @@
 	Color Management…	Farbmanagement…
 	Color Matte…	Farbfläche…
 	Color…	Farbe…
-	Comparison View	Vergleichsansicht
 	Composite Video	Composite-Video
 	Consolidate Duplicates	Duplikate zusammenführen
 	Copy	Kopieren
@@ -207,8 +206,6 @@
 	Link Media…	Medien verknüpfen…
 	Linked Selection	Verknüpfte Auswahl
 	Lock Guides	Hilfslinien sperren
-	Lumetri Color	Lumetri-Farbe
-	Lumetri Scopes	Lumetri-Scopes
 	Magenta	Magenta
 	Magnification	Vergrößerung
 	Make Offline…	Offline setzen…
@@ -275,7 +272,6 @@
 	Rectangle	Rechteck
 	Red	Rot
 	Redo	Wiederholen
-	Reference Monitor	Referenzmonitor
 	Remix	Remix
 	Remix Properties…	Remix-Eigenschaften…
 	Remove Attributes…	Attribute entfernen…
@@ -724,15 +720,11 @@
 	Recorded {n} multi-camera cut(s)	{n} Mehrkamera-Schnitt(e) aufgenommen
 	Clamp Signal	Signal begrenzen
 	Presets	Vorgaben
-	Parade ({kind})	Parade ({kind})
 	Waveform ({kind})	Wellenform ({kind})
-	Parade Type	Paradetyp
 	Waveform Type	Wellenformtyp
-	Vectorscope Targets	Vektorskop-Zielmarken
 	Colour Space	Farbraum
 	Brightness	Helligkeit
 	Signal Scale	Signalskala
-	Histogram	Histogramm
 	Paste Attributes	Attribute einfügen
 	Remove Attributes	Attribute entfernen
 	New Offline File	Neue Offline-Datei
@@ -884,8 +876,6 @@
 	Clip Volume	Cliplautstärke
 	(no clip selected)	(kein Clip ausgewählt)
 	Master · {name}	Master · {name}
-	Add Lumetri Color to clip	Lumetri-Farbe zum Clip hinzufügen
-	Input LUT	Eingabe-LUT
 	Temperature	Temperatur
 	Tint	Tönung
 	Saturation	Sättigung
@@ -899,7 +889,6 @@
 	HDR White	HDR-Weiß
 	HDR Specular	HDR-Spitzlichter
 	Look	Look
-	Look LUT	Look-LUT
 	Intensity	Intensität
 	Adjustments	Anpassungen
 	Faded Film	Verblasster Film
@@ -934,7 +923,6 @@
 	Midpoint	Mittelpunkt
 	Roundness	Rundheit
 	Feather	Weiche Kante
-	LUT	LUT
 	Color Match	Farbabgleich
 	Reference	Referenz
 	Face Detection (protect skin tones)	Gesichtserkennung (Hauttöne schützen)
@@ -953,7 +941,6 @@
 	Stop tracking	Verfolgung stoppen
 	Tracking method: {method}	Verfolgungsmethode: {method}
 	Composite	Zusammengesetzt
-	Comparison	Vergleich
 	Video and Waveform	Video und Wellenform
 	System Default	Systemstandard
 	Default location	Standardspeicherort
@@ -1495,7 +1482,6 @@
 	Color Theme	Farbschema
 	Color To Leave	Beizubehaltende Farbe
 	Color Tolerance	Farbtoleranz
-	Color Wheels & Match	Farbräder und Abgleich
 	Colorize	Färben
 	Columns	Spalten
 	Comment	Kommentar
@@ -1649,7 +1635,6 @@
 	Edge Width	Kantenbreite
 	Elliptical	Elliptisch
 	Emboss	Prägen
-	Enable HSL Secondary	HSL-Sekundär aktivieren
 	Enable Mercury Transmit	Mercury Transmit aktivieren
 	Enable ProRes hardware accelerated encoding, if available	Hardwarebeschleunigte ProRes-Kodierung aktivieren, falls verfügbar
 	Enable clip and XMP metadata linking	Verknüpfung von Clip- und XMP-Metadaten aktivieren
@@ -1718,10 +1703,7 @@
 	Focus Size	Fokusgröße
 	Fold Motion	Faltbewegung
 	Foldback	Foldback
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	Die Parameter für das Farbmanagement findest du auf dem Reiter „Einstellungen“ des Bedienfelds „Lumetri-Farbe“.
 	Format	Format
-	Four Scopes (RGB, 8 bit)	Vier Scopes (RGB, 8 Bit)
-	Four Scopes (YUV, float, no clamp)	Vier Scopes (YUV, Gleitkomma, unbegrenzt)
 	Fractal Influence	Fraktaler Einfluss
 	Fractal Type	Fraktaltyp
 	Frame	Frame
@@ -1805,8 +1787,6 @@
 	Grunge & Distort	Grunge und Verzerrung
 	GuitarSuite	GuitarSuite
 	HDR Graphics White (Nits)	HDR-Grafikweiß (Nits)
-	HLS Vectorscope + Histogram	HLS-Vektorskop + Histogramm
-	HSL Secondary	HSL-Sekundär
 	Hard	Hart
 	Hard Clip	Hartes Clipping
 	Hard Light	Hartes Licht
@@ -1984,7 +1964,6 @@
 	Luma Key	Luma-Key
 	Luma Source	Luma-Quelle
 	Luma and Chroma	Luma und Chroma
-	Lumetri Presets	Lumetri-Vorgaben
 	Luminance	Luminanz
 	Luminance Threshold	Luminanzschwellenwert
 	Luminosity	Luminanz
@@ -2141,8 +2120,6 @@
 	Panel Wipe	Feld-Wischblende
 	Panels	Bedienfelder
 	Panner - Ambisonics	Panner – Ambisonics
-	Parade	Parade
-	Parade (RGB)	Parade (RGB)
 	Parametric Equalizer	Parametrischer Equalizer
 	Passband Ripple	Welligkeit im Durchlassbereich
 	Path	Pfad
@@ -2593,10 +2570,6 @@
 	VR Sharpen	VR-Scharfzeichnen
 	VR Spherical Blur	VR-Kugelförmige Weichzeichnung
 	Validate Content Credentials on import	Content Credentials beim Import überprüfen
-	Vectorscope (YUV)	Vektorskop (YUV)
-	Vectorscope + Waveform YC	Vektorskop + Wellenform YC
-	Vectorscope HLS	Vektorskop HLS
-	Vectorscope YUV	Vektorskop YUV
 	Venetian Blinds	Jalousie
 	Vertical 4:5	Vertikal 4:5
 	Vertical 9:16	Vertikal 9:16
@@ -3073,7 +3046,6 @@
 	Left align text	Text linksbündig
 	Looping GIF, 640×360 at 15 fps	GIF in Schleife, 640×360 mit 15 fps
 	Lower First	Unteres Halbbild zuerst
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR (Avid)
 	MXF OP1a	MXF OP1a
@@ -3214,9 +3186,6 @@
 	Select to Segment End	Bis zum Segmentende auswählen
 	Select to Segment Start	Bis zum Segmentanfang auswählen
 	Selection Tool	Auswahlwerkzeug
-	Set Comparison Reference	Vergleichsreferenz festlegen
-	Set Creative Look	Kreativen Look festlegen
-	Set Input LUT	Eingabe-LUT festlegen
 	Set Project Panel View	Ansicht des Projekt-Bedienfelds festlegen
 	Show Next Screen	Nächsten Bildschirm anzeigen
 	Show Previous Screen	Vorherigen Bildschirm anzeigen

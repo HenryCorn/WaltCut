@@ -19,7 +19,6 @@ pub mod graphics_templates;
 pub mod import_mode;
 pub mod interchange_export;
 pub mod keyboard;
-pub mod lumetri;
 pub mod masks;
 pub mod media_browser;
 pub mod media_dialogs;
@@ -37,9 +36,7 @@ pub mod presets;
 pub mod project;
 pub mod project_dialogs;
 pub mod project_views;
-pub mod reference;
 pub mod remix;
-pub mod scopes;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;
@@ -83,7 +80,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::Effects => effects::show(app, ui, rect),
         PanelKind::EffectControls => effect_controls::show(app, ui, rect),
         PanelKind::AudioMeters => meters::show(app, ui, rect),
-        PanelKind::LumetriColor => lumetri::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),
         PanelKind::Properties => effect_controls::properties_panel(app, ui, rect),
         PanelKind::EssentialGraphics => graphics_templates::essential_graphics(app, ui, rect),
@@ -93,12 +89,10 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::MediaBrowser => media_browser::show(app, ui, rect),
         PanelKind::AudioTrackMixer => mixer::track_mixer(app, ui, rect),
         PanelKind::AudioClipMixer => mixer::clip_mixer(app, ui, rect),
-        PanelKind::LumetriScopes => scopes::show(app, ui, rect),
         PanelKind::Metadata => metadata::show(app, ui, rect),
         PanelKind::Timecode => timecode::show(app, ui, rect),
         PanelKind::Events => events::events(app, ui, rect),
         PanelKind::Progress => events::progress(app, ui, rect),
-        PanelKind::ReferenceMonitor => reference::show(app, ui, rect),
         PanelKind::EssentialSound => essential_sound::show(app, ui, rect),
         PanelKind::ProjectNotes => notes::show(app, ui, rect),
         other => crate::dock::placeholder(ui, rect, &app.tokens, &tlf!("{panel} — coming in a later milestone", panel = crate::i18n::t(other.title()))),
@@ -155,13 +149,6 @@ pub fn dragged_template(ui: &egui::Ui) -> Option<String> {
 }
 pub fn start_drag_effect(ui: &egui::Ui, id: &str) {
     ui.ctx().data_mut(|d| d.insert_temp(payload_id(), Some(DragPayloadBox(DragPayload::Effect(id.to_string())))));
-}
-/// Prefix of a dragged effect payload that names a Lumetri preset rather than an effect id.
-pub const LUMETRI_PRESET_PREFIX: &str = "lumetri:";
-/// A Lumetri preset (Effects ▸ Lumetri Presets) dragged onto a clip: an effect payload
-/// `lumetri:<name>` the Timeline applies with `lumetri.applyPreset`.
-pub fn start_drag_lumetri_preset(ui: &egui::Ui, name: &str) {
-    start_drag_effect(ui, &format!("{LUMETRI_PRESET_PREFIX}{name}"));
 }
 #[derive(Clone, Debug)]
 struct DragPayloadBox(DragPayload);
@@ -237,10 +224,9 @@ pub fn drag_ghost(app: &FilmcraftApp, ui: &egui::Ui) {
                 format!("{name} · {mode} · {:.2} s", s.range.duration.seconds())
             }
             DragPayload::Template(_, name) => name.clone(),
-            DragPayload::Effect(e) => match (e.strip_prefix("preset:"), e.strip_prefix(LUMETRI_PRESET_PREFIX)) {
-                (Some(name), _) => name.to_string(),
-                (_, Some(name)) => crate::i18n::t(name).to_string(),
-                _ => waltcut_project::find_effect(e).map(|d| d.name.to_string()).unwrap_or_default(),
+            DragPayload::Effect(e) => match e.strip_prefix("preset:") {
+                Some(name) => name.to_string(),
+                None => waltcut_project::find_effect(e).map(|d| d.name.to_string()).unwrap_or_default(),
             },
         };
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("drag-ghost")));

@@ -50,7 +50,6 @@ waltcut-text = { path = "crates/text" }
 waltcut-genai = { path = "crates/genai" }
 waltcut-render = { path = "crates/render" }
 waltcut-gpu = { path = "crates/gpu" }
-waltcut-scopes = { path = "crates/scopes" }
 waltcut-export = { path = "crates/export" }
 waltcut-format = { path = "crates/format" }
 waltcut-engine = { path = "crates/engine" }

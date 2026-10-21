@@ -141,14 +141,9 @@ the result's `sourceInClamped: [ids]` (present with `keepSourceIn`) names the cl
 
 **Colour** (`crates/engine/src/color.rs`): `sequence.colorSettings {workingSpace: rec709|rec2100-pq|
 rec2100-hlg, wideGamut, autoToneMap}`, `clip.interpretFootage {items?, colorSpace?: auto|<id>, pixelAspect?: [num, den]|file}`,
-`color.spaces`, `media.colorInfo {item}`; LUTs: `lut.import {path, name?}`, `lut.list`,
-`lut.remove {id}`, `lut.export {lut, path, format?}`, `lumetri.setInputLut` / `lumetri.setLook
-{clip?, lut: lib:<id>|builtin:<id>|"", path?}`, `lumetri.setSection {clip?, section, on?}`,
-`lumetri.applyMatch {clip?, referenceTime|referenceFrame|referenceTimecode, faceDetection?}`. Without
+`color.spaces`, `media.colorInfo {item}`. Without
 params the menu entries open dialogs (ids `colorDialog.space.<id>`, `colorDialog.working.<id>`,
-`colorDialog.wideGamut`, `colorDialog.autoToneMap`, `colorDialog.ok|cancel`). Lumetri panel ids:
-`lumetri.input_lut`, `lumetri.look_lut`, `lumetri.switch.<section>`, `lumetri.section.<section>`,
-`lumetri.match.*`; HDR scopes: `scopes.hdrWaveform`. `file.exportMedia {sdr: true}` exports an HDR
+`colorDialog.wideGamut`, `colorDialog.autoToneMap`, `colorDialog.ok|cancel`). `file.exportMedia {sdr: true}` exports an HDR
 sequence as tone-mapped SDR.
 
 **Keyboard shortcuts** (`crates/engine/src/shortcuts.rs`): `shortcuts.list {query?, panel?}`,

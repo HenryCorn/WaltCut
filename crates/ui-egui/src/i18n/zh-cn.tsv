@@ -77,7 +77,6 @@
 	Close Project	关闭项目
 	Color Management…	色彩管理…
 	Color Matte…	颜色遮罩…
-	Comparison View	比较视图
 	Composite Video	合成视频
 	Consolidate Duplicates	合并重复项
 	Copy	复制
@@ -181,8 +180,6 @@
 	Refresh Changed Media	刷新已更改的媒体
 	Linked Selection	关联选择
 	Lock Guides	锁定参考线
-	Lumetri Color	Lumetri 颜色
-	Lumetri Scopes	Lumetri 示波器
 	Magnification	放大
 	Make Offline…	设为脱机…
 	Make Subclip…	创建子剪辑…
@@ -244,7 +241,6 @@
 	Rectangle	矩形
 	Red	红
 	Redo	重做
-	Reference Monitor	参考监视器
 	Remix	重新混音
 	Remix Properties…	重新混音属性…
 	Remove Attributes…	移除属性…
@@ -682,15 +678,11 @@
 	Recorded {n} multi-camera cut(s)	已录制 {n} 个多机位切换
 	Clamp Signal	钳制信号
 	Presets	预设
-	Parade ({kind})	Parade（{kind}）
 	Waveform ({kind})	波形（{kind}）
-	Parade Type	Parade 类型
 	Waveform Type	波形类型
-	Vectorscope Targets	矢量示波器目标
 	Colour Space	色彩空间
 	Brightness	亮度
 	Signal Scale	信号刻度
-	Histogram	直方图
 	Paste Attributes	粘贴属性
 	Remove Attributes	移除属性
 	New Offline File	新建脱机文件
@@ -842,8 +834,6 @@
 	Clip Volume	剪辑音量
 	(no clip selected)	（未选择剪辑）
 	Master · {name}	主 · {name}
-	Add Lumetri Color to clip	向剪辑添加 Lumetri 颜色
-	Input LUT	输入 LUT
 	Color	颜色
 	Temperature	色温
 	Tint	色调
@@ -858,7 +848,6 @@
 	HDR White	HDR 白色
 	HDR Specular	HDR 高光
 	Look	风格
-	Look LUT	风格 LUT
 	Intensity	强度
 	Adjustments	调整
 	Faded Film	褪色胶片
@@ -893,7 +882,6 @@
 	Midpoint	中点
 	Roundness	圆度
 	Feather	羽化
-	LUT	LUT
 	Color Match	色彩匹配
 	Reference	参考
 	Face Detection (protect skin tones)	人脸检测（保护肤色）
@@ -912,7 +900,6 @@
 	Stop tracking	停止跟踪
 	Tracking method: {method}	跟踪方法：{method}
 	Composite	合成
-	Comparison	比较
 	Video and Waveform	视频与波形
 	System Default	系统默认
 	Default location	默认位置
@@ -1455,7 +1442,6 @@
 	Color Theme	配色主题
 	Color To Leave	保留颜色
 	Color Tolerance	颜色容差
-	Color Wheels & Match	色轮与匹配
 	Colorize	着色
 	Columns	列
 	Comment	注释
@@ -1610,7 +1596,6 @@
 	Edge Width	边缘宽度
 	Elliptical	椭圆
 	Emboss	浮雕
-	Enable HSL Secondary	启用 HSL 辅助
 	Enable Mercury Transmit	启用 Mercury 传输
 	Enable ProRes hardware accelerated encoding, if available	如可用，启用 ProRes 硬件加速编码
 	Enable clip and XMP metadata linking	启用剪辑与 XMP 元数据链接
@@ -1679,10 +1664,7 @@
 	Focus Size	焦点大小
 	Fold Motion	折叠运动
 	Foldback	折叠
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	有关色彩管理参数，请前往 Lumetri 颜色面板中的“设置”选项卡。
 	Format	格式
-	Four Scopes (RGB, 8 bit)	四视图示波器（RGB，8 位）
-	Four Scopes (YUV, float, no clamp)	四视图示波器（YUV，浮点，无钳制）
 	Fractal Influence	分形影响
 	Fractal Type	分形类型
 	Frame	帧
@@ -1766,8 +1748,6 @@
 	Grunge & Distort	做旧与畸变
 	GuitarSuite	吉他套件
 	HDR Graphics White (Nits)	HDR 图形白色（尼特）
-	HLS Vectorscope + Histogram	HLS 矢量示波器 + 直方图
-	HSL Secondary	HSL 辅助
 	Hard	硬
 	Hard Clip	硬削波
 	Hard Light	硬光
@@ -1941,7 +1921,6 @@
 	Luma Key	亮度键
 	Luma Source	亮度源
 	Luma and Chroma	亮度与色度
-	Lumetri Presets	Lumetri 预设
 	Luminance	亮度
 	Luminance Threshold	亮度阈值
 	Luminosity	光度
@@ -2100,8 +2079,6 @@
 	Panel Wipe	面板擦除
 	Panels	面板
 	Panner - Ambisonics	声像器 - 全景声
-	Parade	并列
-	Parade (RGB)	并列（RGB）
 	Parametric Equalizer	参数均衡器
 	Passband Ripple	通带纹波
 	Path	路径
@@ -2552,10 +2529,6 @@
 	VR Sharpen	VR 锐化
 	VR Spherical Blur	VR 球面模糊
 	Validate Content Credentials on import	导入时验证内容凭证
-	Vectorscope (YUV)	矢量示波器（YUV）
-	Vectorscope + Waveform YC	矢量示波器 + 波形 YC
-	Vectorscope HLS	矢量示波器 HLS
-	Vectorscope YUV	矢量示波器 YUV
 	Venetian Blinds	百叶窗
 	Vertical 4:5	竖版 4:5
 	Vertical 9:16	竖版 9:16
@@ -3044,7 +3017,6 @@
 	Left align text	文本左对齐
 	Looping GIF, 640×360 at 15 fps	循环 GIF，640×360，15 fps
 	Lower First	下方优先
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR（Avid）
 	MXF OP1a	MXF OP1a
@@ -3186,9 +3158,6 @@
 	Select to Segment End	选择至片段末尾
 	Select to Segment Start	选择至片段开头
 	Selection Tool	选择工具
-	Set Comparison Reference	设置比较参考
-	Set Creative Look	设置创意风格
-	Set Input LUT	设置输入 LUT
 	Set Project Panel View	设置项目面板视图
 	Show Next Screen	显示下一个屏幕
 	Show Previous Screen	显示上一个屏幕

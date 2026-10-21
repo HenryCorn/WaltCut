@@ -89,7 +89,6 @@
 	Close Project	Tutup Proyek
 	Color Management…	Manajemen Warna…
 	Color Matte…	Matte Warna…
-	Comparison View	Tampilan Perbandingan
 	Composite Video	Video Komposit
 	Consolidate Duplicates	Gabungkan Duplikat
 	Copy	Salin
@@ -193,8 +192,6 @@
 	Refresh Changed Media	Segarkan Media yang Berubah
 	Linked Selection	Pilihan Tertaut
 	Lock Guides	Kunci Garis Bantu
-	Lumetri Color	Lumetri Color
-	Lumetri Scopes	Lumetri Scopes
 	Magnification	Pembesaran
 	Make Offline…	Jadikan Offline…
 	Make Subclip…	Buat Subklip…
@@ -256,7 +253,6 @@
 	Rectangle	Persegi Panjang
 	Red	Merah
 	Redo	Ulangi
-	Reference Monitor	Monitor Referensi
 	Remix	Remix
 	Remix Properties…	Properti Remix…
 	Remove Attributes…	Hapus Atribut…
@@ -694,15 +690,11 @@
 	Recorded {n} multi-camera cut(s)	{n} potongan multi-kamera direkam
 	Clamp Signal	Batasi Sinyal
 	Presets	Preset
-	Parade ({kind})	Parade ({kind})
 	Waveform ({kind})	Bentuk Gelombang ({kind})
-	Parade Type	Jenis Parade
 	Waveform Type	Jenis Bentuk Gelombang
-	Vectorscope Targets	Target Vektorskop
 	Colour Space	Ruang Warna
 	Brightness	Kecerahan
 	Signal Scale	Skala Sinyal
-	Histogram	Histogram
 	Paste Attributes	Tempel Atribut
 	Remove Attributes	Hapus Atribut
 	New Offline File	Berkas Offline Baru
@@ -853,8 +845,6 @@
 	Clip Volume	Volume Klip
 	(no clip selected)	(tidak ada klip yang dipilih)
 	Master · {name}	Master · {name}
-	Add Lumetri Color to clip	Tambahkan Lumetri Color ke klip
-	Input LUT	LUT Input
 	Color	Warna
 	Temperature	Suhu
 	Tint	Rona
@@ -869,7 +859,6 @@
 	HDR White	Putih HDR
 	HDR Specular	Spekular HDR
 	Look	Look
-	Look LUT	LUT Look
 	Intensity	Intensitas
 	Adjustments	Penyesuaian
 	Faded Film	Film Pudar
@@ -904,7 +893,6 @@
 	Midpoint	Titik Tengah
 	Roundness	Kebulatan
 	Feather	Feather
-	LUT	LUT
 	Color Match	Pencocokan Warna
 	Reference	Referensi
 	Face Detection (protect skin tones)	Deteksi Wajah (lindungi warna kulit)
@@ -923,7 +911,6 @@
 	Stop tracking	Hentikan pelacakan
 	Tracking method: {method}	Metode pelacakan: {method}
 	Composite	Komposit
-	Comparison	Perbandingan
 	Video and Waveform	Video dan Bentuk Gelombang
 	System Default	Bawaan Sistem
 	Default location	Lokasi bawaan
@@ -1468,7 +1455,6 @@
 	Color Theme	Tema Warna
 	Color To Leave	Warna yang Dipertahankan
 	Color Tolerance	Toleransi Warna
-	Color Wheels & Match	Roda Warna & Pencocokan
 	Colorize	Warnai
 	Columns	Kolom
 	Comment	Komentar
@@ -1623,7 +1609,6 @@
 	Edge Width	Lebar Tepi
 	Elliptical	Eliptis
 	Emboss	Emboss
-	Enable HSL Secondary	Aktifkan HSL Sekunder
 	Enable Mercury Transmit	Aktifkan Mercury Transmit
 	Enable ProRes hardware accelerated encoding, if available	Aktifkan enkode ProRes dengan akselerasi perangkat keras, jika tersedia
 	Enable clip and XMP metadata linking	Aktifkan penautan metadata klip dan XMP
@@ -1692,10 +1677,7 @@
 	Focus Size	Ukuran Fokus
 	Fold Motion	Gerak Lipat
 	Foldback	Foldback
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	Untuk parameter manajemen warna, buka tab Pengaturan di panel Lumetri Color.
 	Format	Format
-	Four Scopes (RGB, 8 bit)	Empat Skop (RGB, 8 bit)
-	Four Scopes (YUV, float, no clamp)	Empat Skop (YUV, float, tanpa pembatasan)
 	Fractal Influence	Pengaruh Fraktal
 	Fractal Type	Jenis Fraktal
 	Frame	Bingkai
@@ -1779,8 +1761,6 @@
 	Grunge & Distort	Grunge & Distorsi
 	GuitarSuite	GuitarSuite
 	HDR Graphics White (Nits)	Putih Grafis HDR (Nit)
-	HLS Vectorscope + Histogram	Vektorskop HLS + Histogram
-	HSL Secondary	HSL Sekunder
 	Hard	Keras
 	Hard Clip	Clip Keras
 	Hard Light	Cahaya Keras
@@ -1959,7 +1939,6 @@
 	Luma Key	Key Luma
 	Luma Source	Sumber Luma
 	Luma and Chroma	Luma dan Kroma
-	Lumetri Presets	Preset Lumetri
 	Luminance	Luminans
 	Luminance Threshold	Ambang Luminans
 	Luminosity	Luminositas
@@ -2118,8 +2097,6 @@
 	Panel Wipe	Sapuan Panel
 	Panels	Panel
 	Panner - Ambisonics	Panner - Ambisonik
-	Parade	Parade
-	Parade (RGB)	Parade (RGB)
 	Parametric Equalizer	Equalizer Parametrik
 	Passband Ripple	Riak Passband
 	Path	Jalur
@@ -2570,10 +2547,6 @@
 	VR Sharpen	Pertajam VR
 	VR Spherical Blur	Buram Bola VR
 	Validate Content Credentials on import	Validasi Kredensial Konten saat impor
-	Vectorscope (YUV)	Vektorskop (YUV)
-	Vectorscope + Waveform YC	Vektorskop + Bentuk Gelombang YC
-	Vectorscope HLS	Vektorskop HLS
-	Vectorscope YUV	Vektorskop YUV
 	Venetian Blinds	Kerai Venesia
 	Vertical 4:5	Vertikal 4:5
 	Vertical 9:16	Vertikal 9:16
@@ -3057,7 +3030,6 @@
 	Left align text	Rata kiri teks
 	Looping GIF, 640×360 at 15 fps	GIF berulang, 640×360 pada 15 fps
 	Lower First	Bawah Dulu
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR (Avid)
 	MXF OP1a	MXF OP1a
@@ -3199,9 +3171,6 @@
 	Select to Segment End	Pilih sampai Akhir Segmen
 	Select to Segment Start	Pilih sampai Awal Segmen
 	Selection Tool	Alat Seleksi
-	Set Comparison Reference	Atur Referensi Perbandingan
-	Set Creative Look	Atur Look Kreatif
-	Set Input LUT	Atur LUT Input
 	Set Project Panel View	Atur Tampilan Panel Proyek
 	Show Next Screen	Tampilkan Layar Berikutnya
 	Show Previous Screen	Tampilkan Layar Sebelumnya

@@ -1,17 +1,14 @@
-//! Frontend state of the Lumetri Scopes, Timecode, Events, Progress and Reference Monitor panels
+//! Frontend state of the Timecode, Events and Progress panels
 //! (`UiState::panels`). Plain serde, so agents read it with `ui.inspect` (`ui.panels`) and change
-//! it with `ui.set {"panels": {"scopes": {...}, "timecode": {...}, ...}}` (fields merged).
+//! it with `ui.set {"panels": {"timecode": {...}, ...}}` (fields merged).
 
 use serde::{Deserialize, Serialize};
-use waltcut_scopes::{Brightness, ColorSpace, ParadeType, Scale, ScopeKind, Targets, WaveformType};
 use waltcut_time::TimeDisplay;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct PanelsState {
-    pub scopes: ScopesState,
     pub timecode: TimecodeState,
-    pub reference: ReferenceState,
     pub events: EventsState,
     pub progress: ProgressState,
     /// Preferred selection for Metadata and Info; inspector focus does not replace it.
@@ -26,86 +23,6 @@ pub enum InspectorSource {
     #[default]
     Project,
     Timeline,
-}
-
-/// Lumetri Scopes settings (the wrench / right-click menu and the footer).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct ScopesState {
-    /// The scopes shown, in layout order.
-    pub shown: Vec<ScopeKind>,
-    pub waveform_type: WaveformType,
-    pub parade_type: ParadeType,
-    pub color_space: ColorSpace,
-    pub brightness: Brightness,
-    /// The bit-depth dropdown: 8 Bit, Float or HDR.
-    pub scale: Scale,
-    /// Clamp Signal.
-    pub clamp: bool,
-    /// YUV vectorscope targets (75 % / 100 %).
-    pub targets: Targets,
-    /// The preset last applied ("" = custom).
-    pub preset: String,
-}
-
-impl Default for ScopesState {
-    fn default() -> Self {
-        ScopesState {
-            shown: vec![ScopeKind::Parade],
-            waveform_type: WaveformType::Rgb,
-            parade_type: ParadeType::Rgb,
-            color_space: ColorSpace::Auto,
-            brightness: Brightness::Normal,
-            scale: Scale::Bits8,
-            clamp: true,
-            targets: Targets::Percent75,
-            preset: String::new(),
-        }
-    }
-}
-
-/// A scopes layout preset: (name, scopes, waveform type, parade type, scale, clamp).
-pub type ScopePreset = (&'static str, &'static [ScopeKind], WaveformType, ParadeType, Scale, bool);
-
-/// The Presets submenu (our own names).
-pub const SCOPE_PRESETS: [ScopePreset; 8] = {
-    use ScopeKind::*;
-    [
-        ("Waveform (RGB)", &[Waveform], WaveformType::Rgb, ParadeType::Rgb, Scale::Bits8, true),
-        ("Waveform (Luma)", &[Waveform], WaveformType::Luma, ParadeType::Rgb, Scale::Bits8, true),
-        ("Parade (RGB)", &[Parade], WaveformType::Rgb, ParadeType::Rgb, Scale::Bits8, true),
-        ("Vectorscope (YUV)", &[VectorscopeYuv], WaveformType::Rgb, ParadeType::Rgb, Scale::Bits8, true),
-        ("Vectorscope + Waveform YC", &[VectorscopeYuv, Waveform], WaveformType::Yc, ParadeType::Rgb, Scale::Bits8, true),
-        ("Four Scopes (YUV, float, no clamp)", &[VectorscopeYuv, Histogram, Parade, Waveform], WaveformType::Yc, ParadeType::Yuv, Scale::Float, false),
-        ("Four Scopes (RGB, 8 bit)", &[VectorscopeYuv, Histogram, Parade, Waveform], WaveformType::Rgb, ParadeType::Rgb, Scale::Bits8, true),
-        ("HLS Vectorscope + Histogram", &[VectorscopeHls, Histogram], WaveformType::Rgb, ParadeType::Rgb, Scale::Bits8, true),
-    ]
-};
-
-impl ScopesState {
-    pub fn apply_preset(&mut self, name: &str) -> bool {
-        let Some(p) = SCOPE_PRESETS.iter().find(|p| p.0.eq_ignore_ascii_case(name)) else { return false };
-        self.shown = p.1.to_vec();
-        self.waveform_type = p.2;
-        self.parade_type = p.3;
-        self.scale = p.4;
-        self.clamp = p.5;
-        self.preset = p.0.to_string();
-        true
-    }
-    /// Show or hide a scope (the last one cannot be hidden).
-    pub fn toggle(&mut self, k: ScopeKind) {
-        if let Some(i) = self.shown.iter().position(|x| *x == k) {
-            if self.shown.len() > 1 {
-                self.shown.remove(i);
-            }
-        } else {
-            // keep the menu's order
-            self.shown.push(k);
-            self.shown.sort_by_key(|x| ScopeKind::ALL.iter().position(|a| a == x));
-        }
-        self.preset.clear();
-    }
 }
 
 /// What a Timecode panel row measures.
@@ -181,36 +98,6 @@ pub struct TimecodeState {
 impl Default for TimecodeState {
     fn default() -> Self {
         TimecodeState { rows: vec![TimecodeRow::default()], show_name: true }
-    }
-}
-
-/// What the Reference Monitor shows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum RefDisplay {
-    #[default]
-    Composite,
-    /// Lumetri Scopes of the reference frame (the panel's scope selection).
-    Scopes,
-}
-
-/// The Reference Monitor: a second view of the active sequence, ganged to the Program monitor or
-/// parked on its own frame.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct ReferenceState {
-    /// Gang to Program Monitor: follow the playhead.
-    pub ganged: bool,
-    /// The reference time (ticks) when not ganged.
-    pub time: i64,
-    pub display: RefDisplay,
-    /// Scopes shown in Scopes mode.
-    pub scopes: Vec<ScopeKind>,
-}
-
-impl Default for ReferenceState {
-    fn default() -> Self {
-        ReferenceState { ganged: false, time: 0, display: RefDisplay::Composite, scopes: vec![ScopeKind::VectorscopeYuv, ScopeKind::Waveform] }
     }
 }
 

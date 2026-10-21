@@ -24,7 +24,6 @@ waltcut-codecs = { workspace = true }
 waltcut-project = { workspace = true }
 waltcut-edit = { workspace = true }
 waltcut-render = { workspace = true }
-waltcut-scopes = { workspace = true }
 waltcut-text = { workspace = true }
 waltcut-audio-dsp = { workspace = true }
 waltcut-export = { workspace = true }

@@ -289,8 +289,6 @@ pub enum DisplayMode {
     Blue,
     /// Source Monitor: the clip's audio waveform.
     AudioWaveform,
-    /// Program Monitor: a reference frame beside the current frame.
-    Comparison,
     /// Source Monitor: the picture above the audio waveform.
     VideoAndWaveform,
 }
@@ -328,8 +326,6 @@ pub struct MonitorView {
     /// Program monitor display mode Multi-Camera (angle grid + program).
     pub multicam: bool,
     pub display: DisplayMode,
-    /// Comparison View: the reference frame's time (ticks); None = set on entry from the playhead.
-    pub compare_ref: Option<i64>,
     pub show_rulers: bool,
     pub show_guides: bool,
     pub lock_guides: bool,
@@ -353,7 +349,6 @@ impl Default for MonitorView {
             transport_hidden: vec!["playback.loop".into()],
             multicam: false,
             display: DisplayMode::Composite,
-            compare_ref: None,
             show_rulers: false,
             show_guides: true,
             lock_guides: false,
@@ -463,9 +458,6 @@ pub struct UiState {
     pub expanded_bins: Vec<u64>,
     /// Expanded folders in the Effects panel.
     pub expanded_fx: Vec<String>,
-    /// Effects panel: the Lumetri Presets folder shown as a thumbnail grid (wide panel).
-    #[serde(default)]
-    pub lumetri_grid_folder: Option<String>,
     /// Collapsed effect sections in Effect Controls ("clip:index").
     pub collapsed_fx: Vec<String>,
     /// Width of Effect Controls' effect list, left of the keyframe area (points; 0 = the default
@@ -480,8 +472,6 @@ pub struct UiState {
     #[serde(default = "shown")]
     pub show_status_bar: bool,
     pub dark: bool,
-    /// Lumetri scopes visible in the Program monitor area.
-    pub show_scopes: bool,
     /// Transient status line shown in the footer.
     pub status: String,
     /// A link the web browser couldn't open, shown with its address until closed
@@ -591,7 +581,7 @@ pub struct UiState {
     /// `panels::graphics_templates`.
     #[serde(default)]
     pub gfx_templates: crate::panels::graphics_templates::GfxTemplatesState,
-    /// Lumetri Scopes, Timecode, Events, Progress and Reference Monitor settings. See
+    /// Timecode, Events and Progress settings. See
     /// `panels::panel_state`.
     #[serde(default)]
     pub panels: crate::panels::panel_state::PanelsState,
@@ -966,14 +956,12 @@ impl Default for UiState {
             effects_search: String::new(),
             expanded_bins: vec![],
             expanded_fx: vec!["Video Transitions".into(), "Video Transitions/Dissolve".into()],
-            lumetri_grid_folder: None,
             collapsed_fx: vec![],
             effect_controls_split: 0.0,
             show_menu_bar: true,
             show_header: true,
             show_status_bar: true,
             dark: true,
-            show_scopes: false,
             status: String::new(),
             failed_link: None,
             eyedropper: None,
