@@ -308,7 +308,7 @@ fn project_scratch_folders_outside_the_project_are_not_used() {
 }
 
 /// The Captured Audio and Video and Audio Previews folders a project names follow the same rule:
-/// voice-over takes, pasted images and proxies go next to the project unless the folder is
+/// voice-over takes and pasted images go next to the project unless the folder is
 /// inside the project's folder; folders on another computer are never used.
 #[test]
 fn project_captured_folder_outside_the_project_is_not_used() {

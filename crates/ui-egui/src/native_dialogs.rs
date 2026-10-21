@@ -43,7 +43,7 @@ pub enum FileDialog {
     SaveAs { filter: String, exts: Vec<String>, name: String },
     /// Choose a folder, starting at `at` when there is one.
     Folder { at: Option<String> },
-    /// Choose one file to relink to (Link Media ▸ Locate…, Attach Proxies, Reconnect Full
+    /// Choose one file to relink to (Link Media ▸ Locate…
     /// Resolution): the host's relink picker, which may take over the command (the web).
     Relink { exts: Vec<String>, hint: RelinkHint },
 }

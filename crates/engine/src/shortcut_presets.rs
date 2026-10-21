@@ -38,27 +38,6 @@ pub const PREMIERE: &[Entry] = &[
     ("tool.hand", "H", ""),
     ("tool.zoom", "Z", ""),
     ("tool.type", "T", ""),
-    // Multi-camera
-    ("multicam.selectCamera1", "1", ""),
-    ("multicam.selectCamera2", "2", ""),
-    ("multicam.selectCamera3", "3", ""),
-    ("multicam.selectCamera4", "4", ""),
-    ("multicam.selectCamera5", "5", ""),
-    ("multicam.selectCamera6", "6", ""),
-    ("multicam.selectCamera7", "7", ""),
-    ("multicam.selectCamera8", "8", ""),
-    ("multicam.selectCamera9", "9", ""),
-    ("multicam.cutToCamera1", "Ctrl+1", ""),
-    ("multicam.cutToCamera2", "Ctrl+2", ""),
-    ("multicam.cutToCamera3", "Ctrl+3", ""),
-    ("multicam.cutToCamera4", "Ctrl+4", ""),
-    ("multicam.cutToCamera5", "Ctrl+5", ""),
-    ("multicam.cutToCamera6", "Ctrl+6", ""),
-    ("multicam.cutToCamera7", "Ctrl+7", ""),
-    ("multicam.cutToCamera8", "Ctrl+8", ""),
-    ("multicam.cutToCamera9", "Ctrl+9", ""),
-    ("multicam.recordToggle", "0", ""),
-    ("multicam.toggleView", "Shift+0", ""),
     // Application
     ("app.settings.general", "Cmd+,", ""),
     ("app.keyboardShortcuts", "Cmd+Alt+K", ""),
@@ -147,7 +126,6 @@ pub const PREMIERE: &[Entry] = &[
     ("window.panel.EffectControls", "Shift+5", ""),
     ("window.panel.AudioTrackMixer", "Shift+6", ""),
     ("window.panel.Effects", "Shift+7", ""),
-    ("window.panel.MediaBrowser", "Shift+8", ""),
     ("window.panel.AudioClipMixer", "Shift+9", ""),
     // Navigation and playback
     ("playhead.nextEdit", "Down", ""),
@@ -180,7 +158,6 @@ pub const PREMIERE: &[Entry] = &[
     // Keyboard parity (M3.12): commands that only have a key
     ("file.close", "Cmd+W", ""),
     ("file.closeProject", "Cmd+Shift+W", ""),
-    ("file.importFromMediaBrowser", "Cmd+Alt+I", ""),
     ("export.queue.add", "Alt+Shift+M", ""),
     ("file.mediaProperties", "Cmd+Shift+H", ""),
     ("edit.pasteAttributes", "Cmd+Alt+V", ""),
@@ -330,7 +307,6 @@ pub const PREMIERE_PANEL: &[Entry] = &[
     ("playback.loop", "Cmd+L", "Audio Track Mixer"),
     ("playback.toggle", "Space", "Metadata"),
     ("playback.loop", "Cmd+L", "Metadata"),
-    ("mediaBrowser.openInSource", "Shift+O", "Media Browser"),
 ];
 
 /// The whole "Premiere Pro Compatible" table: [`PREMIERE`] plus [`PREMIERE_PANEL`].

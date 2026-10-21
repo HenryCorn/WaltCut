@@ -204,7 +204,6 @@ fn project(frames: i64) -> (Arc<Project>, waltcut_project::ItemId, SourceMap) {
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,

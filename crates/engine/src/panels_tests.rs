@@ -137,7 +137,7 @@ fn events_report_background_jobs() {
     let mut s = demo();
     s.execute("events.clear", json!({})).unwrap();
     let job = |id, label: &str| crate::Job { id, label: label.into(), progress: Arc::new(Default::default()), result: Arc::new(std::sync::Mutex::new(None)) };
-    let (a, b, c) = (job(901, "Export a.mp4"), job(902, "Create Proxies"), job(903, "Scene Edit Detection"));
+    let (a, b, c) = (job(901, "Export a.mp4"), job(902, "Export b.mp4"), job(903, "Export c.mp4"));
     s.jobs.extend([a.clone(), b.clone(), c.clone()]);
     s.poll_persistence();
     assert_eq!(s.log.entries.iter().filter(|e| e.message.starts_with("Started:")).count(), 3);
@@ -150,8 +150,8 @@ fn events_report_background_jobs() {
     let msgs: Vec<(String, String)> =
         l["entries"].as_array().unwrap().iter().map(|e| (e["level"].as_str().unwrap().into(), e["message"].as_str().unwrap().into())).collect();
     assert!(msgs.contains(&("info".into(), "Finished: Export a.mp4".into())), "{msgs:?}");
-    assert!(msgs.contains(&("error".into(), "Failed: Create Proxies: disk full".into())), "{msgs:?}");
-    assert!(msgs.contains(&("warning".into(), "Cancelled: Scene Edit Detection".into())), "{msgs:?}");
+    assert!(msgs.contains(&("error".into(), "Failed: Export b.mp4: disk full".into())), "{msgs:?}");
+    assert!(msgs.contains(&("warning".into(), "Cancelled: Export c.mp4".into())), "{msgs:?}");
     // reported once
     s.poll_persistence();
     assert_eq!(s.log.entries.len(), 6);

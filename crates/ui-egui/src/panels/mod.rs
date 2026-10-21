@@ -19,7 +19,6 @@ pub mod graphics_templates;
 pub mod import_mode;
 pub mod keyboard;
 pub mod masks;
-pub mod media_browser;
 pub mod media_dialogs;
 pub mod menu_dialogs;
 pub mod metadata;
@@ -28,7 +27,6 @@ pub mod misc;
 pub mod mixer;
 pub mod monitor;
 pub mod monitor_view;
-pub mod multicam;
 pub mod notes;
 pub mod panel_state;
 pub mod presets;
@@ -85,7 +83,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::History => misc::history(app, ui, rect),
         PanelKind::Markers => misc::markers(app, ui, rect),
         PanelKind::Info => misc::info(app, ui, rect),
-        PanelKind::MediaBrowser => media_browser::show(app, ui, rect),
         PanelKind::AudioTrackMixer => mixer::track_mixer(app, ui, rect),
         PanelKind::AudioClipMixer => mixer::clip_mixer(app, ui, rect),
         PanelKind::Metadata => metadata::show(app, ui, rect),
@@ -316,10 +313,6 @@ pub fn panel_menu_popup(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
                     if p == PanelKind::Project {
                         ui.separator();
                         close |= project::panel_menu(app, ui);
-                    }
-                    if p == PanelKind::MediaBrowser {
-                        ui.separator();
-                        close |= media_browser::panel_menu(app, ui);
                     }
                     if p == PanelKind::Source {
                         ui.separator();

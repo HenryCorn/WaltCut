@@ -7,16 +7,12 @@
 //!   slate ([`waltcut_render::offline`]) instead of failing; the reason is kept for the UI. So
 //!   do the frames of a file that opens but whose picture FilmCraft cannot decode (a codec or
 //!   profile without a decoder).
-//! - With proxies enabled ([`MediaPool::set_use_proxies`]) items with an attached proxy are read
-//!   from it. Proxy frames are smaller; the source still reports the full-resolution size, and the
-//!   compositor derives its pixel scale from the frame it gets, so effects and Motion render the
-//!   same picture at lower resolution. Export asks for [`MediaPool::full_res_provider`].
-//! - Paths that came from a document (the project file, a template, an interchange file) are
+//! - Paths that came from a document (the project file or a template) are
 //!   opened through [`crate::doc_path`] ([`MediaPool::follow`]); a refused one renders as missing.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+
 use std::sync::{Arc, Mutex, RwLock};
 
 use waltcut_frame::{AudioBuffer, VideoFrame};
@@ -49,14 +45,12 @@ pub struct OfflineMedia {
 pub struct MediaPool {
     /// item → (reference key, source)
     sources: RwLock<HashMap<ItemId, (String, SharedSource)>>,
-    proxies: RwLock<HashMap<ItemId, (String, SharedSource)>>,
     offline: Arc<RwLock<HashMap<ItemId, OfflineStatus>>>,
-    use_proxies: AtomicBool,
     /// Per item: video frames that failed in a row in the monitors (see [`Self::monitor_source`]).
     failures: Arc<Mutex<HashMap<ItemId, u32>>>,
     /// Openers tried before the built-in ones (MP4/MOV + codecs register here).
     pub openers: RwLock<Vec<Opener>>,
-    /// Media and proxy paths that came from a document, with that document's path (see
+    /// Media paths that came from a document, with that document's path (see
     /// [`Self::follow`]).
     stored: RwLock<HashMap<String, Option<PathBuf>>>,
 }
@@ -66,9 +60,7 @@ impl Default for MediaPool {
     fn default() -> Self {
         Self {
             sources: RwLock::new(HashMap::new()),
-            proxies: RwLock::new(HashMap::new()),
             offline: Arc::new(RwLock::new(HashMap::new())),
-            use_proxies: AtomicBool::new(false),
             failures: Arc::default(),
             openers: RwLock::new(waltcut_codecs::openers()),
             stored: RwLock::default(),
@@ -176,16 +168,15 @@ impl MediaPool {
 
     pub fn remove(&self, item: ItemId) {
         self.sources.write().unwrap_or_else(|e| e.into_inner()).remove(&item);
-        self.proxies.write().unwrap_or_else(|e| e.into_inner()).remove(&item);
         self.offline.write().unwrap_or_else(|e| e.into_inner()).remove(&item);
     }
 
-    /// Record the media and proxy paths of `p`, loaded from the document at `document` (None: one
+    /// Record the media paths of `p`, loaded from the document at `document` (None: one
     /// without a file), as stored paths: they are opened only as [`crate::doc_path::resolve`]
     /// allows. A path already recorded keeps the document it came from first.
     pub fn add_stored(&self, p: &Project, document: Option<&str>) {
-        let paths = p.items.values().filter_map(|i| i.as_media()).flat_map(|m| [Some(&m.media), m.proxy.as_ref()]).filter_map(|r| match r {
-            Some(MediaRef::File { path }) => Some(path.clone()),
+        let paths = p.items.values().filter_map(|i| i.as_media()).filter_map(|m| match &m.media {
+            MediaRef::File { path } => Some(path.clone()),
             _ => None,
         });
         self.add_stored_paths(paths, document);
@@ -210,7 +201,7 @@ impl MediaPool {
         self.stored.write().unwrap_or_else(|e| e.into_inner()).remove(path);
     }
 
-    /// The file to open for `path`, a media or proxy path of the project: a stored path as
+    /// The file to open for `path`, a media path of the project: a stored path as
     /// [`crate::doc_path::resolve`] resolves it, any other path as given.
     pub fn follow(&self, path: &str) -> Result<String, crate::doc_path::NotFollowed> {
         // The web host reads only the files the user gave it, under its own virtual paths.
@@ -231,7 +222,6 @@ impl MediaPool {
     /// Forget every opened source (files are re-read on next use).
     pub fn clear(&self) {
         self.sources.write().unwrap_or_else(|e| e.into_inner()).clear();
-        self.proxies.write().unwrap_or_else(|e| e.into_inner()).clear();
         self.offline.write().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
@@ -239,17 +229,9 @@ impl MediaPool {
         self.sources.read().unwrap_or_else(|e| e.into_inner()).get(&item).map(|(_, s)| s.clone())
     }
 
-    /// Sources opened so far (originals and proxies; `perf.stats`).
+    /// Sources opened so far (`perf.stats`).
     pub fn open_sources(&self) -> usize {
-        self.sources.read().unwrap_or_else(|e| e.into_inner()).len() + self.proxies.read().unwrap_or_else(|e| e.into_inner()).len()
-    }
-
-    pub fn use_proxies(&self) -> bool {
-        self.use_proxies.load(Ordering::Relaxed)
-    }
-
-    pub fn set_use_proxies(&self, on: bool) {
-        self.use_proxies.store(on, Ordering::Relaxed);
+        self.sources.read().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// `src` (item `item`) as the monitors show it: once [`DAMAGED_AFTER`] of its video frames in a
@@ -298,26 +280,10 @@ impl MediaPool {
         waltcut_media::reader::open_reader_within(&file_name(path), r, &waltcut_codecs::reader_openers(), &openers, PROBE_WHOLE_FILE_MAX)
     }
 
-    /// Resolve (and cache) the source for a project item, using proxies when they are enabled.
+    /// Resolve (and cache) the source for a project item.
     pub fn source_for(&self, p: &Project, item: ItemId, services: &dyn Services) -> Option<SharedSource> {
-        self.resolve(p, item, services, self.use_proxies())
-    }
-
-    /// Resolve the full-resolution source for an item (never a proxy).
-    pub fn full_res_source(&self, p: &Project, item: ItemId, services: &dyn Services) -> Option<SharedSource> {
-        self.resolve(p, item, services, false)
-    }
-
-    fn resolve(&self, p: &Project, item: ItemId, services: &dyn Services, proxies: bool) -> Option<SharedSource> {
         let (item, m, _) = p.resolve_media(item)?;
         let it = p.item(item)?;
-        if proxies
-            && !m.offline
-            && let Some(MediaRef::File { path }) = &m.proxy
-            && let Some(s) = self.proxy_source(item, path, m, services)
-        {
-            return Some(s);
-        }
         let key = media_key(m);
         if let Some((k, s)) = self.sources.read().unwrap_or_else(|e| e.into_inner()).get(&item)
             && (k.is_empty() || *k == key)
@@ -365,47 +331,9 @@ impl MediaPool {
         self.offline.write().unwrap_or_else(|e| e.into_inner()).insert(item, OfflineStatus { reason, path: path.to_string(), error: error.to_string() });
     }
 
-    fn proxy_source(&self, item: ItemId, path: &str, m: &MediaClip, services: &dyn Services) -> Option<SharedSource> {
-        let key = format!("proxy:{path}");
-        if let Some((k, s)) = self.proxies.read().unwrap_or_else(|e| e.into_inner()).get(&item)
-            && *k == key
-        {
-            return Some(s.clone());
-        }
-        match self.follow_media(path).and_then(|file| self.open_file(&file, services)) {
-            Ok(s) => {
-                // a proxy with fewer audio streams than the original (say one track of an OBS
-                // recording's seven) still stands in for the picture; the audio comes from the
-                // original, so every clip keeps the stream it plays
-                let audio_from = if s.info().audio_streams.len() < m.info.audio_streams.len() {
-                    log::warn!("proxy has fewer audio streams than the original: {path}; audio from full-resolution media");
-                    match &m.media {
-                        MediaRef::File { path: original } if !m.offline => self.follow_media(original).and_then(|file| self.open_file(&file, services)).ok(),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
-                let src: SharedSource = Arc::new(ProxySource { proxy: s, info: m.info.clone(), audio_from });
-                self.proxies.write().unwrap_or_else(|e| e.into_inner()).insert(item, (key, src.clone()));
-                Some(src)
-            }
-            Err(e) => {
-                // a missing proxy falls back to the full-resolution media
-                log::warn!("proxy offline: {path}: {e}");
-                None
-            }
-        }
-    }
-
-    /// A render-side provider bound to a project snapshot (proxies when enabled).
+    /// A render-side provider bound to a project snapshot.
     pub fn provider(self: &Arc<Self>, project: Arc<Project>, services: Arc<dyn Services>) -> PoolProvider {
-        PoolProvider { pool: self.clone(), project, services, full_res: false, used: None }
-    }
-
-    /// A provider that always reads full-resolution media (export).
-    pub fn full_res_provider(self: &Arc<Self>, project: Arc<Project>, services: Arc<dyn Services>) -> PoolProvider {
-        PoolProvider { pool: self.clone(), project, services, full_res: true, used: None }
+        PoolProvider { pool: self.clone(), project, services, used: None }
     }
 }
 
@@ -414,8 +342,6 @@ pub struct PoolProvider {
     pub pool: Arc<MediaPool>,
     pub project: Arc<Project>,
     pub services: Arc<dyn Services>,
-    /// Ignore proxies (export always renders full resolution).
-    pub full_res: bool,
     /// Items asked for so far, when recording ([`PoolProvider::recording`]).
     used: Option<Mutex<BTreeSet<ItemId>>>,
 }
@@ -455,7 +381,7 @@ impl waltcut_render::SourceProvider for PoolProvider {
         if let Some(used) = &self.used {
             used.lock().unwrap_or_else(|e| e.into_inner()).insert(item);
         }
-        if self.full_res { self.pool.full_res_source(&self.project, item, &*self.services) } else { self.pool.source_for(&self.project, item, &*self.services) }
+        self.pool.source_for(&self.project, item, &*self.services)
     }
 }
 
@@ -586,52 +512,10 @@ impl MediaSource for DamagedAsSlate {
     }
 }
 
-/// A proxy standing in for its full-resolution media: reports the full-resolution info and hands
-/// out the proxy's (smaller) frames. A proxy whose aspect ratio differs from the original is
-/// resampled to the original's aspect so it lines up exactly.
-pub struct ProxySource {
-    pub proxy: SharedSource,
-    pub info: MediaInfo,
-    /// Where audio comes from when the proxy has fewer audio streams than the original.
-    pub audio_from: Option<SharedSource>,
-}
-
-impl MediaSource for ProxySource {
-    fn info(&self) -> &MediaInfo {
-        &self.info
-    }
-    fn video_frame(&self, req: FrameRequest) -> waltcut_media::Result<Arc<VideoFrame>> {
-        let full = self.info.video.as_ref().ok_or(MediaError::NoStream("video"))?;
-        let pv = self.proxy.info().video.as_ref().map(|v| (v.width, v.height)).unwrap_or((full.width, full.height));
-        // ask the proxy for the scale relative to its own size
-        let k = (full.width as f32 / pv.0.max(1) as f32).max(1.0);
-        let f = self.proxy.video_frame(FrameRequest { time: req.time, scale: (req.scale * k).min(1.0) })?;
-        let want_h = (f.width as f64 * full.height as f64 / full.width.max(1) as f64).round() as u32;
-        if want_h.abs_diff(f.height) <= 1 {
-            return Ok(f);
-        }
-        // different aspect: resample (nearest) to the original's aspect at the proxy's width
-        let src = f.to_rgba8();
-        let (w, h) = (f.width as usize, want_h.max(1) as usize);
-        let mut out = vec![0u8; w * h * 4];
-        for y in 0..h {
-            let sy = ((y as f64 + 0.5) * f.height as f64 / h as f64) as usize;
-            let row = &src[sy.min(f.height as usize - 1) * w * 4..][..w * 4];
-            out[y * w * 4..(y + 1) * w * 4].copy_from_slice(row);
-        }
-        Ok(Arc::new(VideoFrame::rgba8(w as u32, h as u32, out).with_pts(f.pts)))
-    }
-    fn audio(&self, start: i64, frames: usize, sample_rate: u32) -> waltcut_media::Result<AudioBuffer> {
-        self.audio_from.as_ref().unwrap_or(&self.proxy).audio(start, frames, sample_rate)
-    }
-    fn audio_stream(&self, stream: usize, start: i64, frames: usize, sample_rate: u32) -> waltcut_media::Result<AudioBuffer> {
-        self.audio_from.as_ref().unwrap_or(&self.proxy).audio_stream(stream, start, frames, sample_rate)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::Ordering;
     use waltcut_project::ItemKind;
 
     /// A host whose whole-file read fails: opening must go through the reader.
@@ -672,13 +556,12 @@ mod tests {
             let ItemKind::Subclip { parent: reference, .. } = &mut project.item_mut(a).unwrap().kind else { panic!() };
             *reference = parent;
             assert!(pool.source_for(&project, a, &crate::FsServices).is_none());
-            assert!(pool.full_res_source(&project, a, &crate::FsServices).is_none());
+            assert!(pool.source_for(&project, a, &crate::FsServices).is_none());
             assert!(crate::media_duration(&project, &pool, a).is_none());
             assert!(waltcut_render::source_size(&project, a).is_none());
             assert!(project.resolve_media(a).is_none());
             assert!(waltcut_render::colorman::override_of(&project, a).is_none());
             assert!(waltcut_render::colorman::source_peak_nits(&project, a).is_none());
-            assert!(crate::sync::project_clip(&project, a).is_none());
             let mut session = crate::Session { project: Arc::new(project.clone()), ..Default::default() };
             session.state.project_selection = vec![a];
             assert!(!session.is_enabled("file.mediaProperties"));

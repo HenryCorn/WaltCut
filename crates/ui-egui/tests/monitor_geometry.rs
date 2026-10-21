@@ -2,7 +2,6 @@
 
 use egui::{Event, Modifiers, PointerButton, Rect, pos2, vec2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 use waltcut_engine::Session;
 use waltcut_ui_egui::{
@@ -187,24 +186,6 @@ fn transport_editor_keeps_its_own_space_and_customizes_compact_controls() {
             assert_eq!(h.state().ui.program.transport_hidden, vec!["playback.loop".to_string()]);
         }
     }
-}
-
-#[test]
-fn compact_transport_more_runs_the_existing_proxy_command() {
-    let mut h = harness(250.0, ThemeKind::Light, Which::Program);
-    let before = h.state().session.media.use_proxies();
-    click(&mut h, "program.transport.more");
-    assert_eq!(
-        h.get_by_label("Toggle Proxies").accesskit_node().toggled(),
-        Some(if before { egui::accesskit::Toggled::True } else { egui::accesskit::Toggled::False })
-    );
-    click(&mut h, "program.transport.media.toggleProxies");
-    assert_eq!(h.state().session.media.use_proxies(), !before);
-    click(&mut h, "program.transport.more");
-    assert_eq!(
-        h.get_by_label("Toggle Proxies").accesskit_node().toggled(),
-        Some(if before { egui::accesskit::Toggled::False } else { egui::accesskit::Toggled::True })
-    );
 }
 
 #[test]

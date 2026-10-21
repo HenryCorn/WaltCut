@@ -801,7 +801,6 @@ mod tests {
         waltcut_engine::project_panel::BUILTIN_COLUMNS.iter().for_each(|c| push(&mut out, c));
         waltcut_project::find::COLUMNS.iter().for_each(|c| push(&mut out, c));
         waltcut_project::FindOp::ALL.iter().for_each(|o| push(&mut out, o.label()));
-        waltcut_engine::media_browser::ALL_COLUMNS.iter().for_each(|c| push(&mut out, c));
         // export: presets, settings choices, ranges and pixel aspects
         use waltcut_engine::export as ex;
         for p in ex::builtin_presets() {

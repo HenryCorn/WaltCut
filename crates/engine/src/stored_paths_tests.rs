@@ -101,7 +101,7 @@ fn stored_media_paths_open_only_on_this_computer_or_beside_the_project() {
     let r = t.execute("file.open", json!({"path": doc})).unwrap();
     assert_eq!(r["missingMedia"], json!(refused), "{r}");
     for &id in &items {
-        assert!(t.media.full_res_source(&t.project, id, &*t.services).is_some());
+        assert!(t.media.source_for(&t.project, id, &*t.services).is_some());
     }
     t.execute("media.refreshChanged", json!({})).unwrap();
 
@@ -122,7 +122,7 @@ fn stored_media_paths_open_only_on_this_computer_or_beside_the_project() {
         let id = items[refused - 1];
         t.execute("media.relink", json!({"item": id.0, "path": path, "force": true})).unwrap();
         t.media.remove(id);
-        assert!(t.media.full_res_source(&t.project, id, &*t.services).is_some());
+        assert!(t.media.source_for(&t.project, id, &*t.services).is_some());
         assert_eq!(t.media.offline_status(id), None, "a file linked in this session opens");
     }
 }

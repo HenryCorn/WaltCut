@@ -143,11 +143,11 @@ pub struct HostHooks {
     pub system_languages: Option<Box<dyn Fn() -> Vec<String>>>,
     /// Open dialog for a JSON file (shortcut preset import): filter name, extensions → path.
     pub pick_open_file: Option<Box<dyn FnMut(&str, &[&str]) -> Option<String>>>,
-    /// Folder picker (Link Media search, proxy and Project Manager destinations).
+    /// Folder picker (Link Media search).
     pub pick_folder: Option<Box<dyn FnMut() -> Option<String>>>,
     /// Folder picker starting at the current destination (Export Frame).
     pub pick_folder_at: Option<Box<dyn FnMut(&str) -> Option<String>>>,
-    /// Pick one file for a command that relinks to it (Link Media ▸ Locate…, Attach Proxies,
+    /// Pick one file for a command that relinks to it (Link Media ▸ Locate…)
     /// Reconnect Full Resolution) instead of importing it, as [`Self::pick_files`] does. Native
     /// hosts return the path. A host whose picker is asynchronous (the web) returns `None` and
     /// runs `hint.command` with `hint.params` plus `"path"` itself once the user has chosen.
@@ -998,8 +998,6 @@ impl FilmcraftApp {
             let t = self.session.playhead();
             let _ = self.session.execute("mixer.recordStart", json!({"time": t.0}));
         }
-        // Multi-Camera view: playing records live cuts (keys 1–9 / clicking angles)
-        panels::multicam::on_play(self);
         // voice-over: the capture starts with the audio clock
         panels::voiceover::on_play(self);
     }
@@ -1022,7 +1020,6 @@ impl FilmcraftApp {
                 self.ui.status = e.to_string();
             }
         }
-        panels::multicam::on_stop(self);
         panels::voiceover::on_stop(self);
     }
 
@@ -1210,7 +1207,7 @@ impl FilmcraftApp {
 
     /// Get a thumbnail texture for an item at a media time (requested at low priority).
     /// Cache revision of a project item's own frames: media changes only when its file does
-    /// (relink, Make Offline, proxies on/off), so its frames survive unrelated edits; other items
+    /// (relink, Make Offline), so its frames survive unrelated edits; other items
     /// (sequences) follow the project revision.
     pub fn item_revision(&self, item: waltcut_project::ItemId) -> u64 {
         let p = &self.session.project;
@@ -1223,7 +1220,6 @@ impl FilmcraftApp {
                 use std::hash::{Hash, Hasher};
                 let mut h = std::collections::hash_map::DefaultHasher::new();
                 waltcut_engine::media_pool::media_key(m).hash(&mut h);
-                (m.proxy.is_some() && self.session.media.use_proxies()).hash(&mut h);
                 h.finish()
             }
             _ => self.session.revision,

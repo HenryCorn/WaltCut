@@ -42,7 +42,6 @@
 	Arrange	Disposition
 	ArtCraft Website	Site web d'ArtCraft
 	Assembly	Assemblage
-	Attach Proxies…	Associer des proxys…
 	Audio Channels…	Canaux audio…
 	Audio Clip Mixer	Mixeur de clips audio
 	Audio Gain…	Gain audio…
@@ -88,8 +87,6 @@
 	Consolidate Duplicates	Regrouper les doublons
 	Copy	Copier
 	Copy Paste Includes Sequence Markers	Copier-coller inclut les marqueurs de séquence
-	Create Multi-Camera Source Sequence…	Créer une séquence source multicaméra…
-	Create Proxies…	Créer des proxys…
 	Cut	Couper
 	Darkest	Le plus sombre
 	Delete Render Files	Supprimer les fichiers de rendu
@@ -98,7 +95,6 @@
 	Demo Footage	Rushes de démonstration
 	Demo Project	Projet de démonstration
 	Deselect All	Tout désélectionner
-	Detach Proxies	Dissocier les proxys
 	Display Mode	Mode d'affichage
 	Distribute	Répartir
 	Distribute Horizontally	Répartir horizontalement
@@ -135,7 +131,6 @@
 	Find…	Rechercher…
 	Fit	Adapter
 	Fit to frame	Adapter à l'image
-	Flatten	Aplatir
 	Forest	Forêt
 	Frame Blending	Fusion d'images
 	Frame Hold Options…	Options d'image figée…
@@ -163,10 +158,8 @@
 	History	Historique
 	Import From	Importer depuis
 	Import Image Sequence…	Importer une séquence d'images…
-	Import from Media Browser	Importer depuis l'Explorateur de médias
 	Import…	Importer…
 	Info	Informations
-	Ingest Settings…	Paramètres d'ingestion…
 	Insert	Insérer
 	Insert Frame Hold Segment	Insérer un segment d'image figée
 	Install Motion Graphics Template…	Installer un modèle d'animation graphique…
@@ -199,17 +192,13 @@
 	Mark Split	Marquer la division
 	Markers	Marqueurs
 	Match Frame	Faire correspondre l'image
-	Media Browser	Explorateur de médias
 	Media Cache…	Cache des médias…
 	Media…	Média…
 	Medium	Moyenne
 	Memory…	Mémoire…
-	Merge Clips…	Fusionner des clips…
 	Metadata	Métadonnées
 	Modify	Modifier
 	Motion Graphics Template…	Modèle d'animation graphique…
-	Multi-Camera	Multicaméra
-	Multi-Camera View	Vue multicaméra
 	Nest…	Imbriquer…
 	New	Nouveau
 	New Layer	Nouveau calque
@@ -238,12 +227,10 @@
 	Program	Programme
 	Progress	Progression
 	Project	Projet
-	Project Manager…	Gestionnaire de projets…
 	Project Settings	Paramètres du projet
 	Project…	Projet…
 	Properties	Propriétés
 	Purple	Violet
-	Reconnect Full Resolution Media…	Reconnecter les médias en pleine résolution…
 	Recover Unsaved Changes…	Récupérer les modifications non enregistrées…
 	Rectangle	Rectangle
 	Red	Rouge
@@ -281,7 +268,6 @@
 	Save a Copy…	Enregistrer une copie…
 	Save as Template…	Enregistrer comme modèle…
 	Scale to Frame Size	Adapter à la taille de l'image
-	Scene Edit Detection…	Détection des changements de scène…
 	Scratch Disks…	Disques de travail…
 	Search Bin	Chutier de recherche
 	Select	Sélectionner
@@ -311,7 +297,6 @@
 	Source	Source
 	Source Settings…	Paramètres de la source…
 	Speed/Duration…	Vitesse/durée…
-	Synchronize…	Synchroniser…
 	System Compatibility Report…	Rapport de compatibilité système…
 	Tan	Beige
 	Teal	Bleu canard
@@ -321,7 +306,6 @@
 	Timecode…	Timecode…
 	Timeline	Timeline
 	Timeline…	Timeline…
-	Toggle Proxies	Activer/désactiver les proxys
 	Tools	Outils
 	Top	Haut
 	Transparent Video…	Vidéo transparente…
@@ -611,15 +595,7 @@
 	(no clips)	(aucun clip)
 	Show Transport Controls	Afficher les commandes de transport
 	Loop	Boucle
-	Multi-Camera Audio Follows Video	L'audio multicaméra suit la vidéo
-	Multi-Camera Record	Enregistrement multicaméra
-	Multi-Camera Selection Top Down	Sélection multicaméra de haut en bas
-	Show Multi-Camera Preview Monitor	Afficher le moniteur d'aperçu multicaméra
-	Auto-Adjust Multi-Camera Playback Quality	Ajuster automatiquement la qualité de lecture multicaméra
-	Transmit Multi-Camera View	Transmettre la vue multicaméra
-	Multi-Camera Layout	Disposition multicaméra
 	Automatic	Automatique
-	Edit Cameras…	Modifier les caméras…
 	Add Marker (M)	Ajouter un marqueur (M)
 	Mark In (I)	Marquer l'entrée (I)
 	Mark Out (O)	Marquer la sortie (O)
@@ -635,22 +611,15 @@
 	Extract (')	Extraire (')
 	Export Frame: use Export mode (M6)	Exporter l'image : utilisez le mode Exportation (M6)
 	Button Editor	Éditeur de boutons
-	Multi-Camera Record on	Enregistrement multicaméra activé
-	Multi-Camera Record off	Enregistrement multicaméra désactivé
 	{first} - Merged	{first} - Fusionné
-	{first} Multicam	{first} Multicaméra
 	In Points	Points d'entrée
 	Out Points	Points de sortie
 	Clip Marker	Marqueur de clip
 	Audio	Audio
-	Merge Clips	Fusionner les clips
-	Create Multi-Camera Source Sequence	Créer une séquence source multicaméra
-	Synchronize Clips	Synchroniser les clips
 	Clip Name:	Nom du clip :
 	Sequence Name:	Nom de la séquence :
 	{n} clip(s): {names}	{n} clip(s) : {names}
 	{n} clip(s) selected; the clip on the reference track stays put.	{n} clip(s) sélectionné(s) ; le clip de la piste de référence reste en place.
-	Synchronize Point	Point de synchronisation
 	Ignore Hours	Ignorer les heures
 	first marker	premier marqueur
 	Offset Audio by:	Décaler l'audio de :
@@ -659,27 +628,13 @@
 	Reference track:	Piste de référence :
 	lowest (V1…)	la plus basse (V1…)
 	Remove Audio from AV Clip	Retirer l'audio du clip AV
-	Camera 1	Caméra 1
-	All Cameras	Toutes les caméras
 	Switch Audio	Changer d'audio
-	Camera Names	Noms des caméras
 	Clip Names	Noms des clips
-	Enumerate Cameras	Numéroter les caméras
-	Camera Angle Metadata	Métadonnées d'angle de caméra
 	Move source clips to Processed Clips bin	Déplacer les clips source dans le chutier Clips traités
-	Synchronized {n} clip group(s)	{n} groupe(s) de clips synchronisé(s)
-	Merged clip created	Clip fusionné créé
-	Multi-camera source sequence with {n} camera(s)	Séquence source multicaméra avec {n} caméra(s)
-	No multi-camera clip at the playhead	Aucun clip multicaméra à la tête de lecture
-	Camera {n} — {name}	Caméra {n} — {name}
 	Page {page} of {pages}	Page {page} sur {pages}
 	Previous page	Page précédente
 	Next page	Page suivante
-	Multi-Camera Record On/Off (0)	Activer/désactiver l'enregistrement multicaméra (0)
 	Record	Enregistrer
-	Edit Cameras	Modifier les caméras
-	Cameras shown in the Multi-Camera view (uncheck to hide).	Caméras affichées dans la vue multicaméra (décochez pour masquer).
-	Recorded {n} multi-camera cut(s)	{n} coupe(s) multicaméra enregistrée(s)
 	Clamp Signal	Limiter le signal
 	Presets	Préréglages
 	Waveform ({kind})	Forme d'onde ({kind})
@@ -776,28 +731,20 @@
 	Make {n} selected clip(s) offline. Their clips show the offline slate until you link them again.	Mettre hors ligne {n} clip(s) sélectionné(s). Ces clips affichent le carton hors ligne jusqu'à ce que vous les liiez à nouveau.
 	Media files remain on disk	Les fichiers média restent sur le disque
 	Media files are deleted	Les fichiers média sont supprimés
-	Create Proxies	Créer des proxys
 	{n} clip(s) selected.	{n} clip(s) sélectionné(s).
 	Format and size	Format et taille
 	Destination	Destination
-	Next to the original media, in a Proxies folder	À côté des médias d'origine, dans un dossier Proxies
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	Les proxys sont créés en arrière-plan et associés une fois terminés. L'exportation utilise toujours les médias en pleine résolution.
-	Creating {n} proxy file(s)…	Création de {n} fichier(s) proxy…
-	Project Manager	Gestionnaire de projets
 	Sequences	Séquences
 	Resulting Project	Projet résultant
 	Collect Files and Copy to New Location	Rassembler les fichiers et copier vers un nouvel emplacement
-	Consolidate and Transcode	Consolider et transcoder
 	Options	Options
 	Exclude Unused Clips	Exclure les clips inutilisés
 	Include Handles:	Inclure les marges :
-	Include Proxies	Inclure les proxys
 	Include Preview Files	Inclure les fichiers d'aperçu
 	Destination Path	Chemin de destination
 	Disk space: original {original} · resulting {result} ({n} files)	Espace disque : original {original} · résultat {result} ({n} fichiers)
 	Disk space: —	Espace disque : —
 	Calculate	Calculer
-	Project Manager: writing {path}	Gestionnaire de projets : écriture de {path}
 	Timeline: (no sequences)	Timeline : (aucune séquence)
 	Browse	Parcourir
 	Select audio clips, then click a preset to apply it.	Sélectionnez des clips audio, puis cliquez sur un préréglage pour l'appliquer.
@@ -1070,8 +1017,6 @@
 	File Types Displayed	Types de fichiers affichés
 	List View	Affichage en liste
 	Thumbnail View	Affichage en vignettes
-	Ingest	Ingestion
-	Open Ingest Settings	Ouvrir les paramètres d'ingestion
 	Import as Image Sequence	Importer en tant que séquence d'images
 	{sel} of {total} items selected	{sel} éléments sélectionnés sur {total}
 	{total} items	{total} éléments
@@ -1088,7 +1033,6 @@
 	Reveal in Finder	Afficher dans le gestionnaire de fichiers
 	Edit Columns…	Modifier les colonnes…
 	Hover Scrub	Défilement au survol
-	New Media Browser Panel	Nouveau panneau Explorateur de médias
 	Create Folder For Imported Projects	Créer un dossier pour les projets importés
 	Allow Duplicate Media During Project Import	Autoriser les médias en double lors de l'importation de projets
 	Refresh	Actualiser
@@ -1149,7 +1093,6 @@
 	Open in Timeline	Ouvrir dans la timeline
 	New Sequence From Clip	Nouvelle séquence à partir du clip
 	Set Poster Frame	Définir l'image d'affiche
-	Proxy	Proxy
 	Open in Place	Ouvrir sur place
 	Open in New Tab	Ouvrir dans un nouvel onglet
 	Open in New Window	Ouvrir dans une nouvelle fenêtre
@@ -1607,7 +1550,6 @@
 	Enable developer mode	Activer le mode développeur
 	Enable hardware accelerated decoding (requires restart)	Activer le décodage accéléré par le matériel (redémarrage requis)
 	Enable language auto-detection	Activer la détection automatique de la langue
-	Enable proxies	Activer les proxys
 	End Color	Couleur de fin
 	End Point	Point de fin
 	End of Ramp	Fin de la rampe
@@ -2639,7 +2581,6 @@
 	Source Settings	Paramètres de la source
 	Update Metadata	Mettre à jour les métadonnées
 	Automate To Sequence	Automatiser vers la séquence
-	Scene Edit Detection	Détection des changements de scène
 	Analyze	Analyser
 	Normalize Mix Track	Normaliser la piste de mixage
 	Simplify Sequence	Simplifier la séquence
@@ -2660,15 +2601,12 @@
 	Any	N'importe lequel
 	Case Sensitive	Respecter la casse
 	Scratch Disks	Disques de travail
-	Ingest Settings	Paramètres d'ingestion
 	Captured and Generated:	Capturés et générés :
 	Video Previews:	Aperçus vidéo :
 	Audio Previews:	Aperçus audio :
 	Project Auto Save:	Enregistrement automatique du projet :
 	Same as Project	Identique au projet
 	Path: {path}	Chemin : {path}
-	Transcode	Transcoder
-	Copy and Create Proxies	Copier et créer des proxys
 	Action:	Action :
 	Destination:	Destination :
 	Next to the media	À côté des médias
@@ -2738,7 +2676,6 @@
 	Export formats	Formats d'exportation
 	Match {n} of {total}	Résultat {n} sur {total}
 	Saved template {path}	Modèle enregistré : {path}
-	Scene Edit Detection: analysing in the background (see Progress)	Détection des changements de scène : analyse en arrière-plan (voir Progression)
 	Delete Search Bin	Supprimer le chutier de recherche
 	 (removed from {list})	 (retiré de {list})
 	{key} can't be used as a shortcut	{key} ne peut pas être utilisé comme raccourci
@@ -2934,15 +2871,6 @@
 	Close Bin	Fermer le chutier
 	Close Sequence	Fermer la séquence
 	Contains	Contient
-	Cut to Camera 1	Couper sur la caméra 1
-	Cut to Camera 2	Couper sur la caméra 2
-	Cut to Camera 3	Couper sur la caméra 3
-	Cut to Camera 4	Couper sur la caméra 4
-	Cut to Camera 5	Couper sur la caméra 5
-	Cut to Camera 6	Couper sur la caméra 6
-	Cut to Camera 7	Couper sur la caméra 7
-	Cut to Camera 8	Couper sur la caméra 8
-	Cut to Camera 9	Couper sur la caméra 9
 	D1/DV NTSC (0.9091)	D1/DV NTSC (0.9091)
 	D1/DV PAL (1.0940)	D1/DV PAL (1.0940)
 	DVCPRO HD (1.5)	DVCPRO HD (1.5)
@@ -3033,7 +2961,6 @@
 	Matches	Correspond à
 	Maximize or Restore Active Frame	Agrandir ou restaurer le cadre actif
 	Maximize or Restore Frame Under Cursor	Agrandir ou restaurer le cadre sous le pointeur
-	Media Browser Settings	Paramètres de l'Explorateur de médias
 	MediaBrowser	Explorateur de médias
 	MediaCache	Cache des médias
 	Mixer	Mixeur
@@ -3050,8 +2977,6 @@
 	Move Selection Page Up	Déplacer la sélection d'une page vers le haut
 	Move Selection Right	Déplacer la sélection vers la droite
 	Move Selection Up	Déplacer la sélection vers le haut
-	Multi-Camera Record On/Off Toggle	Activer/désactiver l'enregistrement multicaméra
-	Multicam	Multicaméra
 	Navigate to End of Segment	Aller à la fin du segment
 	Navigate to Next Line	Aller à la ligne suivante
 	Navigate to Next Word	Aller au mot suivant
@@ -3059,7 +2984,6 @@
 	Navigate to Previous Word	Aller au mot précédent
 	Navigate to Start of Segment	Aller au début du segment
 	Navigation	Navigation
-	Next Multi-Camera Page	Page multicaméra suivante
 	Nudge Clip Selection Down	Déplacer la sélection de clips vers le bas
 	Nudge Clip Selection Left Five Frames	Déplacer la sélection de clips de cinq images vers la gauche
 	Nudge Clip Selection Left One Frame	Déplacer la sélection de clips d'une image vers la gauche
@@ -3095,7 +3019,6 @@
 	Play In to Out with Preroll/Postroll	Lire de l'entrée à la sortie avec pré-roll/post-roll
 	Play from Playhead to Out Point	Lire de la tête de lecture au point de sortie
 	Play/Stop	Lire/arrêter
-	Previous Multi-Camera Page	Page multicaméra précédente
 	Progressive	Progressif
 	ProjectPanel	Panneau Projet
 	QuickTime (Motion JPEG)	QuickTime (Motion JPEG)
@@ -3121,15 +3044,6 @@
 	Ripple Trim Next Edit to Playhead	Rogner avec décalage le point de montage suivant jusqu'à la tête de lecture
 	Ripple Trim Previous Edit to Playhead	Rogner avec décalage le point de montage précédent jusqu'à la tête de lecture
 	Rolling Edit Tool	Outil Montage par roulement
-	Select Camera 1	Sélectionner la caméra 1
-	Select Camera 2	Sélectionner la caméra 2
-	Select Camera 3	Sélectionner la caméra 3
-	Select Camera 4	Sélectionner la caméra 4
-	Select Camera 5	Sélectionner la caméra 5
-	Select Camera 6	Sélectionner la caméra 6
-	Select Camera 7	Sélectionner la caméra 7
-	Select Camera 8	Sélectionner la caméra 8
-	Select Camera 9	Sélectionner la caméra 9
 	Select Clip at Playhead	Sélectionner le clip sous la tête de lecture
 	Select Find Box	Sélectionner le champ de recherche
 	Select Next Clip	Sélectionner le clip suivant
@@ -3173,7 +3087,6 @@
 	Step Forward Five Frames	Avancer de cinq images
 	Step Forward One Frame	Avancer d'une image
 	Stop Export Queue	Arrêter la file d'attente d'exportation
-	Stop Multi-Camera Recording	Arrêter l'enregistrement multicaméra
 	Stop Voice-over Recording	Arrêter l'enregistrement de la voix off
 	Sync Voice-over Capture	Synchroniser la capture de la voix off
 	TIFF	TIFF

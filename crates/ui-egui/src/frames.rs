@@ -28,15 +28,10 @@ pub enum Target {
     Item(ItemId),
     /// A GPU frame plan of a sequence (decoded layers + transforms), composited on the GPU.
     SequencePlan(ItemId),
-    /// The Multi-Camera view's angle grid of a multi-camera source at its time: one page (grid
-    /// side, 0 = automatic; page) of the shown angles, each at the job's scale.
-    MulticamGrid(ItemId, u8, u16),
-    /// One angle of a multi-camera source (Edit Cameras thumbnails).
-    MulticamAngle(ItemId, u32),
 }
 
 /// Item jobs at this priority or a larger number are background work: thumbnails of the Project
-/// panel and the timeline (50) and the Media Browser (40). Monitors and playback use 0..=3. Their
+/// panel and the timeline (50). Monitors and playback use 0..=3. Their
 /// decoders are small and are not kept (`waltcut_media::cancel::with_background`).
 pub const BACKGROUND_PRIO: u32 = 40;
 
@@ -942,13 +937,6 @@ fn render_job(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, pr
     let img = match job.key.target {
         Target::Sequence(seq) | Target::SequencePlan(seq) => Some(waltcut_render::render_sequence(&job.project, seq, job.time, opts, &provider)),
         Target::Item(item) => waltcut_render::render_item(&job.project, item, job.time, job.scale, &provider),
-        Target::MulticamGrid(item, side, page) => {
-            let side = (side > 0).then_some(side as usize);
-            waltcut_render::multicam::render_grid_page(&job.project, item, job.time, job.scale, side, page as usize, &provider).map(|(img, _)| img)
-        }
-        Target::MulticamAngle(item, angle) => {
-            waltcut_render::multicam::render_angle_thumbnail(&job.project, item, angle as usize, job.time, job.scale, &provider)
-        }
     };
     let rgba = match img {
         Some(img) => Rgba { w: img.w, h: img.h, px: img.over_black_rgba8() },

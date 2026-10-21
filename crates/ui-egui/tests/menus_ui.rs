@@ -1,5 +1,5 @@
 //! Headless UI tests of the M3.11 menu long tail: Find, Create Search Bin (and its Project panel
-//! rows), Project Settings, Scene Edit Detection, Simplify Sequence, Automate to Sequence,
+//! rows), Project Settings, Simplify Sequence, Automate to Sequence,
 //! Normalize Mix Track, Dynamic Audio Waveforms, Reveal Log Files and the System Compatibility
 //! Report, all driven by automation id through the control channel.
 
@@ -100,7 +100,6 @@ fn menu_items_toggles_and_help() {
     assert_eq!(find("view.dynamicAudioWaveforms")["checked"], true);
     assert_eq!(find("help.systemCompatibilityReport")["path"], json!(["Help"]));
     assert_eq!(find("file.mediaProperties")["path"], json!(["File", "Get Media File Properties for"]));
-    assert_eq!(find("clip.sceneEditDetection")["label"], "Scene Edit Detection…");
     // Dynamic Audio Waveforms toggles
     d.menu("view.dynamicAudioWaveforms");
     assert!(!d.app().ui.extras.dynamic_waveforms);
@@ -117,12 +116,10 @@ fn menu_items_toggles_and_help() {
     assert!(std::fs::read_to_string(&path).unwrap().contains("\"os\""));
     assert_eq!(d.app().ui.extras.opened.last(), Some(&path));
     let _ = std::fs::remove_file(&path);
-    // Import from Media Browser needs a Media Browser selection
-    assert_eq!(d.call("ui.menu.invoke", json!({"id": "file.importFromMediaBrowser"}))["ok"], false);
 }
 
 #[test]
-fn import_image_sequence_from_the_file_menu_and_media_browser() {
+fn import_image_sequence_from_the_file_menu() {
     let dir = std::env::temp_dir().join(format!("fc-ui-imgseq-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let paths: Vec<String> = (1..=5)
@@ -142,9 +139,8 @@ fn import_image_sequence_from_the_file_menu_and_media_browser() {
     let id = ItemId(r["items"][0].as_u64().unwrap());
     let kind = d.app().session.project.item(id).unwrap().as_media().unwrap().info.kind;
     assert_eq!(kind, waltcut_media::MediaKind::ImageSequence);
-    // Media Browser ▸ Import as Image Sequence (the selection, from frame 3)
-    d.exec("mediaBrowser.select", json!({"paths": [paths[2]]}));
-    let r = d.ok("ui.menu.invoke", json!({"id": "file.importFromMediaBrowser", "params": {"imageSequence": true}}));
+    // File ▸ Import with Image Sequence on, from frame 3
+    let r = d.ok("ui.menu.invoke", json!({"id": "file.importImageSequence", "params": {"path": paths[2]}}));
     assert_eq!(r["imageSequences"][0]["frames"], 3);
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -211,8 +207,6 @@ fn project_settings_dialog() {
         "ui.set",
         json!({"menuDialog": {"titleSafe": [15.0, 12.0], "renderer": waltcut_engine::project_tools::RENDERER_SOFTWARE, "captured": "/tmp/fc-captured"}}),
     );
-    d.click("projectSettings.tab.ingest");
-    assert!(d.has("projectSettings.ingest.enabled"));
     d.click("projectSettings.ok");
     assert!(!d.dialog_open());
     let st = d.app().session.project.settings.clone();
@@ -225,16 +219,6 @@ fn project_settings_dialog() {
 #[test]
 fn clip_and_sequence_dialogs() {
     let mut d = Driver::new();
-    // Scene Edit Detection needs a selected video clip
-    assert_eq!(d.call("ui.menu.invoke", json!({"id": "clip.sceneEditDetection"}))["ok"], false);
-    let c = d.app().session.active_sequence().unwrap().video_tracks[0].items[0].id.0;
-    d.exec("timeline.select", json!({"clips": [c]}));
-    d.menu("clip.sceneEditDetection");
-    for id in ["sceneDetect.applyCuts", "sceneDetect.createSubclips", "sceneDetect.generateMarkers", "sceneDetect.sensitivity", "sceneDetect.ok"] {
-        assert!(d.has(id), "{id}");
-    }
-    d.click("sceneDetect.cancel");
-    assert!(!d.dialog_open());
     // Normalize Mix Track
     d.menu("sequence.normalizeMixTrack");
     d.ok("ui.set", json!({"menuDialog": {"db": -6.0}}));

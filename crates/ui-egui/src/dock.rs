@@ -13,7 +13,6 @@ use crate::theme::Tokens;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PanelKind {
     Project,
-    MediaBrowser,
     Libraries,
     Info,
     Effects,
@@ -38,9 +37,8 @@ pub enum PanelKind {
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 23] = [
+    pub const ALL: [PanelKind; 22] = [
         PanelKind::Project,
-        PanelKind::MediaBrowser,
         PanelKind::Libraries,
         PanelKind::Info,
         PanelKind::Effects,
@@ -66,7 +64,6 @@ impl PanelKind {
     pub fn title(self) -> &'static str {
         match self {
             PanelKind::Project => "Project",
-            PanelKind::MediaBrowser => "Media Browser",
             PanelKind::Libraries => "Libraries",
             PanelKind::Info => "Info",
             PanelKind::Effects => "Effects",
@@ -107,7 +104,6 @@ impl PanelKind {
             PanelKind::EffectControls => Some("Shift+5"),
             PanelKind::AudioClipMixer => Some("Shift+9"),
             PanelKind::Effects => Some("Shift+7"),
-            PanelKind::MediaBrowser => Some("Shift+8"),
             PanelKind::AudioTrackMixer => Some("Shift+6"),
             _ => None,
         }
@@ -302,7 +298,7 @@ pub fn workspace(name: &str) -> DockNode {
             Ratio(0.52),
             hsplit(
                 Ratio(0.46),
-                tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0),
+                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
                 hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
             ),
             bottom_editing(),
@@ -321,7 +317,7 @@ pub fn workspace(name: &str) -> DockNode {
             vsplit(
                 Ratio(0.5),
                 hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer], 1), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, MediaBrowser, Info, Markers, History], 0), bottom_editing()),
+                hsplit(Ratio(0.3), tabs(&[Project, Info, Markers, History], 0), bottom_editing()),
             ),
             vsplit(Ratio(0.5), tabs(&[Effects], 0), tabs(&[EssentialGraphics], 0)),
         ),
@@ -330,7 +326,7 @@ pub fn workspace(name: &str) -> DockNode {
             vsplit(
                 Ratio(0.5),
                 hsplit(Ratio(0.5), tabs(&[AudioTrackMixer, Source, AudioClipMixer, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, MediaBrowser, Effects, Markers, History], 0), bottom_editing()),
+                hsplit(Ratio(0.3), tabs(&[Project, Effects, Markers, History], 0), bottom_editing()),
             ),
             tabs(&[EssentialSound], 0),
         ),
@@ -339,7 +335,7 @@ pub fn workspace(name: &str) -> DockNode {
             vsplit(
                 Ratio(0.5),
                 hsplit(Ratio(0.4), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, MediaBrowser, Libraries], 0), bottom_editing()),
+                hsplit(Ratio(0.3), tabs(&[Project, Libraries], 0), bottom_editing()),
             ),
             tabs(&[EssentialGraphics, Properties], 0),
         ),
@@ -350,7 +346,7 @@ pub fn workspace(name: &str) -> DockNode {
                 tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0),
                 hsplit(Ratio(0.6), tabs(&[Program], 0), tabs(&[EssentialGraphics, EssentialSound, Properties, AudioTrackMixer], 0)),
             ),
-            hsplit(Ratio(0.26), tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),
+            hsplit(Ratio(0.26), tabs(&[Project, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),
         ),
         // Editing (default), Learning, Review — Premiere 26 factory layout:
         // top: Source group | Program | Properties; bottom: Project group | Tools | Timeline | Meters.
@@ -363,7 +359,7 @@ pub fn workspace(name: &str) -> DockNode {
             ),
             hsplit(
                 Ratio(0.29),
-                tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0),
+                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
                 hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
             ),
         ),

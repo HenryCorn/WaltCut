@@ -65,8 +65,7 @@ fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
 #[test]
 fn premiere_engine_entries_exist() {
     // UI-owned ids (tools, transport, panels…) are checked by the ui-egui keyboard test
-    let ui_prefixes =
-        ["tool.", "playback.", "window.", "view.", "app.", "help.", "mode.", "multicam.", "projectPanel.", "textPanel.", "panel.", "mediaBrowser."];
+    let ui_prefixes = ["tool.", "playback.", "window.", "view.", "app.", "help.", "mode.", "projectPanel.", "textPanel.", "panel."];
     let ui_ids = ["timeline.expandAllTracks", "timeline.minimizeAllTracks", "graphics.beginTextEditing"];
     for (id, _, _) in presets::premiere() {
         if id.starts_with("timeline.") && (id.contains("Height") || id.contains("Screen")) || ui_ids.contains(&id) {

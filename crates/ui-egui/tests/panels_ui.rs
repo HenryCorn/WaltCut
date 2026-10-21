@@ -232,7 +232,7 @@ fn wheel_over_a_tab_strip_switches_tabs() {
     let mut d = Driver::demo();
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, -40.0);
-    assert_eq!(shown(&mut d), PanelKind::MediaBrowser);
+    assert_eq!(shown(&mut d), PanelKind::Libraries);
     wheel(&mut d, 40.0);
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, 120.0);
@@ -251,13 +251,13 @@ fn wheel_over_a_tab_strip_switches_tabs() {
             phase: egui::TouchPhase::Move,
         });
         d.frames(1);
-        let expect = if step < 3 { PanelKind::Project } else { PanelKind::MediaBrowser };
+        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Libraries };
         assert_eq!(shown(&mut d), expect, "after {} pt", (step + 1) * 10);
     }
 
-    d.ok("ui.scroll", json!({"id": "panel.MediaBrowser", "dy": -40.0}));
+    d.ok("ui.scroll", json!({"id": "panel.Libraries", "dy": -40.0}));
     d.frames(2);
-    assert_eq!(shown(&mut d), PanelKind::MediaBrowser, "the wheel over the content keeps the tab");
+    assert_eq!(shown(&mut d), PanelKind::Libraries, "the wheel over the content keeps the tab");
 
     for _ in 0..10 {
         wheel(&mut d, -40.0);
@@ -433,7 +433,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     let mut d = Driver::demo();
     for theme in ["dark", "light"] {
         d.ok("ui.set", json!({"theme": theme}));
-        for panel in ["Program", "EssentialSound", "Timeline", "MediaBrowser"] {
+        for panel in ["Program", "EssentialSound", "Timeline", "Libraries"] {
             d.ok("ui.panel.show", json!({"panel": panel}));
             d.ok("ui.set", json!({"focused": panel}));
             d.frames(3);

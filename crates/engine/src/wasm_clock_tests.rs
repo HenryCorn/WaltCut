@@ -1,7 +1,6 @@
 //! The web build runs every job synchronously (`wait || cfg!(target_arch = "wasm32")`), so a job
 //! body executes on wasm32 — where `std::time::Instant::now()` panics with "time not implemented
-//! on this platform" and takes the whole app down (#230: Create Proxies and mask tracking both
-//! did). `web_time::Instant` is `std::time::Instant` on native targets and `performance.now()`
+//! on this platform" and takes the whole app down (#230: mask tracking did). `web_time::Instant` is `std::time::Instant` on native targets and `performance.now()`
 //! on the web, so there is never a reason to name the std one in this crate.
 
 use std::path::Path;

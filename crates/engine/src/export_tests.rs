@@ -647,7 +647,7 @@ fn queue_folder_paths_expand_home_and_take_either_separator() {
     s.execute("export.queue.add", json!({"preset": preset, "path": "not-yet-made\\", "sequences": [first.0, second]})).unwrap();
     let paths: Vec<String> = queue(&mut s).iter().map(|i| i["path"].as_str().unwrap().to_string()).collect();
     assert!(paths.iter().any(|p| p.ends_with("Second Cut.wav")), "{paths:?}");
-    if let Some(home) = crate::media_browser::std_home_dir() {
+    if let Some(home) = crate::std_home_dir() {
         s.execute("export.queue.add", json!({"preset": preset, "path": "~/Exports/", "sequence": first.0})).unwrap();
         let last = queue(&mut s).last().unwrap()["path"].as_str().unwrap().to_string();
         assert!(last.starts_with(&home), "{last}");

@@ -47,7 +47,6 @@
 	Arrange	Susun
 	ArtCraft Website	Situs Web ArtCraft
 	Assembly	Perakitan
-	Attach Proxies…	Lampirkan Proksi…
 	Audio Channels…	Kanal Audio…
 	Audio Clip Mixer	Mixer Klip Audio
 	Audio Gain…	Gain Audio…
@@ -93,8 +92,6 @@
 	Consolidate Duplicates	Gabungkan Duplikat
 	Copy	Salin
 	Copy Paste Includes Sequence Markers	Salin Tempel Menyertakan Penanda Sekuens
-	Create Multi-Camera Source Sequence…	Buat Sekuens Sumber Multi-Kamera…
-	Create Proxies…	Buat Proksi…
 	Cut	Potong
 	Darkest	Tergelap
 	Delete Render Files	Hapus Berkas Render
@@ -103,7 +100,6 @@
 	Demo Footage	Rekaman Demo
 	Demo Project	Proyek Demo
 	Deselect All	Batalkan Semua Pilihan
-	Detach Proxies	Lepaskan Proksi
 	Display Mode	Mode Tampilan
 	Distribute	Distribusikan
 	Distribute Horizontally	Distribusikan Secara Horizontal
@@ -140,7 +136,6 @@
 	Find…	Cari…
 	Fit	Pas
 	Fit to frame	Paskan ke bingkai
-	Flatten	Ratakan
 	Forest	Hijau Hutan
 	Frame Blending	Pencampuran Bingkai
 	Frame Hold Options…	Opsi Tahan Bingkai…
@@ -168,10 +163,8 @@
 	History	Riwayat
 	Import From	Impor Dari
 	Import Image Sequence…	Impor Urutan Gambar…
-	Import from Media Browser	Impor dari Peramban Media
 	Import…	Impor…
 	Info	Info
-	Ingest Settings…	Pengaturan Ingest…
 	Insert	Sisipkan
 	Insert Frame Hold Segment	Sisipkan Segmen Tahan Bingkai
 	Install Motion Graphics Template…	Pasang Templat Grafis Gerak…
@@ -204,17 +197,13 @@
 	Mark Split	Tandai Split
 	Markers	Penanda
 	Match Frame	Cocokkan Bingkai
-	Media Browser	Peramban Media
 	Media Cache…	Cache Media…
 	Media…	Media…
 	Medium	Sedang
 	Memory…	Memori…
-	Merge Clips…	Gabungkan Klip…
 	Metadata	Metadata
 	Modify	Ubah
 	Motion Graphics Template…	Templat Grafis Gerak…
-	Multi-Camera	Multi-Kamera
-	Multi-Camera View	Tampilan Multi-Kamera
 	Nest…	Sarangkan…
 	New	Baru
 	New Layer	Lapisan Baru
@@ -243,12 +232,10 @@
 	Program	Program
 	Progress	Kemajuan
 	Project	Proyek
-	Project Manager…	Manajer Proyek…
 	Project Settings	Pengaturan Proyek
 	Project…	Proyek…
 	Properties	Properti
 	Purple	Ungu
-	Reconnect Full Resolution Media…	Sambungkan Ulang Media Resolusi Penuh…
 	Recover Unsaved Changes…	Pulihkan Perubahan yang Belum Disimpan…
 	Rectangle	Persegi Panjang
 	Red	Merah
@@ -286,7 +273,6 @@
 	Save a Copy…	Simpan Salinan…
 	Save as Template…	Simpan sebagai Templat…
 	Scale to Frame Size	Skalakan ke Ukuran Bingkai
-	Scene Edit Detection…	Deteksi Pergantian Adegan…
 	Scratch Disks…	Disk Kerja…
 	Search Bin	Bin Pencarian
 	Select	Pilih
@@ -316,7 +302,6 @@
 	Source	Sumber
 	Source Settings…	Pengaturan Sumber…
 	Speed/Duration…	Kecepatan/Durasi…
-	Synchronize…	Sinkronkan…
 	System Compatibility Report…	Laporan Kompatibilitas Sistem…
 	Tan	Cokelat Muda
 	Teal	Hijau Toska
@@ -326,7 +311,6 @@
 	Timecode…	Kode Waktu…
 	Timeline	Linimasa
 	Timeline…	Linimasa…
-	Toggle Proxies	Alihkan Proksi
 	Tools	Alat
 	Top	Atas
 	Transparent Video…	Video Transparan…
@@ -616,15 +600,7 @@
 	(no clips)	(tidak ada klip)
 	Show Transport Controls	Tampilkan Kontrol Transport
 	Loop	Putar Berulang
-	Multi-Camera Audio Follows Video	Audio Multi-Kamera Mengikuti Video
-	Multi-Camera Record	Rekam Multi-Kamera
-	Multi-Camera Selection Top Down	Pilihan Multi-Kamera dari Atas ke Bawah
-	Show Multi-Camera Preview Monitor	Tampilkan Monitor Pratinjau Multi-Kamera
-	Auto-Adjust Multi-Camera Playback Quality	Sesuaikan Otomatis Kualitas Pemutaran Multi-Kamera
-	Transmit Multi-Camera View	Kirim Tampilan Multi-Kamera
-	Multi-Camera Layout	Tata Letak Multi-Kamera
 	Automatic	Otomatis
-	Edit Cameras…	Edit Kamera…
 	Add Marker (M)	Tambah Penanda (M)
 	Mark In (I)	Tandai Masuk (I)
 	Mark Out (O)	Tandai Keluar (O)
@@ -640,22 +616,15 @@
 	Extract (')	Ekstrak (')
 	Export Frame: use Export mode (M6)	Ekspor Bingkai: gunakan mode Ekspor (M6)
 	Button Editor	Editor Tombol
-	Multi-Camera Record on	Rekam Multi-Kamera aktif
-	Multi-Camera Record off	Rekam Multi-Kamera nonaktif
 	{first} - Merged	{first} - Digabung
-	{first} Multicam	{first} Multikamera
 	In Points	Titik Masuk
 	Out Points	Titik Keluar
 	Clip Marker	Penanda Klip
 	Audio	Audio
-	Merge Clips	Gabungkan Klip
-	Create Multi-Camera Source Sequence	Buat Sekuens Sumber Multi-Kamera
-	Synchronize Clips	Sinkronkan Klip
 	Clip Name:	Nama Klip:
 	Sequence Name:	Nama Sekuens:
 	{n} clip(s): {names}	{n} klip: {names}
 	{n} clip(s) selected; the clip on the reference track stays put.	{n} klip dipilih; klip di trek referensi tetap di tempatnya.
-	Synchronize Point	Titik Sinkronisasi
 	Ignore Hours	Abaikan Jam
 	first marker	penanda pertama
 	Offset Audio by:	Geser Audio sebesar:
@@ -664,27 +633,13 @@
 	Reference track:	Trek referensi:
 	lowest (V1…)	terendah (V1…)
 	Remove Audio from AV Clip	Hapus Audio dari Klip AV
-	Camera 1	Kamera 1
-	All Cameras	Semua Kamera
 	Switch Audio	Ganti Audio
-	Camera Names	Nama Kamera
 	Clip Names	Nama Klip
-	Enumerate Cameras	Nomori Kamera
-	Camera Angle Metadata	Metadata Sudut Kamera
 	Move source clips to Processed Clips bin	Pindahkan klip sumber ke bin Klip Terproses
-	Synchronized {n} clip group(s)	{n} grup klip disinkronkan
-	Merged clip created	Klip gabungan dibuat
-	Multi-camera source sequence with {n} camera(s)	Sekuens sumber multi-kamera dengan {n} kamera
-	No multi-camera clip at the playhead	Tidak ada klip multi-kamera di kepala putar
-	Camera {n} — {name}	Kamera {n} — {name}
 	Page {page} of {pages}	Halaman {page} dari {pages}
 	Previous page	Halaman sebelumnya
 	Next page	Halaman berikutnya
-	Multi-Camera Record On/Off (0)	Rekam Multi-Kamera Aktif/Nonaktif (0)
 	Record	Rekam
-	Edit Cameras	Edit Kamera
-	Cameras shown in the Multi-Camera view (uncheck to hide).	Kamera yang ditampilkan di tampilan Multi-Kamera (hapus centang untuk menyembunyikan).
-	Recorded {n} multi-camera cut(s)	{n} potongan multi-kamera direkam
 	Clamp Signal	Batasi Sinyal
 	Presets	Preset
 	Waveform ({kind})	Bentuk Gelombang ({kind})
@@ -781,28 +736,20 @@
 	Make {n} selected clip(s) offline. Their clips show the offline slate until you link them again.	Jadikan {n} klip terpilih offline. Klip tersebut menampilkan slate offline sampai Anda menautkannya lagi.
 	Media files remain on disk	Berkas media tetap ada di disk
 	Media files are deleted	Berkas media dihapus
-	Create Proxies	Buat Proksi
 	{n} clip(s) selected.	{n} klip dipilih.
 	Format and size	Format dan ukuran
 	Destination	Tujuan
-	Next to the original media, in a Proxies folder	Di samping media asli, dalam folder Proxies
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	Proksi dibuat di latar belakang dan dilampirkan setelah selesai. Ekspor selalu menggunakan media resolusi penuh.
-	Creating {n} proxy file(s)…	Membuat {n} berkas proksi…
-	Project Manager	Manajer Proyek
 	Sequences	Sekuens
 	Resulting Project	Proyek Hasil
 	Collect Files and Copy to New Location	Kumpulkan Berkas dan Salin ke Lokasi Baru
-	Consolidate and Transcode	Konsolidasi dan Transkode
 	Options	Opsi
 	Exclude Unused Clips	Kecualikan Klip yang Tidak Dipakai
 	Include Handles:	Sertakan Handle:
-	Include Proxies	Sertakan Proksi
 	Include Preview Files	Sertakan Berkas Pratinjau
 	Destination Path	Jalur Tujuan
 	Disk space: original {original} · resulting {result} ({n} files)	Ruang disk: asli {original} · hasil {result} ({n} berkas)
 	Disk space: —	Ruang disk: —
 	Calculate	Hitung
-	Project Manager: writing {path}	Manajer Proyek: menulis {path}
 	Timeline: (no sequences)	Linimasa: (tidak ada sekuens)
 	Browse	Telusuri
 	Select audio clips, then click a preset to apply it.	Pilih klip audio, lalu klik preset untuk menerapkannya.
@@ -1075,8 +1022,6 @@
 	File Types Displayed	Jenis Berkas yang Ditampilkan
 	List View	Tampilan Daftar
 	Thumbnail View	Tampilan Gambar Mini
-	Ingest	Ingest
-	Open Ingest Settings	Buka Pengaturan Ingest
 	Import as Image Sequence	Impor sebagai Urutan Gambar
 	{sel} of {total} items selected	{sel} dari {total} item dipilih
 	{total} items	{total} item
@@ -1093,7 +1038,6 @@
 	Reveal in Finder	Tampilkan di Finder
 	Edit Columns…	Edit Kolom…
 	Hover Scrub	Scrub saat Melayang
-	New Media Browser Panel	Panel Peramban Media Baru
 	Create Folder For Imported Projects	Buat Folder untuk Proyek yang Diimpor
 	Allow Duplicate Media During Project Import	Izinkan Media Duplikat Saat Impor Proyek
 	Refresh	Segarkan
@@ -1154,7 +1098,6 @@
 	Open in Timeline	Buka di Linimasa
 	New Sequence From Clip	Sekuens Baru dari Klip
 	Set Poster Frame	Atur Bingkai Poster
-	Proxy	Proksi
 	Open in Place	Buka di Tempat
 	Open in New Tab	Buka di Tab Baru
 	Open in New Window	Buka di Jendela Baru
@@ -1612,7 +1555,6 @@
 	Enable developer mode	Aktifkan mode pengembang
 	Enable hardware accelerated decoding (requires restart)	Aktifkan dekode dengan akselerasi perangkat keras (perlu mulai ulang)
 	Enable language auto-detection	Aktifkan deteksi bahasa otomatis
-	Enable proxies	Aktifkan proksi
 	End Color	Warna Akhir
 	End Point	Titik Akhir
 	End of Ramp	Akhir Gradasi
@@ -2644,7 +2586,6 @@
 	Source Settings	Pengaturan Sumber
 	Update Metadata	Perbarui Metadata
 	Automate To Sequence	Otomatiskan ke Sekuens
-	Scene Edit Detection	Deteksi Pergantian Adegan
 	Analyze	Analisis
 	Normalize Mix Track	Normalisasi Trek Mix
 	Simplify Sequence	Sederhanakan Sekuens
@@ -2665,15 +2606,12 @@
 	Any	Salah Satu
 	Case Sensitive	Peka Huruf Besar/Kecil
 	Scratch Disks	Disk Kerja
-	Ingest Settings	Pengaturan Ingest
 	Captured and Generated:	Direkam dan Dibuat:
 	Video Previews:	Pratinjau Video:
 	Audio Previews:	Pratinjau Audio:
 	Project Auto Save:	Simpan Otomatis Proyek:
 	Same as Project	Sama dengan Proyek
 	Path: {path}	Jalur: {path}
-	Transcode	Transkode
-	Copy and Create Proxies	Salin dan Buat Proksi
 	Action:	Tindakan:
 	Destination:	Tujuan:
 	Next to the media	Di samping media
@@ -2743,7 +2681,6 @@
 	Export formats	Format ekspor
 	Match {n} of {total}	Kecocokan {n} dari {total}
 	Saved template {path}	Templat disimpan: {path}
-	Scene Edit Detection: analysing in the background (see Progress)	Deteksi Pergantian Adegan: menganalisis di latar belakang (lihat Kemajuan)
 	Delete Search Bin	Hapus Bin Pencarian
 	 (removed from {list})	 (dihapus dari {list})
 	{key} can't be used as a shortcut	{key} tidak dapat digunakan sebagai pintasan
@@ -2939,15 +2876,6 @@
 	Close Bin	Tutup Bin
 	Close Sequence	Tutup Sekuens
 	Contains	Berisi
-	Cut to Camera 1	Potong ke Kamera 1
-	Cut to Camera 2	Potong ke Kamera 2
-	Cut to Camera 3	Potong ke Kamera 3
-	Cut to Camera 4	Potong ke Kamera 4
-	Cut to Camera 5	Potong ke Kamera 5
-	Cut to Camera 6	Potong ke Kamera 6
-	Cut to Camera 7	Potong ke Kamera 7
-	Cut to Camera 8	Potong ke Kamera 8
-	Cut to Camera 9	Potong ke Kamera 9
 	D1/DV NTSC (0.9091)	D1/DV NTSC (0.9091)
 	D1/DV PAL (1.0940)	D1/DV PAL (1.0940)
 	DVCPRO HD (1.5)	DVCPRO HD (1.5)
@@ -3038,7 +2966,6 @@
 	Matches	Cocok Dengan
 	Maximize or Restore Active Frame	Maksimalkan atau Pulihkan Bingkai Aktif
 	Maximize or Restore Frame Under Cursor	Maksimalkan atau Pulihkan Bingkai di Bawah Kursor
-	Media Browser Settings	Pengaturan Peramban Media
 	MediaBrowser	MediaBrowser
 	MediaCache	MediaCache
 	Mixer	Mixer
@@ -3055,8 +2982,6 @@
 	Move Selection Page Up	Pindahkan Pilihan Satu Halaman ke Atas
 	Move Selection Right	Pindahkan Pilihan ke Kanan
 	Move Selection Up	Pindahkan Pilihan ke Atas
-	Multi-Camera Record On/Off Toggle	Alihkan Rekam Multi-Kamera Aktif/Nonaktif
-	Multicam	Multikamera
 	Navigate to End of Segment	Navigasi ke Akhir Segmen
 	Navigate to Next Line	Navigasi ke Baris Berikutnya
 	Navigate to Next Word	Navigasi ke Kata Berikutnya
@@ -3064,7 +2989,6 @@
 	Navigate to Previous Word	Navigasi ke Kata Sebelumnya
 	Navigate to Start of Segment	Navigasi ke Awal Segmen
 	Navigation	Navigasi
-	Next Multi-Camera Page	Halaman Multi-Kamera Berikutnya
 	Nudge Clip Selection Down	Geser Sedikit Pilihan Klip ke Bawah
 	Nudge Clip Selection Left Five Frames	Geser Sedikit Pilihan Klip ke Kiri Lima Bingkai
 	Nudge Clip Selection Left One Frame	Geser Sedikit Pilihan Klip ke Kiri Satu Bingkai
@@ -3112,7 +3036,6 @@
 	Play In to Out with Preroll/Postroll	Putar dari Masuk ke Keluar dengan Preroll/Postroll
 	Play from Playhead to Out Point	Putar dari Kepala Putar ke Titik Keluar
 	Play/Stop	Putar/Berhenti
-	Previous Multi-Camera Page	Halaman Multi-Kamera Sebelumnya
 	Progressive	Progresif
 	ProjectPanel	ProjectPanel
 	QuickTime (Motion JPEG)	QuickTime (Motion JPEG)
@@ -3138,15 +3061,6 @@
 	Ripple Trim Next Edit to Playhead	Pangkas Ripple Edit Berikutnya ke Kepala Putar
 	Ripple Trim Previous Edit to Playhead	Pangkas Ripple Edit Sebelumnya ke Kepala Putar
 	Rolling Edit Tool	Alat Edit Roll
-	Select Camera 1	Pilih Kamera 1
-	Select Camera 2	Pilih Kamera 2
-	Select Camera 3	Pilih Kamera 3
-	Select Camera 4	Pilih Kamera 4
-	Select Camera 5	Pilih Kamera 5
-	Select Camera 6	Pilih Kamera 6
-	Select Camera 7	Pilih Kamera 7
-	Select Camera 8	Pilih Kamera 8
-	Select Camera 9	Pilih Kamera 9
 	Select Clip at Playhead	Pilih Klip di Kepala Putar
 	Select Find Box	Pilih Kotak Pencarian
 	Select Next Clip	Pilih Klip Berikutnya
@@ -3190,7 +3104,6 @@
 	Step Forward Five Frames	Maju Lima Bingkai
 	Step Forward One Frame	Maju Satu Bingkai
 	Stop Export Queue	Hentikan Antrean Ekspor
-	Stop Multi-Camera Recording	Hentikan Perekaman Multi-Kamera
 	Stop Voice-over Recording	Hentikan Perekaman Sulih Suara
 	Sync Voice-over Capture	Sinkronkan Perekaman Sulih Suara
 	TIFF	TIFF

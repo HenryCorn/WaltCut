@@ -23,7 +23,7 @@ use crate::commands::{CommandSpec, always, bad, bool_p, str_p};
 use crate::{EngineError, Result, Session};
 
 /// Version of the preferences file layout ([`crate::autosave::Preferences::version`]).
-/// v1: Auto Save, Audio (mixer automation), Playback (pre/postroll), Trim, Media (proxies), guides,
+/// v1: Auto Save, Audio (mixer automation), Playback (pre/postroll), Trim, Media, guides,
 /// Essential Sound presets. v2: every Settings category.
 pub const PREFS_VERSION: u32 = 2;
 
@@ -1144,7 +1144,6 @@ static CATEGORIES: &[Category] = &[
             b("media.validateContentCredentials", "Validate Content Credentials on import", false),
             b("media.writeClipMarkersToXmp", "Write clip markers to XMP", false),
             b("media.enableXmpLinking", "Enable clip and XMP metadata linking", false),
-            b("media.enableProxies", "Enable proxies", true),
             b("media.allowDuplicateMedia", "Allow duplicate media during project import", false),
             b("media.createFolderForImportedProjects", "Create folder for imported projects", false),
             b("media.autoHideDependentClips", "Automatically Hide Dependent Clips", false),

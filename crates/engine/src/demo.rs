@@ -29,7 +29,6 @@ pub fn add_generator(p: &mut Project, pool: &MediaPool, src: GeneratorSource, na
         mark_out: None,
         markers: vec![],
         offline: false,
-        proxy: None,
         identity: None,
     };
     let key = crate::media_pool::media_key(&clip);

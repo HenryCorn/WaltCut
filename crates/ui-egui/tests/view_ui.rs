@@ -146,12 +146,8 @@ fn view_menu_resolutions_and_display_modes() {
     d.menu("view.display.alpha");
     assert_eq!(d.program()["display"], "Alpha");
 
-    // Multi-Camera links to the existing multi-camera view; Composite turns it off
-    d.menu("view.display.multicam");
-    assert_eq!(d.program()["multicam"], true);
     d.menu("view.display.composite");
-    let p = d.program();
-    assert_eq!((p["multicam"].as_bool(), p["display"].as_str()), (Some(false), Some("Composite")));
+    assert_eq!(d.program()["display"], "Composite");
 
     // wrench menu items carry automation ids
     d.click("program.settings");

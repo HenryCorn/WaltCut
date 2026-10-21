@@ -178,8 +178,6 @@ pub struct Preferences {
     pub voice_over: crate::voiceover::VoiceOverPrefs,
     /// Project panel: view, List view columns and sort, view presets, Freeform options.
     pub project_panel: crate::project_panel::ProjectPanelPrefs,
-    /// Media Browser: Favorites, recent directories, file types, view, columns.
-    pub media_browser: crate::media_browser::MediaBrowserPrefs,
     /// AI re-style provider and model (the API key is stored separately, see `ai`).
     pub ai: waltcut_genai::ProviderSettings,
 }
@@ -207,7 +205,6 @@ impl Default for Preferences {
             guides: Default::default(),
             voice_over: Default::default(),
             project_panel: Default::default(),
-            media_browser: Default::default(),
             ai: Default::default(),
         }
     }
@@ -252,9 +249,6 @@ pub struct MediaPrefs {
     pub validate_content_credentials: bool,
     pub write_clip_markers_to_xmp: bool,
     pub enable_xmp_linking: bool,
-    /// "Enable proxies": playback and monitors read attached proxies (the monitors' Toggle
-    /// Proxies button). Export always uses full-resolution media.
-    pub enable_proxies: bool,
     pub allow_duplicate_media: bool,
     pub create_folder_for_imported_projects: bool,
     pub auto_hide_dependent_clips: bool,
@@ -277,7 +271,6 @@ impl Default for MediaPrefs {
             validate_content_credentials: true,
             write_clip_markers_to_xmp: false,
             enable_xmp_linking: false,
-            enable_proxies: false,
             allow_duplicate_media: false,
             create_folder_for_imported_projects: false,
             auto_hide_dependent_clips: false,

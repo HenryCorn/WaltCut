@@ -35,7 +35,6 @@
 	Arrange	排列
 	ArtCraft Website	ArtCraft 官网
 	Assembly	组装
-	Attach Proxies…	附加代理文件…
 	Audio Channels…	音频声道…
 	Audio Clip Mixer	音频剪辑混音器
 	Audio Gain…	音频增益…
@@ -81,8 +80,6 @@
 	Consolidate Duplicates	合并重复项
 	Copy	复制
 	Copy Paste Includes Sequence Markers	复制粘贴包含序列标记
-	Create Multi-Camera Source Sequence…	创建多机位源序列…
-	Create Proxies…	创建代理文件…
 	Cut	剪切
 	Darkest	最暗
 	Delete Render Files	删除渲染文件
@@ -91,7 +88,6 @@
 	Demo Footage	演示素材
 	Demo Project	演示项目
 	Deselect All	取消全选
-	Detach Proxies	分离代理文件
 	Display Mode	显示模式
 	Distribute	分布
 	Distribute Horizontally	水平分布
@@ -128,7 +124,6 @@
 	Find…	查找…
 	Fit	适配
 	Fit to frame	适配到帧
-	Flatten	拼合
 	Forest	森林绿
 	Frame Blending	帧混合
 	Frame Hold Options…	帧定格选项…
@@ -156,10 +151,8 @@
 	History	历史记录
 	Import From	导入来源
 	Import Image Sequence…	导入图像序列…
-	Import from Media Browser	从媒体浏览器导入
 	Import…	导入…
 	Info	信息
-	Ingest Settings…	摄取设置…
 	Insert	插入
 	Insert Frame Hold Segment	插入帧定格片段
 	Install Motion Graphics Template…	安装动态图形模板…
@@ -192,17 +185,13 @@
 	Mark Split	标记拆分点
 	Markers	标记
 	Match Frame	匹配帧
-	Media Browser	媒体浏览器
 	Media Cache…	媒体缓存…
 	Media…	媒体…
 	Medium	中
 	Memory…	内存…
-	Merge Clips…	合并剪辑…
 	Metadata	元数据
 	Modify	修改
 	Motion Graphics Template…	动态图形模板…
-	Multi-Camera	多机位
-	Multi-Camera View	多机位视图
 	Nest…	嵌套…
 	New	新建
 	New Layer	新建图层
@@ -231,12 +220,10 @@
 	Program	节目
 	Progress	进度
 	Project	项目
-	Project Manager…	项目管理器…
 	Project Settings	项目设置
 	Project…	项目…
 	Properties	属性
 	Purple	紫
-	Reconnect Full Resolution Media…	重新连接完整分辨率媒体…
 	Recover Unsaved Changes…	恢复未保存的更改…
 	Rectangle	矩形
 	Red	红
@@ -274,7 +261,6 @@
 	Save a Copy…	保存副本…
 	Save as Template…	另存为模板…
 	Scale to Frame Size	缩放为帧大小
-	Scene Edit Detection…	场景编辑检测…
 	Scratch Disks…	暂存盘…
 	Search Bin	搜索素材箱
 	Select	选择
@@ -304,7 +290,6 @@
 	Source	源
 	Source Settings…	源设置…
 	Speed/Duration…	速度/持续时间…
-	Synchronize…	同步…
 	System Compatibility Report…	系统兼容性报告…
 	Tan	棕褐
 	Teal	蓝绿
@@ -314,7 +299,6 @@
 	Timecode…	时间码…
 	Timeline	时间轴
 	Timeline…	时间轴…
-	Toggle Proxies	切换代理文件
 	Tools	工具
 	Top	顶部
 	Transparent Video…	透明视频…
@@ -604,15 +588,7 @@
 	(no clips)	（无剪辑）
 	Show Transport Controls	显示播放控制
 	Loop	循环
-	Multi-Camera Audio Follows Video	多机位音频跟随视频
-	Multi-Camera Record	多机位录制
-	Multi-Camera Selection Top Down	多机位自上而下选择
-	Show Multi-Camera Preview Monitor	显示多机位预览监视器
-	Auto-Adjust Multi-Camera Playback Quality	自动调整多机位播放质量
-	Transmit Multi-Camera View	传输多机位视图
-	Multi-Camera Layout	多机位布局
 	Automatic	自动
-	Edit Cameras…	编辑摄像机…
 	Add Marker (M)	添加标记（M）
 	Mark In (I)	标记入点（I）
 	Mark Out (O)	标记出点（O）
@@ -628,22 +604,15 @@
 	Extract (')	提取（'）
 	Export Frame: use Export mode (M6)	导出静帧：请使用导出模式（M6）
 	Button Editor	按钮编辑器
-	Multi-Camera Record on	多机位录制：开
-	Multi-Camera Record off	多机位录制：关
 	{first} - Merged	{first} - 已合并
-	{first} Multicam	{first} 多机位
 	In Points	入点
 	Out Points	出点
 	Clip Marker	剪辑标记
 	Audio	音频
-	Merge Clips	合并剪辑
-	Create Multi-Camera Source Sequence	创建多机位源序列
-	Synchronize Clips	同步剪辑
 	Clip Name:	剪辑名称：
 	Sequence Name:	序列名称：
 	{n} clip(s): {names}	{n} 个剪辑：{names}
 	{n} clip(s) selected; the clip on the reference track stays put.	已选择 {n} 个剪辑；参考轨道上的剪辑保持不动。
-	Synchronize Point	同步点
 	Ignore Hours	忽略小时
 	first marker	首个标记
 	Offset Audio by:	音频偏移量：
@@ -652,27 +621,13 @@
 	Reference track:	参考轨道：
 	lowest (V1…)	最低（V1…）
 	Remove Audio from AV Clip	从音视频剪辑中移除音频
-	Camera 1	摄像机 1
-	All Cameras	所有摄像机
 	Switch Audio	切换音频
-	Camera Names	摄像机名称
 	Clip Names	剪辑名称
-	Enumerate Cameras	枚举摄像机
-	Camera Angle Metadata	摄像机角度元数据
 	Move source clips to Processed Clips bin	将源剪辑移到“已处理剪辑”素材箱
-	Synchronized {n} clip group(s)	已同步 {n} 个剪辑组
-	Merged clip created	已创建合并剪辑
-	Multi-camera source sequence with {n} camera(s)	包含 {n} 个摄像机的多机位源序列
-	No multi-camera clip at the playhead	播放头处无多机位剪辑
-	Camera {n} — {name}	摄像机 {n} — {name}
 	Page {page} of {pages}	第 {page} 页，共 {pages} 页
 	Previous page	上一页
 	Next page	下一页
-	Multi-Camera Record On/Off (0)	多机位录制 开/关（0）
 	Record	录制
-	Edit Cameras	编辑摄像机
-	Cameras shown in the Multi-Camera view (uncheck to hide).	多机位视图中显示的摄像机（取消勾选可隐藏）。
-	Recorded {n} multi-camera cut(s)	已录制 {n} 个多机位切换
 	Clamp Signal	钳制信号
 	Presets	预设
 	Waveform ({kind})	波形（{kind}）
@@ -770,28 +725,20 @@
 	Make {n} selected clip(s) offline. Their clips show the offline slate until you link them again.	将 {n} 个所选剪辑设为脱机。在重新链接之前，这些剪辑将显示脱机画面。
 	Media files remain on disk	媒体文件保留在磁盘上
 	Media files are deleted	媒体文件将被删除
-	Create Proxies	创建代理文件
 	{n} clip(s) selected.	已选择 {n} 个剪辑。
 	Format and size	格式与大小
 	Destination	目标位置
-	Next to the original media, in a Proxies folder	位于原始媒体旁，存入 Proxies 文件夹
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	代理文件在后台生成，完成后自动附加。导出始终使用完整分辨率媒体。
-	Creating {n} proxy file(s)…	正在创建 {n} 个代理文件…
-	Project Manager	项目管理器
 	Sequences	序列
 	Resulting Project	结果项目
 	Collect Files and Copy to New Location	收集文件并复制到新位置
-	Consolidate and Transcode	整合与转码
 	Options	选项
 	Exclude Unused Clips	排除未使用的剪辑
 	Include Handles:	包含余量：
-	Include Proxies	包含代理文件
 	Include Preview Files	包含预览文件
 	Destination Path	目标路径
 	Disk space: original {original} · resulting {result} ({n} files)	磁盘空间：原始 {original} · 结果 {result}（{n} 个文件）
 	Disk space: —	磁盘空间：—
 	Calculate	计算
-	Project Manager: writing {path}	项目管理器：正在写入 {path}
 	Timeline: (no sequences)	时间轴：（无序列）
 	Browse	浏览
 	Select audio clips, then click a preset to apply it.	选择音频剪辑，然后点击预设以应用。
@@ -1062,8 +1009,6 @@
 	File Types Displayed	显示的文件类型
 	List View	列表视图
 	Thumbnail View	缩略图视图
-	Ingest	摄取
-	Open Ingest Settings	打开摄取设置
 	Import as Image Sequence	作为图像序列导入
 	{sel} of {total} items selected	已选择 {sel} / {total} 项
 	{total} items	{total} 项
@@ -1080,7 +1025,6 @@
 	Reveal in Finder	在资源管理器中显示
 	Edit Columns…	编辑列…
 	Hover Scrub	悬停擦洗
-	New Media Browser Panel	新建媒体浏览器面板
 	Create Folder For Imported Projects	为导入的项目创建文件夹
 	Allow Duplicate Media During Project Import	允许在项目导入期间出现重复媒体
 	Refresh	刷新
@@ -1141,7 +1085,6 @@
 	Open in Timeline	在时间轴中打开
 	New Sequence From Clip	从剪辑新建序列
 	Set Poster Frame	设置海报帧
-	Proxy	代理
 	Open in Place	就地打开
 	Open in New Tab	在新标签页打开
 	Open in New Window	在新窗口打开
@@ -1599,7 +1542,6 @@
 	Enable developer mode	启用开发者模式
 	Enable hardware accelerated decoding (requires restart)	启用硬件加速解码（需要重启）
 	Enable language auto-detection	启用语言自动检测
-	Enable proxies	启用代理
 	End Color	结束颜色
 	End Point	结束点
 	End of Ramp	渐变结束
@@ -2626,7 +2568,6 @@
 	Source Settings	源设置
 	Update Metadata	更新元数据
 	Automate To Sequence	自动匹配到序列
-	Scene Edit Detection	场景编辑检测
 	Analyze	分析
 	Normalize Mix Track	标准化混音轨道
 	Simplify Sequence	简化序列
@@ -2647,15 +2588,12 @@
 	Any	任意
 	Case Sensitive	区分大小写
 	Scratch Disks	暂存盘
-	Ingest Settings	收录设置
 	Captured and Generated:	采集与生成：
 	Video Previews:	视频预览：
 	Audio Previews:	音频预览：
 	Project Auto Save:	项目自动保存：
 	Same as Project	与项目相同
 	Path: {path}	路径：{path}
-	Transcode	转码
-	Copy and Create Proxies	复制并创建代理
 	Action:	操作：
 	Destination:	目标：
 	Next to the media	位于媒体旁
@@ -2725,7 +2663,6 @@
 	Export formats	导出格式
 	Match {n} of {total}	匹配 {total} 中的 {n}
 	Saved template {path}	已保存模板 {path}
-	Scene Edit Detection: analysing in the background (see Progress)	场景编辑检测：正在后台分析（参见进度）
 	Delete Search Bin	删除搜索素材箱
 	 (removed from {list})	（已从 {list} 移除）
 	{key} can't be used as a shortcut	{key} 不能用作快捷键
@@ -2926,15 +2863,6 @@
 	Close Bin	关闭素材箱
 	Close Sequence	关闭序列
 	Contains	包含
-	Cut to Camera 1	切换到摄像机 1
-	Cut to Camera 2	切换到摄像机 2
-	Cut to Camera 3	切换到摄像机 3
-	Cut to Camera 4	切换到摄像机 4
-	Cut to Camera 5	切换到摄像机 5
-	Cut to Camera 6	切换到摄像机 6
-	Cut to Camera 7	切换到摄像机 7
-	Cut to Camera 8	切换到摄像机 8
-	Cut to Camera 9	切换到摄像机 9
 	D1/DV NTSC (0.9091)	D1/DV NTSC（0.9091）
 	D1/DV PAL (1.0940)	D1/DV PAL（1.0940）
 	DVCPRO HD (1.5)	DVCPRO HD（1.5）
@@ -3025,7 +2953,6 @@
 	Matches	匹配项
 	Maximize or Restore Active Frame	最大化或还原活动帧
 	Maximize or Restore Frame Under Cursor	最大化或还原光标下的帧
-	Media Browser Settings	媒体浏览器设置
 	MediaBrowser	MediaBrowser
 	MediaCache	MediaCache
 	Mixer	混音器
@@ -3042,8 +2969,6 @@
 	Move Selection Page Up	将选区上翻一页
 	Move Selection Right	将选区右移
 	Move Selection Up	将选区上移
-	Multi-Camera Record On/Off Toggle	多机位录制开/关切换
-	Multicam	多机位
 	Navigate to End of Segment	导航至片段末尾
 	Navigate to Next Line	导航至下一行
 	Navigate to Next Word	导航至下一个词
@@ -3051,7 +2976,6 @@
 	Navigate to Previous Word	导航至上一个词
 	Navigate to Start of Segment	导航至片段开头
 	Navigation	导航
-	Next Multi-Camera Page	下一个多机位页面
 	Nudge Clip Selection Down	将剪辑选区下移一点
 	Nudge Clip Selection Left Five Frames	将剪辑选区左移五帧
 	Nudge Clip Selection Left One Frame	将剪辑选区左移一帧
@@ -3099,7 +3023,6 @@
 	Play In to Out with Preroll/Postroll	带预卷/后卷从入点到出点播放
 	Play from Playhead to Out Point	从播放头播放到出点
 	Play/Stop	播放/停止
-	Previous Multi-Camera Page	上一个多机位页面
 	Progressive	逐行扫描
 	ProjectPanel	ProjectPanel
 	QuickTime (Motion JPEG)	QuickTime（Motion JPEG）
@@ -3125,15 +3048,6 @@
 	Ripple Trim Next Edit to Playhead	波纹修剪：将下一个编辑点修剪至播放头
 	Ripple Trim Previous Edit to Playhead	波纹修剪：将上一个编辑点修剪至播放头
 	Rolling Edit Tool	滚动编辑工具
-	Select Camera 1	选择摄像机 1
-	Select Camera 2	选择摄像机 2
-	Select Camera 3	选择摄像机 3
-	Select Camera 4	选择摄像机 4
-	Select Camera 5	选择摄像机 5
-	Select Camera 6	选择摄像机 6
-	Select Camera 7	选择摄像机 7
-	Select Camera 8	选择摄像机 8
-	Select Camera 9	选择摄像机 9
 	Select Clip at Playhead	选择播放头处的剪辑
 	Select Find Box	选择查找框
 	Select Next Clip	选择下一个剪辑
@@ -3177,7 +3091,6 @@
 	Step Forward Five Frames	前进五帧
 	Step Forward One Frame	前进一帧
 	Stop Export Queue	停止导出队列
-	Stop Multi-Camera Recording	停止多机位录制
 	Stop Voice-over Recording	停止画外音录制
 	Sync Voice-over Capture	同步画外音采集
 	TIFF	TIFF

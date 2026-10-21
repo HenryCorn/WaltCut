@@ -1,5 +1,5 @@
 //! Menu long tail (M3.11): the dialogs of Find, Create Search Bin, Project Settings (General /
-//! Scratch Disks / Ingest Settings), Get Media File Properties, Edit Offline, Source Settings,
+//! Scratch Disks), Get Media File Properties, Edit Offline, Source Settings,
 //! Update Metadata, Automate to Sequence, Scene Edit Detection, Normalize Mix Track, Simplify
 //! Sequence, Transcribe Sequence, Save as Template, Add Flash Cue Marker and the System
 //! Compatibility Report; plus the frontend side of Edit Original / Reveal Log Files (the OS
@@ -13,7 +13,7 @@
 //!
 //! Automation ids (`<p>` = the dialog prefix, `<key>` = a parameter): `<p>.ok`, `<p>.cancel` and
 //! `<p>.<key>` for each control; radio buttons `<p>.<key>.<value>`; Find rows
-//! `find.row.<n>.column|operator|text`; Project Settings tabs `projectSettings.tab.<general|scratchDisks|ingest>`,
+//! `find.row.<n>.column|operator|text`; Project Settings tabs `projectSettings.tab.<general|scratchDisks>`,
 //! scratch rows `projectSettings.scratch.<key>` / `.browse` / `.same`.
 
 use crate::widgets::CenteredDialog as _;
@@ -62,7 +62,6 @@ fn meta(command: &str) -> Option<(&'static str, &'static str, &'static str)> {
         "clip.sourceSettings" => (tl!("Source Settings"), "sourceSettings", tl!("OK")),
         "clip.updateMetadata" => (tl!("Update Metadata"), "updateMetadata", tl!("OK")),
         "clip.automateToSequence" => (tl!("Automate To Sequence"), "automate", tl!("OK")),
-        "clip.sceneEditDetection" => (tl!("Scene Edit Detection"), "sceneDetect", tl!("Analyze")),
         "sequence.normalizeMixTrack" => (tl!("Normalize Mix Track"), "normalizeMix", tl!("OK")),
         "sequence.simplify" => (tl!("Simplify Sequence"), "simplify", tl!("Simplify")),
         "file.saveAsTemplate" => (tl!("Save as Template"), "saveTemplate", tl!("Save")),
@@ -77,7 +76,7 @@ fn meta(command: &str) -> Option<(&'static str, &'static str, &'static str)> {
 /// Commands whose menu item opens a dialog (the Project Settings items share one).
 fn dialog_command(id: &str) -> Option<&'static str> {
     Some(match id {
-        "file.projectSettings.general" | "file.projectSettings.scratchDisks" | "project.ingestSettings" => "project.settings",
+        "file.projectSettings.general" | "file.projectSettings.scratchDisks" => "project.settings",
         "edit.find" => "edit.find",
         "file.newSearchBin" => "file.newSearchBin",
         "file.mediaProperties" => "file.mediaProperties",
@@ -85,7 +84,6 @@ fn dialog_command(id: &str) -> Option<&'static str> {
         "clip.sourceSettings" => "clip.sourceSettings",
         "clip.updateMetadata" => "clip.updateMetadata",
         "clip.automateToSequence" => "clip.automateToSequence",
-        "clip.sceneEditDetection" => "clip.sceneEditDetection",
         "sequence.normalizeMixTrack" => "sequence.normalizeMixTrack",
         "sequence.simplify" => "sequence.simplify",
         "file.saveAsTemplate" => "file.saveAsTemplate",
@@ -280,13 +278,11 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
         "project.settings" => {
             let tab = match id {
                 "file.projectSettings.scratchDisks" => "scratchDisks",
-                "project.ingestSettings" => "ingest",
                 _ => "general",
             };
             let st = s.project.settings.clone();
             let general = s.execute("file.projectSettings.general", json!({})).map_err(|e| e.to_string())?;
             let scratch = waltcut_engine::project_tools::scratch_paths(s);
-            let ingest = serde_json::to_value(&st.ingest).unwrap_or_default();
             let sc = &st.scratch;
             (
                 json!({
@@ -294,9 +290,8 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
                     "renderer": general["renderer"], "videoDisplay": general["videoDisplay"], "audioDisplay": general["audioDisplay"],
                     "captureFormat": general["captureFormat"], "titleSafe": general["titleSafe"], "actionSafe": general["actionSafe"],
                     "captured": sc.captured, "videoPreviews": sc.video_previews, "audioPreviews": sc.audio_previews, "autoSave": sc.auto_save,
-                    "ingest": ingest.clone(),
                 }),
-                json!({"scratch": scratch, "ingest": ingest, "project": s.project.name}),
+                json!({"scratch": scratch, "project": s.project.name}),
             )
         }
         "file.mediaProperties" => {
@@ -324,7 +319,6 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
             json!({"ordering": "sort", "placement": "sequentially", "method": "insert", "overlapFrames": 30, "stillFrames": 150, "videoTransition": true, "audioTransition": true, "ignoreAudio": false, "ignoreVideo": false}),
             json!({"sequence": s.active_sequence().map(|_| s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| i.name.clone()).unwrap_or_default())}),
         ),
-        "clip.sceneEditDetection" => (json!({"applyCuts": true, "createSubclips": false, "generateMarkers": false, "sensitivity": 50.0}), Value::Null),
         "sequence.normalizeMixTrack" => (json!({"db": 0.0}), Value::Null),
         "sequence.simplify" => {
             let name = s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| tlf!("{name} (Simplified)", name = i.name)).unwrap_or_default();
@@ -518,7 +512,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             "project.settings" => {
                 ui.label(tlf!("Project: {name}", name = d.info["project"].as_str().unwrap_or_default()));
                 ui.horizontal(|ui| {
-                    for (k, l) in [("general", tl!("General")), ("scratchDisks", tl!("Scratch Disks")), ("ingest", tl!("Ingest Settings"))] {
+                    for (k, l) in [("general", tl!("General")), ("scratchDisks", tl!("Scratch Disks"))] {
                         let r = ui.selectable_label(p["tab"].as_str() == Some(k), l);
                         push(&mut elems, format!("projectSettings.tab.{k}"), &r, l);
                         if r.clicked() {
@@ -557,30 +551,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                             let path = d.info["scratch"][k]["path"].as_str().unwrap_or_default();
                             ui.label(RichText::new(tlf!("Path: {path}", path)).weak().small());
                         }
-                    }
-                    "ingest" => {
-                        let mut ing = p["ingest"].clone();
-                        let mut on = ing["enabled"].as_bool().unwrap_or(false);
-                        let r = ui.checkbox(&mut on, tl!("Ingest"));
-                        push(&mut elems, "projectSettings.ingest.enabled", &r, "Ingest");
-                        ing["enabled"] = json!(on);
-                        let actions = vec![
-                            ("copy".to_string(), tl!("Copy").to_string()),
-                            ("transcode".to_string(), tl!("Transcode").to_string()),
-                            ("createProxies".to_string(), tl!("Create Proxies").to_string()),
-                            ("copyAndCreateProxies".to_string(), tl!("Copy and Create Proxies").to_string()),
-                        ];
-                        combo(ui, &mut elems, "projectSettings.ingest.action", tl!("Action:"), &mut ing["action"], &actions);
-                        ui.horizontal(|ui| {
-                            ui.label(tl!("Destination:"));
-                            let mut v = ing["destination"].as_str().unwrap_or_default().to_string();
-                            let r = ui.add(egui::TextEdit::singleline(&mut v).hint_text(tl!("Next to the media")).desired_width(220.0));
-                            push(&mut elems, "projectSettings.ingest.destination", &r, "Destination");
-                            if r.changed() {
-                                ing["destination"] = if v.is_empty() { Value::Null } else { json!(v) };
-                            }
-                        });
-                        p["ingest"] = ing;
                     }
                     _ => {
                         ui.label(RichText::new(tl!("Video Rendering and Playback")).strong());
@@ -701,18 +671,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 ui.label(RichText::new(tl!("Ignore Options")).strong());
                 check(ui, &mut elems, pre, p, "ignoreAudio", tl!("Ignore Audio"));
                 check(ui, &mut elems, pre, p, "ignoreVideo", tl!("Ignore Video"));
-            }
-            "clip.sceneEditDetection" => {
-                check(ui, &mut elems, pre, p, "applyCuts", tl!("Apply a cut at each detected cut point"));
-                check(ui, &mut elems, pre, p, "createSubclips", tl!("Create a bin of subclips from each detected cut point"));
-                check(ui, &mut elems, pre, p, "generateMarkers", tl!("Create a clip marker at each detected cut point"));
-                ui.horizontal(|ui| {
-                    ui.label(tl!("Sensitivity:"));
-                    let mut v = p["sensitivity"].as_f64().unwrap_or(50.0);
-                    let r = ui.add(egui::Slider::new(&mut v, 0.0..=100.0));
-                    push(&mut elems, "sceneDetect.sensitivity", &r, "Sensitivity");
-                    p["sensitivity"] = json!(v);
-                });
             }
             "sequence.normalizeMixTrack" => number(ui, &mut elems, pre, p, "db", tl!("Normalize Mix Track to:"), -96.0..=24.0, " dB"),
             "sequence.simplify" => {
@@ -861,19 +819,11 @@ fn run(app: &mut FilmcraftApp, d: &ClipDialogDraft) -> Result<Option<String>, St
                 json!({"captured": p["captured"], "videoPreviews": p["videoPreviews"], "audioPreviews": p["audioPreviews"], "autoSave": p["autoSave"]}),
             )
             .map_err(|e| e.to_string())?;
-            if p["ingest"] != d.info["ingest"] {
-                s.execute("project.ingestSettings", p["ingest"].clone()).map_err(|e| e.to_string())?;
-            }
             Ok(None)
         }
         "file.saveAsTemplate" => {
             let r = s.execute("file.saveAsTemplate", p.clone()).map_err(|e| e.to_string())?;
             app.ui.status = tlf!("Saved template {path}", path = r["path"].as_str().unwrap_or_default());
-            Ok(None)
-        }
-        "clip.sceneEditDetection" => {
-            s.execute(&d.command, p.clone()).map_err(|e| e.to_string())?;
-            app.ui.status = tl!("Scene Edit Detection: analysing in the background (see Progress)").into();
             Ok(None)
         }
         cmd => {

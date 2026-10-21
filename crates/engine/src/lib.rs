@@ -26,30 +26,24 @@ pub mod keyboard;
 mod keyframe_move;
 mod marker_export;
 pub mod masks;
-pub mod media_browser;
 pub mod media_pool;
 pub mod media_watch;
 pub mod mixer;
-pub mod multicam;
 pub mod panels;
 pub mod paste_media;
 pub mod perf;
 pub mod presets;
 pub mod previews;
-pub mod project_manager;
 pub mod project_panel;
 pub mod project_tools;
-pub mod proxies;
 pub mod relink;
 pub mod remix;
-pub mod scene_detect;
 pub mod sequence_extras;
 pub mod sequence_tools;
 pub mod settings;
 pub mod shortcut_presets;
 pub mod shortcuts;
 pub mod source_monitor;
-pub mod sync;
 pub mod trim;
 pub mod voiceover;
 
@@ -130,19 +124,13 @@ pub trait Services: Send + Sync {
     fn export_in_memory(&self) -> bool {
         false
     }
-    /// Entries of a directory with their kind, size and date (the Media Browser). The default
-    /// derives them from [`Services::list_dir`] (every name a file).
-    fn list_entries(&self, dir: &str) -> Option<std::io::Result<Vec<media_browser::DirEntry>>> {
-        self.list_dir(dir).map(|r| r.map(|names| names.into_iter().map(|name| media_browser::DirEntry { name, ..Default::default() }).collect()))
-    }
-    /// Drives and network locations (Media Browser ▸ Local Drives / Network).
-    fn volumes(&self) -> Vec<media_browser::Volume> {
-        Vec::new()
-    }
-    /// The user's home directory (where the Media Browser starts).
-    fn home_dir(&self) -> Option<String> {
-        None
-    }
+}
+
+/// The desktop user's home directory. Windows prefers `USERPROFILE`: shells like Git Bash set
+/// `HOME` to a Unix-style path (`/c/Users/…`) that native file APIs cannot open.
+pub fn std_home_dir() -> Option<String> {
+    let vars = if cfg!(windows) { ["USERPROFILE", "HOME"] } else { ["HOME", "USERPROFILE"] };
+    vars.iter().find_map(|v| std::env::var(v).ok().filter(|h| !h.is_empty()))
 }
 
 /// Native filesystem services.
@@ -170,15 +158,6 @@ impl Services for FsServices {
     #[cfg(any(unix, windows))]
     fn reader(&self, path: &str) -> Option<std::io::Result<waltcut_media::SharedReader>> {
         Some(waltcut_media::reader::FileReader::open(std::path::Path::new(path)).map(|r| std::sync::Arc::new(r) as waltcut_media::SharedReader))
-    }
-    fn list_entries(&self, dir: &str) -> Option<std::io::Result<Vec<media_browser::DirEntry>>> {
-        Some(media_browser::std_list_entries(dir))
-    }
-    fn volumes(&self) -> Vec<media_browser::Volume> {
-        media_browser::std_volumes()
-    }
-    fn home_dir(&self) -> Option<String> {
-        media_browser::std_home_dir()
     }
     fn read_range(&self, path: &str, offset: u64, len: usize) -> std::io::Result<Vec<u8>> {
         use std::io::{Read, Seek, SeekFrom};
@@ -318,14 +297,6 @@ pub struct EditorState {
     /// selecting an effect clears the mask selection.
     #[serde(default)]
     pub selected_effect: Option<EffectSel>,
-    /// Multi-Camera Audio Follows Video: switching a multi-camera clip's angle switches its linked
-    /// audio clips too.
-    #[serde(default)]
-    pub multicam_audio_follows_video: bool,
-    /// Multi-Camera view settings: grid layout and page, selection order, preview monitor,
-    /// playback quality, transmit.
-    #[serde(default)]
-    pub multicam_view: multicam::MulticamView,
     /// Audio Clip Mixer automation mode per audio track (track id → mode; missing = Read):
     /// Latch / Touch / Write record the clip Volume and Panner moves as clip keyframes.
     #[serde(default)]
@@ -396,8 +367,6 @@ pub struct Session {
     pub previews: Arc<previews::PreviewStore>,
     /// Audio Track Mixer automation pass in progress.
     pub mixrec: mixer::Recorder,
-    /// Multi-camera live switching pass in progress.
-    pub mcrec: multicam::Recorder,
     /// Voice-over recording: the input device and the take in progress.
     pub voiceover: voiceover::VoiceOver,
     /// Dynamic (J/K/L) trimming and trim-mode loop playback in progress.
@@ -406,16 +375,12 @@ pub struct Session {
     pub shortcuts: shortcuts::Shortcuts,
     /// Missing / offline media found by the last scan (Link Media dialog).
     pub offline: relink::OfflineState,
-    /// Proxy / ingest / project-manager jobs whose results still have to be applied to the project.
-    pub media_jobs: Vec<proxies::PendingJob>,
     /// AI re-style jobs whose frames still have to be placed ([`ai::poll`]).
     pub ai_jobs: Vec<ai::PendingRestyle>,
     /// Tests and embedders: use this backend instead of the configured provider.
     pub restyler_override: Option<Arc<dyn waltcut_genai::Restyler>>,
     /// Mask tracking jobs whose keyframes are still being written.
     pub mask_jobs: Vec<masks::PendingTrack>,
-    /// Scene Edit Detection jobs whose results are applied when they finish.
-    pub scene_jobs: Vec<scene_detect::PendingScene>,
     /// Effect presets (built-in + the user's, persisted in the data directory).
     pub presets: presets::PresetLibrary,
     /// Export presets (built-in + the user's, persisted in the data directory) and favourites.
@@ -426,8 +391,6 @@ pub struct Session {
     pub stepped: Vec<SteppedJob>,
     /// The Events panel log: failed commands, job results, auto-save errors, messages.
     pub log: panels::EventLog,
-    /// Media Browser navigation (directory, back / forward history, selected files).
-    pub browser: media_browser::BrowserState,
     /// Nesting depth of [`Session::execute`] (commands that run other commands).
     exec_depth: u32,
     /// Each media file's size and modification time when last seen (Settings ▸ Media ▸
@@ -506,22 +469,18 @@ impl Session {
             persistence: None,
             previews: Arc::new(previews::PreviewStore::temp()),
             mixrec: Default::default(),
-            mcrec: Default::default(),
             voiceover: Default::default(),
             trim_play: Default::default(),
             shortcuts: shortcuts::Shortcuts::new(),
             offline: Default::default(),
-            media_jobs: Vec::new(),
             ai_jobs: Vec::new(),
             restyler_override: None,
             mask_jobs: Vec::new(),
-            scene_jobs: Vec::new(),
             presets: Default::default(),
             export_presets: Default::default(),
             export_queue: Default::default(),
             stepped: Vec::new(),
             log: Default::default(),
-            browser: Default::default(),
             exec_depth: 0,
             media_stamps: Default::default(),
             media_scan: None,
@@ -563,7 +522,6 @@ impl Session {
         let prefs_path = cfg.data_dir.join("preferences.json");
         self.prefs = autosave::Preferences::load(&prefs_path);
         self.prefs.apply_hardware_decoding();
-        self.media.set_use_proxies(self.prefs.media.enable_proxies);
         self.shortcuts.set_dir(&cfg.data_dir);
         self.presets.set_dir(&cfg.data_dir);
         self.export_presets.set_dir(&cfg.data_dir);
@@ -604,13 +562,10 @@ impl Session {
         p.last_sent = Some(cur);
     }
 
-    /// Apply worker notifications (call regularly, e.g. once per UI frame). Also applies the
-    /// results of finished proxy / ingest jobs.
+    /// Apply worker notifications (call regularly, e.g. once per UI frame).
     pub fn poll_persistence(&mut self) {
-        proxies::poll(self);
         ai::poll(self);
         masks::poll(self);
-        scene_detect::poll(self);
         export_tools::pump_queue(self, false);
         panels::log_jobs(self);
         let Some(p) = self.persistence.as_mut() else { return };
@@ -639,10 +594,6 @@ impl Session {
         if cache_changed {
             self.apply_media_cache();
         }
-        if self.media.use_proxies() != self.prefs.media.enable_proxies {
-            self.media.set_use_proxies(self.prefs.media.enable_proxies);
-            self.bump_view();
-        }
         if let Some(w) = &self.persistence {
             w.set_prefs(self.prefs.auto_save.clone());
         }
@@ -661,7 +612,7 @@ impl Session {
         }
     }
 
-    /// A change of what the project *looks like* that isn't an edit (proxies toggled): bumps the
+    /// A change of what the project *looks like* that isn't an edit: bumps the
     /// revision so frame caches refresh, without marking a clean project as modified.
     pub fn bump_view(&mut self) {
         let clean = !self.is_dirty();
@@ -1235,7 +1186,6 @@ mod locked_clip_edits_tests;
 #[cfg(test)]
 mod masks_tests;
 #[cfg(test)]
-mod media_browser_tests;
 #[cfg(test)]
 mod media_test_util;
 #[cfg(test)]
@@ -1243,7 +1193,6 @@ mod media_watch_tests;
 #[cfg(test)]
 mod mixer_tests;
 #[cfg(test)]
-mod multicam_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod nest_editing_tests;
@@ -1264,11 +1213,9 @@ mod presets_tests;
 #[cfg(test)]
 mod previews_tests;
 #[cfg(test)]
-mod project_manager_tests;
 #[cfg(test)]
 mod project_panel_tests;
 #[cfg(test)]
-mod proxies_tests;
 #[cfg(test)]
 mod relink_tests;
 #[cfg(test)]

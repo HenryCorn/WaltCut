@@ -1,7 +1,6 @@
-//! Media management dialogs: Link Media (offline media / relink), Make Offline, Create Proxies and
-//! Project Manager. Their state lives in `UiState` (serde), so agents can open and fill them with
-//! `ui.set` as well as by clicking; the actions run engine commands (`media.*`,
-//! `file.projectManager`).
+//! Media management dialogs: Link Media (offline media / relink) and Make Offline. Their state lives
+//! in `UiState` (serde), so agents can open and fill them with `ui.set` as well as by clicking; the
+//! actions run engine commands (`media.*`).
 //!
 //! Automation ids:
 //! - Link Media: `linkMedia.row.<n>`, `linkMedia.match.<fileName|extension|clipId|duration|mediaStart|metadata>`,
@@ -9,26 +8,18 @@
 //!   `linkMedia.exactName`, `linkMedia.search`, `linkMedia.candidate.<n>`, `linkMedia.preview`,
 //!   `linkMedia.link`, `linkMedia.locate`, `linkMedia.offline`, `linkMedia.offlineAll`, `linkMedia.cancel`.
 //! - Make Offline: `makeOffline.keep`, `makeOffline.delete`, `makeOffline.ok`, `makeOffline.cancel`.
-//! - Create Proxies: `proxies.preset.<id>`, `proxies.destination`, `proxies.browse`, `proxies.ok`, `proxies.cancel`.
-//! - Project Manager: `pm.seq.<id>`, `pm.mode.<collect|consolidate>`, `pm.preset.<id>`, `pm.excludeUnused`,
-//!   `pm.handles`, `pm.includeProxies`, `pm.includePreviews`, `pm.destination`, `pm.browse`,
-//!   `pm.calculate`, `pm.sizes`, `pm.ok`, `pm.cancel`.
 
 use egui::{Color32, RichText};
 use serde_json::{Value, json};
 
 use crate::native_dialogs::FileDialog;
-use crate::state::{LinkMediaDraft, ProjectManagerDraft, ProxyDraft};
+use crate::state::LinkMediaDraft;
 use crate::{FilmcraftApp, RelinkHint};
 
 type Elems = Vec<(String, egui::Rect, String)>;
 
 fn push(elems: &mut Elems, id: impl Into<String>, r: &egui::Response, label: impl Into<String>) {
     elems.push((id.into(), r.rect, label.into()));
-}
-
-fn mb(b: u64) -> String {
-    if b >= 1 << 30 { format!("{:.2} GB", b as f64 / (1u64 << 30) as f64) } else { format!("{:.1} MB", b as f64 / (1u64 << 20) as f64) }
 }
 
 /// Draw whichever media dialogs are open; open Link Media when a project needs it.
@@ -41,12 +32,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     }
     if app.ui.make_offline.is_some() {
         make_offline(app, ctx);
-    }
-    if app.ui.create_proxies.is_some() {
-        create_proxies(app, ctx);
-    }
-    if app.ui.project_manager.is_some() {
-        project_manager(app, ctx);
     }
 }
 
@@ -72,34 +57,6 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
         "media.makeOffline" => Some(enabled(app, id).map(|_| {
             app.ui.make_offline = Some(false);
             json!({"dialog": "makeOffline"})
-        })),
-        "media.createProxies" => Some(enabled(app, id).map(|_| {
-            let items = app.session.state.project_selection.iter().map(|i| i.0).collect();
-            app.ui.create_proxies = Some(ProxyDraft { items, preset: waltcut_engine::proxies::DEFAULT_PROXY_PRESET.into(), destination: String::new() });
-            json!({"dialog": "createProxies"})
-        })),
-        "media.attachProxies" | "media.reconnectFullRes" => {
-            let item = app.session.state.project_selection.first().copied();
-            let Some(item) = item else { return Some(Err("select a clip in the Project panel".into())) };
-            let exts: Vec<&str> = waltcut_media::VIDEO_EXTENSIONS.to_vec();
-            let hint = RelinkHint { command: id.to_string(), params: json!({"item": item.0}) };
-            let id = id.to_string();
-            Some(app.pick(FileDialog::Relink { exts: exts.iter().map(|e| e.to_string()).collect(), hint }, move |app, paths| {
-                let Some(picked) = paths.into_iter().next() else { return Ok(Value::Null) };
-                app.session.execute(&id, json!({"item": item.0, "path": picked})).map_err(|e| e.to_string())
-            }))
-        }
-        "file.projectManager" => Some(enabled(app, id).map(|_| {
-            let seqs = app.session.state.active_sequence.map(|s| vec![s.0]).unwrap_or_default();
-            let dest = app
-                .session
-                .path
-                .as_deref()
-                .and_then(|p| std::path::Path::new(p).parent())
-                .map(|d| d.join(tlf!("{name} (copy)", name = app.session.project.name)).to_string_lossy().into_owned())
-                .unwrap_or_default();
-            app.ui.project_manager = Some(ProjectManagerDraft { sequences: seqs, destination: dest, ..Default::default() });
-            json!({"dialog": "projectManager"})
         })),
         _ => None,
     }
@@ -407,226 +364,6 @@ fn make_offline(app: &mut FilmcraftApp, ctx: &egui::Context) {
         keep = false;
     }
     app.ui.make_offline = (keep && !crate::widgets::escape_closes(ctx)).then_some(delete);
-}
-
-fn create_proxies(app: &mut FilmcraftApp, ctx: &egui::Context) {
-    let Some(mut d) = app.ui.create_proxies.clone() else { return };
-    let mut elems: Elems = Vec::new();
-    let mut keep = true;
-    let mut ok = false;
-    let mut browse = false;
-    egui::Window::new(tl!("Create Proxies"))
-        .id(egui::Id::new("Create Proxies"))
-        .collapsible(false)
-        .resizable(false)
-        .pivot(egui::Align2::CENTER_CENTER)
-        .default_pos(crate::widgets::dialog_center(ctx))
-        .show(ctx, |ui| {
-            ui.label(tlf!("{n} clip(s) selected.", n = d.items.len()));
-            ui.add_space(4.0);
-            ui.label(RichText::new(tl!("Format and size")).strong());
-            for p in waltcut_engine::proxies::PRESETS.iter().filter(|p| p.proxy) {
-                let r = ui.radio(d.preset == p.id, p.label);
-                push(&mut elems, format!("proxies.preset.{}", p.id), &r, p.label);
-                if r.clicked() {
-                    d.preset = p.id.into();
-                }
-            }
-            ui.add_space(4.0);
-            ui.label(RichText::new(tl!("Destination")).strong());
-            ui.horizontal(|ui| {
-                let r = ui
-                    .add(egui::TextEdit::singleline(&mut d.destination).desired_width(320.0).hint_text(tl!("Next to the original media, in a Proxies folder")));
-                push(&mut elems, "proxies.destination", &r, "destination");
-                let r = ui.button(tl!("Browse…"));
-                push(&mut elems, "proxies.browse", &r, "Browse…");
-                browse = r.clicked();
-            });
-            ui.label(RichText::new(tl!("Proxies are made in the background and attached when done. Export always uses full-resolution media.")).weak());
-            ui.horizontal(|ui| {
-                let r = ui.button(tl!("Cancel"));
-                push(&mut elems, "proxies.cancel", &r, "Cancel");
-                keep &= !r.clicked();
-                let r = ui.add(egui::Button::new(RichText::new(tl!("OK")).color(Color32::WHITE)).fill(app.tokens.accent));
-                push(&mut elems, "proxies.ok", &r, "OK");
-                ok = r.clicked();
-            });
-        });
-    for (id, r, l) in elems {
-        app.auto.add(&id, r, &l);
-    }
-    if browse {
-        app.pick_ui(FileDialog::Folder { at: None }, |app, paths| {
-            if let (Some(f), Some(d)) = (paths.into_iter().next(), app.ui.create_proxies.as_mut()) {
-                d.destination = f;
-            }
-        });
-    }
-    if ok {
-        let p = json!({"items": d.items, "preset": d.preset, "destination": if d.destination.is_empty() { Value::Null } else { json!(d.destination) }});
-        match app.session.execute("media.createProxies", p) {
-            Ok(v) => app.ui.status = tlf!("Creating {n} proxy file(s)…", n = v["outputs"].as_array().map_or(0, Vec::len)),
-            Err(e) => app.ui.status = e.to_string(),
-        }
-        keep = false;
-    }
-    app.ui.create_proxies = (keep && !crate::widgets::escape_closes(ctx)).then_some(d);
-}
-
-fn pm_params(d: &ProjectManagerDraft, dry: bool) -> Value {
-    json!({
-        "destination": d.destination,
-        "mode": d.mode,
-        "sequences": d.sequences,
-        "excludeUnused": d.exclude_unused,
-        "handles": d.handles,
-        "preset": d.preset,
-        "includeProxies": d.include_proxies,
-        "includePreviews": d.include_previews,
-        "dryRun": dry,
-    })
-}
-
-fn project_manager(app: &mut FilmcraftApp, ctx: &egui::Context) {
-    let Some(mut d) = app.ui.project_manager.clone() else { return };
-    crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("project-manager-before-drag"), &mut d);
-    let before = d.clone();
-    let mut elems: Elems = Vec::new();
-    let mut keep = true;
-    let (mut ok, mut calc, mut browse) = (false, false, false);
-    let seqs: Vec<(u64, String)> = app.session.project.sequences().map(|i| (i.id.0, i.name.clone())).collect();
-    egui::Window::new(tl!("Project Manager"))
-        .id(egui::Id::new("Project Manager"))
-        .collapsible(false)
-        .resizable(false)
-        .pivot(egui::Align2::CENTER_CENTER)
-        .default_pos(crate::widgets::dialog_center(ctx))
-        .show(ctx, |ui| {
-            ui.label(RichText::new(tl!("Sequences")).strong());
-            for (id, name) in &seqs {
-                let mut on = d.sequences.contains(id);
-                let r = ui.checkbox(&mut on, name);
-                push(&mut elems, format!("pm.seq.{id}"), &r, name.clone());
-                if r.changed() {
-                    if on {
-                        d.sequences.push(*id);
-                    } else {
-                        d.sequences.retain(|s| s != id);
-                    }
-                }
-            }
-            ui.separator();
-            ui.label(RichText::new(tl!("Resulting Project")).strong());
-            for (id, label) in [("collect", tl!("Collect Files and Copy to New Location")), ("consolidate", tl!("Consolidate and Transcode"))] {
-                let r = ui.radio(d.mode == id, label);
-                push(&mut elems, format!("pm.mode.{id}"), &r, label);
-                if r.clicked() {
-                    d.mode = id.into();
-                }
-            }
-            if d.mode == "consolidate" {
-                ui.indent("pm-presets", |ui| {
-                    for p in waltcut_engine::proxies::PRESETS.iter().filter(|p| !p.proxy) {
-                        let r = ui.radio(d.preset == p.id, p.label);
-                        push(&mut elems, format!("pm.preset.{}", p.id), &r, p.label);
-                        if r.clicked() {
-                            d.preset = p.id.into();
-                        }
-                    }
-                });
-            }
-            ui.separator();
-            ui.label(RichText::new(tl!("Options")).strong());
-            let r = ui.checkbox(&mut d.exclude_unused, tl!("Exclude Unused Clips"));
-            push(&mut elems, "pm.excludeUnused", &r, "Exclude Unused Clips");
-            ui.horizontal(|ui| {
-                ui.add_enabled_ui(d.mode == "consolidate", |ui| {
-                    ui.label(tl!("Include Handles:"));
-                    let r = ui.add(crate::widgets::number_drag(&mut d.handles).range(0..=600).suffix(tl!(" frames")));
-                    push(&mut elems, "pm.handles", &r, format!("{} frames", d.handles));
-                });
-            });
-            ui.add_enabled_ui(d.mode == "collect", |ui| {
-                let r = ui.checkbox(&mut d.include_proxies, tl!("Include Proxies"));
-                push(&mut elems, "pm.includeProxies", &r, "Include Proxies");
-            });
-            let r = ui.checkbox(&mut d.include_previews, tl!("Include Preview Files"));
-            push(&mut elems, "pm.includePreviews", &r, "Include Preview Files");
-            ui.separator();
-            ui.label(RichText::new(tl!("Destination Path")).strong());
-            ui.horizontal(|ui| {
-                let r = ui.add(egui::TextEdit::singleline(&mut d.destination).desired_width(360.0));
-                push(&mut elems, "pm.destination", &r, "destination");
-                let r = ui.button(tl!("Browse…"));
-                push(&mut elems, "pm.browse", &r, "Browse…");
-                browse = r.clicked();
-            });
-            ui.horizontal(|ui| {
-                let text = match d.estimate {
-                    Some((a, b, n)) => tlf!("Disk space: original {original} · resulting {result} ({n} files)", original = mb(a), result = mb(b), n),
-                    None => tl!("Disk space: —").into(),
-                };
-                let r = ui.label(&text);
-                push(&mut elems, "pm.sizes", &r, text);
-                let r = ui.button(tl!("Calculate"));
-                push(&mut elems, "pm.calculate", &r, "Calculate");
-                calc = r.clicked();
-            });
-            if !d.message.is_empty() {
-                ui.colored_label(Color32::from_rgb(0xe0, 0x8a, 0x6a), &d.message);
-            }
-            ui.horizontal(|ui| {
-                let r = ui.button(tl!("Cancel"));
-                push(&mut elems, "pm.cancel", &r, "Cancel");
-                keep &= !r.clicked();
-                let r = ui.add_enabled(
-                    !d.destination.is_empty() && !d.sequences.is_empty(),
-                    egui::Button::new(RichText::new(tl!("OK")).color(Color32::WHITE)).fill(app.tokens.accent),
-                );
-                push(&mut elems, "pm.ok", &r, "OK");
-                ok = r.clicked();
-            });
-        });
-    for (id, r, l) in elems {
-        app.auto.add(&id, r, &l);
-    }
-    if browse {
-        app.pick_ui(FileDialog::Folder { at: None }, |app, paths| {
-            if let (Some(f), Some(d)) = (paths.into_iter().next(), app.ui.project_manager.as_mut()) {
-                d.destination = f;
-            }
-        });
-    }
-    // settings changed: the estimate is stale
-    if (d.mode != before.mode
-        || d.sequences != before.sequences
-        || d.exclude_unused != before.exclude_unused
-        || d.handles != before.handles
-        || d.preset != before.preset)
-        && !calc
-    {
-        d.estimate = None;
-    }
-    if calc {
-        match app.session.execute("file.projectManager", pm_params(&d, true)) {
-            Ok(v) => {
-                d.estimate =
-                    Some((v["originalBytes"].as_u64().unwrap_or(0), v["resultBytes"].as_u64().unwrap_or(0), v["files"].as_array().map_or(0, Vec::len)));
-                d.message.clear();
-            }
-            Err(e) => d.message = e.to_string(),
-        }
-    }
-    if ok {
-        match app.session.execute("file.projectManager", pm_params(&d, false)) {
-            Ok(v) => {
-                app.ui.status = tlf!("Project Manager: writing {path}", path = v["project"].as_str().unwrap_or_default());
-                keep = false;
-            }
-            Err(e) => d.message = e.to_string(),
-        }
-    }
-    app.ui.project_manager = (keep && !crate::widgets::escape_closes(ctx)).then_some(d);
 }
 
 /// Link Media: relink `item` to `path` with the dialog's matching options; the result goes into `d`.

@@ -549,10 +549,6 @@ fn used_items(p: &Project) -> BTreeSet<ItemId> {
                     used.insert(i.item);
                 }
             }
-            if let Some(m) = &q.merged {
-                let v = serde_json::to_value(m).unwrap_or_default();
-                collect_ids(&v, &mut used, p);
-            }
         }
     }
     // subclip parents of anything kept
@@ -569,26 +565,6 @@ fn used_items(p: &Project) -> BTreeSet<ItemId> {
         }
     }
     used
-}
-
-/// Item ids mentioned in a JSON value (keys named `item`/`items`/`video`/`audio` holding ids).
-pub(crate) fn collect_ids(v: &Value, out: &mut BTreeSet<ItemId>, p: &Project) {
-    match v {
-        Value::Object(m) => {
-            for (k, x) in m {
-                if matches!(k.as_str(), "item" | "items" | "video" | "audio") {
-                    for n in x.as_array().cloned().unwrap_or_else(|| vec![x.clone()]) {
-                        if let Some(id) = n.as_u64().map(ItemId).filter(|i| p.items.contains_key(i)) {
-                            out.insert(id);
-                        }
-                    }
-                }
-                collect_ids(x, out, p);
-            }
-        }
-        Value::Array(a) => a.iter().for_each(|x| collect_ids(x, out, p)),
-        _ => {}
-    }
 }
 
 /// Remove Unused removes clips only: never sequences or graphic sources.
@@ -807,7 +783,6 @@ fn offline_file(s: &mut Session, p: &Value) -> Result<Value> {
                 mark_out: None,
                 markers: vec![],
                 offline: true,
-                proxy: None,
                 identity: None,
             }),
             None,
@@ -1592,7 +1567,6 @@ fn breakout_to_mono(s: &mut Session, p: &Value) -> Result<Value> {
                 mm.mark_in = None;
                 mm.mark_out = None;
                 mm.markers.clear();
-                mm.proxy = None;
                 let id = pr.add_item(&format!("{} {suffix}", it.name), it.label, ItemKind::Media(mm), bin);
                 made.push(id);
             }
@@ -1633,7 +1607,7 @@ fn extract_audio(s: &mut Session, p: &Value) -> Result<Value> {
         let pi = s.project.item(item).ok_or_else(|| EngineError::Other("no such item".into()))?;
         let name = pi.name.clone();
         let stem = std::path::Path::new(&name).file_stem().map(|x| x.to_string_lossy().into_owned()).unwrap_or_else(|| name.clone());
-        let src = s.media.full_res_source(&s.project, root, &*s.services).ok_or_else(|| EngineError::Other(format!("{name}: media is offline")))?;
+        let src = s.media.source_for(&s.project, root, &*s.services).ok_or_else(|| EngineError::Other(format!("{name}: media is offline")))?;
         let sr = a.sample_rate.max(8000);
         let start = range.start.to_units_floor(sr as i64);
         let frames = (range.end().to_units_floor(sr as i64) - start).max(0) as usize;
@@ -1734,7 +1708,6 @@ fn replace_with(s: &mut Session, p: &Value, how: Replace) -> Result<Value> {
             it.label = pi.label;
             it.source_in = src_in;
             it.frame_hold = None;
-            it.multicam = None;
             if kind == TrackKind::Audio {
                 it.source_channels = src_channels.clone();
             }

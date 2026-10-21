@@ -49,14 +49,12 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "file.saveAll",
             "file.revert",
             "media.makeOffline",
-            "file.importFromMediaBrowser",
             "file.import",
-            "file.projectManager",
         ],
     );
     assert_order(&menu_ids(&["File", "Export"]), &["file.exportMedia", "file.exportSelectionProject"]);
     assert_eq!(menu_ids(&["File", "Get Media File Properties for"]), vec!["file.mediaPropertiesFile", "file.mediaProperties"]);
-    assert_eq!(menu_ids(&["File", "Project Settings"]), vec!["file.projectSettings.general", "file.projectSettings.scratchDisks", "project.ingestSettings"]);
+    assert_eq!(menu_ids(&["File", "Project Settings"]), vec!["file.projectSettings.general", "file.projectSettings.scratchDisks"]);
     assert_order(&menu_ids(&["Edit"]), &["edit.deselectAll", "edit.find", "edit.findNext", "edit.consolidateDuplicates", "edit.editOriginal"]);
     let clip: Vec<&str> = crate::commands::command_specs().iter().filter(|c| c.menu.first() == Some(&"Clip")).map(|c| c.id).collect();
     assert_order(
@@ -66,7 +64,6 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "clip.editOffline",
             "clip.sourceSettings",
             "clip.speedDuration",
-            "clip.sceneEditDetection",
             "clip.replaceFromBin",
             "clip.updateMetadata",
             "clip.generateAudioWaveform",
@@ -75,12 +72,10 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
     );
     for (id, label, sc) in [
         ("file.close", "Close", Some("Cmd+W")),
-        ("file.importFromMediaBrowser", "Import from Media Browser", Some("Cmd+Alt+I")),
         ("file.mediaProperties", "Selection…", Some("Cmd+Shift+H")),
         ("file.exportSelectionProject", "Selection as FilmCraft Project…", None),
         ("edit.find", "Find…", Some("Cmd+F")),
         ("edit.editOriginal", "Edit Original", Some("Cmd+E")),
-        ("clip.sceneEditDetection", "Scene Edit Detection…", None),
         ("clip.automateToSequence", "Automate to Sequence…", None),
     ] {
         let c = crate::commands::find(id).unwrap();

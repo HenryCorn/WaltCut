@@ -40,7 +40,7 @@ fn drawings_render_on_the_program_frame() {
     let mut s = session();
     new_drawing(&mut s);
     s.execute("drawing.addStroke", json!({"frame": 0, "stroke": {"color": "#ffffff", "size": 20, "points": [[100, 90], [220, 90]]}})).unwrap();
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let img = waltcut_render::render_sequence(&s.project, s.state.active_sequence.unwrap(), waltcut_time::Tick::ZERO, Default::default(), &provider);
     let red = |x: usize, y: usize| img.px[(y * img.w + x) * 4];
     assert!(red(160, 90) > 0.9, "the white stroke is drawn over the black frame");
@@ -79,7 +79,7 @@ fn hostile_parameters_are_refused_not_fatal() {
     // points beyond f32 become infinite and are dropped, which leaves nothing to draw
     assert!(s.execute("drawing.addStroke", json!({"frame": 0, "stroke": {"points": [[1e300, -1e300, 99]]}})).is_err());
     s.execute("drawing.addStroke", json!({"frame": i64::MAX, "stroke": {"size": 1e30, "points": [[1e30, -1e30, 99]]}})).unwrap();
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     waltcut_render::render_sequence(&s.project, s.state.active_sequence.unwrap(), s.playhead(), Default::default(), &provider);
     assert!(s.execute("drawing.tween", json!({"frame": 0})).is_err());
     assert!(s.execute("drawing.deleteCel", json!({"frame": -5})).is_err());
