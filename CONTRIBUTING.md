@@ -20,8 +20,8 @@ Contributions are licensed under MIT OR Apache-2.0, the project licence.
 
 Pull requests target `main`. Use a short branch named for the change (for example,
 `docs/animation-guide` or `fix/cel-timing`), link the related issue, and describe the user-visible
-change and how you verified it. The pull request template lists the checks to report. CI runs
-`cargo xtask ci` on Linux and checks formatting and all-target Clippy on macOS and Windows; all
-three platform checks must pass before merging. CodeRabbit review is configured for pull requests
-when the repository integration is enabled; address its findings and resolve review conversations
-before merging.
+change and how you verified it. The pull request template lists the checks to report. Pull-request
+CI checks formatting on Linux, macOS, and Windows, with a three-minute timeout per platform. To run
+the full Clippy, test, layer, asset, and wasm gates, manually dispatch the CI workflow with
+`full_quality` enabled. CodeRabbit review is configured for pull requests when the repository
+integration is enabled; address its findings and resolve review conversations before merging.

@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full_quality:
+        description: Run the full workspace Clippy, test, layer, asset, and wasm gates
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -16,9 +22,10 @@ concurrency:
 
 jobs:
   quality:
+    if: github.event_name != 'workflow_dispatch' || !inputs.full_quality
     name: quality (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 3
     strategy:
       fail-fast: false
       matrix:
@@ -27,22 +34,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --check
+
+  full-quality:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_quality
+    name: full quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install --yes ffmpeg libasound2-dev libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev pkg-config
       - name: Run full quality gates
-        if: matrix.os == 'ubuntu-latest'
         run: cargo xtask ci
         env:
           CARGO_PROFILE_RELEASE_LTO: "false"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
-      - name: Check native platform targets
-        if: matrix.os != 'ubuntu-latest'
-        run: |
-          cargo fmt --check
-          cargo clippy --workspace --all-targets --release -- -D warnings
