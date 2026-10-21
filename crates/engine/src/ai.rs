@@ -68,7 +68,6 @@ fn write_key(path: &std::path::Path, key: &str) -> std::io::Result<()> {
     }
     let mut o = std::fs::OpenOptions::new();
     o.write(true).create(true).truncate(true);
-    #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
         o.mode(0o600);
@@ -174,7 +173,7 @@ fn frame_times(s: &Session, cmd: &str, p: &Value) -> Result<(Vec<Tick>, Tick)> {
 
 /// Folder for a job's frames: next to the saved project, else in the data directory.
 fn output_dir(s: &Session, job: u64) -> PathBuf {
-    let stamp = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let base = match (&s.path, &s.prefs_path) {
         (Some(p), _) => std::path::Path::new(p).with_extension("").with_file_name(format!(
             "{} AI Frames",
@@ -219,7 +218,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
     let provider = s.media.provider(s.project.clone(), s.services.clone());
     let project = s.project.clone();
     let (prog, res, outs) = (job.progress.clone(), job.result.clone(), outputs.clone());
-    let t0 = web_time::Instant::now();
+    let t0 = std::time::Instant::now();
     let run = move || {
         let r = (|| -> std::result::Result<usize, String> {
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -288,7 +287,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
     let run = crate::export_tools::guard_job(job.progress.clone(), job.result.clone(), run);
     s.jobs.push(job);
     s.ai_jobs.push(PendingRestyle { job: id, sequence: seq_id, hold, outputs });
-    if bool_p(p, "wait").unwrap_or(false) || cfg!(target_arch = "wasm32") {
+    if bool_p(p, "wait").unwrap_or(false) {
         run();
         poll(s);
     } else {

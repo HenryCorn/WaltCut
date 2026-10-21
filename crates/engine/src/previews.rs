@@ -548,16 +548,9 @@ impl PreviewStore {
 /// Open a rendered preview file. Native builds read it in place (the container's index now,
 /// frames on demand): previews are full-resolution ProRes, gigabytes a minute, and reading each
 /// one whole filled memory during render and playback (#2185).
-#[cfg(any(unix, windows))]
 pub(crate) fn open_preview_file(_pool: &MediaPool, name: &str, path: &std::path::Path) -> Option<SharedSource> {
     let reader = waltcut_media::reader::FileReader::open(path).ok()?;
     waltcut_media::reader::open_reader_within(name, std::sync::Arc::new(reader), &waltcut_codecs::reader_openers(), &[], 0).ok()
-}
-
-#[cfg(not(any(unix, windows)))]
-pub(crate) fn open_preview_file(pool: &MediaPool, name: &str, path: &std::path::Path) -> Option<SharedSource> {
-    let bytes = std::fs::read(path).ok()?;
-    pool.open_bytes(name, bytes.into()).ok()
 }
 
 fn need_state(seg: &Segment) -> BarState {
@@ -573,9 +566,6 @@ fn is_hash(s: &str) -> bool {
 }
 
 fn default_temp_dir() -> Option<PathBuf> {
-    if cfg!(target_arch = "wasm32") {
-        return None;
-    }
     Some(untitled_dir(&crate::temp_dir().join("FilmCraft Previews")))
 }
 
@@ -653,7 +643,7 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let nseg = todo.len();
     let run = move || {
-        let t0 = web_time::Instant::now();
+        let t0 = std::time::Instant::now();
         let mut bytes = 0u64;
         let mut done_frames = 0u64;
         let mut outcome: std::result::Result<(), String> = Ok(());
@@ -717,7 +707,7 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
     let run = crate::export_tools::guard_job(job.progress.clone(), job.result.clone(), run);
     s.jobs.push(job);
     let wait = p.get("wait").and_then(Value::as_bool).unwrap_or(false);
-    if wait || cfg!(target_arch = "wasm32") {
+    if wait {
         run();
     } else {
         std::thread::Builder::new().name("filmcraft-render-previews".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
@@ -752,7 +742,7 @@ pub fn render_audio(s: &mut Session, p: &Value) -> Result<Value> {
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let nseg = todo.len();
     let run = move || {
-        let t0 = web_time::Instant::now();
+        let t0 = std::time::Instant::now();
         let mut bytes = 0u64;
         let mut outcome: std::result::Result<(), String> = Ok(());
         let Some(q) = project.sequence(seq) else { return };
@@ -803,7 +793,7 @@ pub fn render_audio(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let run = crate::export_tools::guard_job(job.progress.clone(), job.result.clone(), run);
     s.jobs.push(job);
-    if p.get("wait").and_then(Value::as_bool).unwrap_or(false) || cfg!(target_arch = "wasm32") {
+    if p.get("wait").and_then(Value::as_bool).unwrap_or(false) {
         run();
     } else {
         std::thread::Builder::new().name("filmcraft-render-audio".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;

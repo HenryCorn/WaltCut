@@ -197,7 +197,7 @@ fn the_status_bar_and_the_queue_show_the_time_left() {
     // the app reads the real clock, which is then behind them)
     let job = Job { id: 900, label: "Exporting".into(), progress: Default::default(), result: Default::default() };
     job.progress.total.store(1000, Ordering::Relaxed);
-    let t0 = web_time::Instant::now() + Duration::from_secs(60);
+    let t0 = std::time::Instant::now() + Duration::from_secs(60);
     for i in 0..=50u64 {
         job.progress.done.store(i * 5, Ordering::Relaxed);
         job.progress.eta_at(t0 + Duration::from_millis(i * 100));

@@ -181,7 +181,7 @@ pub struct Exporter {
     project: Arc<Project>,
     vt: usize,
     at: Option<usize>,
-    t0: web_time::Instant,
+    t0: std::time::Instant,
 }
 
 /// Whether [`Exporter`] handles a format.
@@ -287,7 +287,7 @@ impl Exporter {
             project: project.clone(),
             vt: 0,
             at: None,
-            t0: web_time::Instant::now(),
+            t0: std::time::Instant::now(),
             settings,
         })
     }
@@ -321,7 +321,7 @@ impl Exporter {
     /// Whether steps overlap rendering with encoding now: switched on, a pool with more than one
     /// thread, and not on wasm.
     pub fn overlapping(&self) -> bool {
-        self.overlap && !cfg!(target_arch = "wasm32") && rayon::current_num_threads() > 1
+        self.overlap && rayon::current_num_threads() > 1
     }
 
     /// Steps so far that rendered the next batch alongside the encoding of the current one.
@@ -475,7 +475,7 @@ impl Exporter {
             self.next = self.f0;
             return Ok(Step::Progress);
         }
-        let finishing = web_time::Instant::now();
+        let finishing = std::time::Instant::now();
         let mixed = self.audio.as_mut().and_then(|a| a.rest(sources));
         if waltcut_media::pending::take() {
             return Ok(Step::Pending);
@@ -557,13 +557,13 @@ impl Exporter {
         };
         let pipe = self.pipe.clone();
         let mut slot: Option<std::thread::Result<Option<Vec<Frame>>>> = None;
-        let mut encode_done: Option<web_time::Instant> = None;
+        let mut encode_done: Option<std::time::Instant> = None;
         let encoded = rayon::in_place_scope(|s| {
             s.spawn(|_| {
                 slot = Some(catch_unwind(AssertUnwindSafe(|| timed(Stage::Render, || render_batch(&pipe, a, b, sources)))));
             });
             let r = self.encode_batch(f, frames, sources);
-            encode_done = Some(web_time::Instant::now());
+            encode_done = Some(std::time::Instant::now());
             r
         });
         // the scope returned only now: what is left since the encoding ended is waiting for the render
@@ -603,7 +603,7 @@ impl Exporter {
         let cuts: Vec<i64> = (f + 1..=end).filter(|&g| (g - self.f0) % INTERLEAVE == 0).collect();
         let mut mixed = Vec::with_capacity(cuts.len());
         if let Some(sr) = self.audio.as_ref().map(|a| a.sr) {
-            let t = web_time::Instant::now();
+            let t = std::time::Instant::now();
             for &g in &cuts {
                 let until = self.sample_at_frame(g, sr);
                 mixed.push(self.audio.as_mut().and_then(|a| a.pull(until, sources)));

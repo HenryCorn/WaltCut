@@ -31,16 +31,10 @@ pub type Stamp = (u64, u128);
 /// Stamps of the project's media files taken on a worker thread.
 pub type MediaScan = Arc<Mutex<Option<Vec<(String, Option<Stamp>)>>>>;
 
-#[cfg(not(target_arch = "wasm32"))]
 fn stamp(path: &str) -> Option<Stamp> {
     let meta = std::fs::metadata(path).ok()?;
     let modified = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
     Some((meta.len(), modified.as_nanos()))
-}
-
-#[cfg(target_arch = "wasm32")]
-fn stamp(_: &str) -> Option<Stamp> {
-    None
 }
 
 /// The files of `p`'s file media items (made-offline ones aside): each item's path → the file the
@@ -68,7 +62,7 @@ impl Session {
     /// Start stamping the project's media files on a worker thread, unless a look is still
     /// running (or the build has no files to look at: the web app).
     pub fn start_media_scan(&mut self) {
-        if self.media_scan.is_some() || cfg!(target_arch = "wasm32") {
+        if self.media_scan.is_some() {
             return;
         }
         let files = media_files(&self.project, &self.media);

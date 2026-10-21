@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError, Weak};
 use std::time::Duration;
 
-use web_time::Instant;
+use std::time::Instant;
 
 use waltcut_color::ColorInfo;
 use waltcut_frame::{Region, VideoFrame};
@@ -443,7 +443,6 @@ const MIN_FRAMES: usize = 64;
 const CONTINUE_THROUGH: usize = 48;
 
 /// Threads that run the caches' decoding (see [`isolated`]); `None` where none can be made.
-#[cfg(not(target_arch = "wasm32"))]
 fn decode_pool() -> Option<&'static rayon::ThreadPool> {
     static POOL: std::sync::OnceLock<Option<rayon::ThreadPool>> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
@@ -467,7 +466,6 @@ fn decode_pool() -> Option<&'static rayon::ThreadPool> {
 fn isolated<T: Send>(f: impl FnOnce() -> crate::Result<T> + Send) -> crate::Result<T> {
     let ctx = waltcut_media::cancel::Context::current();
     let job = move || ctx.run(f);
-    #[cfg(not(target_arch = "wasm32"))]
     if let Some(pool) = decode_pool() {
         if rayon::current_thread_index().is_none() {
             return pool.install(job);

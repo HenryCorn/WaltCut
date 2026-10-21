@@ -473,9 +473,7 @@ fn stop(s: &mut Session, p: &Value) -> Result<Value> {
     let dir = record_dir(s, p);
     let base = s.prefs.voice_over.name.clone();
     let path = unique_wav_path(s, &dir, &base)?;
-    if !cfg!(target_arch = "wasm32") {
-        std::fs::create_dir_all(&dir).map_err(|e| EngineError::Other(format!("{dir}: {e}")))?;
-    }
+    std::fs::create_dir_all(&dir).map_err(|e| EngineError::Other(format!("{dir}: {e}")))?;
     let samples = s.voiceover.captured.get(skip..).ok_or_else(|| bad("audio.voiceover.stop", "invalid recording trim range"))?;
     let bytes = write_wav_f32(samples, sr as u32);
     s.services.write_file(&path, &bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;

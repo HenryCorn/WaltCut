@@ -9,7 +9,6 @@
 /// Order the app's windows to the front without activating the app (macOS). Returns whether it
 /// did anything; elsewhere the caller only requests a repaint.
 pub fn raise_without_focus() -> bool {
-    #[cfg(target_os = "macos")]
     {
         let Some(mtm) = objc2::MainThreadMarker::new() else { return false };
         let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
@@ -20,9 +19,5 @@ pub fn raise_without_focus() -> bool {
             }
         }
         true
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        false
     }
 }

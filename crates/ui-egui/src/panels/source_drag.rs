@@ -69,12 +69,9 @@ pub fn controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect) {
             crate::icons::paint(ui.painter(), icon, if video { crate::icons::Icon::Film } else { crate::icons::Icon::Audio }, color);
         }
         app.auto.add(id, rect, label);
-        // Windows maps Grab/Grabbing to crossed arrows; Pointer maps to its hand cursor.
-        let hover_cursor = if cfg!(windows) { egui::CursorIcon::PointingHand } else { egui::CursorIcon::Grab };
-        let drag_cursor = if cfg!(windows) { egui::CursorIcon::PointingHand } else { egui::CursorIcon::Grabbing };
-        let response = response.on_hover_cursor(hover_cursor).on_hover_text(label);
+        let response = response.on_hover_cursor(egui::CursorIcon::Grab).on_hover_text(label);
         if response.dragged() {
-            ui.ctx().set_cursor_icon(drag_cursor);
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         }
         if response.drag_started() {
             begin(app, ui, video, audio);

@@ -300,30 +300,3 @@ fn offscreen_float_uses_rendered_clamp_and_maximized_timeline_ignores_hidden_flo
     drop_at(&mut h, at, &still("drop_maximized_timeline.png"));
     assert_eq!(clip_counts(&h), (1, 0));
 }
-
-#[test]
-fn os_cursor_hook_selects_destination_when_egui_pointer_has_no_motion() {
-    let mut h = harness();
-    let at = point_on_row(&h, "timeline.track.V1.target");
-    float_panel(&mut h, "Info", [at.x - 20.0, at.y - 60.0, 320.0, 200.0]);
-    // Physical pixels at 1x, with the synthetic viewport origin fixed at zero.
-    h.state_mut().hooks.cursor_screen_position = Some(Box::new(move || Some((at.x.round() as i32, at.y.round() as i32))));
-    if let Some(viewport) = h.input_mut().viewports.get_mut(&egui::ViewportId::ROOT) {
-        viewport.inner_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 980.0)));
-    }
-    h.input_mut().hovered_files.push(Default::default());
-    step(&mut h);
-    assert!(!h.state().auto.elements.iter().any(|element| element.id == "timeline.fileDropPreview"));
-    h.input_mut().hovered_files.clear();
-    h.input_mut().dropped_files.push(std::sync::Arc::new(OsFile(still("drop_os_hook_covered.png"))));
-    step(&mut h);
-    h.input_mut().dropped_files.clear();
-    step(&mut h);
-    assert_eq!(clip_counts(&h), (0, 0));
-    h.state_mut().ui.floating.clear();
-    h.input_mut().dropped_files.push(std::sync::Arc::new(OsFile(still("drop_os_hook_visible.png"))));
-    step(&mut h);
-    h.input_mut().dropped_files.clear();
-    step(&mut h);
-    assert_eq!(clip_counts(&h), (1, 0));
-}

@@ -1615,9 +1615,6 @@ pub fn clean(dir: &Path, keep: Option<&Path>) -> (usize, u64) {
 impl Session {
     /// The media cache folder (None without a data directory, e.g. tests and the web).
     pub fn media_cache_dir(&self) -> Option<PathBuf> {
-        if cfg!(target_arch = "wasm32") {
-            return None;
-        }
         media_cache_dir(&self.prefs.media_cache, self.prefs_path.as_deref().and_then(Path::parent))
     }
 

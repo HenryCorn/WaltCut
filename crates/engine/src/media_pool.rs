@@ -204,10 +204,6 @@ impl MediaPool {
     /// The file to open for `path`, a media path of the project: a stored path as
     /// [`crate::doc_path::resolve`] resolves it, any other path as given.
     pub fn follow(&self, path: &str) -> Result<String, crate::doc_path::NotFollowed> {
-        // The web host reads only the files the user gave it, under its own virtual paths.
-        if cfg!(target_arch = "wasm32") {
-            return Ok(path.to_string());
-        }
         match self.stored.read().unwrap_or_else(|e| e.into_inner()).get(path) {
             Some(document) => crate::doc_path::resolve(path, document.as_deref()),
             None => Ok(path.to_string()),
@@ -576,7 +572,6 @@ mod tests {
     }
 
     /// The desktop host reads media in place instead of loading every clip into memory.
-    #[cfg(any(unix, windows))]
     #[test]
     fn fs_services_open_media_through_a_file_reader() {
         let dir = std::env::temp_dir().join(format!("filmcraft-pool-reader-{}", std::process::id()));

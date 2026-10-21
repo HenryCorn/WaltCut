@@ -77,30 +77,19 @@ impl DecodeStats {
 
 /// A wall-clock stopwatch (a no-op on wasm32, which has no clock in std).
 pub(crate) struct Timer {
-    #[cfg(not(target_arch = "wasm32"))]
     start: std::time::Instant,
 }
 
 impl Timer {
     #[inline]
     pub fn start() -> Timer {
-        Timer {
-            #[cfg(not(target_arch = "wasm32"))]
-            start: std::time::Instant::now(),
-        }
+        Timer { start: std::time::Instant::now() }
     }
 
     /// Seconds since `start` (0 on wasm32).
     #[inline]
     pub fn secs(&self) -> f64 {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.start.elapsed().as_secs_f64()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            0.0
-        }
+        self.start.elapsed().as_secs_f64()
     }
 
     /// Seconds since `start`, restarting the stopwatch.

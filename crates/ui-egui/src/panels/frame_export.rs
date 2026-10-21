@@ -42,9 +42,6 @@ pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, params: &Value) -> Resu
         app.stop();
     }
     let folder = ctx.data(|m| m.get_temp::<String>(egui::Id::new("frame-export-folder"))).unwrap_or_else(|| {
-        if cfg!(target_arch = "wasm32") {
-            return "/exports".into();
-        }
         app.session.path.as_deref().and_then(|p| std::path::Path::new(p).parent()).map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|| ".".into())
     });
     let name = if target.source { std::path::Path::new(&target.name).file_stem().and_then(|s| s.to_str()).unwrap_or(&target.name) } else { &target.name };

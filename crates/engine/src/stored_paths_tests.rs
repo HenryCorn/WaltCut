@@ -67,9 +67,9 @@ fn foreign(paths: &[String]) -> Vec<&String> {
     paths.iter().filter(|p| p.contains("192.0.2.1") || p.starts_with("//") || p.starts_with(r"\\") || p.starts_with("file:")).collect()
 }
 
-/// `//<path>` for an absolute Unix path (None elsewhere).
+/// `//<path>` for an absolute path.
 fn slashed(path: &Path) -> Option<String> {
-    cfg!(unix).then(|| format!("/{}", path.display()))
+    Some(format!("/{}", path.display()))
 }
 
 #[test]

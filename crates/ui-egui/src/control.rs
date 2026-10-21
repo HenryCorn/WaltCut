@@ -525,13 +525,6 @@ pub fn save_screenshot(ctx: &egui::Context, image: &egui::ColorImage, path: Opti
             rgba.extend_from_slice(&[c.r(), c.g(), c.b(), 255]);
         }
     }
-    if cfg!(target_arch = "wasm32") {
-        // No filesystem on the web: the PNG comes back in the reply.
-        return match encode_png(&rgba, cw as u32, ch as u32) {
-            Ok(png) => json!({"ok": true, "result": {"pngBase64": base64(&png), "width": cw, "height": ch}}),
-            Err(e) => json!({"ok": false, "error": e}),
-        };
-    }
     let path = path.map(str::to_string).unwrap_or_else(|| waltcut_engine::temp_dir().join("filmcraft-screenshot.png").to_string_lossy().to_string());
     match encode_png(&rgba, cw as u32, ch as u32) {
         Ok(png) => match std::fs::write(&path, png) {

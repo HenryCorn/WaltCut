@@ -6,12 +6,8 @@
 use std::path::{Path, PathBuf};
 
 /// (folder under `target/`, what it is, what deleting it costs).
-const CACHES: [(&str, &str); 4] = [
-    ("debug", "debug build output (the big one)"),
-    ("dev", "dev-profile build output"),
-    ("wasm32-unknown-unknown", "WASM build output"),
-    ("export-tests", "files written by export tests"),
-];
+const CACHES: [(&str, &str); 3] =
+    [("debug", "debug build output (the big one)"), ("dev", "dev-profile build output"), ("export-tests", "files written by export tests")];
 
 fn size(p: &Path) -> u64 {
     let Ok(md) = std::fs::symlink_metadata(p) else { return 0 };

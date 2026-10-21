@@ -321,7 +321,6 @@ fn edit_original_opens_media_files_only() {
     for f in ["run.bat", "app.desktop", "clip.mov.lnk", "Tool.app", "folder.mov", "missing.mov", ""] {
         assert!(!ok(f), "{f}");
     }
-    #[cfg(unix)]
     {
         std::os::unix::fs::symlink(d.join("app.desktop"), d.join("link.mov")).unwrap();
         assert!(!ok("link.mov"), "a media name linking to another kind of file");
