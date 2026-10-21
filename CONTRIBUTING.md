@@ -1,6 +1,7 @@
-# Contributing to FilmCraft
+# Contributing to WaltCut
 
-Thanks for helping. Before you start:
+WaltCut is a fork of FilmCraft focused on drawing and 2D animation. Thanks for helping improve it.
+Before you start:
 
 1. Read **[AGENTS.md](AGENTS.md)**. Its rules are absolute. In particular: no Adobe assets of any
    kind, every asset openly licensed with an attribution sidecar, no GPL/LGPL code, and ffmpeg only
@@ -16,3 +17,11 @@ More reading: [docs/architecture.md](docs/architecture.md), [docs/testing.md](do
 [docs/agents.md](docs/agents.md), [ROADMAP.md](ROADMAP.md).
 
 Contributions are licensed under MIT OR Apache-2.0, the project licence.
+
+Pull requests target `main`. Use a short branch named for the change (for example,
+`docs/animation-guide` or `fix/cel-timing`), link the related issue, and describe the user-visible
+change and how you verified it. The pull request template lists the checks to report. Pull-request
+CI checks formatting on Linux, macOS, and Windows, with a three-minute timeout per platform. To run
+the full Clippy, test, layer, asset, and wasm gates, manually dispatch the CI workflow with
+`full_quality` enabled. CodeRabbit review is configured for pull requests when the repository
+integration is enabled; address its findings and resolve review conversations before merging.
