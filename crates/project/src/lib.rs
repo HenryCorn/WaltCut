@@ -11,7 +11,6 @@
 
 pub mod drawing;
 pub mod effect;
-pub mod essential;
 pub mod find;
 pub mod graphic;
 pub mod graphic_design;
@@ -26,7 +25,6 @@ use waltcut_media::{Generator, MediaInfo};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
 pub use effect::{EffectDef, EffectInstance, EffectKind, ParamDef, ParamKind, effect_defs, find_effect};
-pub use essential::{AudioType, EssentialSound};
 pub use find::{FindOp, FindQuery, FindRow, SearchBin};
 pub use graphic_design::{CharStyle, GraphicMeta, LayerExtra, Pin, PinTarget, Roll, RollMode, SourceGraphic, StyleRun};
 pub use keyframe::{Interpolation, Keyframe, Param, ParamValue};
@@ -502,6 +500,7 @@ fn is_zero_stream(stream: &usize) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TrackItem {
     pub id: ClipId,
     pub item: ItemId,
@@ -535,9 +534,6 @@ pub struct TrackItem {
     /// Scale to frame size (Set to Frame Size / Scale to Frame Size).
     #[serde(default)]
     pub scale_to_frame: bool,
-    /// Essential Sound audio type and settings (audio clips).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub essential: Option<EssentialSound>,
     /// Video Options ▸ Time Interpolation: how frames are made when the clip's speed is changed.
     #[serde(default, skip_serializing_if = "TimeInterpolation::is_default")]
     pub time_interpolation: TimeInterpolation,
@@ -1519,7 +1515,6 @@ impl Project {
             gain_db: 0.0,
             frame_hold: None,
             scale_to_frame: false,
-            essential: None,
             time_interpolation: TimeInterpolation::default(),
             hold_filters: false,
             field_options: None,
@@ -1784,6 +1779,27 @@ mod tests {
             assert!(serde_json::from_str::<ParamValue>(bad).is_err(), "{bad}");
         }
         assert!(serde_json::from_str::<Vec2>(r#"{"x":null,"y":0}"#).is_err());
+    }
+
+    #[test]
+    fn audio_clips_and_effects_have_no_essential_sound_metadata() {
+        let (mut project, media, seq) = demo_project();
+        let rate = project.sequence(seq).unwrap().settings.frame_rate;
+        let clip = project.make_track_item(media, TrackKind::Audio, Tick::ZERO, TimeRange::new(Tick::ZERO, Tick(TICKS_PER_SECOND)), rate).unwrap();
+        let mut value = serde_json::to_value(&clip).unwrap();
+        assert!(value.get("essential").is_none());
+        assert_eq!(serde_json::from_value::<TrackItem>(value.clone()).unwrap(), clip);
+        for settings in [serde_json::json!({"kind": "Dialogue", "mute": true}), serde_json::json!(-1), serde_json::Value::Null] {
+            value["essential"] = settings;
+            let error = serde_json::from_value::<TrackItem>(value.clone()).unwrap_err().to_string();
+            assert!(error.contains("unknown field `essential`"), "{error}");
+        }
+        let effect = find_effect("volume").unwrap().instance();
+        let mut value = serde_json::to_value(&effect).unwrap();
+        assert!(value.get("essential").is_none());
+        assert_eq!(serde_json::from_value::<EffectInstance>(value.clone()).unwrap(), effect);
+        value["essential"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<EffectInstance>(value).is_err());
     }
 
     #[test]

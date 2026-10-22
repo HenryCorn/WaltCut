@@ -22,7 +22,6 @@
 pub mod biquad;
 pub mod channels;
 pub mod design;
-pub mod ducking;
 pub mod effects;
 pub mod fft;
 pub mod loudness;

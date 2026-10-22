@@ -318,7 +318,6 @@ mod tests {
             gain_db: 0.0,
             frame_hold: None,
             scale_to_frame: false,
-            essential: None,
             time_interpolation: Default::default(),
             hold_filters: false,
             field_options: None,

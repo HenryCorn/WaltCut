@@ -399,7 +399,6 @@ fn layer_instance(id: &str) -> EffectInstance {
         enabled: true,
         params: Default::default(),
         post_fader: false,
-        essential: false,
         layer: None,
     })
 }

@@ -321,7 +321,7 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
         for t in &mut q.audio_tracks {
             for it in &mut t.items {
                 let n = it.effects.len();
-                it.effects.retain(|e| e.def().is_none_or(|d| d.intrinsic || waltcut_project::graphic::is_layer_id(d.id)) || e.essential);
+                it.effects.retain(|e| e.def().is_none_or(|d| d.intrinsic || waltcut_project::graphic::is_layer_id(d.id)));
                 removed_effects += n - it.effects.len();
             }
             let n = t.effects.len();

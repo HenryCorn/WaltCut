@@ -837,7 +837,7 @@ impl FilmcraftApp {
         }
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
-                PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
+                PanelKind::EssentialGraphics | PanelKind::Properties => PanelKind::Program,
                 PanelKind::Source
                 | PanelKind::EffectControls
                 | PanelKind::AudioClipMixer

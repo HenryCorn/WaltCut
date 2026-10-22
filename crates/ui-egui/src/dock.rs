@@ -28,7 +28,6 @@ pub enum PanelKind {
     AudioMeters,
     AudioTrackMixer,
     EssentialGraphics,
-    EssentialSound,
     Properties,
     Events,
     Progress,
@@ -37,7 +36,7 @@ pub enum PanelKind {
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 22] = [
+    pub const ALL: [PanelKind; 21] = [
         PanelKind::Project,
         PanelKind::Libraries,
         PanelKind::Info,
@@ -54,7 +53,6 @@ impl PanelKind {
         PanelKind::AudioMeters,
         PanelKind::AudioTrackMixer,
         PanelKind::EssentialGraphics,
-        PanelKind::EssentialSound,
         PanelKind::Properties,
         PanelKind::Events,
         PanelKind::Progress,
@@ -79,7 +77,6 @@ impl PanelKind {
             PanelKind::AudioMeters => "Audio Meters",
             PanelKind::AudioTrackMixer => "Audio Track Mixer",
             PanelKind::EssentialGraphics => "Essential Graphics",
-            PanelKind::EssentialSound => "Essential Sound",
             PanelKind::Properties => "Properties",
             PanelKind::Events => "Events",
             PanelKind::Progress => "Progress",

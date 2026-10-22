@@ -197,9 +197,6 @@ fn mix_item(
     if a1 <= a0 {
         return;
     }
-    if item.essential.as_ref().is_some_and(|e| e.mute) {
-        return;
-    }
     let w = out.channels.len();
     let n = (a1 - a0) as usize;
     let buf = if let Some(nested) = project.sequence(item.item) {
@@ -324,7 +321,7 @@ fn effected(item: &TrackItem, src: SourceAudio, a0: i64, n: usize, sr: u32, w: u
 
 /// One clip's own signal for timeline samples `[start, start + frames)` (sequence rate): clip gain
 /// and clip effects, without Volume / Channel Volume / Panner, transitions or Mute (silence outside
-/// the clip). Loudness Auto-Match and ducking analyse this. `None` when the clip has no audio
+/// the clip). Audio-effect render tests use this isolated signal. `None` when the clip has no audio
 /// source (nested sequences are not analysed).
 pub fn clip_signal(item: &TrackItem, start: i64, frames: usize, sr: u32, sources: &dyn SourceProvider) -> Option<[Vec<f32>; 2]> {
     let src = sources.source(item.item)?;
@@ -346,18 +343,6 @@ pub fn clip_signal(item: &TrackItem, start: i64, frames: usize, sr: u32, sources
         }
     }
     Some(out)
-}
-
-/// Whether a clip plays one source channel on both sides: a mono source, or one picked channel
-/// (Modify ▸ Audio Channels, Breakout to Mono). Loudness Auto-Match measures such a clip as the one
-/// channel it is, as BS.1770 (and ffmpeg's `ebur128`) measure a mono programme, not as the
-/// dual-mono pair [`clip_signal`] plays, which reads 3 LU louder. `None` when the clip has no
-/// audio source.
-pub fn clip_is_mono(item: &TrackItem, sources: &dyn SourceProvider) -> Option<bool> {
-    let src = sources.source(item.item)?;
-    let available = src.info().audio_streams.get(item.audio_stream)?.channels as usize;
-    let (left, right) = source_pair(item, available);
-    Some(left == right)
 }
 
 /// The clip's audio (after speed/reverse) for timeline samples `[x0, x0 + len)` as `w` channels

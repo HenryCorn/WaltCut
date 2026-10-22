@@ -187,24 +187,25 @@ keyframes and the Audio Gain dialog by automation id and with multi-frame pointe
 over several frames, release). With `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` it also renders the window
 offscreen through wgpu (`Harness::render`) and writes `mixer-*.png`; this works without a visible
 window (for example on a locked screen, where `ui.screenshot` cannot capture).
-`crates/ui-egui/tests/essential_sound_ui.rs` does the same for the Essential Sound panel (type buttons,
-switches, a slider drag as one undo step, section bypass, Auto-Match, ducking, Browse presets;
-`essential-sound-*.png`).
 `crates/ui-egui/tests/clip_audio_ui.rs` covers the audio of video clips (#223): the linked audio's
 Volume, Channel Volume and Panner in Effect Controls and Properties, and the Volume line on audio
 clips in the Timeline (a drag is one undo step, Pen-tool keyframes, keyframe drags, a click or
 right-click on the line still reaches the clip; `FILMCRAFT_UI_SHOTS=<dir>` writes `volume-*.png`).
 
-Essential Sound engine tests (`crates/engine/src/essential_sound_tests.rs`) build projects from
-generated speech-like and tonal WAVs: Auto-Match lands within ±0.5 LU of the target (measured: 0.000 LU,
-with and without a repair/clarity chain) and measures a mono clip as one channel (3.01 LU below the
-same signal as dual mono, within 0.1 LU of a one-channel meter over the file); ducking on a dialogue +
-music project gives keyframes within 60 ms of the expected times (measured 20 ms) and −15.00 dB in the
-mix; each repair stage improves its metric through the render path (hum −39 dB, rumble −22 dB, noise
-floor −13 dB, sibilance −19 dB, reverb tail −10 dB); the mix is bit-identical however requests are cut
-and the WAV export equals it.
-`perf_full_dialogue_chain_realtime_factor` (ignored; run with `--release`) prints the realtime factor of
-all nine Dialogue effects on one clip (22× on one core).
+The Essential Sound slice of #23 deletes its feature-only engine/UI/ducking tests along with the
+implementation. `engine::audio_reduction_tests` now checks that every removed command rejects
+empty, malformed and hostile parameters without changing project, preferences, editor state,
+undo/redo or jobs; removed preferences reject writes. Project tests check absent metadata and
+rejection of removed clip/effect fields. The scripted UI test checks the absent panel, commands
+and automation ids without project or layout edits.
+
+Retained general audio-effect tests and `crates/ui-egui/tests/audio_timing.rs` remain: the latter
+compares production playback callback samples and float WAV exports with generated stereo input,
+including timing, gain and live track mute/unmute. Platform-independent `audio-dsp` tests can run
+on Windows; engine/media/UI tests require macOS and are only cross-typechecked here with
+`cargo clippy --workspace --all-targets --target aarch64-apple-darwin --quiet -- -D warnings`.
+Native `cargo xtask ci`, actual sample-test execution and the animation-flow control-channel
+screenshot are still pending. This stacked #23 draft is not complete or merged.
 
 `crates/ui-egui/tests/export_ui.rs` drives Export mode: the settings column and Summary, editing a
 setting turning the preset into Custom, the Preset Manager (search, favourite star, save, apply,
