@@ -188,7 +188,7 @@ pub fn replace_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 for (f, st, n) in &used {
                     let missing = waltcut_text::resolve(f, st).missing;
                     ui.label(if missing {
-                        egui::RichText::new(format_placeholders!("{f} (missing)", f)).color(Color32::from_rgb(0xff, 0xa0, 0x60))
+                        egui::RichText::new(tlf!("{f} (missing)", f)).color(Color32::from_rgb(0xff, 0xa0, 0x60))
                     } else {
                         egui::RichText::new(f)
                     });
@@ -239,7 +239,7 @@ pub fn replace_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
         Some(true) => match app.session.execute("file.replaceFonts", json!({"from": d.from, "to": d.to})) {
             Ok(v) => {
                 app.ui.replace_fonts = None;
-                app.ui.status = format_placeholders!("Replaced {n} font uses", n = v["replaced"]);
+                app.ui.status = tlf!("Replaced {n} font uses", n = v["replaced"]);
             }
             Err(e) => {
                 d.error = e.to_string();

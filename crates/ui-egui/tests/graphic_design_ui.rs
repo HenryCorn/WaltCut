@@ -85,7 +85,7 @@ fn graphic_editor_and_font_dialog_work_without_a_library() {
     d.exec("playhead.set", json!({"seconds": 300}));
     let r = d.exec("graphics.newText", json!({"text": "Editable title", "font": "Inter"}));
     let clip = r["clip"].as_u64().unwrap();
-    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.set", json!({"workspace": "Editing"}));
     d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.ok("ui.menu.invoke", json!({"id": "window.panel.EssentialGraphics"}));
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": []}));
@@ -131,11 +131,14 @@ fn type_tool_selection_styles_characters() {
     d.exec("playhead.set", json!({"seconds": 300}));
     let r = d.exec("graphics.newText", json!({"text": "Hello World"}));
     let clip = r["clip"].as_u64().unwrap();
-    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.set", json!({"workspace": "Editing"}));
     d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
     // a Type-tool selection of "World" (bytes 6..11)
     d.ok("ui.set", json!({"tool": "Type", "gfxEdit": {"clip": clip, "layer": 0, "caret": 11, "anchor": 6}}));
+    d.frames(3);
+    // the Style row is below the panel's visible area: scroll the panel until it is on screen
+    d.ok("ui.scroll", json!({"id": "graphics.section.Text", "dy": -600.0}));
     d.frames(3);
     d.ok("ui.click", json!({"id": "graphics.prop.faux_bold"}));
     d.frames(2);
