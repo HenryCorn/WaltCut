@@ -131,7 +131,7 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
   [ROADMAP.md](../ROADMAP.md). If your change has no task id, use the area: `docs: …`,
   `README: …`, `ROADMAP: …`.
 - Commit only green states (all gates pass).
-- When a milestone lands, update its row in [roadmap.md](roadmap.md) (status, what's done, estimates), the summary in `ROADMAP.md`, and the parity doc and [gaps.md](gaps.md) entry it moves, with their "Last updated" lines and revision history.
+- When a milestone lands, update its row in [roadmap.md](roadmap.md) (status, what's done, estimates), the summary in `ROADMAP.md`.
 - AI agents end commit messages with the attribution line their environment requires.
 
 ## 5. Pull requests and repository checks
@@ -205,7 +205,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 4. The GPU path needs no change: `render::plan` pre-renders layers with standard effects on the CPU.
    To run it on the GPU too, make it an `FxOp` in `crates/render/src/gpufx.rs` instead (parameter
    evaluation in `FxOp::eval`, the CPU reference in `FxOp::apply`, the id in `GPU_EFFECTS`), add
-   its passes to `crates/gpu/src/fx.rs` and its math to `fx.wgsl`, and a parity case to
+   its passes to `crates/gpu/src/fx.rs` and its math to `fx.wgsl`, and a CPU-vs-GPU agreement case to
    `crates/gpu/src/fx_tests.rs`.
 
 Audio effects implement `AudioEffect` in `crates/audio-dsp` and register in its `effects()`
@@ -216,7 +216,7 @@ stream is cut into blocks (there are tests for this).
 ### A transition
 
 1. Define video transitions with `tr(id, name, FOLDER, badges, params)` in
-   `crates/project/src/vtransition.rs` (folders follow Premiere 26: ten `Video Transitions/*`
+   `crates/project/src/vtransition.rs` (ten `Video Transitions/*`
    folders plus `Legacy/Video Transitions`). Parameters are not animatable. Never rename an id:
    projects store it. Audio transitions are `EffectKind::AudioTransition` defs in `effect.rs`.
 2. Implement it in the matching module of `crates/render/src/transitions/` (`wipe`, `motion`,

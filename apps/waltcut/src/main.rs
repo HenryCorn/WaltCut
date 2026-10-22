@@ -291,7 +291,6 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         if waltcut_platform::pen::install_pen_monitor() {
             app.hooks.pen_pressure = Some(Box::new(waltcut_platform::pen::pen_pressure));
         }
-        app.hooks.system_languages = Some(Box::new(|| sys_locale::get_locales().collect()));
         app.hooks.raise_without_focus = Some(Box::new(|| {
             window_raise::raise_without_focus();
         }));

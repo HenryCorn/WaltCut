@@ -25,7 +25,7 @@ impl Driver {
         let (tx, rx) = channel();
         let app = FilmcraftApp::new(s).with_control(rx);
         let shots = std::env::var_os("FILMCRAFT_UI_SHOTS").map(std::path::PathBuf::from);
-        let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_step_dt(1.0 / 60.0).with_max_steps(10_000);
+        let mut b = Harness::builder().with_size(egui::vec2(1600.0, 1800.0)).with_step_dt(1.0 / 60.0).with_max_steps(10_000);
         if shots.is_some() {
             b = b.wgpu().with_pixels_per_point(1.0);
         }
@@ -380,7 +380,8 @@ fn a_click_in_the_edited_text_moves_the_caret() {
 #[test]
 fn text_properties_switches_between_point_and_paragraph_text() {
     let mut d = Driver::new();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.panel.show", json!({"panel": "Properties"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Graphics"}));
     let (clip, pre) = d.paragraph_text();
     let tl = d.handle(&pre, 0);
     d.ok("ui.click", json!({"id": "graphics.textProperties"}));

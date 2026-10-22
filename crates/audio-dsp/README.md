@@ -83,7 +83,7 @@ expose the analytic curves for the graphical effect editors. Modulation effects 
 at the beginning of a chain, so a random-access render may differ in LFO phase from continuous
 playback.
 
-`effects::premiere_tests` checks every effect: neutral settings are (delayed) identity, output is
+`effects::effect_tests` checks every effect: neutral settings are (delayed) identity, output is
 deterministic and latency constant (impulse lands at `latency()`), plus a level / frequency-response
 test on generated tones, noise or impulses and a realtime-factor floor.
 

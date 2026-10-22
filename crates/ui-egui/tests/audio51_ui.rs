@@ -138,7 +138,8 @@ impl Driver {
 #[test]
 fn surround_panner_puck_and_six_channel_meters() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     assert!(d.has("mixer.A1.pan") && !d.has("mixer.A1.pan51"), "stereo Mix: pan knob");
     d.exec("sequence.settings", json!({"mix": "5.1"}));
@@ -179,7 +180,8 @@ fn surround_panner_puck_and_six_channel_meters() {
 #[test]
 fn show_hide_tracks_and_meter_input_only() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     assert!(d.has("mixer.A2.fader"));
     d.click("mixer.menu");

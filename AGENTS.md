@@ -1,11 +1,11 @@
-# FilmCraft — rules for agents and contributors
+# WaltCut — rules for agents and contributors
 
 These rules apply to every human and AI contributor. `CLAUDE.md` holds the working instructions; this
 file holds the rules that must never be broken. When the two disagree, this file wins.
 
 ## 0. Never crash
 
-People trust FilmCraft with hours of work. A malformed file, a bad command or MCP parameter, a corrupt
+People trust WaltCut with hours of work. A malformed file, a bad command or MCP parameter, a corrupt
 preset or project, an odd keystroke or a full disk must give an error the user (or agent) can act on,
 never a crash and never lost work. **This rule outranks feature work:** don't ship a feature by adding a
 panic path, and fix a crash before building on top of it. The cross-app standard is
@@ -21,7 +21,7 @@ panic path, and fix a crash before building on top of it. The cross-app standard
    code alone (a literal that always parses): a single-item `#[allow(clippy::expect_used)]` with the reason.
 3. **No `unsafe`** (`unsafe_code = "forbid"` for the workspace). The single exception is
    `crates/platform`, which needs `unsafe` to call the operating system's media APIs (hardware
-   video decoding through VideoToolbox, Media Foundation / Direct3D 11, VA-API and NVDEC; hardware encoding) and does nothing else. It
+   video decoding and encoding through VideoToolbox) and does nothing else. It
    uses `unsafe_code = "deny"` with `#[allow(unsafe_code)]` only on its FFI modules, a
    `// SAFETY:` comment on every `unsafe` block, a safe `Result`-returning public API, and the
    pure-Rust decoder as the tested fallback ([ADR 0001](docs/adr/0001-platform-ffi.md)).
@@ -80,8 +80,8 @@ reproduce an image (for example, point lists traced from someone else's icon).
    `cargo xtask ci`) fails if any asset lacks a sidecar or index entry.
 4. **Screenshots** in the repo may show only FilmCraft (or other open projects), with media we generated
    or media that is itself openly licensed. Never commit screenshots of Adobe products.
-5. **Local reference material stays local.** Premiere reference screenshots and notes live only in
-   `plan/premiere/` (gitignored). They must never be committed, bundled, embedded, traced or shipped.
+5. **Local reference material stays local.** Screenshots or notes of other applications stay out of
+   the repository. They must never be committed, bundled, embedded, traced or shipped.
 6. **Code-drawn assets** (icons in `crates/ui-egui/src/icons.rs`, procedural demo footage in
    `crates/media`, procedural looks in `crates/render`) are original work under the project licence
    and are listed in `ATTRIBUTION.md`.
@@ -142,7 +142,7 @@ as PhotoCraft does with `cargo xtask corpus`.
 - [docs/agents.md](docs/agents.md): driving FilmCraft over MCP / the control channel, and the agent work loop
 - [docs/control-protocol.md](docs/control-protocol.md): control-channel method reference
 - [ATTRIBUTION.md](ATTRIBUTION.md): asset index
-- [ROADMAP.md](ROADMAP.md), [docs/target-app-parity.md](docs/target-app-parity.md), [docs/gaps.md](docs/gaps.md): stage, parity with Premiere Pro and the ranked work list (craftrules `standards/progress-docs.md`)
+- [ROADMAP.md](ROADMAP.md), [docs/roadmap.md](docs/roadmap.md), [docs/animation.md](docs/animation.md): stage, current focus and the product scope
 
 ## Contributor credits (About window)
 

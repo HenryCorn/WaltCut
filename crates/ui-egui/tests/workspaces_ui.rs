@@ -161,22 +161,7 @@ fn save_switch_reset_rename_delete_and_restart() {
     let names: Vec<&str> = menu.iter().map(|(l, _)| l.as_str()).collect();
     assert_eq!(
         names,
-        [
-            "All Panels",
-            "Assembly",
-            "Audio",
-            "Captions and Graphics",
-            "Color",
-            "Cutting",
-            "Editing",
-            "Effects",
-            "Learning",
-            "Review",
-            "Reset to Saved Layout",
-            "Save Changes to this Workspace",
-            "Save as New Workspace…",
-            "Edit Workspaces…"
-        ],
+        ["Cutting", "Editing", "Reset to Saved Layout", "Save Changes to this Workspace", "Save as New Workspace…", "Edit Workspaces…"],
         "one alphabetical list, then the layout commands"
     );
     assert!(menu.iter().any(|(l, c)| l == "Cutting" && *c), "the current workspace is checked: {menu:?}");
@@ -188,9 +173,9 @@ fn save_switch_reset_rename_delete_and_restart() {
     assert!(d.menu_err("window.workspace.saveAs", json!({"name": "Reset"})).contains("can't be used"));
 
     // switch away and back (by menu and by ui.set): the saved layout comes back
-    d.menu("window.workspace.color", json!({}));
-    assert_eq!(d.workspace(), "Color");
-    assert!(d.shows(PanelKind::Effects));
+    d.ok("ui.set", json!({"workspace": "Editing"}));
+    assert_eq!(d.workspace(), "Editing");
+    assert!(d.shows(PanelKind::Metadata));
     d.ok("ui.set", json!({"workspace": "cutting"}));
     assert_eq!(d.workspace(), "Cutting");
     assert!(!d.shows(PanelKind::Metadata));
@@ -202,16 +187,16 @@ fn save_switch_reset_rename_delete_and_restart() {
     assert!(d.shows(PanelKind::Project) && !d.shows(PanelKind::Metadata));
 
     // Save Changes to this Workspace on a built-in; it can't be deleted, only restored
-    d.ok("ui.set", json!({"workspace": "Assembly"}));
+    d.ok("ui.set", json!({"workspace": "Editing"}));
     d.ok("ui.panel.close", json!({"panel": "History"}));
     d.menu("window.workspace.saveChanges", json!({}));
     d.ok("ui.set", json!({"workspace": "Cutting"}));
-    d.ok("ui.set", json!({"workspace": "Assembly"}));
+    d.ok("ui.set", json!({"workspace": "Editing"}));
     assert!(!d.shows(PanelKind::History), "the built-in keeps its saved changes");
-    assert_eq!(d.menu("window.workspace.delete", json!({"name": "Assembly"}))["restored"], "Assembly");
+    assert_eq!(d.menu("window.workspace.delete", json!({"name": "Editing"}))["restored"], "Editing");
     assert!(d.shows(PanelKind::History), "restoring the current built-in shows its original layout");
-    assert!(d.menu_err("window.workspace.delete", json!({"name": "Assembly"})).contains("can't be deleted"));
-    assert!(d.menu_err("window.workspace.rename", json!({"from": "Assembly", "to": "Mine"})).contains("keeps its name"));
+    assert!(d.menu_err("window.workspace.delete", json!({"name": "Editing"})).contains("can't be deleted"));
+    assert!(d.menu_err("window.workspace.rename", json!({"from": "Editing", "to": "Mine"})).contains("keeps its name"));
 
     // rename follows the current workspace
     d.ok("ui.set", json!({"workspace": "Cutting"}));

@@ -158,7 +158,7 @@ fn vsplit(size: SplitSize, a: DockNode, b: DockNode) -> DockNode {
     DockNode::Split { vertical: true, size, a: Box::new(a), b: Box::new(b) }
 }
 
-pub const WORKSPACES: [&str; 9] = ["Editing", "Assembly", "Color", "Effects", "Audio", "Captions and Graphics", "Learning", "Review", "All Panels"];
+pub const WORKSPACES: [&str; 1] = ["Editing"];
 
 /// The user's workspaces file, beside `preferences.json` in the data directory.
 pub const WORKSPACES_FILE: &str = "workspaces.json";
@@ -289,81 +289,24 @@ fn migrate_legacy_effects(root: &mut DockNode) {
 }
 
 /// The default layout of a named workspace.
-pub fn workspace(name: &str) -> DockNode {
+pub fn workspace(_name: &str) -> DockNode {
     use PanelKind::*;
     use SplitSize::*;
-    let bottom_editing = || hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0)));
-    match name {
-        "Assembly" => vsplit(
-            Ratio(0.52),
-            hsplit(
-                Ratio(0.46),
-                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
-            ),
-            bottom_editing(),
+    // The one layout: top: Source group | Program | Properties; bottom: Project group | Tools |
+    // Timeline | Meters.
+    vsplit(
+        Ratio(0.57),
+        hsplit(
+            FixedB(450.0),
+            hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
+            tabs(&[Properties, EssentialGraphics], 0),
         ),
-        "Color" => hsplit(
-            FixedB(340.0),
-            vsplit(
-                Ratio(0.58),
-                hsplit(Ratio(0.42), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Info, Markers, History], 0), bottom_editing()),
-            ),
-            tabs(&[Effects], 0),
+        hsplit(
+            Ratio(0.29),
+            tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
+            hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
         ),
-        "Effects" => hsplit(
-            FixedB(320.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer], 1), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Info, Markers, History], 0), bottom_editing()),
-            ),
-            vsplit(Ratio(0.5), tabs(&[Effects], 0), tabs(&[EssentialGraphics], 0)),
-        ),
-        "Audio" => hsplit(
-            FixedB(320.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.5), tabs(&[AudioTrackMixer, Source, AudioClipMixer, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Effects, Markers, History], 0), bottom_editing()),
-            ),
-            tabs(&[EssentialSound], 0),
-        ),
-        "Captions and Graphics" => hsplit(
-            FixedB(330.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.4), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Libraries], 0), bottom_editing()),
-            ),
-            tabs(&[EssentialGraphics, Properties], 0),
-        ),
-        "All Panels" => vsplit(
-            Ratio(0.5),
-            hsplit(
-                Ratio(0.5),
-                tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0),
-                hsplit(Ratio(0.6), tabs(&[Program], 0), tabs(&[EssentialGraphics, EssentialSound, Properties, AudioTrackMixer], 0)),
-            ),
-            hsplit(Ratio(0.26), tabs(&[Project, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),
-        ),
-        // Editing (default), Learning, Review — Premiere 26 factory layout:
-        // top: Source group | Program | Properties; bottom: Project group | Tools | Timeline | Meters.
-        _ => vsplit(
-            Ratio(0.57),
-            hsplit(
-                FixedB(450.0),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
-                tabs(&[Properties, EssentialGraphics], 0),
-            ),
-            hsplit(
-                Ratio(0.29),
-                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
-                hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
-            ),
-        ),
-    }
+    )
 }
 
 impl DockNode {

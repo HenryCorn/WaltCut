@@ -37,7 +37,8 @@ impl Driver {
         let harness = b.build_eframe(move |_cc| app);
         let mut d = Driver { harness, tx, shots };
         d.frames(4);
-        d.ok("ui.set", json!({"workspace": "Effects"}));
+        d.ok("ui.panel.show", json!({"panel": "Effects"}));
+        d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
         d
     }
     fn frames(&mut self, n: usize) {

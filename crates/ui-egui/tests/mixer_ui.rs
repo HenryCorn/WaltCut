@@ -160,7 +160,8 @@ impl Driver {
 #[test]
 fn audio_chrome_switches_between_themes() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     for theme in ["light", "dark", "medium"] {
         d.ok("ui.set", json!({"theme": theme}));
         d.frames(3);
@@ -173,7 +174,8 @@ fn audio_chrome_switches_between_themes() {
 #[test]
 fn track_mixer_controls_by_id_and_by_drag() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     let ids = d.ids("mixer.");
     for id in [
@@ -223,7 +225,8 @@ fn track_mixer_controls_by_id_and_by_drag() {
 #[test]
 fn recording_a_touch_pass_from_the_fader() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     d.exec("mixer.setStrip", json!({"strip": "A1", "mode": "Touch"}));
     d.exec("playhead.set", json!({"seconds": 1.0}));
@@ -464,9 +467,12 @@ fn audio_gain_dialog_normalizes_the_selection() {
 /// window sleep. Run only frames requested by egui; forcing frames would hide the original bug.
 #[test]
 fn paused_meters_repaint_without_input_and_settle_after_release() {
-    for workspace in ["Editing", "Audio"] {
+    for mixer_open in [false, true] {
         let mut d = Driver::demo_with_step_dt(Some(0.1));
-        d.ok("ui.set", json!({"workspace": workspace}));
+        let workspace = if mixer_open { "Audio" } else { "Editing" };
+        if mixer_open {
+            d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+        }
         d.ok("ui.playback", json!({"action": "play"}));
         d.frames(10);
         let prefix = if workspace == "Audio" { "mixer.Mix.meter" } else { "audioMeters.channel." };

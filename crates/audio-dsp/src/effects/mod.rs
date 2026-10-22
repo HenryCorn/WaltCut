@@ -318,4 +318,4 @@ mod tests {
 }
 
 #[cfg(test)]
-mod premiere_tests;
+mod effect_tests;

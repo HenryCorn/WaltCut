@@ -1,7 +1,7 @@
 # Agents
 
 FilmCraft is built to be driven by AI agents, and largely built by them. Part 1 covers using
-FilmCraft from an agent. Part 2 covers developing FilmCraft as an agent.
+FilmCraft from an agent. Part 2 covers developing WaltCut as an agent.
 
 # Part 1: driving FilmCraft
 
@@ -255,34 +255,28 @@ For any UI change, look at the result:
 Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: FilmCraft only, openly licensed
 media, sidecar and `ATTRIBUTION.md` entry.
 
-# Part 2: developing FilmCraft
+# Part 2: developing WaltCut
 
 ## 4. Orientation, in this order
 
 1. [AGENTS.md](../AGENTS.md): absolute rules (assets, clean-room, licences).
 2. [CLAUDE.md](../CLAUDE.md): working instructions and non-negotiables.
-3. [ROADMAP.md](../ROADMAP.md) for the summary, then [gaps.md](gaps.md) (the ranked shortfalls) first,
-   [target-app-parity.md](target-app-parity.md) and [roadmap.md](roadmap.md) (milestones, current focus).
+3. [ROADMAP.md](../ROADMAP.md) for the summary, [roadmap.md](roadmap.md) (current focus) and
+   [animation.md](animation.md) (the product scope).
 4. [architecture.md](architecture.md), then the README and tests of the crate you'll touch.
 5. [contributing.md](contributing.md) (how to add things, gates) and [testing.md](testing.md).
 
-Maintainers also keep a local planning folder, `plan/`. It is gitignored and not in the repository,
-and holds the task-level plan, the status file and behaviour reference notes. If you don't have it,
-everything you need to contribute is in the public docs above. Ask a maintainer for a task id.
-
 ## 5. Autonomous work loop
 
-1. **Orient.** Pick the next task: the next unchecked task in the maintainer status file, or an open
-   [gaps.md](gaps.md) entry. Prefer those gaps (stability, `.prproj`, camera media, measurement,
-   hardware) over adding more checklist items. Read the relevant
-   architecture section and crate README.
+1. **Orient.** Pick the next open task of the epic #14 or the roadmap's current focus. Read the
+   relevant architecture section and crate README.
 2. **Plan tests first.** Write down the acceptance test before writing code.
 3. **Implement and test.**
 4. **Verify.** Run all gates (`cargo xtask ci`). For UI work, run the app with `--control`, drive it
    and look at the screenshots (§3).
 5. **Record.** Update the crate README (behaviour decisions, test results, limitations) and
-   the progress docs when a milestone moves (ROADMAP.md, docs/roadmap.md, the relevant parity doc
-   and gaps.md, with their timestamps). Commit as `M<n>.<k>: …`, then move on to the next task.
+   the progress docs when a milestone moves (ROADMAP.md, docs/roadmap.md). Commit as `#<issue>: …`,
+   then move on to the next task.
 
 For parallel agents, use one git worktree and one `CARGO_TARGET_DIR` per agent, and keep each crate
 with one owner ([contributing.md §5](contributing.md#5-parallel-work-several-agents-or-worktrees)).
@@ -291,9 +285,8 @@ with one owner ([contributing.md §5](contributing.md#5-parallel-work-several-ag
 
 Don't block on choices you can make yourself:
 
-- **Behaviour.** Match the publicly documented and observable behaviour of professional editors
-  (help pages, published shortcut lists, using the app). Never inspect application internals
-  ([AGENTS.md](../AGENTS.md) §2). If behaviour is undocumented, choose what editors most commonly
+- **Behaviour.** Follow [animation.md](animation.md). Never inspect other applications' internals
+  ([AGENTS.md](../AGENTS.md) §2). If behaviour is undocumented, choose what animators most commonly
   expect and record the choice in the crate README.
 - **Ask a human only about:**
   - licences outside the allowlist;
@@ -313,17 +306,12 @@ A feature is done when:
 - [ ] every new interactive widget has an automation id;
 - [ ] you have driven it through the control channel and reviewed a screenshot;
 - [ ] all gates pass (`cargo xtask ci`), and new assets have sidecars;
-- [ ] the crate README and the progress docs (ROADMAP.md, docs/gaps.md, the parity docs) are updated where relevant;
+- [ ] the crate README and the progress docs (ROADMAP.md, docs/roadmap.md) are updated where relevant;
 - [ ] it is committed with its task id.
 
 ### Reporting progress honestly
 
-ROADMAP.md and [target-app-parity.md](target-app-parity.md) keep two numbers: **feature breadth**
-(does it exist?) and **ready for real work** (does it hold up?). When you update either:
-
 - say how a number was obtained: *measured* (a test, a diff, a benchmark you ran) or *estimated*;
 - count an approximation, a stub or a partly wired setting as such, never as done;
-- record known bugs and limitations in the crate README and [gaps.md](gaps.md), not only
-  what works;
-- benchmarks state the machine, the load average and before/after on the same build;
-- don't raise a percentage without evidence a reviewer can rerun.
+- record known bugs and limitations in the crate README;
+- benchmarks state the machine, the load average and before/after on the same build.

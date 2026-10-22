@@ -411,9 +411,8 @@ pub fn font_families() -> Vec<FontFamily> {
     vec![FontFamily::Proportional, FontFamily::Monospace, FontFamily::Name("semibold".into()), FontFamily::Name("medium".into())]
 }
 
-/// Install the Latin UI fonts, Chinese fallback (craft-fonts or an installed face), Japanese
-/// craft-fonts, Arabic and Hebrew fallbacks (craft-fonts or installed faces, [`crate::rtl`]) and
-/// egui visuals. Document names keep their glyphs in every interface language.
+/// Install the Latin UI fonts, the Japanese craft-fonts (so document names keep their glyphs) and
+/// egui visuals.
 pub fn install(ctx: &egui::Context, t: &Tokens) {
     let mut fonts = FontDefinitions::default();
     fonts.font_data.insert("inter".into(), Arc::new(FontData::from_static(waltcut_text::fonts::INTER_REGULAR)));
@@ -424,10 +423,7 @@ pub fn install(ctx: &egui::Context, t: &Tokens) {
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "jbmono".into());
     fonts.families.insert(FontFamily::Name("semibold".into()), vec!["inter-semibold".into(), "inter".into()]);
     fonts.families.insert(FontFamily::Name("medium".into()), vec!["inter-medium".into(), "inter".into()]);
-    // Japanese before Chinese: the two share code points, and Japanese text must keep Japanese
-    // glyph forms; Chinese faces still cover the hanzi Japanese fonts lack
     add_craft_fonts(&mut fonts);
-    crate::cjk::install(&mut fonts);
     ctx.set_fonts(fonts);
     apply_visuals(ctx, t);
 }
@@ -597,68 +593,6 @@ mod tests {
         assert!(v(t.playhead) > v(pink) && v(t.timecode) > v(pink) && v(t.track_target) < v(pink), "lighter and darker as the default blues are");
     }
 
-    /// Chinese media and track names must render even when the interface stays in English.
-    /// Compare the rasterized glyphs with the missing-glyph box, including custom weight families.
-    #[test]
-    fn chinese_names_render_in_every_theme_and_font_family() {
-        const CHINESE: &str = "中文旁白音乐声轨测试简体汉语繁體漢語车";
-        waltcut_text::fonts::scan_system();
-        let available = waltcut_text::fonts::all_faces()
-            .iter()
-            .any(|f| matches!(f.info.origin, "system" | waltcut_text::fonts::CRAFT_ORIGIN) && CHINESE.chars().all(|c| f.has_char(c)));
-        if !available {
-            eprintln!("SKIPPED: no craft-fonts or installed Chinese font");
-            return;
-        }
-        let ctx = egui::Context::default();
-        for kind in [ThemeKind::Dark, ThemeKind::Medium, ThemeKind::Light] {
-            install(&ctx, &Tokens::for_kind(kind));
-            ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
-            ctx.fonts_mut(|fonts| {
-                for family in font_families() {
-                    let font = FontId::new(13.0, family);
-                    let missing = fonts.layout_no_wrap("\u{fffd}".into(), font.clone(), Color32::WHITE);
-                    let missing_uv = missing.rows[0].glyphs[0].uv_rect;
-                    let names = fonts.layout_no_wrap(CHINESE.into(), font.clone(), Color32::WHITE);
-                    assert_eq!(names.rows.iter().map(|r| r.glyphs.len()).sum::<usize>(), CHINESE.chars().count());
-                    for glyph in names.rows.iter().flat_map(|r| &r.glyphs) {
-                        assert!(!glyph.uv_rect.is_nothing(), "empty {} in {font:?}", glyph.chr);
-                        assert_ne!(glyph.uv_rect, missing_uv, "missing {} in {kind:?} / {font:?}", glyph.chr);
-                    }
-                }
-            });
-        }
-        // the layouts above put glyphs in the atlas: take that update so it isn't dropped unapplied
-        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
-    }
-
-    /// Typed, pasted or IME-composed Hangul draws real glyphs, not the missing-glyph box (artcraft#2093).
-    #[test]
-    fn korean_text_renders_with_an_installed_korean_font() {
-        const KOREAN: &str = "한국어 입력 테스트";
-        waltcut_text::fonts::scan_system();
-        let available = waltcut_text::fonts::all_faces().iter().any(|f| f.info.origin == "system" && KOREAN.chars().all(|c| f.has_char(c)));
-        if !available {
-            eprintln!("SKIPPED: no installed Korean font");
-            return;
-        }
-        let ctx = egui::Context::default();
-        install(&ctx, &Tokens::for_kind(ThemeKind::Dark));
-        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
-        ctx.fonts_mut(|fonts| {
-            for family in font_families() {
-                let font = FontId::new(13.0, family);
-                let missing = fonts.layout_no_wrap("\u{fffd}".into(), font.clone(), Color32::WHITE);
-                let missing_uv = missing.rows[0].glyphs[0].uv_rect;
-                let text = fonts.layout_no_wrap(KOREAN.into(), font.clone(), Color32::WHITE);
-                for glyph in text.rows.iter().flat_map(|r| &r.glyphs).filter(|g| g.chr != ' ') {
-                    assert_ne!(glyph.uv_rect, missing_uv, "missing {} in {font:?}", glyph.chr);
-                }
-            }
-        });
-        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
-    }
-
     /// Built with craft-fonts: every font family ends with the Japanese faces (BIZ UDPGothic
     /// first), and Japanese text gets real glyphs, not the replacement box.
     #[test]
@@ -691,11 +625,11 @@ mod tests {
         assert!(galley.size().x > 13.0 * 4.0, "{:?}", galley.size());
     }
 
-    /// Latin text keeps its UI faces, with or without craft-fonts and system Chinese fonts.
+    /// Latin text keeps its UI faces, with or without craft-fonts.
     #[test]
     fn works_without_craft_fonts() {
         let ctx = installed();
-        let n = waltcut_text::fonts::craft_japanese().count() + crate::cjk::craft_fonts().count();
+        let n = waltcut_text::fonts::craft_japanese().count();
         ctx.fonts_mut(|fonts| {
             let defs = fonts.definitions().clone();
             assert_eq!(defs.font_data.keys().filter(|k| k.starts_with("craft:")).count(), n);

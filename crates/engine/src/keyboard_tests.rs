@@ -38,11 +38,9 @@ fn target_v1(s: &mut Session) {
 
 #[test]
 fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
-    let tables: [(&str, Vec<presets::Entry>); 4] = [
-        ("Premiere", presets::premiere()),
-        ("FilmCraft panels", presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL).copied().collect()),
-        ("Final Cut", presets::FINAL_CUT.to_vec()),
-        ("Avid", presets::AVID.to_vec()),
+    let tables: [(&str, Vec<presets::Entry>); 2] = [
+        ("Extra keys", presets::EXTRA_KEYS.iter().chain(presets::PANEL_KEYS).copied().collect()),
+        ("FilmCraft panels", presets::FILMCRAFT_PANEL.iter().chain(presets::PANEL_KEYS).copied().collect()),
     ];
     for (name, table) in tables {
         let mut seen: std::collections::BTreeMap<(String, String), &str> = Default::default();
@@ -63,18 +61,18 @@ fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
 }
 
 #[test]
-fn premiere_engine_entries_exist() {
+fn extra_key_engine_entries_exist() {
     // UI-owned ids (tools, transport, panels…) are checked by the ui-egui keyboard test
     let ui_prefixes = ["tool.", "playback.", "window.", "view.", "app.", "help.", "mode.", "projectPanel.", "textPanel.", "panel."];
     let ui_ids = ["timeline.expandAllTracks", "timeline.minimizeAllTracks", "graphics.beginTextEditing"];
-    for (id, _, _) in presets::premiere() {
-        if id.starts_with("timeline.") && (id.contains("Height") || id.contains("Screen")) || ui_ids.contains(&id) {
+    for (id, _, _) in presets::EXTRA_KEYS.iter().chain(presets::PANEL_KEYS) {
+        if id.starts_with("timeline.") && (id.contains("Height") || id.contains("Screen")) || ui_ids.contains(id) {
             continue;
         }
         if ui_prefixes.iter().any(|p| id.starts_with(p)) && commands::find(id).is_none() {
             continue;
         }
-        assert!(commands::find(id).is_some(), "Premiere table names unknown engine command `{id}`");
+        assert!(commands::find(id).is_some(), "key table names unknown engine command `{id}`");
     }
 }
 
