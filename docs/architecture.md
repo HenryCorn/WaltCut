@@ -137,8 +137,7 @@ TrackItem (a clip instance)
 ├─ link group, label, enabled
 └─ effects: Vec<EffectInstance>      intrinsic Motion/Opacity/Volume… first, then standard effects
 EffectInstance
-├─ effect id, enabled, params: id → constant value or keyframe track
-└─ masks: Vec<Mask>                  path (keyframable Bézier), feather, opacity, expansion, inverted, mode
+└─ effect id, enabled, params: id → constant value or keyframe track
 ```
 
 - **Graphic clips** ([graphics.md](graphics.md)) reference a `Graphic` canvas item; their text and
@@ -297,12 +296,12 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   Correction, Levels, Extract, Invert, Posterize, Alpha Adjust, Gaussian Blur and Directional Blur
   (and their legacy aliases), Camera Blur, Sharpen, Unsharp Mask, Crop, Edge Feather, Transform,
   Horizontal / Vertical Flip, Mirror, Offset, Vignette and Video Limiter. When every enabled effect of a media clip is in
-  that set (unmasked, with finite parameters, and no Transform shrinking the picture below half
+  that set (with finite parameters, and no Transform shrinking the picture below half
   size, which the CPU pre-filters), the plan hands the GPU the clip's source with
   the effects' parameters evaluated at that time: the source is drawn into an `Rgba32Float`
   working image at the size the CPU decodes it, each effect runs as compute passes with the CPU
   reference's math (effects, then Motion, then Opacity / blend, as on the CPU), and the result is
-  placed like any layer. Other standard effects, effect and opacity masks,
+  placed like any layer. Other standard effects,
   nested sequences (except a plain one, whose own layers go into the plan: same frame size and
   colour settings as its parent, nothing on the clip that changes the picture, every layer inside
   blended normally) and non-dissolve transitions are rendered on the CPU for that layer or frame
@@ -322,7 +321,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   no zero-fill) by the export pipeline once a frame is converted to 8 bits; a standalone export's
   pipeline frees the idle float images (`pool::trim_f32`) when it goes away, so a finished export
   leaves none behind (parts of a batch, such as render-preview segments, keep them for the next part). A clip
-  with effects, opacity masks, frame blending, colour management, or a picture that is not placed
+  with effects, frame blending, colour management, or a picture that is not placed
   one to one on the output takes the general path.
 - **Frame scheduling.** `crates/ui-egui/src/frames.rs` runs a small pool of worker threads with
   prioritised jobs: the frame on screen first, then playback prefetch, then thumbnails. The UI never
@@ -497,35 +496,17 @@ essentialSound.generateDucking   trigger clips' summed level (10 ms hops) → ac
   DeepFilterNet (MIT/Apache-2.0, Rust inference via tract) is the candidate for a future optional
   integration behind a trait.
 
-### 5.3 Masks
+### 5.3 Clip compositing
 
-Every video effect and the intrinsic Opacity carry `EffectInstance::masks` (`project::mask`).
-A mask is a closed cubic Bézier `MaskPath` in clip pixels (ellipse = four smooth vertices with
-circular tangents, 4-point polygon = corner vertices, the pen draws arbitrary vertices), stored as a
-`ParamValue::Path` so the ordinary keyframe engine animates it (vertex-wise interpolation; paths
-with different vertex counts hold). Feather, Opacity and Expansion are ordinary float parameters.
+Motion, Opacity and blend operate on whole media, drawing and graphic clips. Their ordinary
+parameters keep the shared keyframe engine and Effect Controls graphs. Drawing erasers and text
+raster coverage are artwork primitives, not effect masks.
 
-- **Coverage** (`render::mask`): the path is flattened (≤ 0.05 working px chord error); the
-  signed distance to the polygon (nonzero winding) plus Expansion goes through a falloff of width
-  max(Feather, 1) centred on the edge (linear = exact box-filtered antialiasing at Feather 0,
-  blending into smoothstep as Feather grows). Masks combine top to bottom with Add / Subtract /
-  Intersect / Lighten / Darken / Difference; Inverted and Opacity apply per mask.
-- **Semantics.** A masked effect is `lerp(original, effected, coverage)` per premultiplied channel
-  (the effect only applies inside); Opacity masks scale the clip's layer before Motion, so they
-  follow the clip's transform.
-- **GPU.** `waltcut-gpu::GpuMask` evaluates the same coverage and mix in WGSL (compute), tested
-  to agree with the CPU within 3·10⁻⁶. Layers with masks are CPU-rendered images in frame plans.
-- **Editing.** `masks.*` commands (add / remove / set / moveVertex / translate / addVertex /
-  removeVertex / toggleVertexSmooth / roundCorners / select / list; `masks.add` takes a
-  `cornerRadius` for a rounded rectangle); keyframe commands take `"mask": n`. The
-  Program monitor overlay drags vertices, Bézier handles, the whole mask and the feather /
-  expansion handles; drags merge into one undo step.
-- **Tracking** (`render::track`, `masks.track`): Shi–Tomasi features inside the mask, pyramidal
-  Lucas–Kanade (4 levels, 15×15 window) with a forward–backward check, then RANSAC + least squares
-  for Position / Position & Rotation / Position, Scale & Rotation (2D Procrustes). Each frame's
-  transform moves the path, written as Mask Path keyframes while the background job runs (one undo
-  step per run; `jobs.cancel` stops and keeps what was tracked). Frames are tracked at ≤ 960 px
-  wide. On synthetic footage with known similarity motion the path stays within 0.3 px over 20 frames.
+The masks/tracking slice of #24 removes mask data, commands, background jobs, UI overlays and CPU/
+GPU coverage passes. Effects run directly on the layer; opacity and blending still run after
+Motion. Unknown effect-instance fields are rejected to avoid silently rendering old masked data
+as a different picture. The ordinary stabilizer and optical-flow effects retain internal image
+analysis in `render::motion_analysis`; this is not project tracking state or a command surface.
 
 ### 5.4 Colour management
 

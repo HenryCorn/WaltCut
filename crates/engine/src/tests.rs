@@ -13,6 +13,76 @@ fn invalid_preview_scales_are_rejected_without_allocating() {
 }
 use serde_json::json;
 
+#[test]
+fn mask_commands_are_absent_and_unknown_targets_do_not_edit() {
+    let mut s = demo();
+    let before = s.project.clone();
+    let undo = s.history.undo.len();
+    for id in [
+        "masks.add",
+        "masks.remove",
+        "masks.set",
+        "masks.moveVertex",
+        "masks.translate",
+        "masks.addVertex",
+        "masks.removeVertex",
+        "masks.track",
+        "masks.toggleVertexSmooth",
+        "masks.roundCorners",
+        "masks.select",
+        "masks.list",
+    ] {
+        assert!(commands::find(id).is_none(), "{id}");
+        assert!(matches!(s.execute(id, json!({"clip": u64::MAX, "mask": -1})), Err(EngineError::UnknownCommand(_))));
+    }
+    assert!(!commands::command_specs().iter().any(|c| c.id.starts_with("masks.")));
+    let clip = clip_ids(&s, 0)[0];
+    for id in [
+        "effects.setParam",
+        "effects.toggleAnimation",
+        "effects.addKeyframe",
+        "effects.deleteKeyframe",
+        "effects.moveKeyframe",
+        "effects.setKeyframe",
+        "effects.setInterpolation",
+    ] {
+        let result = s.execute(id, json!({"clip": clip, "effect": "opacity", "param": "opacity", "mask": 0, "value": 50}));
+        assert!(result.is_err(), "{id} must not redirect a removed target to clip opacity");
+    }
+    assert!(Arc::ptr_eq(&before, &s.project));
+    assert_eq!(s.history.undo.len(), undo);
+}
+
+#[test]
+fn media_drawing_and_graphic_clips_keep_motion_opacity_and_blend_edits() {
+    let mut s = demo();
+    let media = clip_ids(&s, 0)[0];
+    let drawing = s.execute("drawing.new", json!({"time": 0})).unwrap()["clip"].as_u64().unwrap();
+    let text = s.execute("graphics.newText", json!({"text": "Title", "time": 0, "newClip": true})).unwrap()["clip"].as_u64().unwrap();
+    let shape = s.execute("graphics.newShape", json!({"shape": "path", "points": [[0,0],[100,0],[50,100]], "time": 0})).unwrap()["clip"].as_u64().unwrap();
+    let one = Tick::from_seconds_f64(1.0);
+    for clip in [media, drawing, text, shape] {
+        for (param, value) in [("position", json!([320, 180])), ("scale", json!(80)), ("rotation", json!(15)), ("anchor", json!([100, 50]))] {
+            s.execute("effects.setParam", json!({"clip": clip, "effect": "motion", "param": param, "value": value})).unwrap();
+        }
+        s.execute("effects.setParam", json!({"clip": clip, "effect": "opacity", "param": "blend", "value": "Multiply"})).unwrap();
+        for (time, value) in [(Tick::ZERO, 0), (one, 100)] {
+            s.execute("effects.setParam", json!({"clip": clip, "effect": "opacity", "param": "opacity", "value": value, "time": time.0, "keyframe": true}))
+                .unwrap();
+        }
+        let opacity = |s: &Session| s.active_sequence().unwrap().find_item(ClipId(clip)).unwrap().1.effect("opacity").unwrap().clone();
+        let animated = opacity(&s);
+        assert!(animated.is_animated());
+        assert!((animated.f64_at("opacity", Tick(one.0 / 2)) - 50.0).abs() < 1e-9);
+        let blend = animated.param("blend").unwrap().value.as_f64().unwrap() as usize;
+        assert_eq!(waltcut_project::effect::BLEND_MODES[blend], "Multiply");
+        s.undo();
+        assert_eq!(opacity(&s).param("opacity").unwrap().keyframes.len(), 1);
+        s.redo();
+        assert_eq!(opacity(&s), animated);
+    }
+}
+
 fn demo() -> Session {
     let mut s = Session::default();
     s.execute("file.openDemoProject", json!({})).unwrap();
@@ -841,10 +911,9 @@ fn a_merge_key_folds_several_parameters_into_one_undo_step() {
     assert_eq!(motion(&s), start);
 }
 
-/// #639: `effects.select` names the effect whose handles the Program monitor shows. It and the
-/// mask selection replace each other; undo or removal that takes the effect away clears it.
+/// Effect selection survives reordering; undo or removal clears dangling handles.
 #[test]
-fn selecting_an_effect_replaces_the_mask_selection() {
+fn effect_selection_survives_reordering_and_clears_dangling_handles() {
     let mut s = demo_unlocked();
     let id = v1(&s)[0].0;
     let motion_sel = Some(EffectSel { clip: ClipId(id), effect: "motion".into(), instance: 0 });
@@ -855,13 +924,6 @@ fn selecting_an_effect_replaces_the_mask_selection() {
     assert_eq!(s.state.selected_effect, motion_sel);
     s.execute("effects.remove", json!({"clip": id, "index": 0})).unwrap();
     assert_eq!(s.state.selected_effect, motion_sel, "and when one before it is removed");
-    let motion = s.active_sequence().unwrap().find_item(ClipId(id)).unwrap().1.effects.iter().position(|e| e.effect == "motion").unwrap();
-    s.execute("masks.add", json!({"clip": id, "shape": "ellipse"})).unwrap();
-    assert!(s.state.selected_effect.is_none(), "a new mask is selected instead");
-    s.execute("effects.select", json!({"clip": id, "effect": motion})).unwrap();
-    assert!(s.state.selected_mask.is_none());
-    s.execute("masks.select", json!({"clip": id, "effect": "opacity", "mask": 0})).unwrap();
-    assert!(s.state.selected_effect.is_none());
     s.execute("effects.select", json!({"none": true})).unwrap();
     assert!(s.state.selected_effect.is_none());
     // an applied effect that undo takes away, and one removed

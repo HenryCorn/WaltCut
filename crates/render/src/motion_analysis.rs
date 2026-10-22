@@ -1,10 +1,10 @@
-//! Mask tracking: frame-to-frame motion of the picture inside a mask.
+//! Internal frame-to-frame image analysis for stabilizer and optical-flow effects.
 //!
 //! The method (all textbook, implemented from the papers' equations):
 //!
 //! 1. **Features** — Shi–Tomasi "good features to track" (Shi & Tomasi, CVPR 1994): the smaller
 //!    eigenvalue of the 2×2 gradient structure tensor summed over a 7×7 window, kept above 1 % of
-//!    the strongest response inside the mask (shrunk by the window radius), with non-maximum
+//!    the strongest response inside the analysis region (shrunk by the window radius), with non-maximum
 //!    suppression and a minimum spacing; at most [`MAX_FEATURES`].
 //! 2. **Tracking** — pyramidal Lucas–Kanade (Bouguet's formulation of Lucas & Kanade 1981):
 //!    a 4-level image pyramid (5-tap binomial blur + 2× decimation), a 15×15 window, Gauss–Newton
@@ -12,20 +12,23 @@
 //!    Each feature is tracked forward and then backward; it is kept only when the backward track
 //!    returns within 0.5 px of where it started (forward–backward error, Kalal et al. 2010).
 //! 3. **Fit** — RANSAC (Fischler & Bolles 1981) over minimal samples (1 point for Position,
-//!    2 for Position & Rotation and Position, Scale & Rotation) with a 1 px inlier threshold and
+//!    2 for Position, Scale & Rotation) with a 1 px inlier threshold and
 //!    a fixed-seed generator (deterministic), then a least-squares refit on the inliers:
 //!    translation = mean displacement, similarity = the closed-form 2D Umeyama / Procrustes
-//!    solution, rigid = the same with the scale normalised away.
+//!    solution.
 //!
-//! The result is the transform mapping frame A's pixels to frame B's; the engine applies it to
-//! the mask path to write the next Mask Path keyframe.
+//! The result maps frame A's pixels to frame B's for the ordinary stabilizer effect.
 
 use rayon::prelude::*;
 use waltcut_geom::{Affine, Vec2};
-use waltcut_project::TrackMethod;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MotionModel {
+    Position,
+    PositionScaleRotation,
+}
 
 /// Most features tracked per frame.
-pub const MAX_FEATURES: usize = 160;
+pub(crate) const MAX_FEATURES: usize = 160;
 const WIN: i32 = 7;
 const LEVELS: usize = 4;
 const FB_MAX: f32 = 0.5;
@@ -34,20 +37,15 @@ const RANSAC_ITERS: usize = 300;
 
 /// A single-channel f32 image (0..1, display-referred luma).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Gray {
+pub(crate) struct Gray {
     pub w: usize,
     pub h: usize,
     pub px: Vec<f32>,
 }
 
 impl Gray {
-    pub fn new(w: usize, h: usize, px: Vec<f32>) -> Self {
+    pub(crate) fn new(w: usize, h: usize, px: Vec<f32>) -> Self {
         assert_eq!(px.len(), w * h);
-        Self { w, h, px }
-    }
-    /// Luma of 8-bit RGBA (Rec. 709 weights on the encoded values).
-    pub fn from_rgba8(w: usize, h: usize, rgba: &[u8]) -> Self {
-        let px = rgba.as_chunks::<4>().0.iter().map(|p| (0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32) / 255.0).collect();
         Self { w, h, px }
     }
     #[inline]
@@ -58,7 +56,7 @@ impl Gray {
     }
     /// Bilinear sample at continuous coordinates (pixel centres at integers), clamped.
     #[inline]
-    pub fn sample(&self, x: f32, y: f32) -> f32 {
+    pub(crate) fn sample(&self, x: f32, y: f32) -> f32 {
         let (x0, y0) = (x.floor(), y.floor());
         let (fx, fy) = (x - x0, y - y0);
         let (x0, y0) = (x0 as i32, y0 as i32);
@@ -131,7 +129,7 @@ fn dist_to_poly(poly: &[Vec2], p: Vec2) -> f64 {
 }
 
 /// Shi–Tomasi corners inside `region` (a polygon in `g`'s pixels), strongest first.
-pub fn features(g: &Gray, region: &[Vec2], max: usize, min_dist: f32) -> Vec<[f32; 2]> {
+pub(crate) fn features(g: &Gray, region: &[Vec2], max: usize, min_dist: f32) -> Vec<[f32; 2]> {
     if region.len() < 3 {
         return Vec::new();
     }
@@ -273,15 +271,15 @@ fn lk(pa: &[Gray], pb: &[Gray], p: [f32; 2]) -> Option<[f32; 2]> {
 }
 
 /// Least-squares fit of `method` mapping `src` → `dst`.
-pub fn fit_ls(method: TrackMethod, src: &[Vec2], dst: &[Vec2]) -> Option<Affine> {
+pub(crate) fn fit_ls(method: MotionModel, src: &[Vec2], dst: &[Vec2]) -> Option<Affine> {
     let n = src.len();
-    if n == 0 || (method != TrackMethod::Position && n < 2) {
+    if n == 0 || (method != MotionModel::Position && n < 2) {
         return None;
     }
     let inv = 1.0 / n as f64;
     let cs = src.iter().fold(Vec2::ZERO, |a, p| a + *p) * inv;
     let cd = dst.iter().fold(Vec2::ZERO, |a, p| a + *p) * inv;
-    if method == TrackMethod::Position {
+    if method == MotionModel::Position {
         let t = cd - cs;
         return Some(Affine::translate(t.x, t.y));
     }
@@ -297,15 +295,7 @@ pub fn fit_ls(method: TrackMethod, src: &[Vec2], dst: &[Vec2]) -> Option<Affine>
     if ss < 1e-12 {
         return None;
     }
-    let (mut a, mut b) = (sa / ss, sb / ss);
-    if method == TrackMethod::PositionRotation {
-        let l = (a * a + b * b).sqrt();
-        if l < 1e-12 {
-            return None;
-        }
-        a /= l;
-        b /= l;
-    }
+    let (a, b) = (sa / ss, sb / ss);
     let lin = Affine { a, b, c: -b, d: a, e: 0.0, f: 0.0 };
     let t = cd - lin.apply(cs);
     Some(Affine { e: t.x, f: t.y, ..lin })
@@ -326,9 +316,9 @@ impl Rng {
 }
 
 /// RANSAC + least-squares refit. Returns (transform, inlier count).
-pub fn fit_robust(method: TrackMethod, src: &[Vec2], dst: &[Vec2]) -> Option<(Affine, usize)> {
+pub(crate) fn fit_robust(method: MotionModel, src: &[Vec2], dst: &[Vec2]) -> Option<(Affine, usize)> {
     let n = src.len();
-    let k = if method == TrackMethod::Position { 1 } else { 2 };
+    let k = if method == MotionModel::Position { 1 } else { 2 };
     if n < k {
         return None;
     }
@@ -377,32 +367,22 @@ pub fn fit_robust(method: TrackMethod, src: &[Vec2], dst: &[Vec2]) -> Option<(Af
     fit_ls(method, &s, &d).map(|m| (m, best.len()))
 }
 
-/// One tracking step's result.
-#[derive(Clone, Debug)]
-pub struct Step {
-    /// Maps frame A pixels to frame B pixels.
-    pub transform: Affine,
-    pub features: usize,
-    pub tracked: usize,
-    pub inliers: usize,
-}
-
 /// A frame prepared for tracking (its pyramid).
-pub struct Prepared {
+pub(crate) struct Prepared {
     levels: Vec<Gray>,
 }
 
 impl Prepared {
-    pub fn new(g: Gray) -> Self {
+    pub(crate) fn new(g: Gray) -> Self {
         Self { levels: g.pyramid() }
     }
-    pub fn base(&self) -> &Gray {
+    pub(crate) fn base(&self) -> &Gray {
         &self.levels[0]
     }
 }
 
 /// Track the picture inside `region` (polygon in frame pixels) from `a` to `b`.
-pub fn track_step(a: &Prepared, b: &Prepared, region: &[Vec2], method: TrackMethod) -> Option<Step> {
+pub(crate) fn track_step(a: &Prepared, b: &Prepared, region: &[Vec2], method: MotionModel) -> Option<Affine> {
     let feats = features(a.base(), region, MAX_FEATURES, 5.0);
     if feats.len() < 3 {
         return None;
@@ -421,7 +401,7 @@ pub fn track_step(a: &Prepared, b: &Prepared, region: &[Vec2], method: TrackMeth
     if inliers < 3 {
         return None;
     }
-    Some(Step { transform, features: feats.len(), tracked: src.len(), inliers })
+    Some(transform)
 }
 
 #[cfg(test)]
@@ -469,7 +449,7 @@ mod tests {
         (0..48).map(|i| c + Vec2::new((i as f64 / 48.0 * std::f64::consts::TAU).cos() * r, (i as f64 / 48.0 * std::f64::consts::TAU).sin() * r)).collect()
     }
 
-    fn run(method: TrackMethod, rot: f64, scale: f64, frames: usize) -> f64 {
+    fn run(method: MotionModel, rot: f64, scale: f64, frames: usize) -> f64 {
         let (w, h) = (320, 240);
         let mut region = circle(Vec2::new(150.0, 120.0), 50.0);
         let mut prev = Prepared::new(frame(w, h, &pose(0.0, rot, scale)));
@@ -479,8 +459,8 @@ mod tests {
         for k in 1..=frames {
             let next = Prepared::new(frame(w, h, &pose(k as f64, rot, scale)));
             let st = track_step(&prev, &next, &region, method).expect("tracked");
-            region = region.iter().map(|p| st.transform.apply(*p)).collect();
-            tracked = tracked.iter().map(|p| st.transform.apply(*p)).collect();
+            region = region.iter().map(|p| st.apply(*p)).collect();
+            tracked = tracked.iter().map(|p| st.apply(*p)).collect();
             for (o, t) in probe.iter().zip(&tracked) {
                 let truth = pose(k as f64, rot, scale).apply(*o);
                 worst = worst.max((truth - *t).length());
@@ -492,19 +472,13 @@ mod tests {
 
     #[test]
     fn tracks_translation() {
-        let e = run(TrackMethod::Position, 0.0, 0.0, 10);
+        let e = run(MotionModel::Position, 0.0, 0.0, 10);
         assert!(e < 0.5, "max drift {e} px");
     }
 
     #[test]
-    fn tracks_rotation() {
-        let e = run(TrackMethod::PositionRotation, 2.0, 0.0, 10);
-        assert!(e < 0.75, "max drift {e} px");
-    }
-
-    #[test]
     fn tracks_similarity() {
-        let e = run(TrackMethod::PositionScaleRotation, -1.5, 0.012, 10);
+        let e = run(MotionModel::PositionScaleRotation, -1.5, 0.012, 10);
         assert!(e < 0.75, "max drift {e} px");
     }
 
@@ -518,7 +492,7 @@ mod tests {
             src.push(p);
             dst.push(if i % 4 == 0 { p + Vec2::new(20.0, -13.0) } else { truth.apply(p) });
         }
-        let (m, inl) = fit_robust(TrackMethod::PositionScaleRotation, &src, &dst).unwrap();
+        let (m, inl) = fit_robust(MotionModel::PositionScaleRotation, &src, &dst).unwrap();
         assert_eq!(inl, 30);
         for p in &src {
             assert!((m.apply(*p) - truth.apply(*p)).length() < 1e-6);

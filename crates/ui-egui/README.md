@@ -12,6 +12,16 @@ draft is `UiState::replace_fonts`; the control channel edits it with `ui.set {"r
 Native macOS execution and screenshots are pending for the #24 draft; cross-target Clippy only
 typechecks those tests on Windows.
 
+## Clip compositing
+
+Effect Controls edits ordinary effect parameters, including their keyframes, interpolation menus
+and value/velocity graphs. Motion handles, clip opacity, blend modes and graphic paths remain.
+Effect-mask creation, rows, tracking controls and Program overlays are removed in the stacked
+#24 draft. Brush/cel editing and the drawing eraser are independent of effect masks and remain.
+`keyframes_ui` retains an opacity-group movement regression; engine tests cover Motion/Opacity/
+blend on media, drawing, text and shape clips. Native macOS UI execution and animation-flow
+screenshots remain pending.
+
 ## Transition drop previews
 
 Dragging a video or audio transition over a compatible clip shows its actual time span, the

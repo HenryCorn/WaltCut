@@ -1,12 +1,12 @@
 //! Effect presets (Premiere's Presets bin): one or more configured effects — parameters,
-//! keyframes and masks — saved under a name and applied to clips.
+//! keyframes — saved under a name and applied to clips.
 //!
 //! - **Keyframes.** Times are stored relative to the in point of the clip the preset was saved
 //!   from, with that clip's length (`source_duration`, media ticks). Applying re-times them per
 //!   [`KeyframeMode`]: *Scale* stretches them over the target clip, *Anchor to In Point* keeps their
 //!   distance from the target's in point, *Anchor to Out Point* their distance from its out point.
 //!   Saving with `keyframes: "none"` stores every parameter as its value at the playhead.
-//! - **Geometry.** Point parameters and mask paths are in clip pixels; they are scaled by the
+//! - **Geometry.** Point parameters are in clip pixels; they are scaled by the
 //!   target / source frame-size ratio so a preset made on 4K media lands in the same place on HD.
 //! - **Intrinsic effects** (Motion, Opacity, Time Remapping) replace the target clip's own instance;
 //!   standard effects are added before the intrinsic ones (render order), like `effects.apply`.
@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use waltcut_geom::{Affine, Vec2};
-use waltcut_project::{ClipId, EffectInstance, Keyframe, Mask, MaskPath, Param, ParamValue, TrackItem, TrackKind};
+use waltcut_geom::Vec2;
+use waltcut_project::{ClipId, EffectInstance, Keyframe, ParamValue, TrackItem, TrackKind};
 use waltcut_time::{TICKS_PER_SECOND, Tick};
 
 use crate::commands::{CommandSpec, always, bad, clip_p, has_seq, str_p};
@@ -158,7 +158,6 @@ pub(crate) fn effect_instance(id: &str) -> EffectInstance {
         effect: id.to_string(),
         enabled: true,
         params: Default::default(),
-        masks: Vec::new(),
         post_fader: false,
         essential: false,
         layer: None,
@@ -208,16 +207,6 @@ pub fn builtin_presets() -> Vec<EffectPreset> {
     let mut mosaic_in = effect("mosaic", &[]);
     animate(&mut mosaic_in, "horizontal", vec![kf(0.0, f(8.0)), kf(1.0, f(400.0))]);
     animate(&mut mosaic_in, "vertical", vec![kf(0.0, f(5.0)), kf(1.0, f(225.0))]);
-    // soft oval vignette: darken outside an inverted, heavily feathered ellipse
-    let mut vignette = effect("brightness_contrast", &[("brightness", f(-60.0))]);
-    let mut m = Mask::new("Mask (1)", MaskPath::ellipse(Vec2::new(960.0, 540.0), Vec2::new(900.0, 520.0)));
-    m.inverted = true;
-    m.feather.value = f(320.0);
-    vignette.masks.push(m);
-    let mut spotlight = effect("brightness_contrast", &[("brightness", f(18.0)), ("contrast", f(10.0))]);
-    let mut m = Mask::new("Mask (1)", MaskPath::ellipse(Vec2::new(960.0, 540.0), Vec2::new(420.0, 420.0)));
-    m.feather.value = f(160.0);
-    spotlight.masks.push(m);
     let warm =
         effect("tint", &[("black", ParamValue::Color([0.08, 0.04, 0.02, 1.0])), ("white", ParamValue::Color([1.0, 0.93, 0.8, 1.0])), ("amount", f(35.0))]);
     let mut pip = effect("motion", &[("scale", f(35.0)), ("position", ParamValue::Vec2(Vec2::new(1530.0, 270.0)))]);
@@ -228,23 +217,12 @@ pub fn builtin_presets() -> Vec<EffectPreset> {
         preset("Fade In", "Opacity 0 → 100 % over the first second", KeyframeMode::AnchorToIn, 10.0, vec![fade_in]),
         preset("Fade Out", "Opacity 100 → 0 % over the last second", KeyframeMode::AnchorToOut, 10.0, vec![fade_out]),
         preset("Mosaic In", "Large blocks resolving to the picture over the first second", KeyframeMode::AnchorToIn, 10.0, vec![mosaic_in]),
-        preset("Soft Vignette", "Darkens outside a feathered oval mask", KeyframeMode::Scale, 10.0, vec![vignette]),
-        preset("Spotlight", "Brightens inside a feathered circular mask", KeyframeMode::Scale, 10.0, vec![spotlight]),
         preset("Warm Tint", "Warm highlights, brown shadows", KeyframeMode::Scale, 10.0, vec![warm]),
         preset("PiP 35% Upper Right", "Picture-in-picture: 35 % scale in the upper right", KeyframeMode::Scale, 10.0, vec![pip]),
     ]
 }
 
 // ---------------------------------------------------------------- save / apply
-
-/// Every parameter of an effect instance (its own and its masks').
-fn params_mut(e: &mut EffectInstance) -> Vec<&mut Param> {
-    let mut v: Vec<&mut Param> = e.params.values_mut().collect();
-    for m in &mut e.masks {
-        v.extend(m.params_mut());
-    }
-    v
-}
 
 /// Media length of a track item.
 fn media_len(it: &TrackItem) -> Tick {
@@ -256,7 +234,7 @@ pub fn capture(it: &TrackItem, idx: &[usize], name: &str, description: &str, mod
     let mut effects: Vec<EffectInstance> = idx.iter().filter_map(|i| it.effects.get(*i).cloned()).collect();
     for e in &mut effects {
         e.essential = false;
-        for p in params_mut(e) {
+        for p in e.params.values_mut() {
             match mode {
                 None => {
                     // without keyframes: the value at the playhead
@@ -302,7 +280,6 @@ pub fn retime(rel: Tick, mode: KeyframeMode, source_len: Tick, target: &TrackIte
 fn scale_value(v: &mut ParamValue, sx: f64, sy: f64) {
     match v {
         ParamValue::Vec2(p) if !p.x.is_nan() => *p = Vec2::new(p.x * sx, p.y * sy),
-        ParamValue::Path(path) => *path = path.transformed(&Affine::scale(sx, sy)),
         _ => {}
     }
 }
@@ -329,35 +306,6 @@ pub fn instantiate(p: &EffectPreset, target: &TrackItem, size: (u32, u32)) -> Ve
                 scale_value(&mut prm.value, sx, sy);
                 for k in &mut prm.keyframes {
                     scale_value(&mut k.value, sx, sy);
-                }
-            }
-        }
-        for m in &mut e.masks {
-            for prm in m.params_mut() {
-                for k in &mut prm.keyframes {
-                    k.time = retime(k.time, p.keyframes, p.source_duration, target);
-                }
-                prm.keyframes.sort_by_key(|k| k.time);
-                prm.keyframes.dedup_by_key(|k| k.time);
-                if geometric {
-                    scale_value(&mut prm.value, sx, sy);
-                    for k in &mut prm.keyframes {
-                        scale_value(&mut k.value, sx, sy);
-                    }
-                }
-            }
-            if geometric {
-                // feather / expansion are lengths: scale by the mean factor
-                let s = (sx * sy).sqrt();
-                for prm in [&mut m.feather, &mut m.expansion] {
-                    if let ParamValue::Float(v) = &mut prm.value {
-                        *v *= s;
-                    }
-                    for k in &mut prm.keyframes {
-                        if let ParamValue::Float(v) = &mut k.value {
-                            *v *= s;
-                        }
-                    }
                 }
             }
         }
@@ -434,7 +382,6 @@ fn preset_json(p: &EffectPreset) -> Value {
         "keyframes": p.keyframes.label(),
         "effects": p.effects.iter().map(|e| e.def().map(|d| d.name).unwrap_or(e.effect.as_str()).to_string()).collect::<Vec<_>>(),
         "animated": p.effects.iter().any(|e| e.is_animated()),
-        "masks": p.effects.iter().map(|e| e.masks.len()).sum::<usize>(),
     })
 }
 

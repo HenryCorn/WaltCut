@@ -13,7 +13,6 @@ use waltcut_geom::Vec2;
 use crate::keyframe::{Param, ParamValue};
 
 mod audio;
-use crate::mask::Mask;
 pub use audio::{GEQ10_LABELS, GEQ20_LABELS, GEQ30_LABELS, PREMIERE_AUDIO_EFFECTS};
 
 mod vfx;
@@ -48,8 +47,6 @@ pub enum ParamKind {
     Curve {
         hue: bool,
     },
-    /// A mask path (edited on the Program monitor).
-    Path,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -91,7 +88,6 @@ impl EffectDef {
             effect: self.id.to_string(),
             enabled: true,
             params: self.params.iter().map(|p| (p.id.to_string(), Param::new(p.default.clone()))).collect(),
-            masks: Vec::new(),
             post_fader: false,
             essential: false,
             layer: None,
@@ -100,12 +96,11 @@ impl EffectDef {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EffectInstance {
     pub effect: String,
     pub enabled: bool,
     pub params: BTreeMap<String, Param>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub masks: Vec<Mask>,
     /// Track/Mix inserts only: process after the fader instead of before it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub post_fader: bool,
@@ -135,7 +130,7 @@ impl EffectInstance {
         self.params.get(id).map(|p| p.vec2_at(t)).unwrap_or_default()
     }
     pub fn is_animated(&self) -> bool {
-        self.params.values().any(Param::is_animated) || self.masks.iter().any(Mask::is_animated)
+        self.params.values().any(Param::is_animated)
     }
 }
 

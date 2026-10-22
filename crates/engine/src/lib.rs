@@ -25,7 +25,6 @@ pub mod graphics;
 pub mod keyboard;
 mod keyframe_move;
 mod marker_export;
-pub mod masks;
 pub mod media_pool;
 pub mod media_watch;
 pub mod mixer;
@@ -285,12 +284,8 @@ pub struct EditorState {
     /// Selected layers (indices among the graphic layers, 0 = back) of the selected graphic clip.
     #[serde(default)]
     pub graphic_layers: Vec<usize>,
-    /// The mask being edited on the Program monitor (Effect Controls selection).
-    #[serde(default)]
-    pub selected_mask: Option<masks::MaskSel>,
     /// The effect selected in Effect Controls (its header or one of its properties): Motion and
-    /// Transform show their handles on the Program monitor. Selecting a mask clears it, and
-    /// selecting an effect clears the mask selection.
+    /// Transform show their handles on the Program monitor.
     #[serde(default)]
     pub selected_effect: Option<EffectSel>,
     /// Audio Clip Mixer automation mode per audio track (track id → mode; missing = Read):
@@ -375,8 +370,6 @@ pub struct Session {
     pub ai_jobs: Vec<ai::PendingRestyle>,
     /// Tests and embedders: use this backend instead of the configured provider.
     pub restyler_override: Option<Arc<dyn waltcut_genai::Restyler>>,
-    /// Mask tracking jobs whose keyframes are still being written.
-    pub mask_jobs: Vec<masks::PendingTrack>,
     /// Effect presets (built-in + the user's, persisted in the data directory).
     pub presets: presets::PresetLibrary,
     /// Export presets (built-in + the user's, persisted in the data directory) and favourites.
@@ -460,7 +453,6 @@ impl Session {
             offline: Default::default(),
             ai_jobs: Vec::new(),
             restyler_override: None,
-            mask_jobs: Vec::new(),
             presets: Default::default(),
             export_presets: Default::default(),
             export_queue: Default::default(),
@@ -521,7 +513,6 @@ impl Session {
     /// Apply worker notifications (call regularly, e.g. once per UI frame).
     pub fn poll_persistence(&mut self) {
         ai::poll(self);
-        masks::poll(self);
         export_tools::pump_queue(self, false);
         panels::log_jobs(self);
         let Some(p) = self.persistence.as_mut() else { return };
@@ -895,13 +886,6 @@ impl Session {
     /// Drop dangling references after undo/redo/delete.
     pub fn fix_state(&mut self) {
         let p = self.project.clone();
-        if let Some(m) = self.state.selected_mask {
-            let ok =
-                self.active_sequence().and_then(|q| q.find_item(m.clip)).and_then(|(_, it)| it.effects.get(m.effect)).is_some_and(|e| m.mask < e.masks.len());
-            if !ok {
-                self.state.selected_mask = None;
-            }
-        }
         if let Some(e) = &self.state.selected_effect
             && self.active_sequence().and_then(|q| q.find_item(e.clip)).and_then(|(_, it)| e.index(&it.effects)).is_none()
         {
@@ -1137,8 +1121,6 @@ mod keyboard_tests;
 mod linked_speed_tests;
 #[cfg(test)]
 mod locked_clip_edits_tests;
-#[cfg(test)]
-mod masks_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod media_test_util;

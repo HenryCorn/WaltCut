@@ -94,12 +94,6 @@ pub enum Icon {
     Square,
     /// Offline media: a broken link.
     Offline,
-    /// Mask tracking: backward continuously / one frame, forward one frame / continuously.
-    TrackMaskBack,
-    TrackMaskBackFrame,
-    TrackMaskFwdFrame,
-    TrackMaskFwd,
-    /// Project panel footer: Sort Icons (lines of decreasing length).
     SortIcons,
     /// Project panel footer: Automate to Sequence (three clips in a row).
     Automate,
@@ -671,16 +665,6 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             pen.line(&[(3.0, 1.5), (3.5, 2.8)]);
             pen.line(&[(13.0, 14.5), (12.5, 13.2)]);
         }
-        TrackMaskBack => {
-            pen.fill(&[(8.0, 3.5), (2.0, 8.0), (8.0, 12.5)]);
-            pen.fill(&[(14.0, 3.5), (8.0, 8.0), (14.0, 12.5)]);
-        }
-        TrackMaskBackFrame => pen.fill(&[(11.0, 3.5), (4.0, 8.0), (11.0, 12.5)]),
-        TrackMaskFwdFrame => pen.fill(&[(5.0, 3.5), (12.0, 8.0), (5.0, 12.5)]),
-        TrackMaskFwd => {
-            pen.fill(&[(2.0, 3.5), (8.0, 8.0), (2.0, 12.5)]);
-            pen.fill(&[(8.0, 3.5), (14.0, 8.0), (8.0, 12.5)]);
-        }
         SortIcons => {
             for (i, w) in [12.0, 9.5, 7.0, 4.5].iter().enumerate() {
                 let y = 3.5 + i as f32 * 3.0;
@@ -873,10 +857,6 @@ mod tests {
         Grid,
         Square,
         Offline,
-        TrackMaskBack,
-        TrackMaskBackFrame,
-        TrackMaskFwdFrame,
-        TrackMaskFwd,
         SortIcons,
         Automate,
         Star,

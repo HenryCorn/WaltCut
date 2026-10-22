@@ -123,21 +123,20 @@ fn save_without_keyframes_keeps_the_value_at_the_playhead() {
 }
 
 #[test]
-fn presets_with_masks_and_intrinsics_round_trip_through_files() {
+fn presets_with_effects_and_intrinsics_round_trip_through_files() {
     let (mut s, clips) = demo();
     let a = clips[0];
     s.state.selection = vec![a];
     s.execute("effects.apply", json!({"effect": "black_white"})).unwrap();
-    s.execute("masks.add", json!({"effect": "black_white", "shape": "ellipse", "center": [960, 540], "size": [800, 400]})).unwrap();
     s.execute("effects.setParam", json!({"clip": a.0, "effect": "opacity", "param": "opacity", "value": 50.0})).unwrap();
     let ia = item(&s, a);
     let bw = ia.effects.iter().position(|e| e.effect == "black_white").unwrap();
     let op = ia.effects.iter().position(|e| e.effect == "opacity").unwrap();
-    s.execute("presets.save", json!({"name": "masked bw", "effects": [bw, op], "description": "test"})).unwrap();
+    s.execute("presets.save", json!({"name": "bw and opacity", "effects": [bw, op], "description": "test"})).unwrap();
     let dir = std::env::temp_dir().join(format!("filmcraft-presets-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("p.json").to_string_lossy().to_string();
-    let r = s.execute("presets.export", json!({"path": path, "names": ["masked bw", "Fade In"]})).unwrap();
+    let r = s.execute("presets.export", json!({"path": path, "names": ["bw and opacity", "Fade In"]})).unwrap();
     assert_eq!(r["count"], 2);
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("filmcraft.effect-presets"));
@@ -146,11 +145,10 @@ fn presets_with_masks_and_intrinsics_round_trip_through_files() {
     s2.execute("presets.import", json!({"path": path})).unwrap();
     let names: Vec<String> =
         s2.execute("presets.list", json!({})).unwrap()["presets"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap().to_string()).collect();
-    assert!(names.contains(&"masked bw".to_string()));
-    s2.execute("presets.apply", json!({"preset": "masked bw", "clips": [clips2[1].0]})).unwrap();
+    assert!(names.contains(&"bw and opacity".to_string()));
+    s2.execute("presets.apply", json!({"preset": "bw and opacity", "clips": [clips2[1].0]})).unwrap();
     let it = item(&s2, clips2[1]);
-    let e = it.effects.iter().find(|e| e.effect == "black_white").unwrap();
-    assert_eq!(e.masks.len(), 1);
+    assert!(it.effects.iter().any(|e| e.effect == "black_white"));
     assert_eq!(it.effects.iter().filter(|e| e.effect == "opacity").count(), 1, "intrinsic replaced, not duplicated");
     assert_eq!(it.effect("opacity").unwrap().param("opacity").unwrap().value, ParamValue::Float(50.0));
     // garbage is rejected
@@ -164,7 +162,7 @@ fn builtins_apply_and_user_presets_persist() {
     let (mut s, clips) = demo();
     let l = s.execute("presets.list", json!({})).unwrap();
     let all = l["presets"].as_array().unwrap();
-    assert!(all.len() >= 8);
+    assert!(all.len() >= 7);
     assert!(all.iter().all(|p| p["builtin"] == true));
     for p in all {
         let name = p["name"].as_str().unwrap();
@@ -211,19 +209,6 @@ fn fade_in_and_fade_out_add_up_on_one_clip() {
     s.execute("presets.apply", json!({"preset": "Fade In", "clips": [c.0]})).unwrap();
     let it = item(&s, c);
     assert_eq!(it.effect("opacity").unwrap().param("opacity").unwrap().keyframes.len(), 4);
-}
-
-#[test]
-fn mask_geometry_scales_to_the_target_frame_size() {
-    let (s, clips) = demo();
-    let it = item(&s, clips[0]);
-    let p = crate::presets::builtin_presets().into_iter().find(|p| p.name == "Spotlight").unwrap();
-    let fx = crate::presets::instantiate(&p, &it, (960, 540));
-    let m = &fx[0].masks[0];
-    let path = m.path_at(it.source_in);
-    let c = path.centroid();
-    assert!((c.x - 480.0).abs() < 1e-6 && (c.y - 270.0).abs() < 1e-6, "{c:?}");
-    assert_eq!(m.feather.value, ParamValue::Float(80.0));
 }
 
 /// A host without a filesystem (the web): files exist only through `Services`.

@@ -596,13 +596,6 @@ fn retime_effect(e: &mut waltcut_project::EffectInstance, from: &TrackItem, to: 
             k.time = map(k.time);
         }
     }
-    for m in &mut e.masks {
-        for p in [&mut m.path, &mut m.feather, &mut m.opacity, &mut m.expansion] {
-            for k in &mut p.keyframes {
-                k.time = map(k.time);
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------------------------

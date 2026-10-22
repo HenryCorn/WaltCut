@@ -398,7 +398,6 @@ fn layer_instance(id: &str) -> EffectInstance {
         effect: id.to_string(),
         enabled: true,
         params: Default::default(),
-        masks: Vec::new(),
         post_fader: false,
         essential: false,
         layer: None,

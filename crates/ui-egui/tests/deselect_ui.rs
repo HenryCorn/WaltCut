@@ -1,6 +1,6 @@
 //! Clicking empty space deselects, consistently (#683): the Timeline's empty space below and
 //! between the tracks, a text layer being edited when another panel is clicked, and the Program
-//! monitor's empty space around the picture (graphic layers, masks).
+//! monitor's empty space around the picture (graphic layers).
 
 use std::sync::mpsc::{Sender, channel};
 
@@ -117,17 +117,16 @@ fn clicking_another_panel_ends_text_editing() {
     assert!(d.app().ui.gfx_edit.is_none(), "a click in the Timeline ends it");
 }
 
-/// A click on the Program monitor around the picture lets go of the selected graphic layer and
-/// mask; so does a click on the picture's empty space.
+/// A click on the Program monitor around the picture lets go of the selected graphic layer, as
+/// on the picture's empty space.
 #[test]
-fn empty_monitor_space_deselects_layers_and_masks() {
+fn empty_monitor_space_deselects_layers() {
     let mut d = Driver::demo();
     let pic = d.rect("program.picture");
     let panel = d.rect("panel.Program");
     // the empty space beside or above the picture, a few points away from it
     let outside = if pic[0] - panel[0] > 20.0 { (pic[0] - 8.0, pic[1] + pic[3] / 2.0) } else { (pic[0] + pic[2] / 2.0, pic[1] + pic[3] + 8.0) };
     let seq = d.exec("sequence.inspect", json!({}));
-    let clip = seq["video"][0]["items"][0]["clip"].as_u64().unwrap();
     // a graphic layer
     let at = seq["playhead"].as_i64().unwrap();
     let gclip = d.exec("graphics.newText", json!({"text": "Title", "time": at}))["clip"].as_u64().unwrap();
@@ -136,19 +135,4 @@ fn empty_monitor_space_deselects_layers_and_masks() {
     assert!(!d.app().session.state.graphic_layers.is_empty());
     d.click_at(outside.0, outside.1);
     assert!(d.app().session.state.graphic_layers.is_empty(), "a click around the picture deselects the layer");
-    // a mask: around the picture, and on the picture's empty space
-    d.exec("timeline.select", json!({"clips": [clip]}));
-    d.exec("effects.apply", json!({"clips": [clip], "effect": "gaussian_blur"}));
-    let fx = {
-        let s = &d.harness.state().session;
-        let it = s.active_sequence().unwrap().find_item(waltcut_project::ClipId(clip)).unwrap().1;
-        it.effects.iter().position(|e| e.effect == "gaussian_blur").unwrap()
-    };
-    d.exec("masks.add", json!({"clip": clip, "effect": fx, "shape": "ellipse"}));
-    for (x, y) in [outside, (pic[0] + 6.0, pic[1] + 6.0)] {
-        d.exec("masks.select", json!({"clip": clip, "effect": fx, "mask": 0}));
-        d.frames(2);
-        d.click_at(x, y);
-        assert!(d.app().session.state.selected_mask.is_none(), "a click at ({x}, {y}) deselects the mask");
-    }
 }

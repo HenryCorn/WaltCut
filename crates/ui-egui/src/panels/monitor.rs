@@ -254,7 +254,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
             crate::panels::drawing::monitor_overlay(app, ui, pic, frame_size);
         } else {
             crate::panels::graphics::monitor_overlay(app, ui, pic, frame_size);
-            crate::panels::masks::monitor_overlay(app, ui, pic, frame_size);
             crate::panels::transform_handles::monitor_overlay(app, ui, pic, frame_size);
         }
     }
@@ -491,10 +490,7 @@ fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, 
     };
     // the parameter stores linear values, like the colour picker beside it
     let lin = egui::Rgba::from(Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
-    let mut params = json!({"clip": armed.clip, "effect": armed.effect, "param": armed.param, "value": [lin.r(), lin.g(), lin.b(), 1.0]});
-    if let Some(k) = armed.mask {
-        params["mask"] = json!(k);
-    }
+    let params = json!({"clip": armed.clip, "effect": armed.effect, "param": armed.param, "value": [lin.r(), lin.g(), lin.b(), 1.0]});
     if let Err(e) = app.session.execute("effects.setParam", params) {
         app.ui.status = e.to_string();
     }

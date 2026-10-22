@@ -397,11 +397,10 @@ fn only_the_left_button_drags_the_handles() {
 }
 
 /// The other things dragged on the Program monitor take the left button only too: a guide, a
-/// mask's body and vertices, and a graphic layer stay put under a middle or right drag.
+/// graphic layer stay put under a middle or right drag.
 #[test]
-fn guides_masks_and_graphics_take_the_left_button_only() {
+fn guides_and_graphics_take_the_left_button_only() {
     let mut d = Driver::demo();
-    let (clip, _) = d.first_clip();
     let others = [egui::PointerButton::Middle, egui::PointerButton::Secondary];
     let project = |d: &Driver| d.harness.state().session.project.to_json();
     // a guide
@@ -412,25 +411,7 @@ fn guides_masks_and_graphics_take_the_left_button_only() {
         d.drag_with((g[0] + g[2] / 2.0, g[1] + g[3] * 0.2), b);
         assert_eq!(d.rect("program.guide.0"), g, "a {b:?} drag moved the guide");
     }
-    // a mask
-    d.exec("effects.apply", json!({"clips": [clip], "effect": "gaussian_blur"}));
-    let fx = {
-        let s = &d.harness.state().session;
-        s.active_sequence().unwrap().find_item(ClipId(clip)).unwrap().1.effects.iter().position(|e| e.effect == "gaussian_blur").unwrap()
-    };
-    d.exec("masks.add", json!({"clip": clip, "effect": fx, "shape": "ellipse"}));
-    d.exec("masks.select", json!({"clip": clip, "effect": fx, "mask": 0}));
-    d.frames(3);
-    let before = project(&d);
-    for id in ["program.mask.body", "program.mask.vertex.0"] {
-        for b in others {
-            let at = d.center(id);
-            d.drag_with(at, b);
-            assert_eq!(project(&d), before, "a {b:?} drag on {id} changed the mask");
-        }
-    }
     // a graphic layer
-    d.exec("masks.select", json!({"none": true}));
     let gclip = d.exec("graphics.newText", json!({"text": "Title", "position": [600, 500], "size": 120}))["clip"].as_u64().unwrap();
     d.frames(3);
     let before = project(&d);
