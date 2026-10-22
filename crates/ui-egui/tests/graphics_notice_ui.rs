@@ -110,14 +110,3 @@ fn a_reset_that_cannot_be_saved_says_why_and_keeps_the_button() {
     assert!(d.app().graphics_notice.as_ref().is_some_and(|n| !n.reset_done));
     assert!(d.ids().iter().any(|i| i == "graphics.notice.reset"));
 }
-
-#[test]
-fn the_notice_follows_the_interface_language() {
-    let notice = GraphicsNotice::new("software rendering", Box::new(|| Ok(())));
-    let mut d = Driver::new(Some(notice));
-    d.app().ui.language = waltcut_ui_egui::i18n::Language::Es;
-    d.frames(3);
-    assert_eq!(d.label("graphics.notice"), "Modo gráfico seguro: procesamiento por software");
-    assert_eq!(d.label("graphics.notice.reset"), "Usar gráficos predeterminados");
-    waltcut_ui_egui::i18n::set_current(waltcut_ui_egui::i18n::Language::En);
-}

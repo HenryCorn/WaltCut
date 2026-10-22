@@ -41,7 +41,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "sequence.applyDefaultTransitionsToSelection",
             "Apply Default Transitions to Selection",
             &["Sequence"],
-            // ⇧D comes from the Premiere shortcut audit (`shortcut_presets::PREMIERE`)
+            // ⇧D comes from the shortcut audit (`shortcut_presets::EXTRA_KEYS`)
             None,
             r#"{"clips":[id]?}"#,
             has_clips_or_edit_points,

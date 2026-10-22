@@ -421,8 +421,6 @@ pub struct KeyframeRef {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UiState {
-    #[serde(default)]
-    pub language: crate::i18n::Language,
     pub tool: Tool,
     /// Brush tool options.
     #[serde(default)]
@@ -811,7 +809,6 @@ fn yes() -> bool {
 impl Default for UiState {
     fn default() -> Self {
         Self {
-            language: crate::i18n::Language::default(),
             tool: Tool::Selection,
             brush: Default::default(),
             ai: Default::default(),

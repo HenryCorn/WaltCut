@@ -283,7 +283,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         app.hooks.pick_folder_at =
             Some(Box::new(|dir: &str| rfd::FileDialog::new().set_directory(dir).pick_folder().map(|p| p.to_string_lossy().into_owned())));
         app.hooks.open_path = Some(Box::new(open_path));
-        // Help menu, About and Discord links (#642): eframe is built without its `links`
+        // Help menu and About links (#642): eframe is built without its `links`
         // feature, so `ctx.open_url` does nothing on the desktop. Detached, so a launcher
         // that waits for the browser never freezes the UI.
         app.hooks.open_url = Some(Box::new(|url: &str| open::that_detached(url).map_err(|e| e.to_string())));
@@ -291,7 +291,6 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         if waltcut_platform::pen::install_pen_monitor() {
             app.hooks.pen_pressure = Some(Box::new(waltcut_platform::pen::pen_pressure));
         }
-        app.hooks.system_languages = Some(Box::new(|| sys_locale::get_locales().collect()));
         app.hooks.raise_without_focus = Some(Box::new(|| {
             window_raise::raise_without_focus();
         }));

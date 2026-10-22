@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** trivial (status line, revision history and roadmap link added; content checked against the crate list) · **Target:** Adobe Premiere Pro 2026 (26.5.2)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** trivial (status line, revision history and roadmap link added; content checked against the crate list)
 
 FilmCraft is a Cargo workspace of small crates with strictly enforced layering. The engine is
 headless: every feature can be reached without a window, and the egui UI is one client among the
@@ -67,7 +67,7 @@ and `filmcraft-cli`.
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
 | `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
-| `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU parity; empty library, dev-dependencies only |
+| `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU agreement; empty library, dev-dependencies only |
 | `export` | L3 | render → encode → mux pipeline, progress/cancel |
 | `engine` | L4 | `Session`, command registry, undo history, media pool, jobs |
 | `ui-egui` | L5 | the egui frontend: docking, panels, timeline, monitors, playback, control-channel handlers |
@@ -247,7 +247,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   the decoded biplanar `CVPixelBuffer` is copied into planar `Yuv8` / `Yuv16`. Colour, pixel
   aspect, random-access and disposable answers come from the same helpers as the software
   decoders (`video::vui_color`, `sar_par`, `h264_disposable`, `hevc_disposable`), so the two are
-  interchangeable (bit-exact in the parity tests). If the hardware fails mid-stream (decode error,
+  interchangeable (bit-exact in the agreement tests). If the hardware fails mid-stream (decode error,
   session lost to a GPU change or sleep, changed in-band parameter sets), the hybrid builds
   `codecs::software_video_decoder` (built-in factories only), replays the samples since the last
   restart point and continues in software for that instance; it is logged and counted. A source
@@ -381,7 +381,7 @@ Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts �
   tracks and sends use balance. Solo keeps soloed and solo-safe strips plus everything feeding them
   or fed by them. 24 tracks × (EQ + Dynamics + Studio Reverb) + a compressed submix renders at
   ~6× realtime on one core (release).
-- **Automation modes** (Premiere semantics). Off ignores lanes; Read plays them; Latch records from
+- **Automation modes** . Off ignores lanes; Read plays them; Latch records from
   the first touch and holds the last value until playback stops; Touch records while held and ramps
   back to the existing automation over the **automatch time** (Preferences ▸ Audio, 1 s); Write
   records every control from playback start (then switches to Touch unless "Switch to Touch after

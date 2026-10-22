@@ -33,10 +33,6 @@ pub const PREFS_VERSION: u32 = 2;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GeneralPrefs {
-    /// Interface language (persisted independently of projects): `en`, `ja`, `es`, `pt-br`, `uk`,
-    /// `zh-cn`, `de`, `ru`, `fr`, `id`, `it`, or `system` (the default: the operating system's preferred language when the
-    /// interface has it, otherwise English).
-    pub interface_language: String,
     /// "At Startup": `showHome` (FilmCraft: the demo project), `openMostRecent`, `emptyProject`.
     pub at_startup: String,
     /// "When Opening a Project": `showOpenDialog` | `showHome`.
@@ -63,7 +59,6 @@ pub struct GeneralPrefs {
 impl Default for GeneralPrefs {
     fn default() -> Self {
         Self {
-            interface_language: "system".into(),
             at_startup: "showHome".into(),
             when_opening_project: "showOpenDialog".into(),
             bins_double_click: "openInPlace".into(),
@@ -933,26 +928,6 @@ static CATEGORIES: &[Category] = &[
         id: "general",
         title: "General",
         rows: &[
-            f(
-                "general.interfaceLanguage",
-                "Interface Language",
-                Kind::Choice(&[
-                    ("system", "System Language"),
-                    ("en", "English"),
-                    ("ja", "日本語"),
-                    ("es", "Español"),
-                    ("pt-br", "Português (Brasil)"),
-                    ("uk", "Українська"),
-                    ("zh-cn", "简体中文"),
-                    ("de", "Deutsch"),
-                    ("ru", "Русский"),
-                    ("fr", "Français"),
-                    ("id", "Bahasa Indonesia"),
-                    ("it", "Italiano"),
-                    ("ko", "한국어"),
-                ]),
-                true,
-            ),
             f("general.atStartup", "At Startup", Kind::Choice(STARTUP), true),
             f("general.whenOpeningProject", "When Opening a Project", Kind::Choice(OPENING), false),
             Row::Group(

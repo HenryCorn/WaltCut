@@ -16,9 +16,8 @@
 //! are converted on import: their `Ctrl` is the primary modifier (`Cmd`) and `Win`/`Meta` maps to
 //! the macOS Control key.
 //!
-//! Built-in presets: **FilmCraft Default** (each command's default plus the Premiere-default audit,
-//! see [`Shortcuts::audit`]), **Premiere Pro Compatible**, **Final Cut Pro Compatible** and
-//! **Avid Media Composer Compatible** ([`crate::shortcut_presets`]). Custom presets are JSON files in
+//! Built-in preset: **FilmCraft Default** (each command's default plus the extra editing keys,
+//! see [`Shortcuts::audit`] and [`crate::shortcut_presets`]). Custom presets are JSON files in
 //! `<data dir>/Keyboard Shortcuts/`; the active set persists in `active.json` there.
 //!
 //! Commands the frontend owns (tools, transport, panels, workspaces) are registered with
@@ -54,10 +53,7 @@ pub const PANELS: &[&str] = &[
 ];
 
 pub const DEFAULT_PRESET: &str = "FilmCraft Default";
-pub const PREMIERE_PRESET: &str = "Premiere Pro Compatible";
-pub const FCP_PRESET: &str = "Final Cut Pro Compatible";
-pub const AVID_PRESET: &str = "Avid Media Composer Compatible";
-pub const BUILTIN_PRESETS: [&str; 4] = [DEFAULT_PRESET, PREMIERE_PRESET, FCP_PRESET, AVID_PRESET];
+pub const BUILTIN_PRESETS: [&str; 1] = [DEFAULT_PRESET];
 
 const FILE_FORMAT: &str = "filmcraft-keyboard-shortcuts";
 const DIR_NAME: &str = "Keyboard Shortcuts";
@@ -567,7 +563,7 @@ impl Shortcuts {
                 out.push(Binding::new(&c.id, k, p.as_deref()));
             }
         }
-        for (c, k, p) in presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL) {
+        for (c, k, p) in presets::FILMCRAFT_PANEL.iter().chain(presets::PANEL_KEYS) {
             if self.known(c) {
                 out.push(Binding::new(c, k, panel_opt(p)));
             }
@@ -575,19 +571,19 @@ impl Shortcuts {
         out
     }
 
-    /// Premiere-default entries FilmCraft Default adopts: commands with no shortcut of their own
-    /// whose Premiere key is free in that context on this platform.
+    /// Extra-key entries the default map adopts: commands with no shortcut of their own
+    /// whose key is free in that context on this platform.
     pub fn audit(&self) -> Vec<Binding> {
         self.audit_for(Platform::current())
     }
 
-    /// [`Self::audit`] for platform `p`. The Premiere table is Premiere's macOS keyboard: off macOS
+    /// [`Self::audit`] for platform `p`. The table is written for the macOS keyboard: off macOS
     /// the Control and Command keys are the same key, so an entry whose key would collide there
     /// with one already taken (`⌃T` vs `⌘T`) is left out, and the command keeps no default key.
     pub(crate) fn audit_for(&self, platform: Platform) -> Vec<Binding> {
         let base = self.base_defaults();
         let mut added: Vec<Binding> = Vec::new();
-        for (c, k, p) in presets::PREMIERE {
+        for (c, k, p) in presets::EXTRA_KEYS {
             if !self.known(c) || base.iter().any(|b| b.command == *c) {
                 continue;
             }
@@ -612,9 +608,6 @@ impl Shortcuts {
         b.extend(self.audit_for(p));
         let table: Vec<Entry> = match name {
             DEFAULT_PRESET => Vec::new(),
-            PREMIERE_PRESET => presets::premiere(),
-            FCP_PRESET => presets::FINAL_CUT.to_vec(),
-            AVID_PRESET => presets::AVID.to_vec(),
             _ => return None,
         };
         self.apply_table(&mut b, &table);

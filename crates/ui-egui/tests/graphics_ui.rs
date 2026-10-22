@@ -26,7 +26,7 @@ impl Driver {
         let (tx, rx) = channel();
         let app = FilmcraftApp::new(session).with_control(rx);
         let shots = std::env::var_os("FILMCRAFT_UI_SHOTS").map(std::path::PathBuf::from);
-        let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
+        let mut b = Harness::builder().with_size(egui::vec2(1600.0, 1800.0)).with_max_steps(10_000);
         if shots.is_some() {
             b = b.wgpu().with_pixels_per_point(1.0);
         }
@@ -81,7 +81,8 @@ impl Driver {
 #[test]
 fn type_tool_edit_style_and_move() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.panel.show", json!({"panel": "Properties"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Graphics"}));
     d.exec("playhead.set", json!({"seconds": 2}));
     d.ok("ui.set", json!({"tool": "Type"}));
     d.frames(3);
@@ -127,6 +128,9 @@ fn type_tool_edit_style_and_move() {
     let list2 = d.exec("graphics.list", json!({"clip": clip}));
     let q0 = list2["layers"][0]["quad"][0][0].as_f64().unwrap();
     // selection-tool drag moves the layer
+    d.exec("playhead.set", json!({"seconds": 2}));
+    d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
+    d.frames(3);
     let lr = d.rect(&format!("program.layer.{clip}.0"));
     let pic = d.rect("program.picture");
     // a point on the layer that is inside the picture
@@ -167,7 +171,8 @@ fn text_param(d: &mut Driver, clip: u64, param: &str) -> Option<waltcut_project:
 #[test]
 fn a_property_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.panel.show", json!({"panel": "Properties"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Graphics"}));
     let r = d.exec("graphics.newText", json!({"text": "Title"}));
     let clip = r["clip"].as_u64().unwrap();
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
@@ -197,7 +202,8 @@ fn a_property_drag_is_one_undo_step() {
 #[test]
 fn shadow_color_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.panel.show", json!({"panel": "Properties"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Graphics"}));
     let r = d.exec("graphics.newText", json!({"text": "Title"}));
     let clip = r["clip"].as_u64().unwrap();
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
@@ -209,10 +215,10 @@ fn shadow_color_drag_is_one_undo_step() {
     let sw = d.rect("graphics.prop.shadow_color");
     d.ok("ui.click", json!({"x": sw[0] + sw[2] / 2.0, "y": sw[1] + sw[3] / 2.0}));
     d.frames(3);
-    // the popup flips above the swatch (it does not fit below); find a point in its 2D picker
+    // the popup opens above or below the swatch; find a point in its 2D picker
     let undo0 = d.exec("history.list", json!({}))["undo"].as_array().unwrap().len();
     let mut hit = None;
-    for (dx, dy) in [(30.0, 30.0), (150.0, 30.0), (30.0, 150.0), (150.0, 150.0)] {
+    for (dx, dy) in [(30.0, 30.0), (150.0, 30.0), (30.0, 150.0), (150.0, 150.0), (30.0, -90.0), (150.0, -90.0), (30.0, -200.0), (150.0, -200.0)] {
         let (px, py) = (sw[0] + dx, sw[1] - dy);
         let before = color(&mut d);
         d.ok("ui.drag", json!({"from": {"x": px, "y": py}, "to": {"x": px + 60.0, "y": py + 40.0}, "steps": 4}));
@@ -235,7 +241,7 @@ fn shadow_color_drag_is_one_undo_step() {
 #[test]
 fn selected_character_size_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace":"Captions and Graphics","tool":"Type"}));
+    d.ok("ui.set", json!({"tool":"Type"}));
     d.exec("playhead.set", json!({"seconds":2}));
     d.frames(3);
     let p = d.rect("program.picture");
@@ -264,7 +270,8 @@ fn selected_character_size_drag_is_one_undo_step() {
 #[test]
 fn the_tracking_stopwatch_animates_letter_spacing() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.panel.show", json!({"panel": "Properties"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Graphics"}));
     d.exec("playhead.set", json!({"seconds": 0.0}));
     let r = d.exec("graphics.newText", json!({"text": "Title", "seconds": 4}));
     let clip = r["clip"].as_u64().unwrap();

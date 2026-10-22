@@ -673,7 +673,8 @@ fn graph_keyframes_offer_interpolation_and_clear_in_one_undo_step() {
 #[test]
 fn mask_keyframe_menus_preserve_the_effect_and_other_masks() {
     let (mut d, clip) = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
     for intrinsic in ["motion", "time_remap"] {
         d.click(&format!("effectControls.effect.{intrinsic}.twirl"));
     }

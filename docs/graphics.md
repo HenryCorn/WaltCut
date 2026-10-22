@@ -1,6 +1,6 @@
 # Graphics
 
-FilmCraft's graphics work like Premiere's Essential Graphics: a **graphic clip** on a video track
+FilmCraft's graphics work like an essential-graphics panel: a **graphic clip** on a video track
 holds **text** and **shape** layers. Text is set by the text engine in `crates/text`
 ([README](../crates/text/README.md)): bundled OFL fonts plus system fonts, OpenType shaping with
 kerning and ligatures, bidi, line breaking, all drawn as vectors in linear light.
@@ -37,7 +37,7 @@ Colours are `#rrggbb` (sRGB).
 
 ### Point text and paragraph text
 
-A text layer is one of two types, as in Premiere Pro (behaviour observed in Premiere Pro 26):
+A text layer is one of two types:
 
 | | Point text | Paragraph text |
 |---|---|---|
@@ -66,10 +66,8 @@ A text layer is one of two types, as in Premiere Pro (behaviour observed in Prem
   is and Position is untouched; only Anchor Point is renumbered. Vertical text is always point
   text.
 
-Known differences from Premiere: the first line of paragraph text sits one font ascent below the
-box's top (Premiere places it higher, about one cap height below); Premiere's smallest box and
-the box it fits when switching to paragraph text were not measured exactly; the 60 points were
-measured with the Program monitor at Fit only; Text Properties has no Hindi Digits option.
+Known limits: the 60 points were measured with the Program monitor at Fit only; Text Properties has
+no Hindi Digits option.
 
 ## Rendering
 

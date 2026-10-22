@@ -205,20 +205,13 @@ fn delete_clears_timeline_clips_and_project_items() {
 }
 
 #[test]
-fn compat_presets_map_other_editors() {
+fn only_the_default_preset_is_built_in() {
     let mut s = Session::default();
     with_ui_commands(&mut s);
-    s.execute("shortcuts.loadPreset", json!({"name": "Premiere Pro Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("markers.clearIn").as_deref(), Some("Alt+I"));
-    assert_eq!(s.shortcuts.primary("edit.clear").as_deref(), Some("Delete"));
-    assert!(s.shortcuts.for_command("edit.clear").iter().any(|b| b.panel.as_deref() == Some("Timeline") && b.keys == "Backspace"));
-    s.execute("shortcuts.loadPreset", json!({"name": "Final Cut Pro Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("source.insert").as_deref(), Some("W"));
-    assert_eq!(s.shortcuts.primary("tool.razor").as_deref(), Some("B"));
-    assert!(s.shortcuts.primary("trim.rippleNext").is_none(), "W was taken by Insert");
-    s.execute("shortcuts.loadPreset", json!({"name": "Avid Media Composer Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("sequence.lift").as_deref(), Some("Z"));
-    assert_eq!(s.shortcuts.for_command("markers.markIn").len(), 2, "I and E");
+    assert_eq!(crate::shortcuts::BUILTIN_PRESETS, [crate::shortcuts::DEFAULT_PRESET]);
+    for name in ["Premiere Pro Compatible", "Final Cut Pro Compatible", "Avid Media Composer Compatible"] {
+        assert!(s.execute("shortcuts.loadPreset", json!({"name": name})).is_err(), "{name}");
+    }
     assert!(!s.shortcuts.modified);
     assert!(s.execute("shortcuts.loadPreset", json!({"name": "Nope"})).is_err());
     s.execute("shortcuts.loadPreset", json!({"name": "FilmCraft Default"})).unwrap();

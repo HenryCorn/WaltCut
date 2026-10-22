@@ -105,7 +105,8 @@ fn v0(m: &Value, i: usize) -> (f64, f64) {
 #[test]
 fn create_and_edit_masks_on_the_monitor() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
     let seq = d.exec("sequence.inspect", json!({}));
     let clip = &seq["video"][0]["items"][0];
     let (id, start, dur) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap(), clip["duration"].as_i64().unwrap());
@@ -252,7 +253,8 @@ fn mask_handles_follow_the_clip_selection() {
 #[test]
 fn shift_constrains_pen_mask_segments_to_45_degrees() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
     let seq = d.exec("sequence.inspect", json!({}));
     let clip = &seq["video"][0]["items"][0];
     let (id, start, dur) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap(), clip["duration"].as_i64().unwrap());
@@ -295,7 +297,8 @@ fn shift_constrains_pen_mask_segments_to_45_degrees() {
 #[test]
 fn delete_and_undo_take_back_the_last_pen_point() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
     let seq = d.exec("sequence.inspect", json!({}));
     let clip = &seq["video"][0]["items"][0];
     let (id, start, dur) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap(), clip["duration"].as_i64().unwrap());
@@ -362,7 +365,8 @@ fn delete_and_undo_take_back_the_last_pen_point() {
 #[test]
 fn presets_bin_drag_and_save_dialog() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
     let seq = d.exec("sequence.inspect", json!({}));
     let clip = &seq["video"][0]["items"][0];
     let (id, start, dur) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap(), clip["duration"].as_i64().unwrap());

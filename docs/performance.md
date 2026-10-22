@@ -126,7 +126,7 @@ Every Auto row rendered all its frames on the GPU, without fallbacks.
 On a plain clip the export is decoding- and encoding-bound and both take the same time; with
 layers and effects the GPU is 2.4× (1080p) to 3.2× (4K) faster, with a third to a quarter of the
 CPU. GPU rendering is nevertheless **Off by default** (opt-in per export) until it has been
-measured on Windows and macOS: the GPU result matches the CPU within the compositor's parity
+measured on Windows and macOS: the GPU result matches the CPU within the compositor's agreement
 tolerance, not bit for bit, and Off keeps exports byte-reproducible on every machine. (The 4K row used the same scene with the sequence, clip and positions scaled to 4K.)
 
 ### Memory after an export
@@ -171,7 +171,7 @@ Same commit, Settings ▸ Playback ▸ Hardware decoding switched with the bench
 `--hw auto` (`cargo xtask bench --sections decode --only dec_h --repeat 3 --hw …`, then
 `--sections playback --only h264` and `--only hevc-2160`), 2026-10-05, Apple M4 Pro, load average
 **150–190** throughout (shared with other agent builds). The decoded pictures are identical either
-way (bit-exact parity tests, `crates/platform/tests/videotoolbox.rs`); only who decodes changes.
+way (bit-exact agreement tests, `crates/platform/tests/videotoolbox.rs`); only who decodes changes.
 
 ### Decode (every frame through the media stack)
 
@@ -370,143 +370,6 @@ less bitrate. Its worst frame is better at every bitrate (lowest per-frame PSNR 
 
 So there is no case for a lower default bitrate: the two formats start at the same 20 Mb/s. H.265
 pays off where the file size matters, at 3–6 Mb/s; that 9:29 timeline is 428 MB at 6 Mb/s.
-
-## Results (HW2: Windows Media Foundation / Direct3D 11 hardware decoding, Off → Auto)
-
-Same binary (release build of the HW2 commit), Settings ▸ Playback ▸ Hardware decoding switched
-with `--hw off` / `--hw auto`, 2026-10-07: Intel Xeon E5-2680 v4 (14 cores / 28 threads, 2.4 GHz),
-NVIDIA GeForce RTX 5060 8 GB (driver 617.14), Windows 11 Pro 26200, idle machine. Two alternating
-rounds; the table gives the range of the two (decode: best of 3 within each). Reproduce with
-`cargo xtask bench --sections decode --only dec_h264 --repeat 3 --hw off|auto` (likewise `dec_hevc`)
-and `--sections playback --only "h264-2160 full" --hw off|auto`; set `FILMCRAFT_FFMPEG` if ffmpeg is not
-on `PATH` for the fixture generator. Pictures are identical either way (bit-exact parity tests,
-`crates/platform/tests/media_foundation.rs`). The decoder MFTs were Microsoft's H.264 decoder
-(`Microsoft H264 Video Decoder MFT`) and the `HEVCVideoExtension` decoder, both decoding with DXVA
-on the RTX 5060's NVDEC: `nvidia-smi dmon -s u` showed the decoder engine at 18–27 % during an
-Auto run and 0 % otherwise, and every picture came back as a Direct3D 11 texture.
-
-### Decode (every frame through the media stack)
-
-| codec | size | CPU ms/frame Off → **Auto** | fps Off → **Auto** |
-|---|---|---|---|
-| H.264 | 1080p | 77–80 → **3.3** | 162–166 → **347–353** |
-| H.264 | 2160p | 310–315 → **11.9** | 39–43 → **93** |
-| HEVC Main | 1080p | 69–73 → **3.5** | 89–93 → **307–308** |
-| HEVC Main | 2160p | 315–348 → **12–13** | 26–28 → **87–90** |
-| HEVC Main 10 | 2160p | 314–336 → **17.6** | 32 → **57** |
-
-Counters: every Auto row had `hw frames` = frames × 3 repeats (360 at 1080p, 216 at 2160p), 3
-sessions, 0 fallbacks, 0 declined; every Off row had 0 hardware frames and 0 sessions.
-
-What is left on the CPU is the readback: `examples/mfprobe.rs --time` splits a 2160p H.264 picture
-into 1.1 ms DXVA decode (feeding the MFT), 2.8 ms GPU to CPU copy (staging texture + map) and 7 ms
-CPU conversion (Annex B, biplanar to planar Y'CbCr); Main 10 is 1.4 / 4.5 / 10 ms (twice the bytes).
-A zero-copy path removes the last two.
-
-### Program-monitor playback (8 s, GPU path)
-
-| case | shown/dropped Off → **Auto** | CPU ms/frame Off → **Auto** |
-|---|---|---|
-| H.264 1080p Full | 192/0 → **192/0** | 86–89 → **8.5–8.8** |
-| H.264 2160p Full | 192/0 → **189–190/2–3** | 338–353 → **17–20** |
-| H.264 2160p 1/2 | 192/0 → **190/2** | 355–361 → **22** |
-| HEVC 2160p Full | 112–152/40–80 → **191–192/0–1** | 355–364 → **18** |
-
-This machine has 28 software-decoding threads, so Off keeps up with 4K H.264 (at 340 ms of CPU per
-frame, about 8 cores busy); Auto uses a twentieth of that CPU but drops 2–3 of 192 frames
-(readback latency at the start of the run). 4K HEVC is where Off drops frames and Auto does not.
-Draft playback (1/2 draft: 410–416 → 93–105 CPU ms/frame) is dominated by the draft plan's decimation,
-as on macOS, because the hardware ignores draft mode.
-
-## Results (HW4: Windows NVENC H.264 export, software → hardware)
-
-Same machine as the HW2 results (Xeon E5-2680 v4, 28 threads, RTX 5060, driver 617.14, idle,
-2026-10-07). `cargo xtask bench --sections export --only h264 --hw off|auto --repeat 3`: the export
-of 8 s of a 1080p23.976 H.264 clip (191 frames) to H.264 with the default preset, VBR one pass.
-`--hw off` runs the software encoder; `--hw auto` sets `hardwareEncoding` to auto and runs NVENC
-(preset P5, high-quality tuning). Every NVENC row had `hw frames` = 573 = 191 × 3 repeats.
-
-| encoder | fps | CPU ms/frame | MB |
-|---|---|---|---|
-| software | 15.0 (12.7–12.8 s) | 1050 | 20.4 |
-| **NVENC** | **44** (4.3 s) | **356–373** | 21.7 |
-
-- The remaining CPU is the compositing and render of the frames and the RGBA → YUV conversion, not
-  the encoder.
-- The NVENC file is slightly larger at the same settings (21.7 vs 20.4 MB). The bitrate is not
-  matched, so these rows are not a quality comparison.
-
-Quality at equal bitrate: see the PR description.
-
-## Results (HW2 follow-up: Windows VP9 and AV1 hardware decoding, Off → Auto)
-
-Same machine and method as the H.264 / HEVC results above (Xeon E5-2680 v4, RTX 5060 driver 617.14,
-idle, 2026-10-07, two alternating rounds of `--hw off` / `--hw auto`, the same binary). MFTs:
-`VP9VideoExtensionDecoder` and `AV1VideoExtension` (Microsoft Store codec extensions), DXVA on the
-GPU's NVDEC (profiles VP9 0 / 2, AV1 main). AV1 fixtures here are libaom (`libsvtav1` is not in this
-ffmpeg build; the bench falls back to it) and VP9 are libvpx-vp9, as in the bench's `dec_*` specs.
-`cargo xtask bench --sections decode --only dec_vp9 --repeat 3 --hw off|auto` (likewise `dec_av1`),
-`--sections playback --only "av1-2160 full" --hw off|auto`.
-
-| codec | size | CPU ms/frame Off → **Auto** | fps Off → **Auto** (best of 3) |
-|---|---|---|---|
-| VP9 | 1080p | 38-43 → **3.5-3.6** | 60 → **281-283** |
-| VP9 | 2160p | 165-169 → **15-16** | 16 → **70-79** |
-| AV1 | 1080p | 55-56 → **3.3-3.4** | 22 → **373-374** |
-| AV1 | 2160p | 219-221 → **10.9-11.3** | 5.5 → **106-107** |
-
-Every Auto row had `hw frames` = frames × 3 repeats, 3 sessions, 0 fallbacks, 0 declined.
-
-| playback 8 s, Full | shown/dropped Off → **Auto** | CPU ms/frame Off → **Auto** |
-|---|---|---|
-| VP9 2160p | 11-12/180-181 → **191/1** | 117-124 → **24-27** |
-| AV1 2160p | 0/192 → **192/0** | 47.5-47.9 → **17-20** |
-
-Software AV1 decodes 4K at 5.5 fps here, so it never plays in real time; with the hardware decoder it
-plays without a drop. As on the other codecs, the hardware ignores draft mode and what is left on the
-CPU is the readback and plane conversion.
-
-## Results (Linux VA-API H.264 and HEVC hardware decoding, Off → Auto)
-
-Same commit, Settings ▸ Playback ▸ Hardware decoding switched with the bench flag
-(`cargo xtask bench --sections decode --only dec_h --repeat 3 --hw off|auto`), 2026-10-08, Intel
-Core i5-13500H with Iris Xe graphics (Raptor Lake-P), 7.4 GB RAM, Intel iHD driver 26.1.2 through
-libva 2.22, load average 5–15. Only H.264 goes through VA-API so far; the HEVC rows decode in
-software either way and show the run-to-run spread. The decoded pictures are identical
-(bit-exact parity tests, `crates/platform/tests/vaapi.rs`).
-
-| codec | size | CPU ms/frame Off → **Auto** | fps Off → **Auto** (best of 3) | hw frames |
-|---|---|---|---|---|
-| H.264 | 1080p | 103.7 → **2.3** | 133 → **263** | 360 |
-| H.264 | 2160p | 416.5 → **11.4** | 32 → **56** | 216 |
-| HEVC | 1080p | 63.2 → 46.5 | 99 → 131 | 0 |
-| HEVC | 2160p | 349.5 → 353.7 | 30 → 35 | 0 |
-| HEVC Main 10 | 2160p | 348.9 → 352.6 | 29 → 29 | 0 |
-
-What is left on the CPU per H.264 frame is the host side of stateless decoding (parsing, DPB,
-filling the VA buffers) and the read-back: `vaGetImage` into an NV12 image and the copy into
-planar Y'CbCr. One picture is decoded at a time and read back as soon as the DPB outputs it, so
-4K throughput (56 fps) is bound by that round trip, not by the video engine; overlapping decode
-and read-back, or zero-copy into wgpu, would raise it.
-
-### HEVC through VA-API (HW5 follow-up)
-
-Same machine and commands on 2026-10-09 with HEVC added, at a lower load (the software decoders ran
-faster than in the table above; compare within a row). H.264 is unchanged; every HEVC stream now
-goes through VA-API too (216–360 hardware frames, no fallbacks), bit-exact with the software decoder.
-
-| codec | size | CPU ms/frame Off → **Auto** | fps Off → **Auto** (best of 3) |
-|---|---|---|---|
-| H.264 | 1080p | 57.3 → **2.6** | 227 → **241** |
-| H.264 | 2160p | 231.8 → **12.6** | 58 → **52** |
-| HEVC | 1080p | 45.6 → **2.3** | 141 → **341** |
-| HEVC | 2160p | 202.5 → **10.1** | 47 → **76** |
-| HEVC Main 10 | 2160p | 211.6 → **18.4** | 42 → **46** |
-
-At this lower load the multi-threaded software decoders keep up with the one-picture-at-a-time
-hardware path on throughput for H.264 and 10-bit HEVC, at 5–20 % of their CPU time; under load
-(the run above) the hardware path is ahead on both. 10-bit pictures cost more to read back (P010 is
-twice the bytes of NV12 and is shifted down into 16-bit planes).
 
 ## Results (GPU1: blend modes on the GPU compositor, #30, before → after)
 

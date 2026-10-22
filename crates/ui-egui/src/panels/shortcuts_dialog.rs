@@ -816,19 +816,3 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, t: &Tokens) -> Option<bool>
     });
     close
 }
-
-#[cfg(test)]
-mod localization_tests {
-    use super::*;
-
-    #[test]
-    fn command_search_accepts_spanish_labels_ids_and_keys() {
-        crate::i18n::set_current(crate::i18n::Language::Es);
-        let row = json!({"id": "edit.undo", "label": "Undo", "category": "Edit", "shortcuts": [{"keys": "Cmd+Z", "display": "Ctrl+Z"}]});
-        for query in ["deshacer", "undo", "edit.undo", "ctrl+z", "cmd+z"] {
-            assert!(matches_search(&row, query), "{query}");
-        }
-        assert!(!matches_search(&row, "rehacer"));
-        crate::i18n::set_current(crate::i18n::Language::En);
-    }
-}

@@ -134,7 +134,7 @@ fn delete(app: &mut FilmcraftApp, name: &str) -> Result<Value, String> {
 /// Rebuild the Window ▸ Workspaces submenu: every workspace (the current one checked), then the
 /// layout commands in table order.
 pub fn menu(app: &FilmcraftApp, items: &mut Vec<MenuItem>) {
-    splice(items, &app.workspaces, &app.session, Some(&app.ui.workspace), |n| app.ui.language.tr(n).to_string());
+    splice(items, &app.workspaces, &app.session, Some(&app.ui.workspace), |n| crate::i18n::t(n).to_string());
 }
 
 /// The same submenu without a running app: the built-in workspaces in English, none checked

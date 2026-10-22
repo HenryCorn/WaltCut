@@ -102,7 +102,7 @@ In the UI, Save / Save As / Save a Copy without a `path` show a file dialog.
 ## Auto Save
 
 Preferences ▸ Auto Save (Edit ▸ Preferences ▸ Auto Save…, ⌘,; FilmCraft ▸ Settings… on macOS) works
-like Premiere's:
+as follows:
 
 | Setting | Key | Default |
 |---|---|---|
@@ -131,7 +131,7 @@ Preferences are stored in `<data dir>/preferences.json`. The `prefs.*` commands 
 
 ## Crash recovery
 
-Premiere's auto-save can lose up to one interval of work. FilmCraft also keeps a **recovery journal**:
+Auto-save alone can lose up to one interval of work. FilmCraft also keeps a **recovery journal**:
 
 - Whenever the project has unsaved changes, a snapshot is written to
   `<data dir>/Recovery/<started>-<pid>[-<n>]/snapshot.fcproj`, plus `session.json` (time, revision, project
@@ -195,7 +195,7 @@ UI automation ids: `recovery.recover`, `recovery.later`, `recovery.discard`, `re
 
 ## Settings
 
-Premiere's Settings dialog (app menu ▸ Settings ▸ <category> on macOS, Edit ▸ Preferences
+The Settings dialog (app menu ▸ Settings ▸ <category> on macOS, Edit ▸ Preferences
 elsewhere; General is Cmd+,; the window is titled "Preferences"). The values are user preferences,
 not project data: they live in `preferences.json` in the per-user data directory (written
 atomically on every change) and never touch the `.fcproj` schema. The file carries a `version`
@@ -228,7 +228,7 @@ opens the dialog on a page.
 | Timeline | video / audio transition and still image default durations (frames or seconds), playback auto-scrolling (none / page / smooth), snap playhead, return to beginning at playback end, play after rendering previews |
 | Trim | Large Trim Offset, Selection tool picks roll (on the cut) / ripple (on the edge) without a modifier, playhead determines trim loop |
 
-The remaining fields are kept for parity and shown, but have no effect yet (`wired: false`).
+The remaining fields are kept and shown, but have no effect yet (`wired: false`).
 
 UI automation ids: `settings.category.<id>`; `settings.<key>` for every control (for example
 `settings.timeline.autoScroll`, `settings.labels.colors.rose.color`); `settings.<key>.<value>` for

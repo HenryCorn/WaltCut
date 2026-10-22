@@ -122,7 +122,8 @@ impl Driver {
 
     /// Audio clip on A1 (id) with `effect` applied and selected; Effect Controls showing it.
     fn audio_clip_with(&mut self, effect: &str) -> u64 {
-        self.ok("ui.set", json!({"workspace": "Effects"}));
+        self.ok("ui.panel.show", json!({"panel": "Effects"}));
+        self.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
         let seq = self.exec("sequence.inspect", json!({}));
         let clip = &seq["audio"][0]["items"][0];
         let (id, start) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap());
@@ -215,7 +216,8 @@ fn graphic_eq_and_dynamics_editors() {
 fn track_fx_editor_from_the_mixer_slot() {
     let mut d = Driver::demo();
     d.exec("mixer.addInsert", json!({"strip": "A1", "effect": "multiband_compressor"}));
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
+    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     d.click("mixer.showEffects");
     d.click("mixer.A1.fx.0");

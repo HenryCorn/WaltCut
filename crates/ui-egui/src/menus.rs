@@ -26,18 +26,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("window.dockPanel", "Dock Panel", [], None),
     uic!("window.floatPanel", "Undock Panel", [], None),
     uic!("window.closePanel", "Close Panel", [], None),
-    uic!("app.language.english", "English", ["Edit", "Language"], None),
-    uic!("app.language.japanese", "日本語", ["Edit", "Language"], None),
-    uic!("app.language.spanish", "Español", ["Edit", "Language"], None),
-    uic!("app.language.portuguese", "Português (Brasil)", ["Edit", "Language"], None),
-    uic!("app.language.ukrainian", "Українська", ["Edit", "Language"], None),
-    uic!("app.language.chinese", "简体中文", ["Edit", "Language"], None),
-    uic!("app.language.german", "Deutsch", ["Edit", "Language"], None),
-    uic!("app.language.russian", "Русский", ["Edit", "Language"], None),
-    uic!("app.language.french", "Français", ["Edit", "Language"], None),
-    uic!("app.language.indonesian", "Bahasa Indonesia", ["Edit", "Language"], None),
-    uic!("app.language.italian", "Italiano", ["Edit", "Language"], None),
-    uic!("app.language.korean", "한국어", ["Edit", "Language"], None),
     uic!("source.playback.toggle", "Source Play/Stop", [], None),
     uic!("source.playback.play", "Play Source", [], None),
     uic!("source.playback.stop", "Stop Source", [], None),
@@ -132,10 +120,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("mode.import", "Import", [], None),
     uic!("mode.edit", "Edit", [], None),
     uic!("mode.export", "Export", ["File", "Export"], Some("Cmd+M")),
-    uic!("help.discord", "Join the ArtCraft Discord…", ["Help"], None),
-    uic!("help.website", "ArtCraft Website", ["Help"], None),
-    uic!("help.appPage", "FilmCraft on getartcraft.com", ["Help"], None),
-    uic!("help.github", "FilmCraft on GitHub", ["Help"], None),
+    uic!("help.github", "WaltCut on GitHub", ["Help"], None),
     uic!("help.reportIssue", "Report an Issue…", ["Help"], None),
     uic!("help.revealLogFiles", "Reveal Log Files…", ["Help"], None),
     uic!("help.systemCompatibilityReport", "System Compatibility Report…", ["Help"], None),
@@ -179,58 +164,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if waltcut_engine::source_monitor::source_command(id) && targets_source(app, &params) && params.get("target").is_none() {
         let object = params.as_object_mut().ok_or("command parameters must be an object")?;
         object.insert("target".into(), json!("source"));
-    }
-    if matches!(
-        id,
-        "app.language.english"
-            | "app.language.japanese"
-            | "app.language.spanish"
-            | "app.language.portuguese"
-            | "app.language.ukrainian"
-            | "app.language.chinese"
-            | "app.language.german"
-            | "app.language.russian"
-            | "app.language.french"
-            | "app.language.indonesian"
-            | "app.language.italian"
-            | "app.language.korean"
-    ) {
-        // Japanese needs the craft-fonts (built with CRAFT_FONTS_DIR) or a font installed on the system
-        if id == "app.language.japanese" && !crate::i18n::install_japanese_font(ctx) {
-            return Err("no Japanese font is installed on this system (for example Noto Sans CJK JP); the interface stays in English".into());
-        }
-        // Chinese needs the Chinese fallback theme::install adds (craft-fonts or a system face)
-        if id == "app.language.chinese" && !crate::i18n::chinese_font_available() {
-            return Err("no Chinese font is installed on this system (for example Noto Sans CJK SC or Microsoft YaHei); the interface stays in English".into());
-        }
-        // Korean needs an installed Hangul font (none is bundled; see cjk.rs)
-        if id == "app.language.korean" && !crate::i18n::korean_font_available() {
-            return Err("no Korean font is installed on this system (for example Malgun Gothic or Noto Sans CJK KR); the interface stays in English".into());
-        }
-        let language = match id {
-            "app.language.japanese" => crate::i18n::Language::Ja,
-            "app.language.spanish" => crate::i18n::Language::Es,
-            "app.language.portuguese" => crate::i18n::Language::PtBr,
-            "app.language.ukrainian" => crate::i18n::Language::Uk,
-            "app.language.chinese" => crate::i18n::Language::ZhCn,
-            "app.language.german" => crate::i18n::Language::De,
-            "app.language.russian" => crate::i18n::Language::Ru,
-            "app.language.french" => crate::i18n::Language::Fr,
-            "app.language.indonesian" => crate::i18n::Language::Id,
-            "app.language.italian" => crate::i18n::Language::It,
-            "app.language.korean" => crate::i18n::Language::Ko,
-            _ => crate::i18n::Language::En,
-        };
-        // The preference is updated in memory before it is written, so a failed write (read-only
-        // or full disk) still switches the interface; it only can't be remembered for next time.
-        let saved = app.session.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": language.code()}));
-        app.ui.language = language;
-        crate::i18n::set_current(language);
-        if let Err(e) = saved {
-            app.ui.status = tlf!("The language changed but could not be saved: {e}", e);
-        }
-        ctx.request_repaint();
-        return Ok(json!(app.ui.language));
     }
     if id == "file.exportFrame" {
         if params.get("target").is_none() {
@@ -676,29 +609,14 @@ pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide FilmCraft", "Hide Othe
 pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
     let mut v = menu_items_for(&app.session);
     for it in &mut v {
-        it.label = app.ui.language.tr(&it.label).to_string();
-        match it.id.as_str() {
-            "app.language.english" => it.checked = Some(app.ui.language == crate::i18n::Language::En),
-            "app.language.japanese" => it.checked = Some(app.ui.language == crate::i18n::Language::Ja),
-            "app.language.spanish" => it.checked = Some(app.ui.language == crate::i18n::Language::Es),
-            "app.language.portuguese" => it.checked = Some(app.ui.language == crate::i18n::Language::PtBr),
-            "app.language.ukrainian" => it.checked = Some(app.ui.language == crate::i18n::Language::Uk),
-            "app.language.chinese" => it.checked = Some(app.ui.language == crate::i18n::Language::ZhCn),
-            "app.language.german" => it.checked = Some(app.ui.language == crate::i18n::Language::De),
-            "app.language.russian" => it.checked = Some(app.ui.language == crate::i18n::Language::Ru),
-            "app.language.french" => it.checked = Some(app.ui.language == crate::i18n::Language::Fr),
-            "app.language.indonesian" => it.checked = Some(app.ui.language == crate::i18n::Language::Id),
-            "app.language.italian" => it.checked = Some(app.ui.language == crate::i18n::Language::It),
-            "app.language.korean" => it.checked = Some(app.ui.language == crate::i18n::Language::Ko),
-            _ => {}
-        }
+        it.label = crate::i18n::t(&it.label).to_string();
         if it.id.starts_with("view.") {
             it.checked = crate::panels::monitor_view::checked(app, &it.id).or(crate::panels::menu_dialogs::checked(app, &it.id));
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
         }
     }
     crate::panels::workspaces::menu(app, &mut v);
-    open_recent(&mut v, &app.session, |n| app.ui.language.tr(n).to_string());
+    open_recent(&mut v, &app.session, |n| crate::i18n::t(n).to_string());
     v
 }
 
@@ -884,7 +802,6 @@ pub fn external_commands() -> Vec<waltcut_engine::shortcuts::CommandInfo> {
 
 /// Draw the in-window menu bar.
 pub fn menu_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
-    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("interface-language"), app.ui.language));
     let items = menu_items(app);
     // Draw Edit ▸ Label with the user's live palette, not the baked-in label colours.
     let labels = app.session.prefs.labels.clone();
@@ -894,7 +811,7 @@ pub fn menu_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
         let mut titles = Vec::with_capacity(MENUS.len());
         for top in MENUS {
             let mine: Vec<&MenuItem> = items.iter().filter(|i| i.path.first().map(String::as_str) == Some(top)).collect();
-            let r = ui.menu_button(app.ui.language.tr(top), |ui| {
+            let r = ui.menu_button(crate::i18n::t(top), |ui| {
                 ui.set_min_width(260.0);
                 if mine.is_empty() {
                     ui.add_enabled(false, egui::Button::new(tl!("(empty)")));
@@ -944,8 +861,7 @@ fn menu_level(
             }
             subs.push(sub);
             let inner: Vec<&MenuItem> = items.iter().copied().filter(|x| x.path.get(depth).map(String::as_str) == Some(sub)).collect();
-            let language = ui.ctx().data(|d| d.get_temp::<crate::i18n::Language>(egui::Id::new("interface-language"))).unwrap_or_default();
-            ui.menu_button(language.tr(sub), |ui| {
+            ui.menu_button(crate::i18n::t(sub), |ui| {
                 ui.set_min_width(220.0);
                 menu_level(ui, &inner, depth + 1, clicked, auto, labels);
             });

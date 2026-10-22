@@ -1,7 +1,5 @@
 //! Built-in keyboard shortcut tables (command id, keys, panel; "" = application-wide).
 //!
-//! Key assignments are functional facts about how other editors are operated; these tables map
-//! them onto FilmCraft's own command ids. No files from any other application are used.
 //! Keys use FilmCraft's canonical notation (`Cmd` = ⌘ on macOS / Ctrl elsewhere, `Ctrl` = the
 //! macOS Control key, `Alt` = ⌥ Option / Alt; `Backspace` = the Mac "delete" key, `Delete` = the
 //! forward-delete key).
@@ -20,10 +18,9 @@ pub const FILMCRAFT_PANEL: &[Entry] = &[
     ("sequence.close", "Cmd+W", "Timeline"),
 ];
 
-/// Premiere Pro's default keyboard (macOS) mapped onto FilmCraft commands. FilmCraft Default takes
-/// every entry whose command has no shortcut yet and whose key is free (the shortcut audit);
-/// the "Premiere Pro Compatible" preset applies all of them.
-pub const PREMIERE: &[Entry] = &[
+/// Conventional editing keys for commands that have no shortcut of their own. The default map takes
+/// every entry whose command has no shortcut yet and whose key is free (the shortcut audit).
+pub const EXTRA_KEYS: &[Entry] = &[
     // Tools
     ("tool.selection", "V", ""),
     ("tool.trackSelectBackward", "Shift+A", ""),
@@ -238,9 +235,8 @@ pub const PREMIERE: &[Entry] = &[
     ("edit.redo", "Right", "History"),
 ];
 
-/// Premiere's panel-scoped default keys for the keyboard-only commands (M3.12). FilmCraft Default
-/// uses them as they are, and they are part of the "Premiere Pro Compatible" preset ([`premiere`]).
-pub const PREMIERE_PANEL: &[Entry] = &[
+/// Panel-scoped default keys for the keyboard-only commands. The default map uses them as they are.
+pub const PANEL_KEYS: &[Entry] = &[
     ("timeline.nudgeLeft", "Cmd+Left", "Timeline"),
     ("timeline.nudgeRight", "Cmd+Right", "Timeline"),
     ("timeline.nudgeLeft5", "Cmd+Shift+Left", "Timeline"),
@@ -307,96 +303,4 @@ pub const PREMIERE_PANEL: &[Entry] = &[
     ("playback.loop", "Cmd+L", "Audio Track Mixer"),
     ("playback.toggle", "Space", "Metadata"),
     ("playback.loop", "Cmd+L", "Metadata"),
-];
-
-/// The whole "Premiere Pro Compatible" table: [`PREMIERE`] plus [`PREMIERE_PANEL`].
-pub fn premiere() -> Vec<Entry> {
-    PREMIERE.iter().chain(PREMIERE_PANEL).copied().collect()
-}
-
-/// Final Cut Pro's default keys for the equivalent FilmCraft commands.
-pub const FINAL_CUT: &[Entry] = &[
-    ("tool.selection", "A", ""),
-    ("tool.razor", "B", ""),
-    ("tool.ripple", "T", ""),
-    ("tool.zoom", "Z", ""),
-    ("tool.hand", "H", ""),
-    ("source.insert", "W", ""),
-    ("source.overwrite", "D", ""),
-    ("sequence.addEdit", "Cmd+B", ""),
-    ("sequence.addEditAllTracks", "Cmd+Shift+B", ""),
-    ("edit.rippleDelete", "Backspace", ""),
-    ("sequence.lift", "Shift+Backspace", ""),
-    ("markers.markIn", "I", ""),
-    ("markers.markOut", "O", ""),
-    ("markers.markClip", "X", ""),
-    ("markers.clearInOut", "Alt+X", ""),
-    ("markers.add", "M", ""),
-    ("markers.goNext", "Ctrl+'", ""),
-    ("markers.goPrev", "Ctrl+;", ""),
-    ("playhead.nextEdit", "Down", ""),
-    ("playhead.prevEdit", "Up", ""),
-    ("playhead.stepForward5", "Shift+Right", ""),
-    ("playhead.stepBack5", "Shift+Left", ""),
-    ("playback.toggle", "Space", ""),
-    ("playback.reverse", "J", ""),
-    ("playback.stop", "K", ""),
-    ("playback.forward", "L", ""),
-    ("playback.loop", "Cmd+L", ""),
-    ("playback.inToOut", "/", ""),
-    ("sequence.snap", "N", ""),
-    ("view.zoomIn", "Cmd+=", ""),
-    ("view.zoomOut", "Cmd+-", ""),
-    ("view.zoomToSequence", "Shift+Z", ""),
-    ("sequence.applyVideoTransition", "Cmd+T", ""),
-    ("clip.speedDuration", "Cmd+R", ""),
-    ("clip.enable", "V", ""),
-    ("clip.nest", "Alt+G", ""),
-    ("sequence.matchFrame", "Shift+F", ""),
-    ("trim.extendToPlayhead", "Shift+X", ""),
-    ("trim.backward", ",", ""),
-    ("trim.forward", ".", ""),
-    ("trim.backwardMany", "Shift+,", ""),
-    ("trim.forwardMany", "Shift+.", ""),
-    ("file.newBin", "Alt+N", ""),
-    ("mode.export", "Cmd+E", ""),
-    ("sequence.renderEffectsInToOut", "Ctrl+R", ""),
-    ("sequence.renderInToOut", "Ctrl+Shift+R", ""),
-];
-
-/// Avid Media Composer's default keys for the equivalent FilmCraft commands.
-pub const AVID: &[Entry] = &[
-    ("playback.reverse", "J", ""),
-    ("playback.stop", "K", ""),
-    ("playback.forward", "L", ""),
-    ("playback.toggle", "Space", ""),
-    ("markers.markIn", "I", ""),
-    ("markers.markIn", "E", ""),
-    ("markers.markOut", "O", ""),
-    ("markers.markOut", "R", ""),
-    ("markers.markClip", "T", ""),
-    ("markers.clearIn", "D", ""),
-    ("markers.clearOut", "F", ""),
-    ("markers.clearInOut", "G", ""),
-    ("markers.goToIn", "Q", ""),
-    ("markers.goToOut", "W", ""),
-    ("source.insert", "V", ""),
-    ("source.overwrite", "B", ""),
-    ("sequence.lift", "Z", ""),
-    ("sequence.extract", "X", ""),
-    ("sequence.addEdit", "H", ""),
-    ("playhead.stepBack5", "1", ""),
-    ("playhead.stepForward5", "2", ""),
-    ("playhead.stepBack", "3", ""),
-    ("playhead.stepForward", "4", ""),
-    ("playhead.prevEdit", "A", ""),
-    ("playhead.nextEdit", "S", ""),
-    ("trim.edit", "U", ""),
-    ("trim.backwardMany", "M", ""),
-    ("trim.backward", ",", ""),
-    ("trim.forward", ".", ""),
-    ("trim.forwardMany", "/", ""),
-    ("view.zoomIn", "Cmd+]", ""),
-    ("view.zoomOut", "Cmd+[", ""),
-    ("markers.add", "F5", ""),
 ];

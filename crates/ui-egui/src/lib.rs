@@ -6,17 +6,16 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-/// A literal UI string in the language the interface is drawn in (`i18n::t`). Only literals: the
-/// i18n tests read every `tl!` literal in the crate and require a Spanish translation for it.
+/// A literal UI string as displayed (`i18n::t`; the interface is English only).
 macro_rules! tl {
     ($s:literal) => {
         $crate::i18n::t($s)
     };
 }
 
-/// A translated template with `{name}` placeholders filled in, for text that `format!` would build.
+/// A template with `{name}` placeholders filled in, for text that `format!` would build.
 /// After the template literal come the values: `n = count`, or just `gain` for a variable of the
-/// same name. Values are formatted with `Display`; the translation may reorder placeholders.
+/// same name. Values are formatted with `Display`;
 macro_rules! tlf {
     (@v $k:ident = $v:expr) => {
         $v
@@ -30,9 +29,7 @@ macro_rules! tlf {
 }
 
 pub mod automation;
-pub mod brand;
 pub mod calc;
-mod cjk;
 pub mod control;
 pub mod crash;
 pub mod credits;
@@ -135,9 +132,6 @@ pub struct HostHooks {
     /// The menu tree changed (labels, shortcuts, enablement, checkmarks): update the native menu
     /// bar. Called from the frame loop only when something differs from the last call.
     pub menu_changed: Option<Box<dyn FnMut(&[menus::MenuItem])>>,
-    /// The user's preferred languages (locale tags, most preferred first) for Interface Language ▸
-    /// System Language. Without it, System Language is English.
-    pub system_languages: Option<Box<dyn Fn() -> Vec<String>>>,
     /// Open dialog for a JSON file (shortcut preset import): filter name, extensions → path.
     pub pick_open_file: Option<Box<dyn FnMut(&str, &[&str]) -> Option<String>>>,
     /// Folder picker (Link Media search).
@@ -161,8 +155,7 @@ pub struct HostHooks {
     /// running while the dialog is open (the desktop app on Linux, #260); without it the
     /// synchronous pickers above are used.
     pub run_dialog: Option<Box<dyn FnMut(native_dialogs::FileDialog) -> Receiver<Vec<String>>>>,
-    /// Open a URL in the system browser (Help menu links, About dialog, Discord button, Import
-    /// screen). Without it, or when it fails, links go through `egui::Context::open_url`, which
+    /// Open a URL in the system browser (Help menu links, About dialog). Without it, or when it fails, links go through `egui::Context::open_url`, which
     /// opens a new tab on the web (the native egui backend is built without its `links` feature).
     pub open_url: Option<Box<dyn FnMut(&str) -> Result<(), String>>>,
     /// The operating system's light or dark appearance when egui cannot report it (Linux desktops
@@ -532,10 +525,9 @@ impl FilmcraftApp {
         let frames = Arc::new(FrameServer::new(session.media.clone(), session.services.clone(), session.previews.clone(), FrameServer::default_workers()));
         let workspaces =
             session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| dock::WorkspacePrefs::load(&d.join(dock::WORKSPACES_FILE))).unwrap_or_default();
-        let language = i18n::Language::parse(&session.prefs.general.interface_language).unwrap_or_default();
         Self {
             session,
-            ui: UiState { language, ..UiState::default() },
+            ui: UiState::default(),
             tokens: Tokens::for_kind(ThemeKind::Dark),
             frames,
             playback: Playback { speed: 1.0, ..Default::default() },
@@ -717,28 +709,6 @@ impl FilmcraftApp {
         if prev.as_ref().is_none_or(|q| q.appearance != p.appearance || q.general.show_tool_tips != p.general.show_tool_tips) {
             let k = self.appearance_kind(ctx);
             self.set_theme(ctx, k);
-        }
-        if prev.as_ref().is_none_or(|q| q.general.interface_language != p.general.interface_language) {
-            let language = match i18n::Language::parse(&p.general.interface_language) {
-                Some(l) => l,
-                None if p.general.interface_language == "system" => {
-                    i18n::Language::from_locales(&self.hooks.system_languages.as_ref().map(|f| f()).unwrap_or_default())
-                }
-                None => i18n::Language::default(),
-            };
-            if language == i18n::Language::Ja && !i18n::install_japanese_font(ctx) {
-                self.ui.language = i18n::Language::En;
-                self.ui.status = tl!("no Japanese font is installed on this system; the interface stays in English").into();
-            } else if language == i18n::Language::ZhCn && !i18n::chinese_font_available() {
-                self.ui.language = i18n::Language::En;
-                self.ui.status = tl!("no Chinese font is installed on this system; the interface stays in English").into();
-            } else if language == i18n::Language::Ko && !i18n::korean_font_available() {
-                self.ui.language = i18n::Language::En;
-                self.ui.status = tl!("no Korean font is installed on this system; the interface stays in English").into();
-            } else {
-                self.ui.language = language;
-            }
-            i18n::set_current(self.ui.language);
         }
         self.frames.set_cache_budget(p.memory.frame_cache_mb as usize * (1 << 20));
         self.ui.play_after_render = p.timeline.play_after_rendering;
@@ -1685,7 +1655,6 @@ impl FilmcraftApp {
     }
 
     fn frame(&mut self, ui: &mut egui::Ui) {
-        i18n::set_current(self.ui.language);
         if std::mem::take(&mut self.panic_next_frame) {
             crash::injected_fault("injected UI fault");
         }
@@ -2008,16 +1977,6 @@ impl eframe::App for FilmcraftApp {
         self.poll_native_dialog(ctx);
         if !self.styled {
             theme::install(ctx, &self.tokens);
-            // theme::install replaces the fonts: add the system Japanese font back (or fall back to
-            // English when a saved Japanese setting meets a system without one)
-            // (likewise Chinese without a Chinese face, Korean without a Hangul one)
-            let japanese_missing = self.ui.language == i18n::Language::Ja && !i18n::install_japanese_font(ctx);
-            if japanese_missing
-                || (self.ui.language == i18n::Language::ZhCn && !i18n::chinese_font_available())
-                || (self.ui.language == i18n::Language::Ko && !i18n::korean_font_available())
-            {
-                self.ui.language = i18n::Language::En;
-            }
             self.styled = true;
             ctx.request_repaint();
         } else {
