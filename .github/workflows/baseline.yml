@@ -27,66 +27,76 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
       - name: Install ffmpeg (test oracle and fixture generator)
         run: brew install ffmpeg
-      - name: Measure
+      - name: Count
         shell: bash
         run: |
           set -uo pipefail
-          now() { date +%s; }
-
           crates=$(cargo metadata --no-deps --format-version 1 | jq '.packages | length')
           deps=$(cargo metadata --no-deps --format-version 1 | jq '
             [.packages[].name] as $own
             | [.packages[].dependencies[] | select(.kind != "dev") | .name | select(. as $n | $own | index($n) | not)]
             | unique | length')
-          dev_deps=$(cargo metadata --no-deps --format-version 1 | jq '
-            [.packages[].name] as $own
-            | [.packages[].dependencies[] | .name | select(. as $n | $own | index($n) | not)]
-            | unique | length')
           rs_files=$(git ls-files '*.rs' | wc -l | tr -d ' ')
           rs_lines=$(git ls-files -z '*.rs' | xargs -0 cat | wc -l | tr -d ' ')
-
-          t0=$(now)
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "runner=${RUNNER_OS} ${RUNNER_ARCH} ($(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores, $(( $(sysctl -n hw.memsize) / 1073741824 )) GiB)"
+            echo "rustc=$(rustc --version)"
+            echo "crates=$crates"
+            echo "direct_dependencies=$deps"
+            echo "rust_files=$rs_files"
+            echo "rust_lines=$rs_lines"
+          } > baseline.env
+          cat baseline.env
+      - name: Clean release build
+        shell: bash
+        run: |
+          set -uo pipefail
           # the app package is `filmcraft` before the crate rename (#2) and `waltcut` after it
           pkg=filmcraft
           cargo metadata --no-deps --format-version 1 | jq -e '.packages[] | select(.name == "waltcut")' > /dev/null && pkg=waltcut
+          t0=$(date +%s)
           cargo build --release -p "$pkg"
-          build_status=$?
-          build_secs=$(( $(now) - t0 ))
+          status=$?
+          secs=$(( $(date +%s) - t0 ))
           # the binary keeps its name until the product rename
           bin=target/release/waltcut
           [ -f "$bin" ] || bin=target/release/filmcraft
-          bin_bytes=$(stat -f %z "$bin" 2>/dev/null || echo 0)
-
-          t0=$(now)
-          cargo test --workspace --release --no-fail-fast
-          test_status=$?
-          test_secs=$(( $(now) - t0 ))
-
-          cat > baseline.json <<EOF
           {
-            "commit": "$(git rev-parse HEAD)",
-            "runner": "${RUNNER_OS} ${RUNNER_ARCH} ($(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores, $(( $(sysctl -n hw.memsize) / 1073741824 )) GiB)",
-            "rustc": "$(rustc --version)",
-            "crates": $crates,
-            "direct_dependencies": $deps,
-            "direct_dependencies_including_dev": $dev_deps,
-            "rust_files": $rs_files,
-            "rust_lines": $rs_lines,
-            "release_build_seconds": $build_secs,
-            "release_build_exit": $build_status,
-            "binary_bytes": $bin_bytes,
-            "test_seconds": $test_secs,
-            "test_exit": $test_status
-          }
-          EOF
-          cat baseline.json
+            echo "release_build_seconds=$secs"
+            echo "release_build_exit=$status"
+            echo "binary_bytes=$(stat -f %z "$bin" 2>/dev/null || echo 0)"
+          } >> baseline.env
+          tail -3 baseline.env
+          exit $status
+      - name: Workspace tests
+        shell: bash
+        # a debug test build is what contributors and CI run; capped so a hang cannot lose the numbers above
+        timeout-minutes: 75
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          t0=$(date +%s)
+          cargo test --workspace --no-fail-fast
+          status=$?
+          {
+            echo "test_seconds=$(( $(date +%s) - t0 ))"
+            echo "test_exit=$status"
+          } >> baseline.env
+          tail -2 baseline.env
+          exit $status
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
           {
             echo '### Baseline'
-            echo '```json'
-            cat baseline.json
+            echo '```'
+            cat baseline.env
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: baseline
-          path: baseline.json
+          path: baseline.env
