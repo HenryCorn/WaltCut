@@ -354,7 +354,7 @@ pub fn template_controls(
             && let Some(ParamValue::Text(s0)) = &pv
             && s0.contains('\n')
         {
-            ui.label(egui::RichText::new(format!("    {}", &c.name)).color(t.text_dim).size(12.0));
+            ui.label(egui::RichText::new(format!("    {}", c.name)).color(t.text_dim).size(12.0));
             let mut s = s0.clone();
             let rows = s.lines().count().clamp(2, 8);
             let r = ui
