@@ -1,84 +1,10 @@
 //! `filmcraft-cli probe`: media info as JSON, plus container details for MPEG TS / PS (program,
-//! streams with their codecs, access units, picture types and timestamp ranges), MXF (operational
-//! pattern, tracks, index, timecode), Ogg (logical streams, pre-skip, granules), Broadcast WAV
+//! streams with their codecs, access units, picture types and timestamp ranges), Broadcast WAV
 //! (time reference) and image sequences (frames, missing numbers).
 
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-
-fn rate(r: waltcut_mxf::Rational) -> String {
-    format!("{}/{}", r.num, r.den)
-}
-
-fn mxf_details(src: &waltcut_codecs::MxfSource) -> Value {
-    let f = src.file();
-    let tracks: Vec<Value> = f
-        .tracks
-        .iter()
-        .map(|t| {
-            let mut v = json!({
-                "trackId": t.track_id,
-                "trackNumber": format!("{:08x}", t.track_number),
-                "kind": format!("{:?}", t.kind),
-                "codec": t.codec.name(),
-                "wrapping": format!("{:?}", t.wrapping),
-                "editRate": rate(t.edit_rate),
-                "origin": t.origin,
-                "startPosition": t.start_position,
-                "duration": t.duration,
-            });
-            if t.kind == waltcut_mxf::TrackKind::Picture {
-                v["pictures"] = json!(t.samples.len());
-                v["keyFrames"] = json!(t.samples.iter().filter(|s| s.key).count());
-                v["indexed"] = json!(t.indexed);
-                v["temporalOffsets"] = json!(t.temporal_offsets);
-                v["reorderedFromBitstream"] = json!(t.needs_reorder);
-            }
-            if let Some(s) = &t.sound {
-                v["sampleRate"] = json!(rate(s.sample_rate));
-                v["channels"] = json!(s.channels);
-                v["bits"] = json!(s.bits);
-                v["sampleFrames"] = json!(t.stored_sample_frames());
-            }
-            v
-        })
-        .collect();
-    json!({
-        "operationalPattern": f.operational_pattern.name(),
-        "timecode": f.timecode.map(|t| json!({"start": t.start, "roundedBase": t.rounded_base, "dropFrame": t.drop_frame, "text": t.format()})),
-        "materialPackage": f.material_package_name,
-        "product": f.product_name,
-        "company": f.company_name,
-        "partitions": f.partitions.len(),
-        "indexSegments": f.index_segments.len(),
-        "runIn": f.run_in,
-        "tracks": tracks,
-        "warnings": f.warnings,
-    })
-}
-
-fn ogg_details(src: &waltcut_codecs::OggSource) -> Value {
-    let f = src.file();
-    let streams: Vec<Value> = f
-        .streams
-        .iter()
-        .map(|s| {
-            let mut v = json!({"serial": s.serial, "codec": s.codec.name(), "packets": s.packets.len(), "pages": s.pages, "lastGranule": s.last_granule, "endOfStream": s.saw_eos});
-            if s.codec == waltcut_ogg::Codec::Opus
-                && let Some(h) = s.headers.first()
-                && h.len() >= 12
-            {
-                let pre_skip = u16::from_le_bytes([h[10], h[11]]);
-                let t = waltcut_ogg::OpusTiming::of(s, pre_skip as u32);
-                v["preSkip"] = json!(pre_skip);
-                v["samples48k"] = json!(t.total);
-            }
-            v
-        })
-        .collect();
-    json!({"streams": streams, "warnings": f.warnings})
-}
 
 fn mpeg_details(src: &waltcut_codecs::MpegSource) -> Value {
     let Some(f) = src.file() else {
@@ -156,27 +82,20 @@ pub fn probe(path: &str, image_sequence: bool) -> Result<Value, String> {
     let bytes: Arc<[u8]> = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?.into();
     let name = std::path::Path::new(path).file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
     let head = &bytes[..bytes.len().min(70_000)];
-    if waltcut_mxf::sniff(head) {
-        let src = waltcut_codecs::MxfSource::open(&name, bytes).map_err(|e| format!("{path}: {e}"))?;
-        let mut v = serde_json::to_value(waltcut_media::MediaSource::info(&src)).unwrap_or_default();
-        v["mxf"] = mxf_details(&src);
-        return Ok(v);
-    }
     if waltcut_codecs::mpeg::sniff(head) {
         let src = waltcut_codecs::MpegSource::open(&name, bytes).map_err(|e| format!("{path}: {e}"))?;
         let mut v = serde_json::to_value(waltcut_media::MediaSource::info(&src)).unwrap_or_default();
         v["mpeg"] = mpeg_details(&src);
-        return Ok(v);
-    }
-    if waltcut_ogg::sniff(head)
-        && let Ok(src) = waltcut_codecs::OggSource::open(&name, bytes.clone())
-    {
-        let mut v = serde_json::to_value(waltcut_media::MediaSource::info(&src)).unwrap_or_default();
-        v["ogg"] = ogg_details(&src);
+        if !waltcut_media::MediaSource::notices(&src).is_empty() {
+            v["notices"] = json!(waltcut_media::MediaSource::notices(&src));
+        }
         return Ok(v);
     }
     let src = waltcut_codecs::open_bytes(&name, bytes.clone()).map_err(|e| format!("{path}: {e}"))?;
     let mut v = serde_json::to_value(src.info()).unwrap_or_default();
+    if !src.notices().is_empty() {
+        v["notices"] = json!(src.notices());
+    }
     if waltcut_media::wav::sniff(head)
         && let Ok(w) = waltcut_media::wav::WavSource::parse(&name, bytes)
         && let Some(tr) = w.time_reference()

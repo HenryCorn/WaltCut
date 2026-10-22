@@ -1,4 +1,4 @@
-//! Still images (PNG, JPEG, GIF, WebP, TIFF, BMP, Targa, DPX, OpenEXR, Radiance HDR, DNG camera raw) as media
+//! Still images (PNG, JPEG, GIF, WebP, TIFF, BMP, Targa, DPX, OpenEXR and Radiance HDR) as media
 //! sources. Animated PNG and GIF files open as movies instead ([`crate::animated`]); here they would
 //! show their first frame.
 
@@ -9,7 +9,6 @@ use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick};
 
 use crate::{FrameRequest, MediaError, MediaInfo, MediaKind, MediaSource, Result, VideoStreamInfo};
 
-pub mod dng;
 pub mod exr;
 pub mod hdr;
 mod ycbcr_tiff;
@@ -66,10 +65,6 @@ pub struct StillSource {
 
 impl StillSource {
     pub fn decode(name: &str, bytes: &[u8]) -> Result<Self> {
-        // a DNG is a TIFF too: develop its raw image instead of reading its preview
-        if dng::sniff(bytes) {
-            return dng::still(name, bytes);
-        }
         if hdr::sniff(bytes) {
             return hdr::still(name, bytes);
         }

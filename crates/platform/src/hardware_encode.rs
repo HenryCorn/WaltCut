@@ -27,9 +27,6 @@ pub fn config_for(w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Result
     if !hevc && s.hardware_encoding != HardwareEncoding::Auto {
         return Err("hardware encoding is off".into());
     }
-    if s.format.is_mxf() {
-        return Err("MXF carries an Annex B stream".into());
-    }
     if s.bitrate_mode == BitrateMode::Vbr2Pass || !matches!(s.h264_pass, H264Pass::Single) {
         return Err("two-pass encoding".into());
     }

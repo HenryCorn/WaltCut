@@ -58,16 +58,20 @@ Boxes with 64-bit sizes and with size 0 (runs to the end of the file) are suppor
 | `vp09` + `vpcC` | `Vp9(VpcConfig)` |
 | `apch apcn apcs apco ap4h ap4x` | `ProRes { fourcc }` |
 | `jpeg mjpa mjpb` | `Jpeg { fourcc }` |
-| `AVdn AVdh` | `Dnx { fourcc }` |
+| `AVdn AVdh` | `Dnx { fourcc }` (recognized so the media source can return an actionable unsupported-codec error) |
 | `mp4a` + `esds` (in `wave` too) | `Aac(AacConfig)`: ASC bytes + decoded object type/rate/channels; `Mp3` for OTI 0x69/0x6B |
 | `.mp3`/`.mp2` | `Mp3`: MPEG-1/2 audio of any layer (each frame header names it) |
 | PCM fourccs | `Pcm(PcmConfig)`: bits, float, endianness (`enda`, lpcm flags, `pcmC`), channels, rate |
 | `alac` | `Alac { cookie }` |
 | `Opus` + `dOps` | `Opus(OpusConfig)` |
-| `fLaC` + `dfLa` | `Flac(FlacConfig)` (STREAMINFO decoded) |
-| `ac-3`/`ec-3` | `Ac3 { dac3 }` / `Eac3 { dec3 }` |
+| `fLaC` + `dfLa` | `Flac(FlacConfig)` (recognized so the media source can return an actionable unsupported-codec error) |
+| `ac-3`/`ec-3` | `Ac3 { dac3 }` / `Eac3 { dec3 }` (recognized for the picture-only import notice) |
 | `tmcd` | `Timecode(TimecodeConfig)`: flags (drop frame), timescale, frame duration, fps, start frame, reel name; `format_frame()` |
 | anything else | `Unknown { fourcc, raw }` |
+
+Parsing a sample entry identifies its format; it does not imply that `waltcut-codecs` can decode it.
+In particular DNx and FLAC are rejected with conversion guidance, while AC-3/E-AC-3 are omitted
+from otherwise-retained picture imports with a user-visible notice.
 
 Video entries also parse `colr` (`nclx`/`nclc`/ICC), `pasp`, `clap`, `fiel`, `gama` and `btrt` into
 `VideoParams`. The MP4 source in `waltcut-codecs` crops every frame to `clap`'s clean aperture
@@ -121,8 +125,8 @@ let bytes = w.finish_faststart()?.into_inner(); // or finish() for moov-at-end
 - Property tests (`tests/roundtrip.rs`) write random multi-track files, both progressive (MP4/MOV,
   faststart, PCM, edits) and fragmented, then read them back and compare sample tables and bytes.
 - ffprobe oracle tests (`tests/oracle_demux.rs`) run on ffmpeg-generated fixtures in
-  `target/fixtures/isobmff/`: H.264 with B-frames (MP4 and MOV), HEVC, ProRes 422/4444, MJPEG, DNxHR, PCM
-  s16le/s16be/s24le/f32le, AAC, ALAC, FLAC, Opus, AC-3, VP9, AV1, fragmented (with and without
+  `target/fixtures/isobmff/`: H.264 with B-frames (MP4 and MOV), HEVC, ProRes 422/4444, MJPEG, PCM
+  s16le/s16be/s24le/f32le, AAC, ALAC, Opus, VP9, AV1, fragmented (with and without
   default-base-is-moof), faststart, an edit-list cut, `tmcd` at 29.97 DF and 23.976, and colr/pasp. They
   compare packet offsets, sizes, pts/dts, durations and key flags, plus stream parameters. Tests skip
   with a message when ffmpeg or an encoder is missing.

@@ -6,8 +6,8 @@
 //!   GOP-aware random access ([`crate::gop`]). Frames are presented in display order, from the
 //!   first random-access picture; display order comes from the PTS (or, without timestamps, the
 //!   GOP and temporal reference). Leading pictures of an open GOP decode from the previous GOP.
-//! - Audio: MPEG audio layers I-III (symphonia), AAC in ADTS or LATM (our decoder), AC-3 (our
-//!   decoder), Blu-ray / AVCHD and DVD LPCM. Every audio PID is a stream (capped). Audio frames
+//! - Audio: MPEG audio, AAC in ADTS or LATM, and Blu-ray / AVCHD and DVD LPCM. AC-3/E-AC-3
+//!   tracks are omitted with a visible notice. Every audio PID is a stream (capped). Audio frames
 //!   are placed on the timeline from their PTS relative to the first video frame,
 //!   sample-contiguously (re-anchored only at gaps).
 
@@ -69,7 +69,6 @@ enum ACodec {
     Mpa(u8),
     Adts,
     Latm,
-    Ac3,
     LpcmBluray,
     LpcmDvd(waltcut_mpegts::LpcmFormat),
 }
@@ -110,6 +109,7 @@ pub struct MpegSource {
     /// Why the video or audio stream cannot be decoded.
     unsupported_video: Option<String>,
     unsupported_audio: Option<String>,
+    notices: Vec<String>,
 }
 
 fn vkind(c: &Codec) -> Option<VKind> {
@@ -122,7 +122,7 @@ fn vkind(c: &Codec) -> Option<VKind> {
 }
 
 fn audio_supported(c: &Codec) -> bool {
-    matches!(c, Codec::MpegAudio | Codec::AacAdts | Codec::AacLatm | Codec::LpcmBluray | Codec::LpcmDvd | Codec::Ac3 | Codec::Eac3)
+    matches!(c, Codec::MpegAudio | Codec::AacAdts | Codec::AacLatm | Codec::LpcmBluray | Codec::LpcmDvd)
 }
 
 /// The coded rate unless the timestamps say otherwise (3:2 pulldown, field-rate coding). Never
@@ -204,6 +204,11 @@ impl MpegSource {
         }
         let vstream = file.find(Kind::Video, |c| vkind(c).is_some()).or_else(|| file.find(Kind::Video, |_| true));
         let has_audio = file.streams.iter().any(|s| s.kind() == Kind::Audio && !s.units.is_empty());
+        let has_supported_audio = file.streams.iter().any(|s| s.kind() == Kind::Audio && !s.units.is_empty() && audio_supported(&s.codec));
+        let has_unsupported_ac3 = file.streams.iter().any(|s| s.kind() == Kind::Audio && !s.units.is_empty() && matches!(s.codec, Codec::Ac3 | Codec::Eac3));
+        if vstream.is_none() && has_unsupported_ac3 && !has_supported_audio {
+            return Err(CodecError::Unsupported("AC-3/E-AC-3 audio is not supported. Convert audio to AAC, MP2, or PCM and reimport.".into()));
+        }
         if vstream.is_none() && !has_audio {
             return Err(CodecError::Unsupported(format!("{}: no video or audio streams", file.format.name())));
         }
@@ -226,6 +231,7 @@ impl MpegSource {
             audios: Vec::new(),
             unsupported_video: None,
             unsupported_audio: None,
+            notices: Vec::new(),
         };
         // video
         let origin;
@@ -331,6 +337,7 @@ impl MpegSource {
             audios: Vec::new(),
             unsupported_video: None,
             unsupported_audio: None,
+            notices: Vec::new(),
         };
         src.describe_video(None)?;
         // the first GOP's time code (non-drop-frame count at the nominal rate)
@@ -489,6 +496,14 @@ impl MpegSource {
             .collect();
         let mut tracks = Vec::new();
         for ai in indices {
+            let Some(stream) = file.streams.get(ai) else { continue };
+            if matches!(stream.codec, Codec::Ac3 | Codec::Eac3) {
+                self.notices.push(format!(
+                    "{} audio is not supported; the video was imported without that audio. Convert the audio to AAC, MP2, or PCM and import the converted file to retain sound.",
+                    stream.codec.name()
+                ));
+                continue;
+            }
             if let Some(t) = self.audio_track(&file, ai, origin) {
                 tracks.push(t);
             }
@@ -499,6 +514,7 @@ impl MpegSource {
 
     /// Mark the audio stream as not decodable (it still shows in the media info when nothing plays).
     fn audio_unsupported(&mut self, codec_name: &str, why: String) -> Option<AudioTrack> {
+        self.notices.push(format!("{why}. Convert audio to AAC, MP2, or PCM and import the converted file to retain sound."));
         if !self.info.audio_streams.is_empty() {
             return None;
         }
@@ -523,14 +539,14 @@ impl MpegSource {
         };
         let mut latm = None;
         let (codec, rate, channels, per_frame, bits) = match &st.codec {
-            Codec::MpegAudio | Codec::AacAdts | Codec::Ac3 | Codec::Eac3 => {
+            Codec::MpegAudio | Codec::AacAdts => {
                 let Some(fi) = waltcut_mpegts::frame_info(&st.codec, &first) else {
                     return self.audio_unsupported(&codec_name, format!("{codec_name}: bad frame header"));
                 };
                 let c = match st.codec {
                     Codec::MpegAudio => ACodec::Mpa(fi.variant),
                     Codec::AacAdts => ACodec::Adts,
-                    _ => ACodec::Ac3,
+                    _ => ACodec::Adts,
                 };
                 (c, fi.sample_rate, fi.channels as usize, Some(fi.samples), None)
             }
@@ -557,9 +573,6 @@ impl MpegSource {
             },
             _ => return self.audio_unsupported(&codec_name, format!("{codec_name} audio")),
         };
-        if codec_is_ac3_unsupported(codec) {
-            return self.audio_unsupported(&codec_name, format!("{codec_name} audio (FilmCraft has no AC-3 decoder yet)"));
-        }
         // DVD LPCM packets split sample groups: units own the groups that start in them
         let mut byte_starts = Vec::new();
         if let ACodec::LpcmDvd(_) = codec {
@@ -698,10 +711,6 @@ fn chroma_name(c: waltcut_frame::Chroma) -> &'static str {
     }
 }
 
-fn codec_is_ac3_unsupported(c: ACodec) -> bool {
-    matches!(c, ACodec::Ac3) && !crate::audio::AC3_DECODER
-}
-
 /// The audio decoders behind the TS/PS audio codecs.
 enum AudioDecoder {
     Packet { dec: crate::audio::PacketDecoder, codec: ACodec, latm: Option<crate::audio::LatmConfig> },
@@ -714,7 +723,6 @@ impl AudioDecoder {
         Ok(match codec {
             ACodec::Mpa(layer) => AudioDecoder::Packet { dec: PacketDecoder::mpeg_audio(layer, rate)?, codec, latm: None },
             ACodec::Adts | ACodec::Latm => AudioDecoder::Packet { dec: PacketDecoder::lazy_aac(), codec, latm },
-            ACodec::Ac3 => AudioDecoder::Packet { dec: PacketDecoder::ac3()?, codec, latm: None },
             ACodec::LpcmBluray | ACodec::LpcmDvd(_) => AudioDecoder::Pcm { codec, channels },
         })
     }
@@ -786,6 +794,9 @@ impl VideoSamples for MpegVideo<'_> {
 impl MediaSource for MpegSource {
     fn info(&self) -> &MediaInfo {
         &self.info
+    }
+    fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     fn video_frame(&self, req: FrameRequest) -> Result<Arc<VideoFrame>, MediaError> {

@@ -48,10 +48,6 @@ pub fn fixture_specs() -> Vec<(&'static str, Vec<&'static str>)> {
         ("prores.mov", cat(&[V, A, &["-t", "1", "-c:v", "prores_ks", "-profile:v", "3", "-c:a", "pcm_s24le"]])),
         ("prores4444.mov", cat(&[V, &["-t", "0.5", "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le"]])),
         ("mjpeg.mov", cat(&[V, &["-t", "1", "-c:v", "mjpeg", "-q:v", "5"]])),
-        (
-            "dnxhd.mov",
-            vec!["-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=25", "-t", "0.2", "-c:v", "dnxhd", "-profile:v", "dnxhr_lb", "-pix_fmt", "yuv422p"],
-        ),
         ("pcm_f32.mov", cat(&[A, &["-t", "1", "-c:a", "pcm_f32le"]])),
         ("pcm_s16be.mov", cat(&[A, &["-t", "1", "-c:a", "pcm_s16be"]])),
         ("aac.mp4", cat(&[A, &["-t", "2", "-c:a", "aac", "-b:a", "96k"]])),
@@ -78,10 +74,8 @@ pub fn fixture_specs() -> Vec<(&'static str, Vec<&'static str>)> {
             vec!["-f", "lavfi", "-i", "testsrc2=size=160x120:rate=24000/1001", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-timecode", "01:00:00:00"],
         ),
         ("h264_2997.mp4", vec!["-f", "lavfi", "-i", "testsrc2=size=160x120:rate=30000/1001", "-t", "2", "-c:v", "libx264", "-bf", "2", "-pix_fmt", "yuv420p"]),
-        ("flac.mp4", cat(&[A, &["-t", "1", "-c:a", "flac"]])),
         ("alac.m4a", cat(&[A, &["-t", "1", "-c:a", "alac"]])),
         ("opus.mp4", cat(&[A, &["-t", "1", "-c:a", "libopus"]])),
-        ("ac3.mp4", cat(&[A, &["-t", "1", "-c:a", "ac3"]])),
         ("vp9.mp4", cat(&[V, &["-t", "1", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8"]])),
         ("av1.mp4", cat(&[V, &["-t", "1", "-c:v", "libsvtav1", "-preset", "12"]])),
         (

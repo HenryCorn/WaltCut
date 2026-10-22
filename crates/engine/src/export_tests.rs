@@ -194,11 +194,10 @@ fn every_builtin_preset_exports_and_ffprobe_confirms() {
         let Some(j) = probe(&out) else { continue };
         let fmt_name = j["format"]["format_name"].as_str().unwrap();
         match fmt.as_str() {
-            "wav" | "aiff" | "flac" => {
+            "wav" | "aiff" => {
                 let a = stream(&j, "audio").unwrap();
                 let bits = settings["audio"]["bits"].as_u64().unwrap();
                 let codec = match (fmt.as_str(), bits) {
-                    ("flac", _) => "flac",
                     ("wav", 24) => "pcm_s24le",
                     ("wav", _) => "pcm_s16le",
                     (_, 24) => "pcm_s24be",
@@ -224,18 +223,6 @@ fn every_builtin_preset_exports_and_ffprobe_confirms() {
                 let v = stream(&j, "video").unwrap();
                 assert_eq!(v["codec_name"], "gif");
                 assert_eq!((v["width"].as_u64().unwrap(), v["height"].as_u64().unwrap()), (640, 360));
-                continue;
-            }
-            "mxf-opatom" => {
-                // Avid style: picture only in Demo.mxf, one mono PCM file per channel
-                assert_eq!(fmt_name, "mxf", "{name}");
-                assert_eq!(j["streams"].as_array().unwrap().len(), 1, "{name}");
-                assert_eq!(stream(&j, "video").unwrap()["codec_name"], "dnxhd", "{name}");
-                for k in 1..=2 {
-                    let a = probe(&format!("{}_A{k}.mxf", out.trim_end_matches(".mxf"))).unwrap();
-                    let a = stream(&a, "audio").unwrap();
-                    assert_eq!((a["codec_name"].as_str(), a["channels"].as_u64()), (Some("pcm_s24le"), Some(1)), "{name} A{k}");
-                }
                 continue;
             }
             _ => {}
@@ -274,46 +261,6 @@ fn every_builtin_preset_exports_and_ffprobe_confirms() {
                     assert!(pix.contains("444") && pix.starts_with("yuva") == alpha, "{name}: {pix}");
                 }
                 assert!(vbr <= mbps * px * 1.5, "{name}: {vbr:.1} Mb/s vs nominal {:.1}", mbps * px);
-                assert_eq!(a["codec_name"], "pcm_s24le", "{name}");
-            }
-            "dnxhr" => {
-                assert_eq!(v["codec_name"], "dnxhd", "{name}");
-                let p = settings["dnxProfile"].as_str().unwrap().to_ascii_uppercase();
-                assert_eq!(v["profile"], format!("DNXHR {p}"), "{name}");
-                let mbps = match p.as_str() {
-                    "LB" => 45.0,
-                    "SQ" => 145.0,
-                    _ => 220.0,
-                };
-                assert!((vbr / (mbps * px) - 1.0).abs() < 0.25, "{name}: {vbr:.1} Mb/s vs nominal {:.1}", mbps * px);
-                assert_eq!(a["codec_name"], "pcm_s24le", "{name}");
-            }
-            "apv" => {
-                assert!(fmt_name.contains("mov"), "{name}: {fmt_name}");
-                assert_eq!(v["codec_name"], "apv", "{name}");
-                let p = settings["apvProfile"].as_str().unwrap();
-                let idc = match p {
-                    "422-10" => "33",
-                    "422-12" => "44",
-                    "444-10" => "55",
-                    "444-12" => "66",
-                    "4444-10" => "77",
-                    "4444-12" => "88",
-                    "400-10" => "99",
-                    other => other,
-                };
-                let got_profile = v["profile"].as_str().unwrap_or("");
-                assert!(got_profile == p || got_profile == idc, "{name}: profile {got_profile} != {p} ({idc})");
-                assert_eq!(a["codec_name"], "pcm_s24le", "{name}");
-            }
-            "mxf-op1a" => {
-                assert_eq!(fmt_name, "mxf", "{name}");
-                let codec = match settings["mxfVideoCodec"].as_str().unwrap() {
-                    "proRes" => "prores",
-                    "h264" => "h264",
-                    _ => "dnxhd",
-                };
-                assert_eq!(v["codec_name"], codec, "{name}");
                 assert_eq!(a["codec_name"], "pcm_s24le", "{name}");
             }
             other => panic!("{name}: unexpected format {other}"),
@@ -391,7 +338,7 @@ fn user_presets_persist_with_favourites_import_and_export() {
     let favs = s.execute("export.presets.list", json!({"favorites": true})).unwrap()["presets"].as_array().unwrap().len();
     assert_eq!(favs, 2);
     let hits = s.execute("export.presets.list", json!({"query": "prores"})).unwrap()["presets"].as_array().unwrap().len();
-    assert_eq!(hits, 8, "seven QuickTime ProRes presets and MXF OP1a ProRes 422 HQ");
+    assert_eq!(hits, 7, "seven QuickTime ProRes presets");
     // #1371: the query also matches the format id and the normalised label
     let h264_only = s.execute("export.presets.list", json!({"format": "h264"})).unwrap()["presets"].as_array().unwrap().len();
     let mut count = |q: &str| s.execute("export.presets.list", json!({"query": q})).unwrap()["presets"].as_array().unwrap().len();

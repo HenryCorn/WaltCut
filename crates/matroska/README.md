@@ -35,7 +35,7 @@ while let Some(p) = d.next_packet()? {        // file order, all tracks
   open stops at the first Cluster.
 - **Timestamps.** Matroska ticks are `TimestampScale` ns (usually 1 ms); `Track::timebase` is that
   as a reduced fraction of a second. `pts` is in ticks, `pts_ns` in exact nanoseconds. `CodecDelay`
-  is subtracted (RFC 9559), as FFmpeg does (Opus/Vorbis priming gives negative pts). Laced frames get
+  is subtracted (RFC 9559), as FFmpeg does (Opus priming gives negative pts). Laced frames get
   `block ts + i × (BlockDuration or DefaultDuration)/n`; if neither is known, later laces repeat the
   block timestamp and have `duration == 0` (`Packet::lace` tells which).
 - **Keyframes:** SimpleBlock keyframe flag; BlockGroup = keyframe iff it has no ReferenceBlock.
@@ -63,15 +63,15 @@ while let Some(p) = d.next_packet()? {        // file order, all tracks
 |---|---|---|
 | `V_MPEG4/ISO/AVC` | `Avc` | avcC (CodecPrivate) |
 | `V_MPEGH/ISO/HEVC` | `Hevc` | hvcC |
-| `V_VP8`, `V_VP9` | `Vp8`, `Vp9` | VP9 CodecPrivate features |
+| `V_VP8`, `V_VP9` | `Vp8`, `Vp9` | VP8 is recognized for an actionable unsupported-codec error; VP9 CodecPrivate features |
 | `V_AV1` | `Av1` | av1C |
 | `V_PRORES` | `ProRes` | FourCC; frames get the 8-byte `size`+`icpf` header re-added |
 | `V_MJPEG`, `V_MS/VFW/FOURCC` (MJPG) | `Mjpeg` | |
 | `V_MS/VFW/FOURCC` (other) | `VfwFourcc` | BITMAPINFOHEADER |
 | `A_AAC`, legacy `A_AAC/MPEG{2,4}/…` | `Aac` | AudioSpecificConfig (synthesised for legacy IDs, incl. SBR) |
 | `A_OPUS` | `Opus` | OpusHead |
-| `A_VORBIS` | `Vorbis` | three headers split from Xiph-laced CodecPrivate |
-| `A_FLAC` | `Flac` | `fLaC` + metadata blocks |
+| `A_VORBIS` | `Vorbis` | recognized for an actionable unsupported-codec error |
+| `A_FLAC` | `Flac` | recognized for an actionable unsupported-codec error |
 | `A_PCM/INT/LIT`, `A_PCM/INT/BIG`, `A_PCM/FLOAT/IEEE` | `Pcm` | bit depth from Audio |
 | `A_AC3`, `A_EAC3`, `A_MPEG/L3`, `A_MPEG/L2`, `A_MPEG/L1` | `Ac3`, `Eac3`, `Mp3`, `Mp2`, `Mp1` | |
 | `S_TEXT/UTF8` | `SubRip` | |
@@ -97,7 +97,7 @@ CRC-32, Chapters, Tags, Attachments, or content encodings.
   BlockGroups, Colour + mastering metadata, Chapters, Tags, Attachments, CRC-32 pass/fail, Cue-less
   seek), and mux → demux round trips for every lacing mode.
 - Oracle (`tests/oracle.rs`, skipped without ffmpeg/ffprobe; fixtures in `target/fixtures/matroska`):
-  H.264+AAC, VP9+Opus WebM, FLAC, Vorbis, SRT+ASS subtitles, WebVTT WebM, Cues at front, a
+  H.264+AAC, VP9+Opus WebM, SRT+ASS subtitles, WebVTT WebM, Cues at front, a
   streamed (pipe) file without Cues, HEVC with HDR colour, ProRes+PCM, MJPEG+AC-3, AV1. Every packet
   is compared with `ffprobe -show_packets` (stream, size, keyframe flag, pts, duration), plus codec
   names, time bases, dimensions, audio params and duration; the sample index must equal the packet

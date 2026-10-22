@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use common::*;
 use waltcut_codecs::MpegSource;
-use waltcut_media::{FrameRequest, MediaError, MediaSource};
+use waltcut_media::{FrameRequest, MediaSource};
 
 /// Stereo test audio with different content per channel (tones and a chirp).
 const NOISE: &[&str] =
@@ -85,6 +85,7 @@ fn spec(name: &str) -> Vec<String> {
                 "1",
             ],
         ]),
+        "audio_ac3.ts" => cat(&[MONO, &["-t", "1", "-c:a", "ac3", "-b:a", "192k", "-f", "mpegts"]]),
         "ts_hevc_latm.ts" => cat(&[
             &["-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25"],
             NOISE,
@@ -163,6 +164,7 @@ pub const ALL: &[&str] = &[
     "ts_h264_aac.ts",
     "m2ts_h264_lpcm.m2ts",
     "m2ts_h264_ac3.mts",
+    "audio_ac3.ts",
     "ts_hevc_latm.ts",
     "ps_mpeg2_mp2.vob",
     "ps_mpeg2_lpcm.vob",
@@ -410,19 +412,19 @@ fn avchd_ac3_audio() {
     let f = make(&ff, "m2ts_h264_ac3.mts");
     let src = open(&f);
     check_video(&ff, &f, 0, 6);
-    let a = src.info().audio().cloned().unwrap();
-    if waltcut_codecs::audio::AC3_DECODER {
-        assert_eq!((a.codec.as_str(), a.channels), ("AC-3", 2));
-        // AC-3 zero-bit mantissas carry decoder-specific dither (A/52 §7.3.4)
-        let e = check_audio(&ff, &f, 5e-3);
-        println!("m2ts_h264_ac3: AC-3 max error {e:.2e}");
-    } else {
-        assert_eq!(a.codec, "AC-3 (unsupported)");
-        match src.audio(0, 100, 48_000) {
-            Err(MediaError::Unsupported(why)) => assert!(why.contains("AC-3"), "{why}"),
-            other => panic!("expected unsupported, got {:?}", other.map(|_| ())),
-        }
-    }
+    assert!(src.info().audio_streams.is_empty(), "unsupported AC-3 is not presented as usable audio");
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
+}
+
+#[test]
+fn ac3_only_mpeg_audio_is_rejected_actionably() {
+    let ff = waltcut_testkit::require_ffmpeg!();
+    let path = make(&ff, "audio_ac3.ts");
+    let Err(error) = MpegSource::open("audio_ac3.ts", bytes(&path)) else {
+        panic!("AC-3-only input must not import as a silent audio-only source");
+    };
+    let message = error.to_string();
+    assert!(message.contains("AC-3/E-AC-3") && message.contains("Convert audio"), "{message}");
 }
 
 #[test]
@@ -457,12 +459,12 @@ fn program_streams() {
     let f = make(&ff, "ps_mpeg2_lpcm16.vob");
     assert_eq!(open(&f).info().audio().unwrap().bits_per_sample, Some(16));
     assert_eq!(check_audio(&ff, &f, 0.0), 0.0);
-    // AC-3 in private stream 1
+    // AC-3 in private stream 1 leaves the retained MPEG-2 picture available with a clear notice.
     let f = make(&ff, "ps_mpeg2_ac3.vob");
     let src = open(&f);
-    assert_eq!(src.info().audio().unwrap().codec, "AC-3");
-    let e = check_audio(&ff, &f, 5e-3);
-    println!("ps_mpeg2_ac3: AC-3 max error {e:.2e}");
+    assert!(src.info().video.is_some());
+    assert!(src.info().audio_streams.is_empty(), "unsupported AC-3 is not presented as usable audio");
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
     // MPEG-1 system stream
     let f = make(&ff, "mpeg1_system.mpg");
     let src = open(&f);

@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(f.level_for("filmcraft"), LevelFilter::Info);
         assert_eq!(f.level_for("filmcraft::audio"), LevelFilter::Info);
         assert_eq!(f.level_for("waltcut_ui_egui::play_ahead"), LevelFilter::Info);
-        assert_eq!(f.level_for("waltcut_codecs::mxf"), LevelFilter::Info);
+        assert_eq!(f.level_for("waltcut_codecs::mp4"), LevelFilter::Info);
         assert_eq!(f.level_for("wgpu_core::device"), LevelFilter::Warn);
         assert_eq!(f.level_for("naga"), LevelFilter::Warn);
         assert_eq!(f.max(), LevelFilter::Info);
@@ -325,11 +325,11 @@ mod tests {
 
     #[test]
     fn directives_follow_env_logger_and_the_most_specific_one_wins() {
-        let f = Filter::parse("info,wgpu_core=error,waltcut_codecs=trace,waltcut_codecs::mxf=off");
+        let f = Filter::parse("info,wgpu_core=error,waltcut_codecs=trace,waltcut_codecs::mp4=off");
         assert_eq!(f.level_for("eframe"), LevelFilter::Info);
         assert_eq!(f.level_for("wgpu_core::instance"), LevelFilter::Error);
-        assert_eq!(f.level_for("waltcut_codecs::ogg"), LevelFilter::Trace);
-        assert_eq!(f.level_for("waltcut_codecs::mxf"), LevelFilter::Off);
+        assert_eq!(f.level_for("waltcut_codecs::mkv"), LevelFilter::Trace);
+        assert_eq!(f.level_for("waltcut_codecs::mp4"), LevelFilter::Off);
         assert_eq!(f.max(), LevelFilter::Trace);
         // A module name is matched at `::` boundaries, not as a bare prefix.
         assert_eq!(f.level_for("wgpu_core_extra"), LevelFilter::Info);

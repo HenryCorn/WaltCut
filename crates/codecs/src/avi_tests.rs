@@ -1,6 +1,6 @@
 //! AVI files made by ffmpeg (skipped without it), checked against ffmpeg's decode of the same file:
 //! bit-exact where the decoder is (H.264, uncompressed video, PCM), within decoder tolerance where
-//! it differs (JPEG, MP3 / MP2 / AC-3).
+//! it differs (JPEG, MP3 / MP2). AC-3 tracks are explicitly reported and omitted.
 
 use std::path::Path;
 use std::process::Command;
@@ -126,15 +126,21 @@ fn uncompressed_video_is_bit_exact() {
 }
 
 #[test]
-fn mp2_and_ac3_audio() {
-    for (name, codec, label) in [("avi_mp2.avi", "mp2", "MPEG Audio"), ("avi_ac3.avi", "ac3", "AC-3")] {
-        let Some((path, src)) = avi(name, &["-c:v", "mjpeg"], &["-c:a", codec, "-b:a", "192k"]) else { return };
-        assert_eq!(src.info().audio_streams[0].codec, label, "{name}");
-        let r = reference_audio(&path);
-        let a = ours(&src, 48_000);
-        let (rms_ref, rms_diff) = rms_and_diff(&r, &a, 4_800..43_200);
-        assert!(rms_ref > 0.05 && rms_diff < rms_ref * 0.05, "{name}: tone {rms_ref}, difference {rms_diff}");
-    }
+fn mp2_audio() {
+    let Some((path, src)) = avi("avi_mp2.avi", &["-c:v", "mjpeg"], &["-c:a", "mp2", "-b:a", "192k"]) else { return };
+    assert_eq!(src.info().audio_streams[0].codec, "MPEG Audio");
+    let r = reference_audio(&path);
+    let a = ours(&src, 48_000);
+    let (rms_ref, rms_diff) = rms_and_diff(&r, &a, 4_800..43_200);
+    assert!(rms_ref > 0.05 && rms_diff < rms_ref * 0.05, "tone {rms_ref}, difference {rms_diff}");
+}
+
+#[test]
+fn ac3_audio_is_reported_and_omitted_from_avi() {
+    let Some((_, src)) = avi("avi_ac3.avi", &["-c:v", "mjpeg"], &["-c:a", "ac3", "-b:a", "192k"]) else { return };
+    assert!(src.info().video.is_some());
+    assert!(src.info().audio_streams.is_empty());
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
 }
 
 /// Dropped frames are stored as empty chunks: their slot shows the picture before.

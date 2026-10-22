@@ -35,7 +35,8 @@ let au: Vec<u8> = file.read_unit(&bytes, v, 0)?;      // the first access unit
 - **Program streams**: MPEG-2 and MPEG-1 packs, system headers, the program stream map (stream
   types for elementary stream ids), padding, private stream 2 (DVD navigation) skipped, private
   stream 1 split by sub-stream id. Garbage resynchronises on the next pack or PES start code.
-- **Streams**: MPEG-1/2 video, H.264, HEVC, MPEG audio, AAC (ADTS, LATM/LOAS), AC-3, E-AC-3,
+- **Streams**: MPEG-1/2 video, H.264, HEVC, MPEG audio, AAC (ADTS, LATM/LOAS), AC-3 / E-AC-3
+  identifiers (the editor omits these audio tracks and surfaces a conversion notice),
   DTS, TrueHD, Blu-ray LPCM, DVD LPCM (format from the sub-stream header), PGS / DVB / teletext
   subtitles; ISO 639 language from the PMT.
 - **Access units**, found while the file is scanned (one pass, streaming; only a few bytes of

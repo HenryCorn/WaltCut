@@ -162,22 +162,6 @@ fn vp9_opus_webm() {
 }
 
 #[test]
-fn flac() {
-    let Some((_, f, _)) = run("flac.mkv") else { return };
-    assert!(matches!(&f.tracks[0].codec, Codec::Flac { private } if private.starts_with(b"fLaC")));
-}
-
-#[test]
-fn vorbis() {
-    let Some((_, f, _)) = run("vorbis.mkv") else { return };
-    let Codec::Vorbis { headers } = &f.tracks[0].codec else { panic!("not vorbis") };
-    assert_eq!(headers.len(), 3);
-    assert_eq!(&headers[0][..7], b"\x01vorbis");
-    assert_eq!(&headers[1][..7], b"\x03vorbis");
-    assert_eq!(&headers[2][..7], b"\x05vorbis");
-}
-
-#[test]
 fn subtitles() {
     let Some((_, f, packets)) = run("subs.mkv") else { return };
     let subs: Vec<usize> = (0..f.tracks.len()).filter(|&i| f.tracks[i].kind == TrackKind::Subtitle).collect();
@@ -271,12 +255,7 @@ fn av1() {
 #[test]
 fn laced_remux() {
     let Some((ffmpeg, ffprobe)) = tools() else { return };
-    for (src, modes) in [
-        ("vorbis.mkv", &[LacingMode::Xiph, LacingMode::Ebml][..]),
-        ("h264_aac.mkv", &[LacingMode::Ebml, LacingMode::Xiph][..]),
-        ("prores_pcm.mkv", &[LacingMode::FixedOrEbml][..]),
-        ("flac.mkv", &[LacingMode::Ebml][..]),
-    ] {
+    for (src, modes) in [("h264_aac.mkv", &[LacingMode::Ebml, LacingMode::Xiph][..]), ("prores_pcm.mkv", &[LacingMode::FixedOrEbml][..])] {
         let Some(path) = fixture(&ffmpeg, src) else { continue };
         let bytes = std::fs::read(&path).unwrap();
         let d = Demuxer::from_slice(&bytes).unwrap();

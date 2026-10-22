@@ -111,7 +111,6 @@ fn declines_what_the_hardware_path_does_not_take() {
     declined(&ExportSettings { h264_pass: H264Pass::First, ..ok.clone() }, "an analysis pass");
     declined(&ExportSettings { signal: waltcut_export::ColorSignal::PQ, ..ok.clone() }, "HDR");
     declined(&ExportSettings { pixel_aspect: Some((4, 3)), ..ok.clone() }, "non-square pixels");
-    declined(&ExportSettings { format: Format::MxfOp1a, ..ok.clone() }, "MXF");
     assert!(config_for(W, H, FrameRate { num: 0, den: 1 }, &ok).is_err());
     assert!(config_for(W, H, FrameRate { num: 30, den: 0 }, &ok).is_err());
     assert!(config_for(W, H, FrameRate { num: -30, den: 1 }, &ok).is_err());
@@ -128,7 +127,7 @@ fn declines_what_the_hardware_path_does_not_take() {
 #[test]
 fn factory_only_acts_when_asked() {
     let s = hardware_settings();
-    for format in [Format::ProRes, Format::DnxHr, Format::Mjpeg, Format::PngSequence] {
+    for format in [Format::ProRes, Format::Mjpeg, Format::PngSequence] {
         assert!(videotoolbox_encoder_factory(format, W, H, FPS, &s).is_none(), "{format:?}");
     }
     assert!(videotoolbox_encoder_factory(Format::H264, W, H, FPS, &ExportSettings { hardware_encoding: HardwareEncoding::Off, ..s }).is_none());

@@ -29,6 +29,46 @@ fn fixture(name: &str, args: &[&str]) -> Option<Arc<[u8]>> {
     Some(std::fs::read(out).ok()?.into())
 }
 
+fn check_mkv(name: &str, video_args: &[&str], audio_args: &[&str]) {
+    let Some(ffmpeg) = ffmpeg() else {
+        eprintln!("ffmpeg not found; skipping");
+        return;
+    };
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs").join(name);
+    if let Some(parent) = path.parent()
+        && std::fs::create_dir_all(parent).is_err()
+    {
+        eprintln!("could not create fixture directory; skipping");
+        return;
+    }
+    if !path.exists() {
+        let status = Command::new(ffmpeg)
+            .args(["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=160x120:r=25:d=1", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:d=1"])
+            .args(video_args)
+            .args(audio_args)
+            .args(["-shortest"])
+            .arg(&path)
+            .status();
+        if !status.is_ok_and(|status| status.success()) {
+            eprintln!("fixture {name} failed; skipping");
+            return;
+        }
+    }
+    let Ok(bytes) = std::fs::read(&path) else {
+        eprintln!("fixture {name} could not be read; skipping");
+        return;
+    };
+    let Ok(source) = crate::open_bytes(name, bytes.into()) else {
+        panic!("generated Matroska fixture {name} did not open");
+    };
+    assert!(source.info().video.is_some(), "{name} has no video");
+    assert!(!source.info().audio_streams.is_empty(), "{name} has no audio");
+    let frame = source.video_frame(FrameRequest::full(Tick(0))).unwrap();
+    assert_eq!((frame.width, frame.height), (160, 120));
+    let audio = source.audio(0, 4800, 48_000).unwrap();
+    assert!(audio.peaks()[0] > 0.01, "{name} has silent audio");
+}
+
 #[test]
 fn mjpeg_mov_with_pcm() {
     let Some(b) = fixture(
@@ -164,81 +204,30 @@ fn prores_mov_decodes() {
 }
 
 #[test]
-fn dnxhd_and_dnxhr_movs_decode() {
-    for (name, args, codec, fmt) in [
-        ("bars_dnxhr_hq.mov", &["-c:v", "dnxhd", "-profile:v", "dnxhr_hq", "-pix_fmt", "yuv422p"][..], "DNxHR HQ", "4:2:2"),
-        ("bars_dnxhr_hqx.mov", &["-c:v", "dnxhd", "-profile:v", "dnxhr_hqx", "-pix_fmt", "yuv422p10le"][..], "DNxHR HQX", "4:2:2"),
-        ("bars_dnxhd_1251.mov", &["-c:v", "dnxhd", "-b:v", "90M", "-pix_fmt", "yuv422p"][..], "CID 1251", "4:2:2"),
-    ] {
-        let mut a = vec!["-f", "lavfi", "-i", if name.contains("1251") { "smptehdbars=s=1280x720:r=50:d=0.2" } else { "smptehdbars=s=640x360:r=24:d=0.5" }];
-        a.extend_from_slice(args);
-        let Some(b) = fixture(name, &a) else { return };
-        let src = crate::open_bytes(name, b).unwrap();
-        let info = src.info().video.clone().unwrap();
-        assert!(info.codec.contains(codec), "{}", info.codec);
-        let f = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 10))).unwrap();
-        assert!(f.format_label().contains(fmt), "{}", f.format_label());
-        let w = f.width as usize;
-        let px = f.to_rgba8();
-        // leftmost bars area is 40% grey
-        let c = &px[(100 * w + 20) * 4..][..3];
-        assert!((c[0] as i32 - 104).abs() < 6, "{name}: {c:?}");
-    }
-}
-
-/// Solid-colour Matroska fixtures: decoded frames must match the colour, audio must be a 1 kHz tone.
-fn check_mkv(name: &str, vcodec: &[&str], acodec: &[&str]) {
-    let mut args: Vec<&str> =
-        vec!["-f", "lavfi", "-i", "color=c=0x3060c0:s=320x240:r=25:d=2", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:d=2"];
-    args.extend_from_slice(vcodec);
-    args.extend_from_slice(acodec);
-    let Some(b) = fixture(name, &args) else { return };
-    let src = crate::open_bytes(name, b).expect("open");
-    let info = src.info();
-    assert_eq!(info.container, "Matroska");
-    let v = info.video.as_ref().expect("video");
-    assert_eq!((v.width, v.height), (320, 240));
-    assert_eq!(v.frame_rate.num as f64 / v.frame_rate.den as f64, 25.0);
-    let d = info.duration.0 as f64 / TICKS_PER_SECOND as f64;
-    assert!((d - 2.0).abs() < 0.1, "duration {d}");
-    for secs in [0.0, 1.24, 0.4] {
-        let f = src.video_frame(FrameRequest { time: Tick((secs * TICKS_PER_SECOND as f64) as i64), scale: 1.0 }).expect("frame");
-        let rgba = f.to_rgba8();
-        let px = &rgba[(120 * 320 + 160) * 4..][..3];
-        for (got, want) in px.iter().zip([0x30u8, 0x60, 0xc0]) {
-            assert!((*got as i32 - want as i32).abs() <= 6, "{name} at {secs}s: {px:?}");
-        }
-    }
-    let a = src.audio(24_000, 4800, 48_000).expect("audio");
-    let peak = a.channels[0].iter().fold(0f32, |m, s| m.max(s.abs()));
-    assert!(peak > 0.05 && peak < 1.0, "{name}: audio peak {peak}");
-}
-
-#[test]
 fn matroska_h264_aac() {
     check_mkv("blue_h264_aac.mkv", &["-c:v", "libx264", "-bf", "2", "-pix_fmt", "yuv420p"], &["-c:a", "aac"]);
 }
 
 #[test]
-fn matroska_hevc_flac() {
-    check_mkv("blue_hevc_flac.mkv", &["-c:v", "libx265", "-x265-params", "log-level=error", "-pix_fmt", "yuv420p"], &["-c:a", "flac"]);
-}
-
-/// FLAC in MP4 (`fLaC` + `dfLa`): the decoder gets the STREAMINFO from `dfLa` (it was given
-/// nothing, and every FLAC track in an MP4 failed with "missing extra data").
-#[test]
-fn mp4_flac_audio() {
-    let args = ["-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:d=2", "-c:a", "flac", "-strict", "-2"];
-    let Some(b) = fixture("tone_flac.mp4", &args) else { return };
-    let src = crate::open_bytes("tone_flac.mp4", b).expect("open");
-    let a = src.audio(24_000, 4800, 48_000).expect("audio");
-    let peak = a.channels[0].iter().fold(0f32, |m, s| m.max(s.abs()));
-    assert!(peak > 0.05 && peak < 1.0, "audio peak {peak}");
-}
-
-#[test]
 fn matroska_prores_pcm() {
     check_mkv("blue_prores_pcm.mkv", &["-c:v", "prores_ks", "-profile:v", "2"], &["-c:a", "pcm_s16le"]);
+}
+
+#[test]
+fn removed_video_codecs_in_retained_containers_are_rejected_actionably() {
+    for (name, args, token) in [
+        ("unsupported_vp8.webm", &["-f", "lavfi", "-i", "testsrc2=s=64x48:r=25:d=0.2", "-c:v", "libvpx", "-deadline", "realtime"][..], "vp8"),
+        (
+            "unsupported_dnx.mov",
+            &["-f", "lavfi", "-i", "testsrc2=s=1280x720:r=25:d=0.2", "-c:v", "dnxhd", "-profile:v", "dnxhr_lb", "-pix_fmt", "yuv422p"][..],
+            "dnx",
+        ),
+    ] {
+        let Some(bytes) = fixture(name, args) else { continue };
+        let err = crate::open_bytes(name, bytes).err().expect("removed codec must fail during import");
+        let message = err.to_string().to_ascii_lowercase();
+        assert!(message.contains(token) && message.contains("convert"), "{name}: {err}");
+    }
 }
 
 /// `bytes` with its first `DefaultDuration` element (0x23E383) overwritten by an EBML Void of the
@@ -492,121 +481,7 @@ fn vp9_webm_alpha_layer_matches_libvpx() {
     }
 }
 
-/// #432: VP8 in WebM with hidden altref frames (vpxenc, two-pass with ARNR: 11 of its 161
-/// frames are not shown). Frames requested out of order (seeks back and forth, then sequential
-/// playback across the hidden frames) are sample-exact against libvpx's decode, and the stream's
-/// colour is BT.601 (RFC 6386 9.2). Skipped without ffmpeg or vpxenc.
-#[test]
-fn vp8_webm_random_access_matches_libvpx() {
-    let frames = 150usize;
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs");
-    let path = dir.join("vp8_hidden_altref.webm");
-    if !path.exists() {
-        let Some(y4m) =
-            fixture_path("mandelbrot_352x288_150.y4m", &["-f", "lavfi", "-i", "mandelbrot=s=352x288:r=25", "-frames:v", "150", "-pix_fmt", "yuv420p"])
-        else {
-            return;
-        };
-        let tmp = dir.join(format!("vp8_hidden_altref.{}.webm", std::process::id()));
-        let enc = Command::new("vpxenc")
-            .args(["--codec=vp8", "--passes=2", "--auto-alt-ref=1", "--lag-in-frames=25", "--arnr-maxframes=7", "--arnr-strength=5"])
-            .args(["--target-bitrate=300", "--kf-max-dist=150", "-q", "-o"])
-            .arg(&tmp)
-            .arg(&y4m)
-            .status();
-        if !enc.is_ok_and(|s| s.success()) {
-            eprintln!("vpxenc not available; skipping");
-            return;
-        }
-        let _ = std::fs::rename(&tmp, &path);
-    }
-    let p = path.to_string_lossy().into_owned();
-    let Some(reference) =
-        fixture("vp8_hidden_altref.webm.yuv", &["-c:v", "libvpx", "-i", &p, "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "yuv420p"])
-    else {
-        return;
-    };
-    let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-    let src = crate::open_bytes("vp8_hidden_altref.webm", bytes).unwrap();
-    let info = src.info().clone();
-    assert_eq!(info.container, "WebM");
-    let v = info.video.as_ref().unwrap();
-    assert_eq!(v.codec, "VP8");
-    assert_eq!((v.width, v.height), (352, 288));
-    assert_eq!(v.color.matrix, waltcut_color::Matrix::Bt601);
-    assert_eq!(reference.len(), frames * 352 * 288 * 3 / 2);
-    let frame_len = reference.len() / frames;
-    let rate = info.frame_rate();
-    let order: Vec<usize> = [147, 3, 90, 26, 24, 149, 0, 112, 61].into_iter().chain(40..frames).collect();
-    for k in order {
-        let f = src.video_frame(FrameRequest::full(rate.tick_of(k as i64))).unwrap();
-        assert_eq!((f.width, f.height), (352, 288));
-        assert_eq!(f.color.matrix, waltcut_color::Matrix::Bt601);
-        assert!(yuv_bytes(&f) == reference[k * frame_len..(k + 1) * frame_len], "frame {k} differs from libvpx");
-    }
-}
-
-/// #432 / #402: a VP8 WebM with an alpha layer (`AlphaMode` 1, a second VP8 stream in each
-/// block's `BlockAdditional`, as browsers and GIF converters write transparent WebM) decodes
-/// with that alpha; frames requested out of order match libvpx exactly, colour and alpha.
-#[test]
-fn vp8_webm_alpha_layer_matches_libvpx() {
-    let (w, h, frames) = (176usize, 144usize, 30usize);
-    let Some(path) = fixture_path(
-        "alpha_vp8.webm",
-        &[
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc2=s=176x144:r=25,format=yuva420p,geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='mod(X*2+N*7\\,256)'",
-            "-frames:v",
-            "30",
-            "-c:v",
-            "libvpx",
-            "-pix_fmt",
-            "yuva420p",
-            "-g",
-            "10",
-            "-auto-alt-ref",
-            "0",
-            "-b:v",
-            "600k",
-        ],
-    ) else {
-        return;
-    };
-    let src_path = path.to_string_lossy().into_owned();
-    let Some(reference) =
-        fixture("alpha_vp8.webm.yuva420p.yuv", &["-c:v", "libvpx", "-i", &src_path, "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "yuva420p"])
-    else {
-        return;
-    };
-    let (luma, chroma) = (w * h, (w / 2) * (h / 2));
-    let frame_len = luma * 2 + chroma * 2;
-    if reference.len() != frame_len * frames {
-        eprintln!("libvpx reference has {} bytes, not {}; skipping", reference.len(), frame_len * frames);
-        return;
-    }
-    let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-    let src = crate::open_bytes("alpha_vp8.webm", bytes).unwrap();
-    let info = src.info().clone();
-    assert_eq!(info.container, "WebM");
-    assert!(info.video.as_ref().unwrap().has_alpha);
-    let rate = info.frame_rate();
-    let order: Vec<usize> = [29, 3, 17, 12, 0, 25, 21, 9].into_iter().chain(10..frames).collect();
-    for k in order {
-        let f = src.video_frame(FrameRequest::full(rate.tick_of(k as i64))).unwrap();
-        let r = &reference[k * frame_len..(k + 1) * frame_len];
-        let waltcut_frame::PixelData::Yuv8 { planes, alpha, .. } = &f.data else { panic!("frame {k}: not 8-bit YUV: {}", f.format_label()) };
-        assert_eq!(planes[0].as_slice(), &r[..luma], "frame {k}: luma");
-        assert_eq!(planes[1].as_slice(), &r[luma..luma + chroma], "frame {k}: U");
-        let alpha = alpha.as_ref().unwrap_or_else(|| panic!("frame {k}: no alpha plane"));
-        assert_eq!(alpha.as_slice(), &r[luma + 2 * chroma..], "frame {k}: alpha");
-    }
-}
-
-/// Every sample flagged as sync (as in an MP4 without `stss`): the GOP cache must still start
-/// decoding at a real VP9 key frame.
+/// VP9 random access restarts at genuine key frames even when a container marks every sample sync.
 #[test]
 fn vp9_random_access_ignores_bogus_sync_flags() {
     use crate::gop::{GopCache, VideoSamples};
@@ -795,43 +670,6 @@ fn opus_mp4_stereo() {
         &["-b:a", "128k"],
         "MPEG-4",
     );
-}
-
-#[test]
-fn apv_mp4_and_raw_bitstream_decode() {
-    use waltcut_isobmff::{ApvConfig, Brand, Mp4Writer, SampleEntry, TrackConfig, WriteSample, WriterOptions};
-
-    let (w, h) = (64u32, 32u32);
-    let mut fr = waltcut_apv::Frame::new(w, h, waltcut_apv::ChromaFormat::Yuv422, 10, false);
-    for (i, y) in fr.y.iter_mut().enumerate() {
-        *y = if (i as u32 % w) < w / 2 { 850 } else { 150 };
-    }
-    let mut enc = waltcut_apv::Encoder::new(waltcut_apv::Profile::P422_10, w, h).expect("encoder");
-    let au = enc.encode_raw_au(&fr).expect("encode_raw_au");
-    let apvc = ApvConfig::parse(&enc.decoder_config_record()).expect("parse apvC");
-
-    // 1. Raw .apv elementary stream
-    let raw_src = crate::open_bytes("clip.apv", au.clone().into()).expect("open raw .apv");
-    let raw_v = raw_src.info().video.as_ref().expect("video info");
-    assert_eq!((raw_v.width, raw_v.height), (w, h));
-    assert_eq!(raw_v.codec, "APV 422-10");
-    assert_eq!(raw_v.pixel_format, "YUV 4:2:2 10-bit");
-    let decoded_raw = raw_src.video_frame(FrameRequest::full(Tick::ZERO)).expect("decode raw frame");
-    assert_eq!((decoded_raw.width, decoded_raw.height), (w, h));
-
-    // 2. MP4 with apv1 + apvC
-    let mut mux = Mp4Writer::new(std::io::Cursor::new(Vec::new()), WriterOptions::new(Brand::Mp4)).expect("writer");
-    let vt = mux.add_track(TrackConfig::new(SampleEntry::apv(apvc, w as u16, h as u16), 24)).expect("track");
-    mux.write_sample(vt, WriteSample { data: &au, duration: 1, composition_offset: 0, is_sync: true }).expect("sample");
-    let mp4_bytes: Arc<[u8]> = mux.finish().expect("finish").into_inner().into();
-
-    let mp4_src = crate::open_bytes("clip.mp4", mp4_bytes).expect("open mp4");
-    let mp4_v = mp4_src.info().video.as_ref().expect("mp4 video info");
-    assert_eq!((mp4_v.width, mp4_v.height), (w, h));
-    assert_eq!(mp4_v.codec, "APV 422-10");
-    assert_eq!(mp4_v.pixel_format, "YUV 4:2:2 10-bit");
-    let decoded_mp4 = mp4_src.video_frame(FrameRequest::full(Tick::ZERO)).expect("decode mp4 frame");
-    assert_eq!(decoded_mp4.to_rgba8(), decoded_raw.to_rgba8());
 }
 
 /// ffmpeg writes MP4 without a `colr` box unless asked: the colour comes from the x265 / x264

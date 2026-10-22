@@ -25,9 +25,7 @@ waltcut-gpu = { workspace = true }
 waltcut-media = { workspace = true }
 waltcut-codecs = { workspace = true }
 waltcut-platform = { workspace = true }
-waltcut-mxf = { workspace = true }
 waltcut-mpegts = { workspace = true }
-waltcut-ogg = { workspace = true }
 waltcut-automation = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

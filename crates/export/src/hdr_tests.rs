@@ -112,7 +112,7 @@ fn the_hdr_probe_registry_follows_its_probes() {
     assert!(!hdr_available(Format::ProRes));
     HERE.store(true, Ordering::SeqCst);
     assert!(hdr_available(Format::ProRes));
-    assert!(!hdr_available(Format::DnxHr), "probes are per format");
+    assert!(!hdr_available(Format::Mjpeg), "probes are per format");
     HERE.store(false, Ordering::SeqCst);
     assert!(!hdr_available(Format::ProRes));
 }
@@ -122,8 +122,8 @@ fn which_exports_are_hdr() {
     use crate::job::hdr_output;
     let never = |_: Format| false;
     let hevc_only = |f: Format| f == Format::Hevc;
-    // H.264, ProRes, DNxHR and APV follow the working space, whatever the probes say
-    for f in [Format::H264, Format::ProRes, Format::DnxHr, Format::Apv] {
+    // H.264 and ProRes follow the working space, whatever the probes say
+    for f in [Format::H264, Format::ProRes] {
         assert!(hdr_output(true, false, f, never), "{f:?}");
         assert!(!hdr_output(false, false, f, hevc_only), "{f:?}: SDR working space");
         assert!(!hdr_output(true, true, f, hevc_only), "{f:?}: SDR asked for");

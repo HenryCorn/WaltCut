@@ -92,7 +92,6 @@ fn check_stream(file: &Mp4File, idx: usize, st: &Value) -> Result<(), String> {
             let ch = int(&st["channels"]).unwrap_or(0);
             let (our_sr, our_ch) = match codec {
                 CodecConfig::Pcm(p) => (p.sample_rate, p.channels),
-                CodecConfig::Flac(f) => (f.sample_rate as f64, f.channels as u32),
                 CodecConfig::Opus(o) => (48000.0, o.output_channels as u32),
                 _ => (a.sample_rate, a.channels),
             };
@@ -222,7 +221,6 @@ fixture_tests! {
     prores_mov => "prores.mov",
     prores4444_mov => "prores4444.mov",
     mjpeg_mov => "mjpeg.mov",
-    dnxhd_mov => "dnxhd.mov",
     pcm_f32_mov => "pcm_f32.mov",
     pcm_s16be_mov => "pcm_s16be.mov",
     aac_mp4 => "aac.mp4",
@@ -233,10 +231,8 @@ fixture_tests! {
     tmcd_2997df_mov => "tmcd_2997df.mov",
     tmcd_23976_mov => "tmcd_23976.mov",
     h264_2997_mp4 => "h264_2997.mp4",
-    flac_mp4 => "flac.mp4",
     alac_m4a => "alac.m4a",
     opus_mp4 => "opus.mp4",
-    ac3_mp4 => "ac3.mp4",
     vp9_mp4 => "vp9.mp4",
     av1_mp4 => "av1.mp4",
     colr_pasp_mov => "colr_pasp.mov",

@@ -26,26 +26,18 @@ const LAYERS: &[(&str, u8)] = &[
     ("isobmff", 0),
     ("avi", 0),
     ("matroska", 0),
-    ("mxf", 0),
     ("mpegts", 0),
     ("mpeg2v", 0),
-    ("ac3", 0),
     ("mpa", 0),
-    ("ogg", 0),
     ("riff", 0),
     ("h264", 0),
     ("h264enc", 0),
     ("hevc", 0),
-    ("vp8", 0),
     ("vp9", 0),
     ("prores", 0),
     ("mjpeg", 0),
-    ("dnx", 0),
-    ("apv", 0),
-    ("dng", 0),
     ("av1", 0),
     ("aac", 0),
-    ("flac", 0),
     ("opus", 0),
     ("frame", 1),
     ("media", 1),
@@ -166,8 +158,8 @@ fn layers() -> Result<(), String> {
 /// File extensions that count as assets (AGENTS.md §1).
 const ASSET_EXT: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "icns", "bmp", "tif", "tiff", "heic", "avif", "exr", "ttf", "otf", "ttc", "woff", "woff2", "cube",
-    "3dl", "lut", "look", "wav", "mp3", "aac", "flac", "ogg", "opus", "m4a", "aif", "aiff", "mp4", "mov", "m4v", "mkv", "webm", "avi", "mxf", "psd", "ai",
-    "eps", "pdf", "prproj", "ffx", "prfpset", "mogrt", "aep",
+    "3dl", "lut", "look", "wav", "mp3", "aac", "opus", "m4a", "aif", "aiff", "mp4", "mov", "m4v", "mkv", "webm", "avi", "psd", "ai", "eps", "pdf", "prproj",
+    "ffx", "prfpset", "mogrt", "aep",
 ];
 
 /// Sidecar fields that must be present and non-empty.
@@ -243,13 +235,9 @@ const FIXTURE_GENERATORS: &[(&str, &str)] = &[
     ("isobmff", "oracle_demux"),
     ("matroska", "oracle"),
     ("prores", "oracle_decode"),
-    ("dnx", "oracle_decode"),
-    ("codecs", "mxf_oracle"),
     ("codecs", "mpeg_oracle"),
     ("mpeg2v", "oracle"),
-    ("ac3", "oracle"),
     ("mpa", "oracle"),
-    ("codecs", "ogg_oracle"),
 ];
 
 fn fixtures(only: &[String]) -> Result<(), String> {

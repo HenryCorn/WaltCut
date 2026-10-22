@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::{CODEC_TYPE_AAC, CODEC_TYPE_ALAC, CODEC_TYPE_FLAC, CODEC_TYPE_MP3, CodecParameters, CodecType, Decoder, DecoderOptions};
+use symphonia::core::codecs::{CODEC_TYPE_AAC, CODEC_TYPE_ALAC, CODEC_TYPE_MP3, CodecParameters, CodecType, Decoder, DecoderOptions};
 use symphonia::core::formats::{FormatOptions, Packet};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
@@ -24,12 +24,10 @@ enum Inner {
     /// codec, not the layer; layers I / II go to our decoder, layer III to symphonia's).
     MpegPending(u32),
     /// Our own Opus decoder (always 48 kHz output; pre-skip is left to container timestamps).
-    /// `order` maps output channel → decoded channel (Vorbis → WAV/SMPTE order for surround).
+    /// `order` maps output channel → decoded channel (Opus mapping family 1 → WAV/SMPTE order).
     Opus { dec: Box<waltcut_opus::Decoder>, order: Option<&'static [usize]> },
-    /// Bootstrap decoders (MP3, ALAC, FLAC, HE-AAC…) via symphonia.
+    /// Bootstrap decoders (MP3, ALAC, HE-AAC…) via symphonia.
     Symphonia(Box<dyn Decoder>),
-    /// Our AC-3 and E-AC-3 decoder (ATSC A/52, Annex E).
-    Ac3(Box<waltcut_ac3::Decoder>),
     /// Our MPEG-1/2 audio Layer I and II decoder (ISO/IEC 11172-3, 13818-3).
     Mpa(Box<waltcut_mpa::Decoder>),
 }
@@ -45,9 +43,9 @@ pub const OPUS_RATE: u32 = 48_000;
 /// same samples as playback (render caches, scrubbing), so we pay the extra few packets.
 pub const OPUS_PRE_ROLL: u32 = 4 * 3840;
 
-/// Channel order for Vorbis-ordered surround (Opus mapping family 1, RFC 7845 §5.1.1.2): output
+/// Channel order for Opus mapping family 1 (RFC 7845 §5.1.1.2): output
 /// channel → decoded channel, giving the WAV/SMPTE order (L R C LFE back… side…) used elsewhere.
-fn vorbis_to_wav_order(channels: usize) -> Option<&'static [usize]> {
+fn opus_mapping_to_wav_order(channels: usize) -> Option<&'static [usize]> {
     Some(match channels {
         3 => &[0, 2, 1],
         5 => &[0, 2, 1, 3, 4],
@@ -60,7 +58,7 @@ fn vorbis_to_wav_order(channels: usize) -> Option<&'static [usize]> {
 
 /// Channel order for AAC surround (ISO/IEC 14496-3 Table 1.19, our decoder's element order: C, L R,
 /// surrounds, LFE): output channel → decoded channel, giving the WAV/SMPTE order (L R C LFE Ls Rs)
-/// used elsewhere, as the AC-3 decoder does and the AAC encoder's caller undoes on export. Only the
+/// used elsewhere, as the AAC encoder's caller undoes on export. Only the
 /// unambiguous channel configurations 3–6, 11 (6.1: … LFE, back centre, sides) and 12 (7.1: … LFE,
 /// backs, sides); 1, 2, 7 and PCE layouts keep the decoded order.
 fn aac_to_wav_order(channel_config: u8) -> Option<&'static [usize]> {
@@ -129,7 +127,7 @@ impl PacketDecoder {
     pub fn opus(head: waltcut_opus::OpusHead) -> Result<Self> {
         let dec = waltcut_opus::Decoder::from_head(head, OPUS_RATE).map_err(|e| CodecError::Unsupported(format!("Opus: {e}")))?;
         let channels = dec.channels();
-        let order = if dec.head().mapping_family == 1 { vorbis_to_wav_order(channels) } else { None };
+        let order = if dec.head().mapping_family == 1 { opus_mapping_to_wav_order(channels) } else { None };
         Ok(Self { inner: Inner::Opus { dec: Box::new(dec), order }, channels })
     }
     /// MPEG-1/2 audio layer I, II (our decoder: symphonia rejects the bit rate / mode
@@ -163,10 +161,6 @@ impl PacketDecoder {
         self.inner = Inner::Aac { dec: Box::new(dec), asc: asc.to_vec(), up: None };
         Ok(())
     }
-    /// AC-3 and E-AC-3 (ATSC A/52, Annex E).
-    pub fn ac3() -> Result<Self> {
-        Ok(Self { inner: Inner::Ac3(Box::new(waltcut_ac3::Decoder::new())), channels: 0 })
-    }
     /// Whether this decodes Opus (which needs [`OPUS_PRE_ROLL`] of pre-roll after a seek).
     pub fn is_opus(&self) -> bool {
         matches!(self.inner, Inner::Opus { .. })
@@ -176,10 +170,7 @@ impl PacketDecoder {
         match c {
             C::Aac(a) => Self::aac(&a.asc, if rate > 0 { rate } else { a.sample_rate }),
             C::Mp3 => Ok(Self::lazy_mpeg_audio(rate)),
-            C::Ac3 { .. } | C::Eac3 { .. } => Self::ac3(),
             C::Alac { cookie } => Self::new(CODEC_TYPE_ALAC, rate, Some(cookie.clone())),
-            // the decoder needs the STREAMINFO body: `dfLa` holds it after the 4-byte block header
-            C::Flac(f) => Self::new(CODEC_TYPE_FLAC, rate, f.metadata_blocks.get(4..38).map(<[u8]>::to_vec)),
             C::Opus(o) => Self::opus(waltcut_opus::OpusHead::from_dops(&o.to_bytes()).map_err(|e| CodecError::Unsupported(format!("Opus: {e}")))?),
             other => Err(CodecError::Unsupported(format!("{} audio", other.name()))),
         }
@@ -213,28 +204,6 @@ impl PacketDecoder {
             Inner::Symphonia(d) => d,
             Inner::AacPending => return Err(CodecError::Decode("AAC: no configuration yet".into())),
             Inner::MpegPending(_) => return Err(CodecError::Decode("MPEG audio: no frame header".into())),
-            Inner::Ac3(d) => {
-                // a packet may hold several syncframes (MP4 / Matroska); E-AC-3 dependent
-                // substreams and further programs decode to no channels and are skipped
-                let mut out: Vec<Vec<f32>> = Vec::new();
-                let mut p = 0;
-                while p < data.len() {
-                    let f = d.decode(&data[p..]).map_err(|e| CodecError::Decode(e.to_string()))?;
-                    p += f.header.frame_bytes;
-                    if f.channels.is_empty() {
-                        continue;
-                    }
-                    if out.is_empty() {
-                        out = f.channels;
-                    } else {
-                        for (o, c) in out.iter_mut().zip(f.channels) {
-                            o.extend(c);
-                        }
-                    }
-                }
-                self.channels = out.len();
-                return Ok(out);
-            }
             Inner::Mpa(d) => {
                 // a packet holds one frame or several; a damaged first frame is an error, damage
                 // after a good frame ends the packet
@@ -291,7 +260,6 @@ impl PacketDecoder {
             Inner::Mpa(d) => d.reset(),
             Inner::Opus { dec, .. } => dec.reset(),
             Inner::Symphonia(d) => d.reset(),
-            Inner::Ac3(d) => d.reset(),
             Inner::AacPending | Inner::MpegPending(_) => {}
         }
     }
@@ -340,17 +308,11 @@ pub enum FixedFrames<'a> {
     Aac(&'a [u8]),
     /// MPEG-1/2 audio, layer I, II or III.
     MpegAudio,
-    /// AC-3 (and E-AC-3 in a stream of single syncframes, MPEG-TS).
-    Ac3,
-    /// E-AC-3 packets of whole syncframes (MP4, Matroska): an access unit may hold several
-    /// syncframes and dependent substreams.
-    Eac3,
 }
 
 /// Samples each packet decodes to at the stream's output `rate`, for codecs where that is the same
 /// for every packet: AAC 1024 (2048 when [`PacketDecoder::aac`] upsamples an HE-AAC core); MPEG
-/// audio and AC-3 from the frame header of `first`, the stream's first packet; E-AC-3 from the
-/// syncframes of the program we decode in `first`. `None` when it is not known: an AAC
+/// audio from the frame header of `first`, the stream's first packet. `None` when it is not known: an AAC
 /// configuration our decoder does not read, a header that does not parse, or a header whose rate
 /// is not `rate`.
 pub fn fixed_packet_samples(codec: FixedFrames, first: &[u8], rate: u32) -> Option<i64> {
@@ -359,22 +321,7 @@ pub fn fixed_packet_samples(codec: FixedFrames, first: &[u8], rate: u32) -> Opti
             let core = waltcut_aac::Decoder::new(asc).ok()?.sample_rate();
             return Some(if upsamples_core(core, rate) { 2048 } else { 1024 });
         }
-        FixedFrames::Eac3 => {
-            let mut samples = 0usize;
-            let mut p = 0;
-            while let Some(h) = first.get(p..).and_then(|b| waltcut_ac3::parse_header(b).ok()) {
-                if h.is_primary() {
-                    if h.sample_rate != rate {
-                        return None;
-                    }
-                    samples += h.samples();
-                }
-                p += h.frame_bytes;
-            }
-            return i64::try_from(samples).ok().filter(|&n| n > 0);
-        }
         FixedFrames::MpegAudio => waltcut_mpegts::Codec::MpegAudio,
-        FixedFrames::Ac3 => waltcut_mpegts::Codec::Ac3,
     };
     let f = waltcut_mpegts::frame_info(&mpegts, first)?;
     (f.sample_rate == rate && f.samples > 0).then_some(f.samples as i64)
@@ -1017,7 +964,7 @@ impl MediaSource for AudioFileSource {
 
 pub fn opener(name: &str, bytes: Arc<[u8]>) -> Option<std::result::Result<SharedSource, MediaError>> {
     let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-    if !matches!(ext.as_str(), "mp3" | "mp2" | "aac" | "flac" | "ogg" | "oga" | "aif" | "aiff" | "aifc") {
+    if !matches!(ext.as_str(), "mp3" | "mp2" | "aac" | "aif" | "aiff" | "aifc") {
         return None;
     }
     Some(AudioFileSource::decode(name, bytes).map(|s| Arc::new(s) as SharedSource).map_err(Into::into))
@@ -1246,16 +1193,6 @@ mod packet_time_tests {
         // the header's rate must be the stream's
         assert_eq!(fixed_packet_samples(FixedFrames::MpegAudio, &[0xFF, 0xFB, 0x90, 0x44], 48_000), None);
         assert_eq!(fixed_packet_samples(FixedFrames::MpegAudio, &[0xFF], 44_100), None);
-        assert_eq!(fixed_packet_samples(FixedFrames::Ac3, &[0x0B, 0x77], 48_000), None);
-        // E-AC-3 access units: 8-byte syncframes (frmsiz 3) at 48 kHz, stereo. A six-block
-        // independent frame with a dependent substream (7.1) is 1536 samples; two one-block
-        // frames are 512
-        let frame = |strmtyp: u8, numblkscod: u8| [0x0B, 0x77, strmtyp << 6, 3, (numblkscod << 4) | (2 << 1), 16 << 3, 0, 0];
-        let au = |frames: &[[u8; 8]]| frames.concat();
-        assert_eq!(fixed_packet_samples(FixedFrames::Eac3, &au(&[frame(0, 3), frame(1, 3)]), 48_000), Some(1536));
-        assert_eq!(fixed_packet_samples(FixedFrames::Eac3, &au(&[frame(0, 0), frame(0, 0)]), 48_000), Some(512));
-        assert_eq!(fixed_packet_samples(FixedFrames::Eac3, &au(&[frame(0, 3)]), 44_100), None);
-        assert_eq!(fixed_packet_samples(FixedFrames::Eac3, &[0x0B, 0x77], 48_000), None);
     }
 }
 

@@ -141,7 +141,7 @@ pub struct TypeParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct MediaImportParams {
-    /// Absolute paths to media files (MP4/MOV, WAV/MP3/FLAC/AIFF/Ogg, PNG/JPEG/…).
+    /// Absolute paths to supported media files (MP4/MOV, WAV/MP3/MP2/AAC/Opus/AIFF, PNG/JPEG/…).
     pub paths: Vec<String>,
     /// Bin ID to import into (optional).
     #[serde(default)]
@@ -415,7 +415,7 @@ impl FilmcraftMcp {
 
     #[tool(
         title = "Import media",
-        description = "Import media files by absolute path (MP4/MOV, WAV/MP3/FLAC/AIFF/Ogg, PNG/JPEG/…).",
+        description = "Import supported media files by absolute path (MP4/MOV, WAV/MP3/MP2/AAC/Opus/AIFF, PNG/JPEG/…).",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false, open_world_hint = false)
     )]
     async fn media_import(&self, Parameters(p): Parameters<MediaImportParams>) -> Result<CallToolResult, McpError> {

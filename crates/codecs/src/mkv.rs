@@ -2,7 +2,7 @@
 //!
 //! Video codecs are mapped onto ISO-BMFF sample entries so the same decoder factories serve both
 //! containers (H.264, HEVC, VP9, AV1, ProRes, MJPEG). Audio: AAC and Opus
-//! via our decoders, PCM directly, MP3/FLAC/Vorbis via the bootstrap decoders.
+//! via our decoders, PCM directly, and MP3 via the bootstrap decoder.
 //!
 //! Opus (`A_OPUS`): `CodecPrivate` is the `OpusHead`; output is always 48 kHz. The demuxer
 //! subtracts `CodecDelay` from timestamps, so the pre-skip samples land before zero and are never
@@ -58,10 +58,11 @@ pub struct MkvSource {
     /// Video codec as an ISO-BMFF sample entry (for the decoder factories).
     ventry: Option<SampleEntry>,
     video: GopCache,
-    /// The alpha layer of a VP8 / VP9 track with `AlphaMode` 1 (WebM transparency, #402).
+    /// The alpha layer of a VP9 track with `AlphaMode` 1 (WebM transparency, #402).
     alpha: Option<Arc<crate::webm_alpha::AlphaLayer>>,
     /// The playable audio tracks in file order: `info.audio_streams[k]` describes `audios[k]`.
     audios: Vec<MkvAudio>,
+    notices: Vec<String>,
 }
 
 /// Audio packet start positions in source sample frames.
@@ -84,8 +85,6 @@ fn audio_starts(file: &MkvFile, bytes: &crate::Src, ti: usize, rate: i64) -> Vec
     let frame = match &t.codec {
         Codec::Aac { asc } => fixed_packet_samples(FixedFrames::Aac(asc), &[], out_rate),
         Codec::Mp3 | Codec::Mp2 | Codec::Mp1 => fixed_packet_samples(FixedFrames::MpegAudio, &first(), out_rate),
-        Codec::Ac3 => fixed_packet_samples(FixedFrames::Ac3, &first(), out_rate),
-        Codec::Eac3 => fixed_packet_samples(FixedFrames::Eac3, &first(), out_rate),
         _ => None,
     };
     let Some(frame) = frame else {
@@ -248,10 +247,8 @@ fn vp9_config(private: &[u8], v: Option<&waltcut_matroska::VideoInfo>) -> VpcCon
 
 fn sample_entry(c: &Codec, private: &[u8], v: Option<&waltcut_matroska::VideoInfo>, w: u16, h: u16) -> Option<SampleEntry> {
     Some(match c {
-        Codec::Vp8 => SampleEntry::video(FourCc(*b"vp08"), CodecConfig::Unknown { fourcc: FourCc(*b"vp08"), raw: Vec::new() }, w, h),
         Codec::Vp9 { private } => SampleEntry::video(FourCc(*b"vp09"), CodecConfig::Vp9(vp9_config(private, v)), w, h),
         Codec::Av1 { av1c } => SampleEntry::video(FourCc(*b"av01"), CodecConfig::Av1(waltcut_isobmff::Av1Config::parse(av1c).unwrap_or_default()), w, h),
-        Codec::Apv { apvc } => SampleEntry::apv(waltcut_isobmff::ApvConfig::parse(apvc).unwrap_or_default(), w, h),
         Codec::Avc { avcc } => SampleEntry::avc(AvcConfig::parse(avcc).ok()?, w, h),
         Codec::Hevc { hvcc } => SampleEntry::hevc(HevcConfig::parse(hvcc).ok()?, w, h),
         Codec::ProRes { fourcc } => SampleEntry::prores(FourCc(fourcc.unwrap_or(*b"apcn")), w, h),
@@ -302,19 +299,13 @@ fn codec_label(c: &Codec) -> String {
     match c {
         Codec::Avc { .. } => "H.264".into(),
         Codec::Hevc { .. } => "HEVC".into(),
-        Codec::Vp8 => "VP8".into(),
         Codec::Vp9 { .. } => "VP9".into(),
         Codec::Av1 { .. } => "AV1".into(),
-        Codec::Apv { apvc } => match waltcut_isobmff::ApvConfig::parse(apvc).ok().and_then(|a| waltcut_apv::Profile::from_idc(a.profile_idc)) {
-            Some(p) => p.name().into(),
-            None => "APV".into(),
-        },
         Codec::ProRes { .. } => "Apple ProRes".into(),
         Codec::Mjpeg => "Motion JPEG".into(),
         Codec::Aac { .. } => "AAC".into(),
         Codec::Opus { .. } => "Opus".into(),
         Codec::Vorbis { .. } => "Vorbis".into(),
-        Codec::Flac { .. } => "FLAC".into(),
         Codec::Pcm { bits, float, .. } => format!("PCM {bits}-bit{}", if *float { " float" } else { "" }),
         Codec::Mp3 => "MP3".into(),
         Codec::Mp2 | Codec::Mp1 => "MPEG Audio".into(),
@@ -335,16 +326,44 @@ impl MkvSource {
         let mut file = waltcut_matroska::open(&bytes).map_err(|e| CodecError::Container(e.to_string()))?;
         let vtrack = file.tracks.iter().position(|t| t.kind == TrackKind::Video && !t.samples.is_empty());
         // every audio track is a stream (the track count comes from the file: capped)
+        let unsupported_audio =
+            file.tracks.iter().find(|t| t.kind == TrackKind::Audio && !t.samples.is_empty() && matches!(t.codec, Codec::Flac { .. } | Codec::Vorbis { .. }));
+        if let Some(track) = unsupported_audio {
+            return Err(CodecError::Unsupported(format!(
+                "{} audio is not supported; convert it to AAC, MP2, or PCM before importing.",
+                codec_label(&track.codec)
+            )));
+        }
+        let unsupported_ac3 = file.tracks.iter().any(|t| t.kind == TrackKind::Audio && !t.samples.is_empty() && matches!(t.codec, Codec::Ac3 | Codec::Eac3));
+        let mut notices = Vec::new();
+        if unsupported_ac3 {
+            notices.push(
+                "AC-3/E-AC-3 audio is not supported; the video was imported without sound. Convert audio to AAC, MP2, or PCM and reimport to retain sound."
+                    .to_string(),
+            );
+        }
         let atracks: Vec<usize> = file
             .tracks
             .iter()
             .enumerate()
-            .filter(|(_, t)| t.kind == TrackKind::Audio && !t.samples.is_empty())
+            .filter(|(_, t)| t.kind == TrackKind::Audio && !t.samples.is_empty() && !matches!(t.codec, Codec::Ac3 | Codec::Eac3))
             .map(|(i, _)| i)
             .take(waltcut_media::MAX_AUDIO_STREAMS)
             .collect();
         if vtrack.is_none() && atracks.is_empty() {
+            if unsupported_ac3 {
+                return Err(CodecError::Unsupported("AC-3/E-AC-3 audio is not supported. Convert audio to AAC, MP2, or PCM and reimport.".into()));
+            }
             return Err(CodecError::Unsupported("no playable tracks".into()));
+        }
+        if let Some(track) = vtrack.and_then(|i| file.tracks.get(i)) {
+            match track.codec {
+                Codec::Vp8 => return Err(CodecError::Unsupported("VP8 video is not supported; convert the file to VP9, H.264, HEVC, ProRes, or AV1.".into())),
+                Codec::Apv { .. } => {
+                    return Err(CodecError::Unsupported("APV video is not supported; convert the file to H.264, HEVC, ProRes, VP9, or AV1.".into()));
+                }
+                _ => {}
+            }
         }
         let main = vtrack.or(atracks.first().copied());
         // The Segment's end (`Info/Duration` or the last sample), in Segment time.
@@ -450,51 +469,26 @@ impl MkvSource {
                 Some(MkvAudio { track: i, state, starts, preroll })
             })
             .collect();
-        // WebM transparency: VP8 / VP9 alpha in each block's BlockAdditional (ID 1)
+        // WebM transparency: VP9 alpha in each block's BlockAdditional (ID 1)
         let alpha = vtrack.and_then(|i| file.tracks.get(i)).filter(|t| {
-            matches!(t.codec, Codec::Vp8 | Codec::Vp9 { .. })
-                && t.video.as_ref().is_some_and(|v| v.alpha_mode != 0)
-                && t.samples.iter().any(|s| s.addition.is_some())
+            matches!(t.codec, Codec::Vp9 { .. }) && t.video.as_ref().is_some_and(|v| v.alpha_mode != 0) && t.samples.iter().any(|s| s.addition.is_some())
         });
         let alpha = alpha.map(|t| Arc::new(crate::webm_alpha::AlphaLayer::new(bytes.clone(), t.samples.iter().map(|s| (s.pts, s.addition)))));
-        Ok(Self { info, bytes, file, vtrack, ventry, video: GopCache::new(explicit_color).with_rotation(rotation), alpha, audios })
+        Ok(Self { info, bytes, file, vtrack, ventry, video: GopCache::new(explicit_color).with_rotation(rotation), alpha, audios, notices })
     }
 
     fn read(&self, track: usize, i: usize) -> crate::Result<Vec<u8>> {
         self.file.read_sample(&self.bytes, track, i).map_err(|e| CodecError::Container(e.to_string()))
     }
 
-    /// Whether sample `i` of a VP8 track is a hidden frame (`show_frame` 0, RFC 6386 9.1): only the
-    /// first byte of the frame is read.
-    fn vp8_hidden(&self, track: usize, i: usize) -> bool {
-        let Some(t) = self.file.tracks.get(track) else { return false };
-        let Some(s) = t.samples.get(i) else { return false };
-        let first = match t.frame_prefix(u64::from(s.size)).first() {
-            Some(&b) => Some(b),
-            None => {
-                let mut b = [0u8; 1];
-                (s.size > 0 && self.bytes.0.read_at(s.offset, &mut b).is_ok()).then_some(b[0])
-            }
-        };
-        first.is_some_and(|b| b & 0x10 == 0)
-    }
-
     fn audio_decoder(&self, c: &Codec, rate: u32) -> crate::Result<PacketDecoder> {
-        use symphonia::core::codecs::{CODEC_TYPE_FLAC, CODEC_TYPE_MP3, CODEC_TYPE_VORBIS};
+        use symphonia::core::codecs::CODEC_TYPE_MP3;
         match c {
             Codec::Aac { asc } => PacketDecoder::aac(asc, rate),
             Codec::Opus { head } => PacketDecoder::opus(waltcut_opus::OpusHead::parse(head).map_err(|e| CodecError::Unsupported(format!("Opus: {e}")))?),
             Codec::Mp3 => PacketDecoder::new(CODEC_TYPE_MP3, rate, None),
             Codec::Mp2 => PacketDecoder::mpeg_audio(2, rate),
             Codec::Mp1 => PacketDecoder::mpeg_audio(1, rate),
-            Codec::Ac3 | Codec::Eac3 => PacketDecoder::ac3(),
-            // symphonia wants the STREAMINFO block body: skip `fLaC` + the 4-byte block header.
-            Codec::Flac { private } => PacketDecoder::new(CODEC_TYPE_FLAC, rate, private.get(8..42).map(<[u8]>::to_vec)),
-            Codec::Vorbis { headers } if headers.len() == 3 => {
-                let mut extra = headers[0].clone();
-                extra.extend_from_slice(&headers[2]);
-                PacketDecoder::new(CODEC_TYPE_VORBIS, rate, Some(extra))
-            }
             other => Err(CodecError::Unsupported(format!("{} audio", codec_label(other)))),
         }
     }
@@ -575,18 +569,7 @@ impl VideoSamples for MkvVideo<'_> {
     fn sample_at(&self, t: i64) -> Option<usize> {
         let track = &self.src.file.tracks[self.track];
         let i = track.sample_at_pts(t)?;
-        if !matches!(track.codec, Codec::Vp8) {
-            return Some(i);
-        }
-        // VP8 has no superframes: an encoder stores a hidden (altref) frame as a block of its own
-        // with the time of the frame that follows it, which vpxenc moves 1 ms later. The hidden
-        // frame shows nothing, so its time asks for that next shown frame (as decoders that pass
-        // the two on as one packet show it).
-        let mut k = i;
-        while k + 1 < track.samples.len() && k < i + 8 && self.src.vp8_hidden(self.track, k) {
-            k += 1;
-        }
-        Some(k)
+        Some(i)
     }
     fn read(&self, i: usize) -> crate::Result<Vec<u8>> {
         self.src.read(self.track, i)
@@ -608,6 +591,9 @@ impl VideoSamples for MkvVideo<'_> {
 impl MediaSource for MkvSource {
     fn info(&self) -> &MediaInfo {
         &self.info
+    }
+    fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     fn video_frame(&self, req: FrameRequest) -> Result<Arc<VideoFrame>, MediaError> {

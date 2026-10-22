@@ -19,7 +19,6 @@ mod aac_out;
 mod audio_out;
 mod deflate;
 mod job;
-mod mxf_out;
 mod pace;
 mod pcm;
 mod pipeline;
@@ -28,7 +27,6 @@ mod raster;
 pub mod settings;
 pub mod still;
 pub use job::{Exporter, Step, stepped};
-pub use mxf_out::opatom_audio_paths;
 pub use pcm::{image_sequence_path, write_aiff, write_wav};
 pub use pipeline::limit_rgba8;
 pub use presets::{ExportPreset, builtin_presets};
@@ -79,13 +77,6 @@ pub enum Format {
     /// QuickTime, Apple ProRes 422 (HQ unless the settings pick another flavour) + PCM.
     #[serde(rename = "prores", alias = "ProRes")]
     ProRes,
-    /// QuickTime, Avid DNxHR (HQ unless the settings pick another profile) + PCM.
-    #[serde(rename = "dnxhr", alias = "DnxHr")]
-    DnxHr,
-    /// QuickTime, APV (Advanced Professional Video, RFC 9924; 422-10 unless the settings pick
-    /// another profile) + PCM.
-    #[serde(rename = "apv", alias = "Apv")]
-    Apv,
     /// QuickTime, Motion-JPEG + PCM.
     #[serde(rename = "mjpeg", alias = "Mjpeg")]
     Mjpeg,
@@ -120,16 +111,6 @@ pub enum Format {
     /// the path ends in `.aac`.
     #[serde(rename = "aac", alias = "Aac")]
     Aac,
-    /// FLAC (RFC 9639): lossless compressed audio.
-    #[serde(rename = "flac", alias = "Flac")]
-    Flac,
-    /// MXF OP1a (SMPTE ST 378): frame-wrapped DNxHR, ProRes or H.264 ([`MxfVideoCodec`]) + PCM.
-    #[serde(rename = "mxf-op1a", alias = "MxfOp1a")]
-    MxfOp1a,
-    /// MXF OP-Atom (SMPTE ST 390, Avid style): the picture in one file, one mono PCM file per
-    /// audio channel ([`opatom_audio_paths`]).
-    #[serde(rename = "mxf-opatom", alias = "MxfOpAtom")]
-    MxfOpAtom,
 }
 
 impl Format {
@@ -139,10 +120,6 @@ impl Format {
             "hevc" | "h265" | "hvc1" | "hev1" | "x265" => Format::Hevc,
             "av1" | "av01" => Format::Av1,
             "prores" | "mov" | "appleprores" => Format::ProRes,
-            "dnxhr" | "dnxhd" | "dnx" | "avid" | "aviddnxhr" | "aviddnxhd" | "vc3" => Format::DnxHr,
-            "apv" | "apv1" => Format::Apv,
-            "mxf" | "mxfop1a" | "op1a" => Format::MxfOp1a,
-            "mxfopatom" | "opatom" | "mxfatom" | "avidmxf" => Format::MxfOpAtom,
             "mjpeg" | "motionjpeg" | "jpeg" => Format::Mjpeg,
             "png" | "pngsequence" => Format::PngSequence,
             "tif" | "tiff" | "tiffsequence" => Format::TiffSequence,
@@ -156,7 +133,6 @@ impl Format {
             "wav" | "waveform" | "waveformaudio" => Format::Wav,
             "aif" | "aiff" | "aifc" => Format::Aiff,
             "aac" | "aacaudio" | "m4a" | "adts" => Format::Aac,
-            "flac" | "fla" => Format::Flac,
             _ => return None,
         })
     }
@@ -167,8 +143,6 @@ impl Format {
             Format::Hevc => "hevc",
             Format::Av1 => "av1",
             Format::ProRes => "prores",
-            Format::DnxHr => "dnxhr",
-            Format::Apv => "apv",
             Format::Mjpeg => "mjpeg",
             Format::PngSequence => "png",
             Format::TiffSequence => "tiff",
@@ -181,15 +155,12 @@ impl Format {
             Format::Wav => "wav",
             Format::Aiff => "aiff",
             Format::Aac => "aac",
-            Format::Flac => "flac",
-            Format::MxfOp1a => "mxf-op1a",
-            Format::MxfOpAtom => "mxf-opatom",
         }
     }
     pub fn extension(self) -> &'static str {
         match self {
             Format::H264 | Format::Hevc | Format::Av1 => "mp4",
-            Format::ProRes | Format::DnxHr | Format::Apv | Format::Mjpeg => "mov",
+            Format::ProRes | Format::Mjpeg => "mov",
             Format::PngSequence => "png",
             Format::TiffSequence => "tif",
             Format::BmpSequence => "bmp",
@@ -201,8 +172,6 @@ impl Format {
             Format::Wav => "wav",
             Format::Aiff => "aif",
             Format::Aac => "m4a",
-            Format::Flac => "flac",
-            Format::MxfOp1a | Format::MxfOpAtom => "mxf",
         }
     }
     pub fn label(self) -> &'static str {
@@ -211,8 +180,6 @@ impl Format {
             Format::Hevc => "H.265 (HEVC)",
             Format::Av1 => "AV1",
             Format::ProRes => "Apple ProRes",
-            Format::DnxHr => "Avid DNxHR",
-            Format::Apv => "APV",
             Format::Mjpeg => "QuickTime (Motion JPEG)",
             Format::PngSequence => "PNG",
             Format::TiffSequence => "TIFF",
@@ -225,9 +192,6 @@ impl Format {
             Format::Wav => "Waveform Audio",
             Format::Aiff => "AIFF",
             Format::Aac => "AAC Audio",
-            Format::Flac => "FLAC",
-            Format::MxfOp1a => "MXF OP1a",
-            Format::MxfOpAtom => "MXF OP-Atom",
         }
     }
     /// Numbered stills, one per frame ([`image_sequence_path`]).
@@ -243,18 +207,14 @@ impl Format {
                 | Format::ExrSequence
         )
     }
-    /// An MXF container format.
-    pub fn is_mxf(self) -> bool {
-        matches!(self, Format::MxfOp1a | Format::MxfOpAtom)
-    }
     /// Whether the crate carries an encoder for the format; the others need one registered at runtime
     /// ([`register_format_probe`]).
     pub fn has_builtin_encoder(self) -> bool {
         !matches!(self, Format::Hevc | Format::Av1)
     }
-    /// Sound without picture: Waveform Audio, AIFF, AAC Audio and FLAC.
+    /// Sound without picture: Waveform Audio, AIFF and AAC Audio.
     pub fn is_audio_only(self) -> bool {
-        matches!(self, Format::Wav | Format::Aiff | Format::Aac | Format::Flac)
+        matches!(self, Format::Wav | Format::Aiff | Format::Aac)
     }
     /// H.264 or H.265: MPEG-4 (or QuickTime) with AAC audio, set up with the same bitrate controls.
     pub fn is_h26x(self) -> bool {
@@ -268,13 +228,11 @@ impl Format {
     pub fn is_mp4_with(self, mux: Multiplexer) -> bool {
         self == Format::Av1 || (self.is_h26x() && mux == Multiplexer::Mp4)
     }
-    pub const ALL: [Format; 21] = [
+    pub const ALL: [Format; 16] = [
         Format::H264,
         Format::Hevc,
         Format::Av1,
         Format::ProRes,
-        Format::DnxHr,
-        Format::Apv,
         Format::Mjpeg,
         Format::PngSequence,
         Format::TiffSequence,
@@ -287,9 +245,6 @@ impl Format {
         Format::Wav,
         Format::Aiff,
         Format::Aac,
-        Format::Flac,
-        Format::MxfOp1a,
-        Format::MxfOpAtom,
     ];
 }
 
@@ -324,15 +279,6 @@ pub struct ExportSettings {
     /// ProRes flavour: `proxy`, `lt`, `standard`, `hq`, `4444` or `4444xq` (empty = HQ).
     #[serde(default)]
     pub prores_profile: String,
-    /// DNxHR profile: `lb`, `sq`, `hq` or `hqx` (empty = HQ).
-    #[serde(default)]
-    pub dnx_profile: String,
-    /// APV profile: `422-10`, `422-12`, `444-10` or `444-12` (empty = `422-10`).
-    #[serde(default)]
-    pub apv_profile: String,
-    /// Video codec of the MXF formats (DNxHR unless set; the ProRes / DNxHR profile fields apply).
-    #[serde(default)]
-    pub mxf_video_codec: MxfVideoCodec,
     /// Encode display-referred SDR (Rec. 709, tone mapped) even when the sequence works in
     /// Rec. 2100 PQ/HLG. Otherwise H.264 and ProRes exports of an HDR sequence are encoded in the
     /// sequence's HDR space and signal it (VUI / `colr` / `mdcv` / `clli` / SEI).
@@ -415,7 +361,6 @@ impl std::fmt::Debug for OutputSink {
 /// How an audio-only export codes its samples.
 enum AudioWriter {
     Pcm(pcm::PcmContainer),
-    Flac(Box<waltcut_flac::Encoder>),
 }
 
 /// An export's output file: on disk, or in memory for an [`OutputSink`].
@@ -429,7 +374,7 @@ impl Out {
         Out::create_path(settings, &settings.path)
     }
 
-    /// An output file at `path` (OP-Atom exports write several).
+    /// An output file at `path`.
     fn create_path(settings: &ExportSettings, path: &str) -> Result<Out> {
         if settings.sink.is_some() {
             return Ok(Out::Mem(std::io::Cursor::new(Vec::new())));
@@ -516,7 +461,7 @@ impl ColorSignal {
     /// Sample-entry boxes: `colr` (nclx for MP4, nclc for MOV) plus `mdcv`/`clli` for PQ
     /// (mastering display BT.2020/D65, 1000/0.0001 cd/m²; MaxCLL/MaxFALL 0 = unknown). SDR gets
     /// its `colr` too: Apple's media stack (QuickTime Player, Final Cut Pro) reads the colour of
-    /// ProRes, DNxHR and APV only from this box, not from their frame headers (#2142).
+    /// ProRes only from this box, not from its frame headers (#2142).
     pub fn apply_to(&self, e: &mut SampleEntry, mov: bool) {
         if let Some(v) = e.video.as_mut() {
             let (p, t, m) = (self.primaries as u16, self.transfer as u16, self.matrix as u16);
@@ -551,9 +496,6 @@ impl Default for ExportSettings {
             bitrate_kbps: 20_000,
             part_of_batch: false,
             prores_profile: String::new(),
-            dnx_profile: String::new(),
-            apv_profile: String::new(),
-            mxf_video_codec: MxfVideoCodec::default(),
             sdr: false,
             alpha: false,
             exr_compression: ExrCompression::None,
@@ -621,7 +563,7 @@ impl ExportSettings {
         }
         let sample_format = self.audio.sample_format();
         if (self.has_audio() || self.format.is_audio_only()) && self.audio_codec() != AudioCodec::Aac && !self.supports_sample_format(sample_format) {
-            let codec = if self.audio_codec() == AudioCodec::Flac { "FLAC" } else { self.format.label() };
+            let codec = self.format.label();
             return Err(ExportError::Unsupported(format!("{codec} audio has no {} samples: choose 16, 24 or 32 bit", sample_format.label())));
         }
         if self.field_order != FieldOrder::Progressive && self.has_video() {
@@ -699,9 +641,6 @@ pub struct Report {
     pub seconds: f64,
     pub bytes: u64,
     pub render_fps: f64,
-    /// Further files written besides `path` (MXF OP-Atom audio files).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub extra_files: Vec<String>,
 }
 
 /// A packet produced by a video encoder.
@@ -749,17 +688,6 @@ pub trait AudioEncoder: Send {
     fn priming(&self) -> u32;
     /// Samples per access unit (1024 for AAC).
     fn frame_size(&self) -> u32;
-    /// [`AudioEncoder::flush`] with each access unit's duration, for codecs whose last unit is
-    /// shorter than [`AudioEncoder::frame_size`] (FLAC); by default every unit is a full frame.
-    fn flush_timed(&mut self) -> Result<Vec<(Vec<u8>, u32)>> {
-        let n = self.frame_size();
-        Ok(self.flush()?.into_iter().map(|au| (au, n)).collect())
-    }
-    /// The sample entry once everything is encoded, when it differs from the first one (the FLAC
-    /// STREAMINFO learns its frame sizes and MD5 at the end).
-    fn final_sample_entry(&self) -> Option<SampleEntry> {
-        None
-    }
 }
 
 pub type EncoderFactory = fn(format: Format, width: u32, height: u32, rate: FrameRate, settings: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>>;
@@ -767,7 +695,7 @@ pub type AudioEncoderFactory = fn(format: Format, sample_rate: u32, channels: u3
 
 fn video_factories() -> &'static RwLock<Vec<EncoderFactory>> {
     static F: OnceLock<RwLock<Vec<EncoderFactory>>> = OnceLock::new();
-    F.get_or_init(|| RwLock::new(vec![h264_factory, prores_factory, dnx_factory, apv_factory, mjpeg_factory]))
+    F.get_or_init(|| RwLock::new(vec![h264_factory, prores_factory, mjpeg_factory]))
 }
 fn audio_factories() -> &'static RwLock<Vec<AudioEncoderFactory>> {
     static F: OnceLock<RwLock<Vec<AudioEncoderFactory>>> = OnceLock::new();
@@ -1098,53 +1026,6 @@ impl AudioEncoder for AacEncoder {
     }
 }
 
-/// FLAC (our encoder) in MP4 / QuickTime: one frame of 4096 samples per access unit.
-pub(crate) struct FlacAudio {
-    enc: waltcut_flac::Encoder,
-    format: SampleFormat,
-    /// Samples of the frame `flush` returns (shorter than a full block).
-    tail: u32,
-}
-
-impl FlacAudio {
-    pub(crate) fn new(sample_rate: u32, channels: u32, s: &ExportSettings) -> Result<Self> {
-        let format = s.audio.sample_format();
-        let ch = u8::try_from(channels).map_err(|_| ExportError::Unsupported("FLAC: too many audio channels".into()))?;
-        let mut cfg = waltcut_flac::EncoderConfig::new(sample_rate, ch, format.bits() as u8);
-        cfg.level = s.audio.flac_level.min(8);
-        let enc = waltcut_flac::Encoder::new(cfg).map_err(|e| ExportError::Unsupported(format!("FLAC: {e}")))?;
-        Ok(FlacAudio { enc, format, tail: 0 })
-    }
-}
-
-impl AudioEncoder for FlacAudio {
-    fn sample_entry(&self) -> SampleEntry {
-        SampleEntry::flac(&self.enc.streaminfo())
-    }
-    fn encode(&mut self, planar: &[Vec<f32>]) -> Result<Vec<Vec<u8>>> {
-        let ints: Vec<Vec<i32>> = planar.iter().map(|c| c.iter().map(|&s| self.format.quantise(s)).collect()).collect();
-        let refs: Vec<&[i32]> = ints.iter().map(Vec::as_slice).collect();
-        self.enc.encode_frames(&refs).map_err(|e| ExportError::Encode(format!("FLAC: {e}")))
-    }
-    fn flush(&mut self) -> Result<Vec<Vec<u8>>> {
-        Ok(self.flush_timed()?.into_iter().map(|(au, _)| au).collect())
-    }
-    fn flush_timed(&mut self) -> Result<Vec<(Vec<u8>, u32)>> {
-        self.tail = self.enc.pending_samples() as u32;
-        let last = self.enc.finish();
-        Ok(if last.is_empty() { Vec::new() } else { vec![(last, self.tail)] })
-    }
-    fn priming(&self) -> u32 {
-        0
-    }
-    fn frame_size(&self) -> u32 {
-        4096
-    }
-    fn final_sample_entry(&self) -> Option<SampleEntry> {
-        Some(SampleEntry::flac(&self.enc.streaminfo()))
-    }
-}
-
 fn aac_factory(_format: Format, sample_rate: u32, channels: u32, s: &ExportSettings) -> Option<Result<Box<dyn AudioEncoder>>> {
     // AAC caps a frame at 6144 bits per channel (ISO/IEC 14496-3 §4.5.3.2): 6 bits per sample, so
     // 264.6 kbps for stereo at 22.05 kHz; a higher setting is capped instead of refused
@@ -1319,158 +1200,6 @@ fn prores_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSet
         cfg.encode_alpha = alpha;
         let enc = waltcut_prores::Encoder::with_config(cfg);
         Ok(Box::new(ProResEncoder { enc, profile, alpha, w, h, rate, signal: s.signal }) as Box<dyn VideoEncoder>)
-    })
-}
-
-/// The DNxHR profile named by [`ExportSettings::dnx_profile`].
-pub fn dnx_profile(name: &str) -> waltcut_dnx::Profile {
-    use waltcut_dnx::Profile;
-    match name.to_ascii_lowercase().as_str() {
-        "lb" => Profile::Lb,
-        "sq" => Profile::Sq,
-        "hqx" => Profile::Hqx,
-        _ => Profile::Hq,
-    }
-}
-
-/// DNxHR encoder (RGBA8 or HDR floats → BT.709 / BT.2020 limited-range 4:2:2; 8-bit for
-/// LB/SQ/HQ, 10-bit for HQX).
-struct DnxEncoder {
-    enc: waltcut_dnx::Encoder,
-    w: u32,
-    h: u32,
-    rate: FrameRate,
-    signal: ColorSignal,
-}
-
-impl VideoEncoder for DnxEncoder {
-    fn sample_entry(&self) -> SampleEntry {
-        let mut e = SampleEntry::dnx(waltcut_isobmff::FourCc(*b"AVdh"), self.w as u16, self.h as u16);
-        self.signal.apply_to(&mut e, true);
-        e
-    }
-    fn timescale(&self) -> u32 {
-        self.rate.num as u32
-    }
-    fn encode(&mut self, f: &EncoderFrame) -> Result<Vec<EncodedPacket>> {
-        let mut fr = waltcut_dnx::Frame::new(f.width, f.height, waltcut_dnx::ChromaFormat::Yuv422, 10, false);
-        match f.hdr {
-            Some(rgb) => {
-                let (kr, kb) = self.signal.kr_kb();
-                rgbf_to_yuv422_10(rgb, f.width as usize, f.height as usize, kr, kb, &mut fr.y, &mut fr.cb, &mut fr.cr)
-            }
-            None => rgba_to_yuv422_10(f.rgba, f.width as usize, f.height as usize, &mut fr.y, &mut fr.cb, &mut fr.cr),
-        }
-        // the encoder rescales 10-bit input to its coded depth
-        let data = self.enc.encode(&fr).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(vec![EncodedPacket { data, key: true, duration: self.rate.den as u32, composition_offset: 0 }])
-    }
-    fn flush(&mut self) -> Result<Vec<EncodedPacket>> {
-        Ok(Vec::new())
-    }
-}
-
-fn dnx_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>> {
-    (format == Format::DnxHr).then(|| {
-        let mut cfg = waltcut_dnx::EncoderConfig::new(dnx_profile(&s.dnx_profile), w, h);
-        if s.signal.primaries == 9 {
-            cfg.color_volume = waltcut_dnx::ColorVolume::Bt2020Ncl;
-        }
-        let enc = waltcut_dnx::Encoder::with_config(cfg).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(Box::new(DnxEncoder { enc, w, h, rate, signal: s.signal }) as Box<dyn VideoEncoder>)
-    })
-}
-
-/// The APV profile named by [`ExportSettings::apv_profile`].
-pub fn apv_profile(name: &str) -> waltcut_apv::Profile {
-    use waltcut_apv::Profile;
-    match name.to_ascii_lowercase().replace([' ', '_'], "-").trim_start_matches("apv-").trim_start_matches("apv") {
-        "422-12" | "42212" => Profile::P422_12,
-        "444-10" | "44410" => Profile::P444_10,
-        "444-12" | "44412" => Profile::P444_12,
-        "4444-10" | "444410" => Profile::P4444_10,
-        "4444-12" | "444412" => Profile::P4444_12,
-        "400-10" | "40010" => Profile::P400_10,
-        _ => Profile::P422_10,
-    }
-}
-
-/// APV encoder (RFC 9924: 10/12-bit 4:2:2 or 4:4:4 intra).
-struct ApvEncoder {
-    enc: waltcut_apv::Encoder,
-    chroma: waltcut_apv::ChromaFormat,
-    w: u32,
-    h: u32,
-    rate: FrameRate,
-    signal: ColorSignal,
-}
-
-impl VideoEncoder for ApvEncoder {
-    fn sample_entry(&self) -> SampleEntry {
-        let apvc = waltcut_isobmff::ApvConfig::parse(&self.enc.decoder_config_record()).unwrap_or_default();
-        let mut e = SampleEntry::apv(apvc, self.w as u16, self.h as u16);
-        self.signal.apply_to(&mut e, true);
-        e
-    }
-    fn timescale(&self) -> u32 {
-        self.rate.num as u32
-    }
-    fn encode(&mut self, f: &EncoderFrame) -> Result<Vec<EncodedPacket>> {
-        let (w, h) = (f.width as usize, f.height as usize);
-        let mut fr = waltcut_apv::Frame::new(f.width, f.height, self.chroma, 10, self.chroma == waltcut_apv::ChromaFormat::Yuv4444);
-        let mut y422 = vec![0u16; w * h];
-        let cw = w.div_ceil(2);
-        let mut cb422 = vec![0u16; cw * h];
-        let mut cr422 = vec![0u16; cw * h];
-        match f.hdr {
-            Some(rgb) => {
-                let (kr, kb) = self.signal.kr_kb();
-                rgbf_to_yuv422_10(rgb, w, h, kr, kb, &mut y422, &mut cb422, &mut cr422);
-            }
-            None => rgba_to_yuv422_10(f.rgba, w, h, &mut y422, &mut cb422, &mut cr422),
-        }
-        fr.y = y422;
-        match self.chroma {
-            waltcut_apv::ChromaFormat::Monochrome => {
-                fr.cb.clear();
-                fr.cr.clear();
-            }
-            waltcut_apv::ChromaFormat::Yuv422 => {
-                fr.cb = cb422;
-                fr.cr = cr422;
-            }
-            waltcut_apv::ChromaFormat::Yuv444 | waltcut_apv::ChromaFormat::Yuv4444 => {
-                for row in 0..h {
-                    for x in 0..w {
-                        fr.cb[row * w + x] = cb422[row * cw + x / 2];
-                        fr.cr[row * w + x] = cr422[row * cw + x / 2];
-                    }
-                }
-                if let Some(a) = fr.alpha.as_mut() {
-                    for (i, dst) in a.iter_mut().enumerate() {
-                        *dst = f.rgba.get(i * 4 + 3).map_or(1023, |&v| ((v as u32 * 1023 + 127) / 255) as u16);
-                    }
-                }
-            }
-        }
-        let data = self.enc.encode_raw_au(&fr).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(vec![EncodedPacket { data, key: true, duration: self.rate.den as u32, composition_offset: 0 }])
-    }
-    fn flush(&mut self) -> Result<Vec<EncodedPacket>> {
-        Ok(Vec::new())
-    }
-}
-
-fn apv_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>> {
-    (format == Format::Apv).then(|| {
-        let profile = apv_profile(&s.apv_profile);
-        let mut cfg = waltcut_apv::EncoderConfig::new(profile, w, h);
-        if s.signal.is_hdr() {
-            cfg.color = waltcut_apv::ColorInfo { primaries: s.signal.primaries, transfer: s.signal.transfer, matrix: s.signal.matrix, full_range: false };
-        }
-        let chroma = cfg.chroma;
-        let enc = waltcut_apv::Encoder::with_config(cfg).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(Box::new(ApvEncoder { enc, chroma, w, h, rate, signal: s.signal }) as Box<dyn VideoEncoder>)
     })
 }
 
@@ -1662,9 +1391,8 @@ fn h264_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSetti
         return None;
     }
     let mut cfg = waltcut_h264enc::EncoderConfig::new(w, h, rate.num as u32, rate.den as u32);
-    // MXF carries the Annex B byte stream (ST 381-3) with in-band parameter sets
-    cfg.format = if s.format.is_mxf() { waltcut_h264enc::PacketFormat::AnnexB } else { waltcut_h264enc::PacketFormat::LengthPrefixed };
-    cfg.aud = s.format.is_mxf();
+    cfg.format = waltcut_h264enc::PacketFormat::LengthPrefixed;
+    cfg.aud = false;
     cfg.keyint = s.keyframe_distance.filter(|k| *k > 0).unwrap_or_else(|| (rate.num as f64 / rate.den as f64 * 2.0).round().max(1.0) as u32);
     cfg.slices = h264_slices(h);
     let kbps = s.bitrate_kbps.max(100);
@@ -1842,23 +1570,17 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
     let batch = rayon::current_num_threads().clamp(2, 16) as i64;
     let (bytes, nframes) = match settings.format {
         Format::Aac => aac_out::export(project, seq, settings, range, sources, progress)?,
-        Format::Wav | Format::Aiff | Format::Flac => {
+        Format::Wav | Format::Aiff => {
             let mut a = audio_out::AudioOut::new(project.clone(), seq, settings, range)?;
             let (ch, sr, fmt) = (a.channels as u16, a.sr, settings.audio.sample_format());
             let frames = a.remaining();
             // the sizes are known up front: refuse an AIFF that cannot hold them before measuring
             let mut writer = match settings.format {
-                Format::Flac => {
-                    let mut cfg = waltcut_flac::EncoderConfig::new(sr, ch as u8, fmt.bits() as u8);
-                    cfg.level = settings.audio.flac_level.min(8);
-                    AudioWriter::Flac(Box::new(waltcut_flac::Encoder::new(cfg).map_err(|e| ExportError::Unsupported(format!("FLAC: {e}")))?))
-                }
                 Format::Wav => AudioWriter::Pcm(pcm::PcmContainer::Wav),
                 _ => AudioWriter::Pcm(pcm::PcmContainer::Aiff),
             };
             let head = match &writer {
                 AudioWriter::Pcm(c) => pcm::header(*c, ch, sr, fmt, frames).map_err(ExportError::Unsupported)?,
-                AudioWriter::Flac(enc) => enc.header(),
             };
             // one second per chunk: memory stays flat however long the range is
             let chunk = i64::from(sr.max(1));
@@ -1877,11 +1599,6 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
                 buf.clear();
                 match &mut writer {
                     AudioWriter::Pcm(c) => pcm::encode(*c, &audio_out::interleave(&planar), fmt, &mut buf),
-                    AudioWriter::Flac(enc) => {
-                        let ints: Vec<Vec<i32>> = planar.iter().map(|c| c.iter().map(|&s| fmt.quantise(s)).collect()).collect();
-                        let refs: Vec<&[i32]> = ints.iter().map(Vec::as_slice).collect();
-                        buf = enc.encode(&refs).map_err(|e| ExportError::Encode(format!("FLAC: {e}")))?;
-                    }
                 }
                 out.write_all(&buf).map_err(io)?;
                 if !settings.part_of_batch {
@@ -1890,14 +1607,6 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
             }
             match &mut writer {
                 AudioWriter::Pcm(_) => out.write_all(pcm::pad(frames, ch, fmt)).map_err(io)?,
-                AudioWriter::Flac(enc) => {
-                    out.write_all(&enc.finish()).map_err(io)?;
-                    // the frame sizes and MD5 are known now: fill them into STREAMINFO
-                    use std::io::{Seek, SeekFrom};
-                    out.seek(SeekFrom::Start(waltcut_flac::STREAMINFO_OFFSET)).map_err(io)?;
-                    out.write_all(&enc.streaminfo()).map_err(io)?;
-                    out.seek(SeekFrom::End(0)).map_err(io)?;
-                }
             }
             let n = out.finish(settings)?;
             if settings.part_of_batch {
@@ -1978,7 +1687,7 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
         progress.finished.store(true, Ordering::Relaxed);
         progress.set_status(format!("Done in {secs:.1}s"));
     }
-    Ok(Report { path: settings.path.clone(), frames: nframes, seconds: secs, bytes, render_fps: nframes as f64 / secs.max(1e-6), extra_files: Vec::new() })
+    Ok(Report { path: settings.path.clone(), frames: nframes, seconds: secs, bytes, render_fps: nframes as f64 / secs.max(1e-6) })
 }
 
 #[cfg(test)]
@@ -1986,10 +1695,6 @@ mod tests;
 
 #[cfg(test)]
 mod settings_tests;
-
-#[cfg(test)]
-#[cfg(test)]
-mod mxf_tests;
 
 #[cfg(test)]
 mod determinism_tests;

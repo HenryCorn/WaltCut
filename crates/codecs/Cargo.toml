@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-codecs"
-description = "Container + codec hub: MP4/MOV, Matroska, MXF, Ogg and MPEG TS/PS sources, image sequences, GOP-aware seeking, decoder registry, audio decoding"
+description = "Container + codec hub: MP4/MOV, Matroska, AVI and MPEG TS/PS sources, image sequences, GOP-aware seeking, decoder registry, audio decoding"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,21 +17,15 @@ waltcut-media = { workspace = true }
 waltcut-avi = { workspace = true }
 waltcut-isobmff = { workspace = true }
 waltcut-matroska = { workspace = true }
-waltcut-mxf = { workspace = true }
 waltcut-mpegts = { workspace = true }
 waltcut-mpeg2v = { workspace = true }
-waltcut-ac3 = { workspace = true }
 waltcut-mpa = { workspace = true }
-waltcut-ogg = { workspace = true }
 waltcut-bitstream = { workspace = true }
 waltcut-h264 = { workspace = true }
 waltcut-hevc = { workspace = true }
-waltcut-vp8 = { workspace = true }
 waltcut-vp9 = { workspace = true }
 waltcut-prores = { workspace = true }
-waltcut-dnx = { workspace = true }
 waltcut-av1 = { workspace = true }
-waltcut-apv = { workspace = true }
 waltcut-aac = { workspace = true }
 waltcut-opus = { workspace = true }
 rayon = { workspace = true }
@@ -39,7 +33,7 @@ thiserror = { workspace = true }
 log = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # Bootstrap audio decoding (MPL-2.0, used unmodified); replaced by own decoders over time.
-symphonia = { version = "0.5.5", default-features = false, features = ["aac", "mp1", "mp2", "mp3", "flac", "alac", "pcm", "wav", "aiff", "ogg", "vorbis", "isomp4"] }
+symphonia = { version = "0.5.5", default-features = false, features = ["aac", "mp1", "mp2", "mp3", "alac", "pcm", "wav", "aiff", "isomp4"] }
 
 [dev-dependencies]
 waltcut-testkit = { workspace = true }
