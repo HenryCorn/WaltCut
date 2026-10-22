@@ -5,10 +5,10 @@
 //! - a phone clip: H.264 + AAC in MP4 with a variable frame rate (dropped frames);
 //! - a camera clip: long-GOP H.264 (one keyframe) in Matroska with two audio tracks (AAC, AC-3).
 //!
-//! Each test imports, edits (extract, audio gain, title; ripple trims, colour matte, cross
-//! dissolve), exports (H.264 MP4; save the project, reopen it in a new process and export ProRes)
+//! Each test imports, edits (extract, audio gain, title; ripple trims and colour matte),
+//! exports (H.264 MP4; save the project, reopen it in a new process and export ProRes)
 //! and checks the file with the ffprobe / ffmpeg oracles: streams, frame count, duration, which
-//! source frame lands where, A/V sync, the title's pixels, the dissolve's mix, audio levels.
+//! source frame lands where, A/V sync, the title's pixels and audio levels.
 //!
 //! The media is generated with ffmpeg into `target/fixtures/cli/workflows` at test time (never
 //! committed); without ffmpeg the tests skip (`FILMCRAFT_REQUIRE_ORACLES=1` makes that a failure).
@@ -374,12 +374,12 @@ fn phone_vfr_clip_extract_gain_title_to_h264_mp4() {
 
 /// Camera footage: import a long-GOP H.264 Matroska file with two audio tracks through MCP, make
 /// a sequence (both tracks land on A1 and A2), ripple-trim 2.6 s off the head (decoding starts at
-/// the only keyframe) and 15 frames off the tail, add a red colour matte with a centred cross
-/// dissolve, save the project; then a new `filmcraft-cli` process opens it and exports ProRes.
-/// The first exported frame is source frame 65, the dissolve mixes the two pictures, both audio
+/// the only keyframe) and 15 frames off the tail, add a red colour matte and save the project;
+/// then a new `filmcraft-cli` process opens it and exports ProRes.
+/// The first exported frame is source frame 65, the matte follows the cut, and both audio
 /// tracks are in the mix at their own level and stop where the clip does.
 #[test]
-fn camera_long_gop_two_audio_tracks_trim_dissolve_to_prores() {
+fn camera_long_gop_two_audio_tracks_trim_to_prores() {
     let (ffmpeg, ffprobe) = waltcut_testkit::require_oracles!();
     let Some(src) = camera_long_gop_mkv(&ffmpeg) else {
         return waltcut_testkit::skip("camera workflow", "ffmpeg could not make the long-GOP Matroska fixture (libx264?)");
@@ -412,12 +412,7 @@ fn camera_long_gop_two_audio_tracks_trim_dissolve_to_prores() {
         }
 
         let matte = m.run("file.newColorMatte", json!({"color": "#ff0000", "seconds": 2.0}))["item"].as_u64().unwrap();
-        let placed = m.run("timeline.place", json!({"item": matte, "track": "V1", "frame": end, "insert": false}));
-        let matte_clip = placed["clips"][0].as_u64().unwrap();
-        m.run("sequence.applyVideoTransition", json!({"clip": matte_clip, "edge": "in", "frames": 10, "effect": "cross_dissolve"}));
-        let seq = m.tool("sequence_inspect", json!({}));
-        let tr = &seq["video"][0]["transitions"][0];
-        assert_eq!((tr["effect"].as_str(), tr["align"].as_str()), (Some("cross_dissolve"), Some("center")), "{tr}");
+        m.run("timeline.place", json!({"item": matte, "track": "V1", "frame": end, "insert": false}));
         m.run("file.saveAs", json!({"path": project}));
     }
     assert_eq!(end_frame_of(&project), Some(71), "the saved project holds the edit");
@@ -440,7 +435,7 @@ fn camera_long_gop_two_audio_tracks_trim_dissolve_to_prores() {
     let duration = num(&j["format"]["duration"]);
     assert!((duration - f64::from(total) / 25.0).abs() < 0.05, "duration {duration}");
 
-    // picture: frame k is source frame 65 + k up to the dissolve (frames 66..76), red after it
+    // picture: frame k is source frame 65 + k up to the cut, red after it
     let src_frames = frames(&ffmpeg, &src, None, "rgb24");
     let got = frames(&ffmpeg, &out, None, "rgb24");
     assert_eq!((src_frames.len(), got.len()), (150, total as usize));
@@ -449,22 +444,6 @@ fn camera_long_gop_two_audio_tracks_trim_dissolve_to_prores() {
     }
     let red = &got[100];
     assert!(red.as_chunks::<3>().0.iter().all(|[r, g, b]| *r > 230 && *g < 25 && *b < 25), "the matte is red");
-    // the dissolve: frame = (1 - a)·camera + a·red, `a` rising through about 0.5 at the cut
-    let mix = |k: usize| {
-        let (cam, e) = (&src_frames[65 + k], &got[k]);
-        let (mut num, mut den) = (0.0, 0.0);
-        for ((c, r), e) in cam.iter().zip(red).zip(e) {
-            let (c, r, e) = (f64::from(*c), f64::from(*r), f64::from(*e));
-            num += (e - c) * (r - c);
-            den += (r - c) * (r - c);
-        }
-        num / den
-    };
-    let alphas: Vec<f64> = (64..=78).map(mix).collect();
-    assert!(alphas[0].abs() < 0.05 && (alphas[14] - 1.0).abs() < 0.05, "outside the dissolve: {alphas:?}");
-    assert!(alphas.windows(2).all(|w| w[1] >= w[0] - 0.02), "the dissolve progresses: {alphas:?}");
-    assert!((alphas[7] - 0.5).abs() < 0.12, "half way at the cut (frame 71): {alphas:?}");
-
     // sound: both tracks in the mix at their own level while the clip plays, silence on the matte
     let got_pcm = pcm(&ffmpeg, &out, 0);
     let (t1, t2) = (pcm(&ffmpeg, &src, 0), pcm(&ffmpeg, &src, 1));

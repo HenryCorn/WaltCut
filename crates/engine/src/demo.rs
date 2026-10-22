@@ -8,7 +8,7 @@ use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{DemoScene, Generator, MediaSource};
 use waltcut_project::{
     BinId, ItemId, ItemKind, Label, Marker, MarkerId, MarkerKind, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackKind, Transition,
-    TransitionId, find_effect, resolve_auto_points,
+    TransitionId, resolve_auto_points,
 };
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
@@ -127,7 +127,7 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
         s.audio_tracks[0].items.push(a);
         t += dur_t;
     }
-    // A lower-third-ish overlay on V2: the plasma clip scaled down in the corner with a drop shadow.
+    // A lower-third-ish overlay on V2: the plasma clip scaled down in the corner.
     let ov_range = TimeRange::new(Tick::ZERO, r.snap(Tick::from_seconds_f64(4.0)));
     let mut ov = p.make_track_item(clips[4], TrackKind::Video, r.snap(Tick::from_seconds_f64(6.0)), ov_range, r)?;
     for e in &mut ov.effects {
@@ -136,11 +136,6 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
     if let Some(m) = ov.effect_mut("motion") {
         m.params.get_mut("scale").map(|s| s.value = ParamValue::Float(32.0));
         m.params.get_mut("position").map(|s| s.value = ParamValue::Vec2(waltcut_geom::Vec2::new(1540.0, 820.0)));
-    }
-    if let Some(mut ds) = find_effect("drop_shadow").map(|d| d.instance()) {
-        ds.params.get_mut("distance").map(|v| v.value = ParamValue::Float(18.0));
-        ds.params.get_mut("softness").map(|v| v.value = ParamValue::Float(40.0));
-        ov.effects.insert(0, ds);
     }
     ov.label = Label::Mango;
     // Fade the overlay in/out with opacity keyframes (media time).
@@ -153,29 +148,12 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
     }
     let s = p.sequence_mut(seq)?;
     s.video_tracks[1].items.push(ov);
-    // Transitions: cross dissolve between shots 1-2, dip to black 3-4, push 5-6, fade in at start.
+    // Audio crossfade between the first two shots.
     let tr_len = r.tick_of(24);
-    let mk = |id: u64, eff: &str, from: Option<waltcut_project::ClipId>, to: Option<waltcut_project::ClipId>, start: Tick| Transition {
-        id: TransitionId(id),
-        effect: crate::presets::effect_instance(eff),
-        start,
-        duration: tr_len,
-        from,
-        to,
-        align: Default::default(),
-        reverse: false,
-    };
     let cut = |i: usize| placed[i].2;
-    let trs = vec![
-        mk(900_001, "dip_to_black", None, Some(placed[0].0), Tick::ZERO),
-        mk(900_002, "cross_dissolve", Some(placed[0].0), Some(placed[1].0), cut(1) - tr_len.mul_ratio(1, 2)),
-        mk(900_003, "dip_to_black", Some(placed[2].0), Some(placed[3].0), cut(3) - tr_len.mul_ratio(1, 2)),
-        mk(900_004, "push", Some(placed[4].0), Some(placed[5].0), cut(5) - tr_len.mul_ratio(1, 2)),
-    ];
-    s.video_tracks[0].transitions = trs;
     s.audio_tracks[0].transitions.push(Transition {
         id: TransitionId(900_010),
-        effect: crate::presets::effect_instance("constant_power"),
+        effect: waltcut_project::find_effect("constant_power")?.instance(),
         start: cut(1) - tr_len.mul_ratio(1, 2),
         duration: tr_len,
         from: Some(placed[0].1),

@@ -115,25 +115,20 @@ fn paste_attributes_dialog() {
     let (a, b) = (d.v1(0), d.v1(2));
     d.exec("effects.setParam", json!({"clip": a.id.0, "effect": "motion", "param": "rotation", "value": 45.0}));
     d.exec("effects.setParam", json!({"clip": a.id.0, "effect": "opacity", "param": "opacity", "value": 25.0}));
-    d.exec("effects.apply", json!({"clips": [a.id.0], "effect": "gaussian_blur"}));
     d.exec("timeline.select", json!({"clips": [a.id.0]}));
     d.exec("edit.copy", json!({}));
     d.exec("timeline.select", json!({"clips": [b.id.0]}));
     assert_eq!(d.menu("edit.pasteAttributes")["dialog"], "pasteAttributes");
-    for id in
-        ["pasteAttributes.motion", "pasteAttributes.opacity", "pasteAttributes.volume", "pasteAttributes.effect.gaussian_blur", "pasteAttributes.scaleTimes"]
-    {
+    for id in ["pasteAttributes.motion", "pasteAttributes.opacity", "pasteAttributes.volume", "pasteAttributes.scaleTimes"] {
         assert!(d.has(id), "{id}");
     }
-    // untick Opacity and the blur, then OK
+    // untick Opacity, then OK
     d.click("pasteAttributes.opacity");
-    d.click("pasteAttributes.effect.gaussian_blur");
     d.click("pasteAttributes.ok");
     assert!(d.app().ui.clip_dialog.is_none(), "closed on OK");
     let got = d.v1(2);
     assert_eq!(got.effect("motion").unwrap().param("rotation").unwrap().value.as_f64(), Some(45.0));
     assert_eq!(got.effect("opacity").unwrap().param("opacity").unwrap().value.as_f64(), Some(100.0));
-    assert!(got.effect("gaussian_blur").is_none());
     // Cancel leaves the clip alone; with params the command runs directly (no dialog)
     d.menu("edit.removeAttributes");
     d.click("removeAttributes.cancel");

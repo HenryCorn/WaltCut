@@ -389,7 +389,7 @@ fn live_override_holds_and_ramps_back() {
 
 #[test]
 fn audio_transition_curves() {
-    use crate::transitions::audio_gains;
+    use crate::audio_transition::audio_gains;
     for i in 0..=20 {
         let p = i as f32 / 20.0;
         let (a, b) = audio_gains("constant_power", p);
@@ -420,7 +420,7 @@ fn audio_transition_on_a_cut_crossfades_through_the_handles() {
     let sec = |s: f64| Tick::from_seconds_f64(s);
     let a = r.p.make_track_item(a_src, TrackKind::Audio, Tick::ZERO, TimeRange::new(Tick::ZERO, sec(1.0)), FrameRate::FPS_24).unwrap();
     let b = r.p.make_track_item(b_src, TrackKind::Audio, sec(1.0), TimeRange::new(sec(2.0), sec(1.0)), FrameRate::FPS_24).unwrap();
-    let effect = waltcut_project::vtransition::find_transition("constant_gain", waltcut_project::EffectKind::AudioTransition).unwrap().instance();
+    let effect = waltcut_project::find_effect("constant_gain").unwrap().instance();
     let tr = Transition {
         id: TransitionId(1),
         effect,

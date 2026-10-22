@@ -344,7 +344,7 @@ pub fn monitor_info(s: &Session) -> Value {
 }
 
 /// `trim.applyDefaultTransition` (Apply Default Transitions to Selection, Trim Monitor button): the
-/// default video/audio transition at every selected edit point.
+/// default audio transition at every selected edit point.
 pub fn apply_default_transitions(s: &mut Session) -> Result<Value> {
     let pts = s.state.edit_points.clone();
     let n0 = s.history.undo.len();
@@ -352,8 +352,10 @@ pub fn apply_default_transitions(s: &mut Session) -> Result<Value> {
     for ep in &pts {
         let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
         let Some((tid, _)) = seq.find_item(ep.clip) else { continue };
-        let video = seq.track(tid).is_some_and(|t| t.kind == TrackKind::Video);
-        let cmd = if video { "sequence.applyVideoTransition" } else { "sequence.applyAudioTransition" };
+        if !seq.track(tid).is_some_and(|t| t.kind == TrackKind::Audio) {
+            continue;
+        }
+        let cmd = "sequence.applyAudioTransition";
         if let Ok(r) = s.execute(cmd, json!({"clip": ep.clip.0, "edge": if ep.out { "out" } else { "in" }})) {
             ids.push(r["transition"].clone());
         }

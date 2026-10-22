@@ -160,7 +160,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Automate to Sequence…",
             &["Clip"],
             None,
-            r#"{"items":[id]?,"ordering":"sort|selection","placement":"sequentially|unnumberedMarkers","method":"insert|overwrite","overlapFrames":n=30,"stillFrames":n?,"videoTransition":bool=true,"audioTransition":bool=true,"ignoreAudio":bool=false,"ignoreVideo":bool=false}"#,
+            r#"{"items":[id]?,"ordering":"sort|selection","placement":"sequentially|unnumberedMarkers","method":"insert|overwrite","overlapFrames":n=30,"stillFrames":n?,"audioTransition":bool=true,"ignoreAudio":bool=false,"ignoreVideo":bool=false}"#,
             can_automate,
             automate_to_sequence,
         ),
@@ -235,7 +235,7 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
 }
 
 /// The Sequence menu in Premiere's order (submenu items where their submenu goes).
-const SEQUENCE_MENU: [&str; 33] = [
+const SEQUENCE_MENU: [&str; 32] = [
     "sequence.settings",
     "sequence.renderEffectsInToOut",
     "sequence.renderInToOut",
@@ -248,7 +248,6 @@ const SEQUENCE_MENU: [&str; 33] = [
     "sequence.addEdit",
     "sequence.addEditAllTracks",
     "trim.edit",
-    "sequence.applyVideoTransition",
     "sequence.applyAudioTransition",
     "trim.applyDefaultTransition",
     "sequence.lift",
@@ -1277,12 +1276,11 @@ fn automate_to_sequence(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(e);
     }
     // default transitions over the overlaps (and at the cuts when there is no overlap)
-    let vt = bool_p(p, "videoTransition").unwrap_or(true);
     let at = bool_p(p, "audioTransition").unwrap_or(true);
     let mut transitions = 0;
-    if placement == "sequentially" && (vt || at) {
+    if placement == "sequentially" && at {
         let q = s.active_sequence().ok_or(EngineError::NoSequence)?;
-        let default_frames = s.project.settings.default_transition_duration_frames;
+        let default_frames = rate.frame_at(s.prefs.timeline.audio_transition_duration(rate));
         let mut edges = Vec::new();
         for ((_, ids), ov) in placed.iter().skip(1).zip(cut_overlap.iter().chain(std::iter::repeat(&overlap))) {
             let frames = if *ov > Tick::ZERO { rate.frame_at(*ov) } else { default_frames };
@@ -1290,7 +1288,6 @@ fn automate_to_sequence(s: &mut Session, p: &Value) -> Result<Value> {
                 let Some((tid, _)) = q.find_item(*c) else { continue };
                 let kind = q.track(tid).map(|t| t.kind);
                 let cmd = match kind {
-                    Some(TrackKind::Video) if vt => "sequence.applyVideoTransition",
                     Some(TrackKind::Audio) if at => "sequence.applyAudioTransition",
                     _ => continue,
                 };

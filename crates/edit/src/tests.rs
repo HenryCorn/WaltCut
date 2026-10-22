@@ -376,7 +376,7 @@ fn ripple_trim_group_takes_a_split_edit_along() {
     }
     fx.seq.track_mut(a1).unwrap().transitions = vec![Transition {
         id: TransitionId(1),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
+        effect: waltcut_project::find_effect("constant_gain").unwrap().instance(),
         start: f(4),
         duration: f(4),
         from: Some(stays),
@@ -430,13 +430,13 @@ fn slide_keeps_reversed_neighbours_content() {
 #[test]
 fn transitions_stay_on_their_cuts() {
     let mut fx = Fx::new();
-    let v1 = fx.v(0);
+    let v1 = fx.a(0);
     let a = fx.put(v1, 0, 10, 10);
     let b = fx.put(v1, 10, 10, 10);
     let c = fx.put(v1, 20, 10, 10);
     let cross = |id, start, from, to| Transition {
         id: TransitionId(id),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
+        effect: waltcut_project::find_effect("constant_gain").unwrap().instance(),
         start: f(start),
         duration: f(4),
         from,
@@ -477,11 +477,11 @@ fn transitions_stay_on_their_cuts() {
 #[test]
 fn fades_follow_a_regular_trim() {
     let mut fx = Fx::new();
-    let v1 = fx.v(0);
+    let v1 = fx.a(0);
     let a = fx.put(v1, 10, 20, 10);
     let fade = |id, start, from, to| Transition {
         id: TransitionId(id),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
+        effect: waltcut_project::find_effect("constant_gain").unwrap().instance(),
         start: f(start),
         duration: f(6),
         from,
@@ -506,11 +506,11 @@ fn fades_follow_a_regular_trim() {
 fn fades_follow_a_non_ripple_speed_change() {
     // #918: faster without ripple shortens the clip; the fade-out stays on the new out point.
     let mut fx = Fx::new();
-    let v1 = fx.v(0);
+    let v1 = fx.a(0);
     let a = fx.put(v1, 0, 100, 0);
     fx.seq.track_mut(v1).unwrap().transitions = vec![Transition {
         id: TransitionId(1),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
+        effect: waltcut_project::find_effect("constant_gain").unwrap().instance(),
         start: f(90),
         duration: f(10),
         from: Some(a),
@@ -528,15 +528,15 @@ fn fades_follow_a_non_ripple_speed_change() {
 
 #[test]
 fn transitions_travel_with_moved_clips() {
-    // V1: a [0,10) fading in, b [10,20), c [20,30); b→c crossfade, c fading out
+    // A1: a [0,10) fading in, b [10,20), c [20,30); b→c crossfade, c fading out
     let mut fx = Fx::new();
-    let (v1, v2) = (fx.v(0), fx.v(1));
+    let (v1, v2) = (fx.a(0), fx.a(1));
     let a = fx.put(v1, 0, 10, 10);
     let b = fx.put(v1, 10, 10, 10);
     let c = fx.put(v1, 20, 10, 10);
     let tr = |id, start, from, to| Transition {
         id: TransitionId(id),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
+        effect: waltcut_project::find_effect("constant_gain").unwrap().instance(),
         start: f(start),
         duration: f(4),
         from,

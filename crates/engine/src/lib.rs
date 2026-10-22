@@ -263,7 +263,6 @@ pub struct EditorState {
     /// Timeline clipboard (serialized track items with their relative track index).
     #[serde(skip)]
     pub clipboard: Vec<(TrackKind, usize, waltcut_project::TrackItem)>,
-    pub default_video_transition: String,
     pub default_audio_transition: String,
     /// Selected edit points (trim mode).
     #[serde(default)]
@@ -429,13 +428,7 @@ impl Session {
             revision: 1,
             saved_revision: 1,
             path: None,
-            state: EditorState {
-                snapping: true,
-                linked_selection: true,
-                default_video_transition: "cross_dissolve".into(),
-                default_audio_transition: "constant_power".into(),
-                ..Default::default()
-            },
+            state: EditorState { snapping: true, linked_selection: true, default_audio_transition: "constant_power".into(), ..Default::default() },
             media: Arc::new(MediaPool::default()),
             services,
             events: Vec::new(),
@@ -1187,7 +1180,7 @@ mod track_params_tests;
 #[cfg(test)]
 mod trim_tests;
 #[cfg(test)]
-mod vfx_tests;
+mod video_catalogue_tests;
 #[cfg(test)]
 mod voiceover_tests;
 

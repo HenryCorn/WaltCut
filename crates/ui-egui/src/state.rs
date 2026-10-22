@@ -808,7 +808,7 @@ impl Default for UiState {
             project_search: String::new(),
             effects_search: String::new(),
             expanded_bins: vec![],
-            expanded_fx: vec!["Video Transitions".into(), "Video Transitions/Dissolve".into()],
+            expanded_fx: vec!["Audio Effects".into()],
             collapsed_fx: vec![],
             effect_controls_split: 0.0,
             show_menu_bar: true,

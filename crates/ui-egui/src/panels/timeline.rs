@@ -2921,7 +2921,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
     {
         {
             let transition_kind = waltcut_project::find_effect(&effect).and_then(|d| match d.kind {
-                waltcut_project::EffectKind::VideoTransition => Some(TrackKind::Video),
                 waltcut_project::EffectKind::AudioTransition => Some(TrackKind::Audio),
                 _ => None,
             });

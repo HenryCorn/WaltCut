@@ -79,7 +79,6 @@ pub const EXTRA_KEYS: &[Entry] = &[
     ("sequence.addEditAllTracks", "Cmd+Shift+K", ""),
     ("trim.edit", "Shift+T", ""),
     ("trim.extendToPlayhead", "E", ""),
-    ("sequence.applyVideoTransition", "Cmd+D", ""),
     ("sequence.applyAudioTransition", "Cmd+Shift+D", ""),
     ("trim.applyDefaultTransition", "Shift+D", ""),
     ("sequence.lift", ";", ""),

@@ -243,8 +243,8 @@ mod tests {
     }
 
     fn transition(id: u64, start: i64, dur: i64, from: Option<u64>, to: Option<u64>) -> Transition {
-        // any effect: these tests are about where the transition sits
-        let effect = find_effect("opacity").unwrap().instance();
+        // Retained audio crossfade; these tests exercise placement.
+        let effect = find_effect("constant_gain").unwrap().instance();
         Transition {
             id: TransitionId(id),
             effect,
@@ -257,20 +257,20 @@ mod tests {
         }
     }
 
-    /// V1: c1 0..48, c2 48..96, c3 96..144; a centred 24-frame transition on 48 (id 1), a fade in
+    /// A1: c1 0..48, c2 48..96, c3 96..144; a centred 24-frame transition on 48 (id 1), a fade in
     /// at 0 (id 2) and a fade out at 144 (id 3).
     fn seq() -> Sequence {
         let mut p = Project::new("t");
-        let s = p.new_sequence("s", SequenceSettings { frame_rate: R, ..Default::default() }, 1, 0, None);
+        let s = p.new_sequence("s", SequenceSettings { frame_rate: R, ..Default::default() }, 0, 1, None);
         let mut q = p.sequence(s).unwrap().clone();
-        let t = &mut q.video_tracks[0];
+        let t = &mut q.audio_tracks[0];
         t.items = vec![clip(1, 0, 48), clip(2, 48, 48), clip(3, 96, 48)];
         t.transitions = vec![transition(1, 36, 24, Some(1), Some(2)), transition(2, 0, 12, None, Some(1)), transition(3, 132, 12, Some(3), None)];
         q
     }
 
     fn span(q: &Sequence, id: u64) -> (Tick, Tick) {
-        let x = q.video_tracks[0].transitions.iter().find(|x| x.id.0 == id).unwrap();
+        let x = q.audio_tracks[0].transitions.iter().find(|x| x.id.0 == id).unwrap();
         (x.start, x.duration)
     }
 
@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn locked_tracks_refuse() {
         let mut q = seq();
-        q.video_tracks[0].locked = true;
+        q.audio_tracks[0].locked = true;
         assert_eq!(set_span(&mut q, TransitionId(1), f(40), f(20), f(1), f(1)), Err(EditError::Locked));
         assert_eq!(remove(&mut q, &[TransitionId(1)]), Err(EditError::Locked));
     }
@@ -392,9 +392,9 @@ mod tests {
     fn remove_takes_only_the_named_transitions() {
         let mut q = seq();
         assert_eq!(remove(&mut q, &[TransitionId(1), TransitionId(3)]), Ok(2));
-        let left: Vec<u64> = q.video_tracks[0].transitions.iter().map(|x| x.id.0).collect();
+        let left: Vec<u64> = q.audio_tracks[0].transitions.iter().map(|x| x.id.0).collect();
         assert_eq!(left, vec![2]);
-        assert_eq!(q.video_tracks[0].items.len(), 3, "the clips stay");
+        assert_eq!(q.audio_tracks[0].items.len(), 3, "the clips stay");
         assert_eq!(remove(&mut q, &[TransitionId(1)]), Err(EditError::Nothing));
     }
 }

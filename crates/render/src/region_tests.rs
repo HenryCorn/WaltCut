@@ -7,7 +7,7 @@ use super::*;
 use waltcut_frame::{AudioBuffer, Chroma};
 use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{Generator, MediaInfo, MediaSource};
-use waltcut_project::{Label, MediaClip, MediaRef, SequenceSettings, TrackKind, find_effect};
+use waltcut_project::{Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, TimeRange};
 
 const FPS: FrameRate = FrameRate::FPS_24;
@@ -90,12 +90,11 @@ struct Spec {
     opacity: f64,
     blend: u32,
     motion_scale: Option<f64>,
-    effect: Option<&'static str>,
 }
 
 impl Spec {
     fn new(frame: Arc<VideoFrame>) -> Self {
-        Self { frame, opacity: 100.0, blend: 0, motion_scale: None, effect: None }
+        Self { frame, opacity: 100.0, blend: 0, motion_scale: None }
     }
 }
 
@@ -135,9 +134,6 @@ fn scene(specs: &[Spec]) -> (Project, ItemId, SourceMap) {
         if let Some(s) = spec.motion_scale {
             clip.effect_mut("motion").expect("motion").params.get_mut("scale").expect("scale").value = ParamValue::Float(s);
         }
-        if let Some(id) = spec.effect {
-            clip.effects.push(find_effect(id).expect("effect").instance());
-        }
         if let Some(t) = p.sequence_mut(seq).and_then(|s| s.video_tracks.get_mut(track)) {
             t.items.push(clip);
         }
@@ -152,10 +148,9 @@ fn reference(p: &Project, seq: ItemId, t: Tick, opts: RenderOptions, map: &Sourc
     let s = p.sequence(seq).expect("sequence");
     let (w, h) = output_size(s, opts.scale);
     let mut canvas = Image::new(w, h);
-    let tc = format_time(t, s.settings.frame_rate, s.settings.drop_frame, TimeDisplay::Timecode, s.settings.sample_rate as i64);
     for track in &s.video_tracks {
         let Some(item) = track.item_at(t) else { continue };
-        if let Some((layer, op, bl)) = item_layer(p, s, item, t, opts, map, &tc) {
+        if let Some((layer, op, bl)) = item_layer(p, s, item, t, opts, map) {
             blend::composite(&mut canvas, &layer, op, bl);
         }
     }
@@ -208,11 +203,9 @@ fn shortcuts_give_the_general_paths_bits() {
     check("camera at half opacity", &[Spec { opacity: 50.0, ..cam() }, ban(bar)], 1.0);
     check("camera at zero opacity", &[Spec { opacity: 0.0, ..cam() }, ban(bar)], 1.0);
     check("banner at zero opacity", &[cam(), Spec { opacity: 0.0, ..ban(bar) }], 1.0);
-    // not placed as it is, or with effects: the general path
+    // not placed as it is: the general path
     check("moved camera", &[Spec { motion_scale: Some(50.0), ..cam() }, ban(bar)], 1.0);
     check("scaled banner", &[cam(), Spec { motion_scale: Some(60.0), ..ban(corner) }], 1.0);
-    check("camera with an effect", &[Spec { effect: Some("brightness_contrast"), ..cam() }, ban(bar)], 1.0);
-    check("banner with an effect", &[cam(), Spec { effect: Some("gaussian_blur"), ..ban(bar) }], 1.0);
     // a source of another size than the sequence's
     check("bigger banner", &[cam(), Spec::new(banner(W * 2, H * 2, (0, H * 2 - 18, W * 2, H * 2)))], 1.0);
     // reduced-resolution rendering decimates every frame
@@ -225,7 +218,7 @@ fn which_layers_take_a_shortcut() {
     let (p, seq, map) = scene(&[Spec::new(camera(W, H)), Spec::new(banner(W, H, (0, H - 9, W, H)))]);
     let s = p.sequence(seq).expect("sequence");
     let (opts, t) = (RenderOptions::default(), FPS.tick_of(3));
-    let layer = |track: usize, allow: bool| item_layer_ex(&p, s, s.video_tracks[track].item_at(t).expect("clip"), t, opts, &map, "", allow);
+    let layer = |track: usize, allow: bool| item_layer_ex(&p, s, s.video_tracks[track].item_at(t).expect("clip"), t, opts, &map, allow);
     // a camera frame has no alpha: opaque, the whole picture
     assert!(matches!(layer(0, true), Some(Layer::Full { opaque: true, .. })));
     // a banner is only its rectangle (rows H-9.. of a 96-wide picture)
@@ -239,16 +232,14 @@ fn which_layers_take_a_shortcut() {
     // a transparent banner is an empty region
     let (p, seq, map) = scene(&[Spec::new(banner(W, H, (0, 0, 0, 0)))]);
     let s = p.sequence(seq).expect("sequence");
-    match item_layer_ex(&p, s, s.video_tracks[0].item_at(t).expect("clip"), t, opts, &map, "", true) {
+    match item_layer_ex(&p, s, s.video_tracks[0].item_at(t).expect("clip"), t, opts, &map, true) {
         Some(Layer::Region { image, .. }) => assert_eq!((image.w, image.h, image.px.len()), (0, 0, 0)),
         _ => panic!("a transparent banner is an empty region"),
     }
-    // an effect or a move keeps the clip on the general path
-    for spec in [Spec { effect: Some("brightness_contrast"), ..Spec::new(camera(W, H)) }, Spec { motion_scale: Some(50.0), ..Spec::new(camera(W, H)) }] {
-        let (p, seq, map) = scene(&[spec]);
-        let s = p.sequence(seq).expect("sequence");
-        assert!(matches!(item_layer_ex(&p, s, s.video_tracks[0].item_at(t).expect("clip"), t, opts, &map, "", true), Some(Layer::Full { opaque: false, .. })));
-    }
+    // A move keeps the clip on the general path.
+    let (p, seq, map) = scene(&[Spec { motion_scale: Some(50.0), ..Spec::new(camera(W, H)) }]);
+    let s = p.sequence(seq).expect("sequence");
+    assert!(matches!(item_layer_ex(&p, s, s.video_tracks[0].item_at(t).expect("clip"), t, opts, &map, true), Some(Layer::Full { opaque: false, .. })));
 }
 
 #[test]

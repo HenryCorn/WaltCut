@@ -53,7 +53,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Simplify Sequence…",
             &["Sequence"],
             None,
-            r#"{"name":str?,"removeDisabled":bool=true,"removeEmptyTracks":bool=true,"closeGaps":bool=false,"moveClipsDown":bool=false,"removeVideoEffects":bool=false,"removeAudioEffects":bool=false,"removeText":bool=false,"keep":"both|video|audio"}"#,
+            r#"{"name":str?,"removeDisabled":bool=true,"removeEmptyTracks":bool=true,"closeGaps":bool=false,"moveClipsDown":bool=false,"removeAudioEffects":bool=false,"removeText":bool=false,"keep":"both|video|audio"}"#,
             has_seq,
             simplify,
         ),
@@ -75,7 +75,15 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
 
 fn has_clips_or_edit_points(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
-    if s.state.selection.is_empty() && s.state.edit_points.is_empty() { Err("select clips or edit points".into()) } else { Ok(()) }
+    let q = s.active_sequence().ok_or_else(|| "no active sequence".to_string())?;
+    if q.audio_tracks
+        .iter()
+        .any(|t| !t.locked && t.items.iter().any(|i| s.state.selection.contains(&i.id) || s.state.edit_points.iter().any(|p| p.clip == i.id)))
+    {
+        Ok(())
+    } else {
+        Err("select audio clips or audio edit points".into())
+    }
 }
 
 fn has_audio_clips(s: &Session) -> std::result::Result<(), String> {
@@ -88,7 +96,7 @@ fn has_audio_clips(s: &Session) -> std::result::Result<(), String> {
 // Apply Default Transitions to Selection
 // ---------------------------------------------------------------------------------------------
 
-/// Premiere applies the default video / audio transition at each edge of the selected clips
+/// Premiere applies the default audio transition at each edge of the selected clips
 /// (centred on cuts between two clips, starting / ending at a clip's free edge). Edges that
 /// already have a transition keep it. With edit points selected (trim mode) and no clips, the
 /// transitions go at the edit points.
@@ -105,7 +113,7 @@ fn apply_default_transitions(s: &mut Session, p: &Value) -> Result<Value> {
     apply_at_edges(s, edges, &Value::Null, "Apply Default Transitions")
 }
 
-/// Apply Video / Audio Transition (⌘D / ⇧⌘D) with clips or edit points of `kind` selected: the
+/// Apply Audio Transition (⇧⌘D) with clips or edit points of `kind` selected: the
 /// transition goes at the selected clips' edges (as Apply Default Transitions to Selection), or at
 /// the selected edit points, instead of at the playhead (#1124). `None` when nothing of `kind` is
 /// selected. `p`'s settings (`effect`, `frames`, `params`, `reverse`) apply to every edge.
@@ -126,7 +134,7 @@ pub(crate) fn apply_to_selection(s: &mut Session, p: &Value, kind: TrackKind) ->
     if clips.is_empty() && edges.is_empty() {
         return Ok(None);
     }
-    let label = if kind == TrackKind::Video { "Apply Video Transition" } else { "Apply Audio Transition" };
+    let label = "Apply Audio Transition";
     apply_at_edges(s, edges, p, label).map(Some)
 }
 
@@ -137,6 +145,9 @@ fn clip_edges(q: &Sequence, clips: &[ClipId]) -> Vec<(TrackKind, ClipId, &'stati
     for c in clips {
         let Some((tid, it)) = q.find_item(*c) else { continue };
         let Some(tr) = q.track(tid) else { continue };
+        if tr.kind != TrackKind::Audio {
+            continue;
+        }
         for (edge, at) in [("in", it.start), ("out", it.end())] {
             if edges.iter().any(|e| e.4 == tid && e.3 == at) {
                 continue;
@@ -157,7 +168,10 @@ fn apply_at_edges(s: &mut Session, edges: Vec<(TrackKind, ClipId, &'static str)>
     let mut ids = Vec::new();
     let mut errors = Vec::new();
     for (kind, clip, edge) in edges {
-        let cmd = if kind == TrackKind::Video { "sequence.applyVideoTransition" } else { "sequence.applyAudioTransition" };
+        if kind != TrackKind::Audio {
+            continue;
+        }
+        let cmd = "sequence.applyAudioTransition";
         let mut args = settings.as_object().cloned().unwrap_or_default();
         args.insert("clip".into(), json!(clip.0));
         args.insert("edge".into(), json!(edge));
@@ -238,7 +252,6 @@ pub struct SimplifyOptions {
     pub remove_empty_tracks: bool,
     pub close_gaps: bool,
     pub move_clips_down: bool,
-    pub remove_video_effects: bool,
     pub remove_audio_effects: bool,
     pub remove_text: bool,
     /// `both`, `video` or `audio`.
@@ -256,7 +269,6 @@ impl SimplifyOptions {
             remove_empty_tracks: bool_p(p, "removeEmptyTracks").unwrap_or(true),
             close_gaps: bool_p(p, "closeGaps").unwrap_or(false),
             move_clips_down: bool_p(p, "moveClipsDown").unwrap_or(false),
-            remove_video_effects: bool_p(p, "removeVideoEffects").unwrap_or(false),
             remove_audio_effects: bool_p(p, "removeAudioEffects").unwrap_or(false),
             remove_text: bool_p(p, "removeText").unwrap_or(false),
             keep,
@@ -303,26 +315,21 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
         }
         edit::remove_orphan_transitions(t);
     }
-    // effects (standard ones; intrinsic Motion / Opacity / Volume… and Essential Sound stay)
+    // Audio effects only; intrinsic parameters and Essential Sound stay.
     let mut removed_effects = 0usize;
-    for (video, tracks) in [(true, &mut q.video_tracks), (false, &mut q.audio_tracks)] {
-        if (video && !o.remove_video_effects) || (!video && !o.remove_audio_effects) {
-            continue;
-        }
-        for t in tracks.iter_mut() {
+    if o.remove_audio_effects {
+        for t in &mut q.audio_tracks {
             for it in &mut t.items {
                 let n = it.effects.len();
                 it.effects.retain(|e| e.def().is_none_or(|d| d.intrinsic || waltcut_project::graphic::is_layer_id(d.id)) || e.essential);
                 removed_effects += n - it.effects.len();
             }
-            if !video {
-                let n = t.effects.len();
-                t.effects.clear();
-                removed_effects += n;
-            }
+            let n = t.effects.len();
+            t.effects.clear();
+            removed_effects += n;
         }
     }
-    // move video clips down to the lowest track where they fit (clips with transitions stay)
+    // Move video clips down to the lowest track where they fit.
     let mut moved = 0usize;
     if o.move_clips_down {
         for ti in 1..q.video_tracks.len() {
@@ -330,9 +337,6 @@ pub fn simplify_sequence(proj: &waltcut_project::Project, q: &mut Sequence, o: &
             for id in ids {
                 let Some(pos) = q.video_tracks[ti].items.iter().position(|i| i.id == id) else { continue };
                 let it = q.video_tracks[ti].items[pos].clone();
-                if q.video_tracks[ti].transitions.iter().any(|x| x.from == Some(id) || x.to == Some(id)) {
-                    continue;
-                }
                 let Some(dest) = (0..ti).find(|&d| !q.video_tracks[d].locked && edit::track_range_empty(&q.video_tracks[d], it.range())) else { continue };
                 q.video_tracks[ti].items.remove(pos);
                 q.video_tracks[dest].items.push(it);

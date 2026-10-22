@@ -180,7 +180,7 @@ fn speed_reverse_and_frame_hold_on_a_nest_pick_the_frame_of_its_sequence() {
 }
 
 #[test]
-fn opacity_and_effects_on_a_nest_apply_to_its_whole_picture() {
+fn opacity_and_motion_on_a_nest_apply_to_its_whole_picture() {
     let mut r = Rig::new();
     let red = r.matte(RED, 320, 180);
     let inner = r.seq("inner", 320, 180, FrameRate::FPS_24);
@@ -192,14 +192,13 @@ fn opacity_and_effects_on_a_nest_apply_to_its_whole_picture() {
         let c = img.get(160, 90);
         assert!((c[3] - 0.5).abs() < 0.02, "half transparent: {c:?}");
     }
-    // a crop on the nest cuts its picture like any clip's
+    // Motion positions the nest as one picture.
     let c = r.clip(outer, nest);
     c.effect_mut("opacity").unwrap().params.get_mut("opacity").unwrap().value = ParamValue::Float(100.0);
-    let mut crop = waltcut_project::effect::find_effect("crop").unwrap().instance();
-    crop.params.get_mut("left").unwrap().value = ParamValue::Float(50.0);
-    c.effects.push(crop);
-    let img = r.frame(outer, Tick(1000));
-    assert!(img.get(40, 90)[3] < 0.02 && close(img.get(280, 90), RED));
+    c.effect_mut("motion").unwrap().params.get_mut("position").unwrap().value = ParamValue::Vec2(waltcut_geom::Vec2::new(240.0, 90.0));
+    for img in [r.frame(outer, Tick(1000)), r.planned(outer, Tick(1000))] {
+        assert!(img.get(40, 90)[3] < 0.02 && close(img.get(280, 90), RED));
+    }
 }
 
 // ---- the frame plan draws a plain nest's layers itself
@@ -263,17 +262,12 @@ fn a_plain_nest_is_planned_as_its_own_layers_and_looks_the_same() {
 fn a_nest_that_is_not_plain_is_still_drawn_right() {
     let t = FrameRate::FPS_24.tick_of(20);
     // each of these keeps the nest one layer (rendered on the CPU), and the plan matches the reference
-    let cases: [(&str, fn(&mut Rig, ItemId, ItemId, ClipId)); 5] = [
+    let cases: [(&str, fn(&mut Rig, ItemId, ItemId, ClipId)); 4] = [
         ("half-transparent nest", |r, _, outer, nest| {
             r.clip(outer, nest).effect_mut("opacity").unwrap().params.get_mut("opacity").unwrap().value = ParamValue::Float(50.0);
         }),
         ("moved nest", |r, _, outer, nest| {
             r.clip(outer, nest).effect_mut("motion").unwrap().params.get_mut("scale").unwrap().value = ParamValue::Float(60.0);
-        }),
-        ("nest with an effect", |r, _, outer, nest| {
-            let mut crop = waltcut_project::effect::find_effect("crop").unwrap().instance();
-            crop.params.get_mut("left").unwrap().value = ParamValue::Float(30.0);
-            r.clip(outer, nest).effects.push(crop);
         }),
         ("a blend mode inside the nest", |r, inner, _, _| {
             let top = &mut r.p.sequence_mut(inner).unwrap().video_tracks[1].items[0];

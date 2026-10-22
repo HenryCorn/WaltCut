@@ -192,7 +192,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 4. The command now appears in menus (from `menu`), shortcuts, `filmcraft-cli commands`,
    `engine.commands` and MCP `command_list` without further work.
 
-### A video effect
+### Effect parameters
 
 1. Define it in `build_effects()` in `crates/project/src/effect.rs` with the `video(id, name,
    CATEGORY, params)` helper. Parameter helpers cover floats with slider ranges, choices, bools,
@@ -213,7 +213,7 @@ registry. Then add an `audio(…)` definition in `effect.rs` and a `Mapping` fro
 to DSP parameters in `crates/render/src/audio_fx.rs`. The DSP must give the same output however the
 stream is cut into blocks (there are tests for this).
 
-### A transition
+### Audio transitions (temporary, #23)
 
 1. Define video transitions with `tr(id, name, FOLDER, badges, params)` in
    `crates/project/src/vtransition.rs` (ten `Video Transitions/*`

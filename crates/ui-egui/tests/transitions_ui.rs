@@ -114,7 +114,7 @@ impl Driver {
 
     fn crossing(&mut self) -> Crossing {
         let q = self.exec("sequence.inspect", json!({}));
-        for tr in q["video"].as_array().unwrap() {
+        for tr in q["audio"].as_array().unwrap() {
             for x in tr["transitions"].as_array().unwrap() {
                 if let (Some(_), Some(to)) = (x["from"].as_u64(), x["to"].as_u64()) {
                     let cut = tr["items"].as_array().unwrap().iter().find(|i| i["clip"] == to).unwrap()["start"].as_i64().unwrap();
@@ -127,7 +127,7 @@ impl Driver {
 
     fn transition(&mut self, id: u64) -> Option<Value> {
         let q = self.exec("sequence.inspect", json!({}));
-        q["video"].as_array().unwrap().iter().flat_map(|t| t["transitions"].as_array().unwrap().clone()).find(|x| x["id"] == id)
+        q["audio"].as_array().unwrap().iter().flat_map(|t| t["transitions"].as_array().unwrap().clone()).find(|x| x["id"] == id)
     }
 
     fn rate(&mut self) -> (i64, i64) {
@@ -160,18 +160,18 @@ fn click_selects_a_transition_and_delete_removes_it() {
     assert_eq!(d.label("effectControls.transition.alignment"), "Center at Cut");
     assert_eq!(d.label("effectControls.transition.reverse"), "false");
     d.snapshot("transition-selected");
-    let clips_before = q["video"].as_array().unwrap().iter().map(|t| t["items"].as_array().unwrap().len()).sum::<usize>();
+    let clips_before = q["audio"].as_array().unwrap().iter().map(|t| t["items"].as_array().unwrap().len()).sum::<usize>();
     // Delete
     d.ok("ui.key", json!({"key": "Delete"}));
     d.frames(3);
     assert!(d.transition(c.id).is_none(), "Delete removes the selected transition");
     let q = d.exec("sequence.inspect", json!({}));
-    assert_eq!(q["video"].as_array().unwrap().iter().map(|t| t["items"].as_array().unwrap().len()).sum::<usize>(), clips_before, "its clips stay");
+    assert_eq!(q["audio"].as_array().unwrap().iter().map(|t| t["items"].as_array().unwrap().len()).sum::<usize>(), clips_before, "its clips stay");
     assert!(d.find("effectControls.transition.duration").is_none(), "Effect Controls lets go of it");
     d.exec("edit.undo", json!({}));
     assert!(d.transition(c.id).is_some(), "undo brings it back");
     // clicking a clip selects the clip instead
-    let clip = q["video"][0]["items"][0]["clip"].as_u64().unwrap();
+    let clip = q["audio"][0]["items"][0]["clip"].as_u64().unwrap();
     d.exec("timeline.select", json!({"transitions": [c.id]}));
     d.exec("timeline.select", json!({"clips": [clip]}));
     assert_eq!(d.exec("sequence.inspect", json!({}))["transitionSelection"], json!([]));
@@ -248,33 +248,6 @@ fn set_transition_duration_and_alignment_menu() {
     assert_eq!(d.transition(c.id).unwrap()["reverse"], json!(true));
 }
 
-/// A transition's own settings are in Effect Controls and change it (Push: Direction, Motion Blur).
-#[test]
-fn transition_settings_in_effect_controls() {
-    let mut d = Driver::demo();
-    let q = d.exec("sequence.inspect", json!({}));
-    let push = q["video"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .flat_map(|t| t["transitions"].as_array().unwrap().clone())
-        .find(|x| x["effect"] == "push")
-        .expect("the demo has a Push");
-    let id = push["id"].as_u64().unwrap();
-    d.click(&format!("timeline.transition.{id}"));
-    for p in ["direction", "motion_blur"] {
-        assert!(d.find(&format!("effectControls.transition.param.{p}")).is_some(), "{p} shown");
-    }
-    d.snapshot("transition-push-settings");
-    d.click("effectControls.transition.param.direction");
-    d.click("effectControls.transition.param.direction.option.0");
-    assert_eq!(d.transition(id).unwrap()["params"]["direction"], json!({"Choice": 0}));
-    d.click("effectControls.transition.reset");
-    let def = waltcut_engine::project::vtransition::find_transition("push", waltcut_engine::project::EffectKind::VideoTransition).unwrap();
-    let want = serde_json::to_value(&def.instance().params.get("direction").unwrap().value).unwrap();
-    assert_eq!(d.transition(id).unwrap()["params"]["direction"], want, "Reset puts Push's own defaults back");
-}
-
 /// Effect Controls' own timeline for a selected transition (#577): clip A, clip B and the
 /// transition over their cut. Dragging its end changes its duration from that end, dragging its
 /// middle slides it over the cut, each drag one undo step; the ruler moves the playhead.
@@ -286,7 +259,7 @@ fn transition_timeline_in_effect_controls() {
     d.click(&format!("timeline.transition.{}", c.id));
     // both clips are shown, by name
     let q = d.exec("sequence.inspect", json!({}));
-    let names: Vec<String> = q["video"]
+    let names: Vec<String> = q["audio"]
         .as_array()
         .unwrap()
         .iter()

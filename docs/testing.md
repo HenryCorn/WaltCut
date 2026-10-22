@@ -130,40 +130,26 @@ Each codec README has the full fixture matrix and the measured results.
 ## 3. Rendering: CPU reference and GPU agreement
 
 - The CPU compositor in `waltcut-render` is the reference. Its tests check computed values
-  (opacity blends, dissolve midpoints, Motion placement, ½-resolution against downsampled full
+  (opacity blends, Motion placement, ½-resolution against downsampled full
   resolution) and that `render::plan` matches `render_sequence`.
 - `crates/gpu/src/tests.rs` composites the same frame plan (a YUV layer plus a transformed,
   semi-transparent RGBA layer) on the GPU and on the CPU. It requires a 99th-percentile channel
   difference of ≤ 6 and a mean of < 1.5 (8-bit levels). It skips when no GPU adapter is available.
-- Effects implemented only on the CPU need no GPU test: the plan pre-renders those layers on the
-  CPU.
 - **Golden images** (`crates/golden`, a test-only crate): `tests/golden.rs` builds small procedural
   projects (demo-generator footage, bars, no media files) at 320×180 and renders one frame of each
   through the CPU compositor: Motion transform + opacity, four blend modes (Multiply, Screen,
-  Overlay, Difference), Gaussian Blur, Crop, Cross Dissolve at 50 %, Dip
-  to Black at 25 %, Wipe at 50 %, Timecode / Clip Name burn-in text, graphic clips (text/shape
-  layers and per-character styles with a pinned box), and colour
+  Overlay, Difference), graphic clips (text/shape layers and per-character styles with a pinned
+  box), and colour
   management: S-Log3/S-Gamut3.Cine footage interpreted into Rec. 709 (`log_to_rec709`) and
   Rec. 2100 PQ footage tone mapped into Rec. 709 (`hdr_tone_map`; the footage is demo frames
   re-encoded by the test's `Encoded` source). Each frame is compared
   with `crates/golden/goldens/<scene>.png` by `waltcut_testkit::golden`:
   **PSNR ≥ 45 dB, max abs ≤ 12, 99th-percentile per-pixel max channel difference ≤ 2** (8-bit
   sRGB levels; `Tolerance::RENDER`). On failure the actual frame and a ×8 difference image go to
-  `<workspace>/target/golden-failures/`. Six `vfx_*` scenes cover the M5.11 effects (Corner Pin over Turbulent
-  Displace, Ultra Key, Wonder Glow + Glint, Spacer + Stroke + Long Shadow over Gradient, VR Rotate Sphere,
-  Channel Mix + Color Emboss + Rounded Crop); per-effect unit tests live in `crates/render/src/vfx/tests.rs`
-  (identity at neutral parameters, determinism, range, a known value each, temporal/track effects through
-  the compositor). `scenes_are_distinct` guards against blank or duplicate
-  scenes.
-- **Video transitions** (`crates/render/src/transitions/tests.rs`) are checked for every transition
-  (84 modern, 21 Legacy, 7 hidden Obsolete): p = 0 is exactly the outgoing frame and p = 1 exactly
-  the incoming one, near both ends the output is close to that frame (continuity), the midpoint differs
-  from both, the output is finite and deterministic (also on 1×1 / odd sizes and NaN progress), every
-  parameter visibly changes the picture, and every direction differs. Golden *fingerprints* (4×4 mean
-  RGB grid at p = 0.25/0.5/0.75, ±4 levels) live in `src/transitions/goldens.txt`; re-bless with
-  `FILMCRAFT_BLESS=1 cargo test -p waltcut-render golden_fingerprints` and review the diff.
-  `FILMCRAFT_TRANSITION_SHEETS=<dir> cargo test -p waltcut-render contact_sheets -- --ignored`
-  writes one contact-sheet PNG per folder for eyeballing (never commit them).
+  `<workspace>/target/golden-failures/`. `scenes_are_distinct` guards against blank or duplicate
+  scenes. Removed video effects/transitions have no retained goldens, contact sheets or fixtures.
+  Negative registry/command/persistence tests reject their IDs. Audio crossfades remain tested
+  through the mixer and shared transition editing until #23.
 - **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
   References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
@@ -191,7 +177,7 @@ next frame by the app's own `raw_input_hook`, so clicks by automation id work he
 | `demo_project_opens_headless_and_registers_widgets` | active sequence, > 50 registered widgets, panel and tool ids, 6 clips on V1 (`sequence.inspect`) |
 | `razor_then_undo_through_the_control_channel` | `timeline.razor` adds a clip, the timeline can locate it on screen, `edit.undo` via `ui.menu.invoke`, redo |
 | `insert_from_source_ripples_the_sequence` | `source.open` + marks + `source.insert` lengthens the sequence |
-| `apply_effect_appears_in_effect_controls` | `effects.apply` adds Gaussian Blur in the model and `effectControls.effect.gaussian_blur` appears in the panel; undo removes it |
+| `effects_panel_omits_removed_video_catalogue` | Video catalogue folders and entries are absent; retained audio folders still work |
 | `playback_toggle_and_stop` | `playback.toggle` / `ui.playback stop` and `ui.inspect` playback state |
 | `clicking_a_tool_button_by_automation_id` | `ui.click {id: "tools.Razor"}` changes the tool (real egui input path) |
 | `unknown_methods_and_commands_fail_cleanly` | errors come back as `{"ok": false}` |

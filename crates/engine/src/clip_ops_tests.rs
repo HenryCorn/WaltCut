@@ -142,7 +142,6 @@ fn paste_attributes_with_scaled_keyframes_and_remove_attributes() {
     s.execute("effects.setParam", json!({"clip": a.id.0, "effect": "motion", "param": "rotation", "value": 30.0})).unwrap();
     s.execute("effects.setParam", json!({"clip": a.id.0, "effect": "opacity", "param": "opacity", "value": 40.0})).unwrap();
     s.execute("timeline.select", json!({"clips": [a.id.0]})).unwrap();
-    s.execute("effects.apply", json!({"clips": [a.id.0], "effect": "gaussian_blur"})).unwrap();
     // animate scale over the whole of clip A (media time keyframes)
     let a_now = clip(&s, a.id.0);
     {
@@ -164,17 +163,14 @@ fn paste_attributes_with_scaled_keyframes_and_remove_attributes() {
     let got = clip(&s, b.id.0);
     assert_eq!(f64_param(&got, "motion", "rotation"), 30.0);
     assert_eq!(f64_param(&got, "opacity", "opacity"), 100.0, "opacity left alone");
-    assert!(got.effect("gaussian_blur").is_some());
     let kf: Vec<Tick> = got.effect("motion").unwrap().param("scale").unwrap().keyframes.iter().map(|k| k.time).collect();
     assert_eq!(kf, vec![got.source_in, got.source_out()], "Scale Attribute Times fits A's keyframes to B");
     // without scaling, keyframes keep their distance from the clip start
     s.execute("edit.undo", json!({})).unwrap();
-    assert!(clip(&s, b.id.0).effect("gaussian_blur").is_none(), "one undo step");
     s.execute("edit.pasteAttributes", json!({"scaleTimes": false, "effects": false})).unwrap();
     let got = clip(&s, b.id.0);
     let kf: Vec<Tick> = got.effect("motion").unwrap().param("scale").unwrap().keyframes.iter().map(|k| k.time).collect();
     assert_eq!(kf, vec![got.source_in, got.source_in + (a_now.source_out() - a_now.source_in)]);
-    assert!(got.effect("gaussian_blur").is_none(), "effects unticked");
     assert_eq!(f64_param(&got, "opacity", "opacity"), 40.0);
     // Remove Attributes: Motion back to defaults, effects gone, opacity kept when unticked
     s.execute("edit.pasteAttributes", json!({})).unwrap();
@@ -184,7 +180,6 @@ fn paste_attributes_with_scaled_keyframes_and_remove_attributes() {
     assert_eq!(f64_param(&got, "motion", "scale"), 100.0);
     assert!(got.effect("motion").unwrap().param("scale").unwrap().keyframes.is_empty());
     assert_eq!(got.effect("motion").unwrap().param("position").unwrap().value.as_vec2().unwrap(), waltcut_geom::Vec2::new(960.0, 540.0));
-    assert!(got.effect("gaussian_blur").is_none());
     assert_eq!(f64_param(&got, "opacity", "opacity"), 40.0);
     // audio: volume pasted onto another audio clip
     let aud = s.active_sequence().unwrap().audio_tracks[0].items.clone();
@@ -905,12 +900,12 @@ fn speed_duration_moves_fade_out_to_the_new_clip_end() {
     let matte = s.execute("file.newColorMatte", json!({"color": "#ff0000", "seconds": seconds})).unwrap()["item"].as_u64().unwrap();
     let c = s.execute("timeline.place", json!({"item": matte, "track": "V1", "seconds": 0.0})).unwrap()["clips"][0].as_u64().unwrap();
     select(&mut s, &[c]);
-    s.execute("sequence.applyVideoTransition", json!({"edge": "out", "frames": 10})).unwrap();
-    let before = s.active_sequence().unwrap().video_tracks[0].transitions[0].clone();
+    s.execute("sequence.applyAudioTransition", json!({"edge": "out", "frames": 10})).unwrap();
+    let before = s.active_sequence().unwrap().audio_tracks[0].transitions[0].clone();
     assert_eq!((rate.frame_at(before.start), rate.frame_at(before.end())), (90, 100));
     s.execute("clip.speedDuration", json!({"speed": 200})).unwrap();
     let it = clip(&s, c);
-    let fade = &s.active_sequence().unwrap().video_tracks[0].transitions[0];
+    let fade = &s.active_sequence().unwrap().audio_tracks[0].transitions[0];
     assert_eq!((rate.frame_at(it.start), rate.frame_at(it.end())), (0, 50));
     assert_eq!((rate.frame_at(fade.start), rate.frame_at(fade.end())), (40, 50));
     assert_eq!(fade.from, Some(waltcut_project::ClipId(c)));

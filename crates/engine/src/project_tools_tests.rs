@@ -446,11 +446,7 @@ fn automate_to_sequence_places_clips_with_overlap_and_transitions() {
     // sort order (bin order): Ocean, Aurora (bin order of the demo), Forest
     s.execute("edit.undo", json!({})).unwrap();
     assert!(s.active_sequence().unwrap().video_tracks[0].items.is_empty());
-    s.execute(
-        "clip.automateToSequence",
-        json!({"ordering": "sort", "overlapFrames": 0, "videoTransition": false, "audioTransition": false, "ignoreAudio": true}),
-    )
-    .unwrap();
+    s.execute("clip.automateToSequence", json!({"ordering": "sort", "overlapFrames": 0, "audioTransition": false, "ignoreAudio": true})).unwrap();
     let q = s.active_sequence().unwrap();
     assert_eq!(q.video_tracks[0].items.iter().map(|i| i.item).collect::<Vec<_>>(), vec![ids[1], ids[2], ids[0]]);
     assert!(q.audio_tracks.iter().all(|t| t.items.is_empty()));

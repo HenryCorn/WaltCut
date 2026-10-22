@@ -44,7 +44,6 @@ fn sequence_and_markers_menu_order_matches_premiere() {
         "sequence.matchFrame",
         "sequence.addEdit",
         "trim.edit",
-        "sequence.applyVideoTransition",
         "sequence.applyAudioTransition",
         "trim.applyDefaultTransition",
         "sequence.lift",
@@ -70,67 +69,22 @@ fn sequence_and_markers_menu_order_matches_premiere() {
 fn apply_default_transitions_to_selected_clips() {
     let mut s = demo();
     let q = s.active_sequence().unwrap();
-    // shot 3 (City Night): its in edge has no transition yet, its out edge has the dip to black
-    let c = q.video_tracks[0].items[2].clone();
+    // Shot 3's audio has no existing transition at either edge.
+    let c = q.audio_tracks[0].items[2].clone();
     let before_v = q.video_tracks[0].transitions.len();
     let before_a = q.audio_tracks[0].transitions.len();
     assert!(s.execute("trim.applyDefaultTransition", json!({})).is_err(), "nothing selected");
     s.execute("timeline.select", json!({"clips": [c.id.0]})).unwrap();
     assert!(s.is_enabled("trim.applyDefaultTransition"));
     let n_undo = s.history.undo.len();
-    let r = s.execute("trim.applyDefaultTransition", json!({})).unwrap();
+    s.execute("trim.applyDefaultTransition", json!({})).unwrap();
     assert_eq!(s.history.undo.len(), n_undo + 1, "one undo step");
-    let q = s.active_sequence().unwrap();
-    let vt = &q.video_tracks[0].transitions;
-    assert_eq!(vt.len(), before_v + 1, "only the free in edge of the video clip gets one: {r}");
-    let cut = vt.iter().find(|t| t.to == Some(c.id)).expect("transition at the in point");
-    assert_eq!(cut.effect.effect, "cross_dissolve");
-    assert_eq!(cut.start + Tick(cut.duration.0 / 2), c.start, "centred on the cut");
-    // the linked audio clip (selected with it) gets audio transitions at its free edges
-    assert!(q.audio_tracks[0].transitions.len() > before_a);
-    s.execute("edit.undo", json!({})).unwrap();
-    assert_eq!(s.active_sequence().unwrap().video_tracks[0].transitions.len(), before_v);
-}
-
-#[test]
-fn apply_video_transition_goes_to_the_selection_not_the_playhead() {
-    // #1124: ⌘D with a clip selected adds the transition at its free edges wherever the playhead is
-    let mut s = demo();
-    let q = s.active_sequence().unwrap();
-    let c = q.video_tracks[0].items[2].clone();
-    let before_v = q.video_tracks[0].transitions.len();
-    let before_a = q.audio_tracks[0].transitions.len();
-    s.execute("playhead.set", json!({"time": (c.start + Tick(c.duration.0 / 2)).0})).unwrap();
-    assert!(s.execute("sequence.applyVideoTransition", json!({})).is_err(), "no selection, no edit point at the playhead");
-    s.execute("timeline.select", json!({"clips": [c.id.0]})).unwrap();
-    let n_undo = s.history.undo.len();
-    let r = s.execute("sequence.applyVideoTransition", json!({"effect": "wipe", "frames": 4})).unwrap();
-    assert_eq!(r["transitions"].as_array().map(Vec::len), Some(1), "{r}");
-    assert_eq!(s.history.undo.len(), n_undo + 1, "one undo step");
-    assert_eq!(s.history.undo.last().unwrap().0, "Apply Video Transition");
-    let q = s.active_sequence().unwrap();
-    assert_eq!(q.video_tracks[0].transitions.len(), before_v + 1, "the out edge keeps its dip to black");
-    let t = q.video_tracks[0].transitions.iter().find(|t| t.to == Some(c.id)).expect("transition at the in point");
-    assert_eq!(t.effect.effect, "wipe");
-    assert_eq!(t.duration, s.sequence_rate().tick_of(4));
-    assert_eq!(q.audio_tracks[0].transitions.len(), before_a, "video only, though the linked audio is selected");
-    s.execute("edit.undo", json!({})).unwrap();
-    assert_eq!(s.active_sequence().unwrap().video_tracks[0].transitions.len(), before_v);
-
-    // a selected edit point gets the transition at that edge only
-    s.execute("trim.selectEditPoint", json!({"clip": c.id.0, "edge": "in"})).unwrap();
-    s.execute("sequence.applyVideoTransition", json!({})).unwrap();
-    let q = s.active_sequence().unwrap();
-    assert_eq!(q.video_tracks[0].transitions.len(), before_v + 1);
-    assert!(q.video_tracks[0].transitions.iter().any(|t| t.to == Some(c.id) && t.effect.effect == "cross_dissolve"));
-
-    // ⇧⌘D with the clip selected: audio only
-    s.execute("edit.undo", json!({})).unwrap();
-    s.execute("timeline.select", json!({"clips": [c.id.0]})).unwrap();
-    s.execute("sequence.applyAudioTransition", json!({})).unwrap();
     let q = s.active_sequence().unwrap();
     assert_eq!(q.video_tracks[0].transitions.len(), before_v);
+    // Selected audio gets transitions at its free edges; linked video stays untouched.
     assert!(q.audio_tracks[0].transitions.len() > before_a);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.active_sequence().unwrap().video_tracks[0].transitions.len(), before_v);
 }
 
 #[test]
@@ -165,10 +119,8 @@ fn simplify_sequence_makes_a_clean_copy() {
     let c2 = orig.video_tracks[0].items[1].id;
     s.execute("timeline.select", json!({"clips": [c2.0]})).unwrap();
     s.execute("clip.enable", json!({})).unwrap();
-    let blur = orig.video_tracks[0].items[0].id;
-    s.execute("effects.apply", json!({"clips": [blur.0], "effect": "gaussian_blur"})).unwrap();
     let n_items = s.project.items.len();
-    let r = s.execute("sequence.simplify", json!({"removeDisabled": true, "removeEmptyTracks": true, "closeGaps": true, "removeVideoEffects": true})).unwrap();
+    let r = s.execute("sequence.simplify", json!({"removeDisabled": true, "removeEmptyTracks": true, "closeGaps": true})).unwrap();
     assert_eq!(s.project.items.len(), n_items + 1);
     let new_id = waltcut_project::ItemId(r["sequence"].as_u64().unwrap());
     assert_eq!(s.state.active_sequence, Some(new_id), "the copy opens");
@@ -187,7 +139,7 @@ fn simplify_sequence_makes_a_clean_copy() {
         assert_eq!(w[0].end(), w[1].start);
     }
     assert_eq!(r["closedGaps"].as_i64().unwrap(), orig.video_tracks[0].items[1].duration.0);
-    // effects: Gaussian Blur gone, Motion & Opacity kept
+    // Motion and Opacity are retained.
     assert!(q.video_tracks.iter().flat_map(|t| &t.items).all(|i| i.effects.iter().all(|e| e.def().is_some_and(|d| d.intrinsic))));
     assert!(q.video_tracks[0].items[0].effect("motion").is_some());
     // the original is untouched

@@ -2,9 +2,9 @@
 //! play, and a content hash that names its render preview.
 //!
 //! # Segments
-//! The timeline is cut at every edge of every clip and transition on the enabled video tracks
+//! The timeline is cut at every edge of every clip on the enabled video tracks
 //! (snapped up to the sequence frame grid). Between two cuts the *structure* of the picture is
-//! constant: the same clips and transitions are visible on the same tracks. Each such stretch with
+//! constant: the same clips are visible on the same tracks. Each such stretch with
 //! at least one visible layer is a [`Segment`]; gaps produce no segment (no bar, nothing to render).
 //!
 //! # Content hash
@@ -16,8 +16,7 @@
 //! drawing settings). Ids, names, labels, markers, link/group membership and source
 //! In/Out marks are excluded because they don't change pixels. Because positions are relative, a
 //! ripple edit that moves a segment along the timeline keeps its hash (and its preview); only the
-//! segments whose content changed get a new hash. Effects that print absolute sequence time (the
-//! Timecode effect) also hash the absolute start frame. The hash is computed from the serde JSON
+//! segments whose content changed get a new hash. The hash is computed from the serde JSON
 //! form of those values, so it is stable across save/load and across processes.
 //!
 //! # Cost estimate (yellow vs red)
@@ -25,21 +24,17 @@
 //! sequence resolution, as the sum over visible layers of:
 //! * **decode**: per source codec at 1080p — H.264 3 ms, HEVC 6 ms, ProRes 2.5 ms, MJPEG 4 ms,
 //!   other files 4 ms, stills/generators 1 ms — scaled by source pixels / 1080p pixels;
-//! * **CPU layer path**: a layer with standard effects or a non-Normal blend mode leaves the GPU
-//!   fast path and pays 10 ms (1080p) for linear conversion, transform and compositing;
-//! * **effects**: per enabled standard effect, a measured tier cost at 1080p (6 / 20 / 50 ms, see
-//!   [`effect_cost_ms`]), scaled by sequence pixels / 1080p pixels;
-//! * **transitions**: dissolves/dips 1 ms (GPU), any other transition renders both sides on the
-//!   CPU: 12 ms plus the CPU path of both layers;
+//! * **layer path**: drawing, graphic and nested-sequence layers pay a CPU rasterisation
+//!   estimate of 10 ms at 1080p, scaled by sequence pixels; media composition pays 0.5 ms.
 //!
 //! A segment is **red** when the estimate exceeds [`REALTIME_BUDGET`] × the frame duration,
 //! **yellow** when it plays in real time but is not "native", and has **no bar** when it is a single
-//! clip with no standard effects, untouched Motion/Opacity, normal speed, and a source whose frame
+//! clip with untouched Motion/Opacity, normal speed, and a source whose frame
 //! size and rate match the sequence. Green (a valid preview exists) is decided by the preview
 //! store, which knows which hashes have files.
 
 use serde::Serialize;
-use waltcut_project::{ClipId, ItemId, ItemKind, Project, Sequence, TrackItem, TrackKind, Transition};
+use waltcut_project::{ClipId, ItemId, ItemKind, Project, Sequence, TrackItem, TrackKind};
 use waltcut_time::{FrameRate, Tick};
 
 /// Bump when the hash layout or the preview format changes (invalidates every preview).
@@ -101,10 +96,7 @@ fn frame_ceil(rate: FrameRate, t: Tick) -> i64 {
     if rate.tick_of(f) < t { f + 1 } else { f }
 }
 
-enum Layer<'a> {
-    Item(usize, &'a TrackItem),
-    Transition(usize, &'a Transition, Option<&'a TrackItem>, Option<&'a TrackItem>),
-}
+type Layer<'a> = (usize, &'a TrackItem);
 
 fn layers_at<'a>(seq: &'a Sequence, t: Tick) -> Vec<Layer<'a>> {
     let mut out = Vec::new();
@@ -112,16 +104,8 @@ fn layers_at<'a>(seq: &'a Sequence, t: Tick) -> Vec<Layer<'a>> {
         if !tr.enabled {
             continue;
         }
-        if let Some(x) = tr.transitions.iter().find(|x| x.range().contains(t)) {
-            let a = x.from.and_then(|id| tr.item(id)).filter(|i| i.enabled);
-            let b = x.to.and_then(|id| tr.item(id)).filter(|i| i.enabled);
-            if a.is_some() || b.is_some() {
-                out.push(Layer::Transition(ti, x, a, b));
-            }
-            continue;
-        }
         if let Some(it) = tr.item_at(t).filter(|i| i.enabled) {
-            out.push(Layer::Item(ti, it));
+            out.push((ti, it));
         }
     }
     out
@@ -136,10 +120,6 @@ pub fn video_segments(project: &Project, seq_id: ItemId) -> Vec<Segment> {
         for it in &tr.items {
             cuts.push(frame_ceil(rate, it.start));
             cuts.push(frame_ceil(rate, it.end()));
-        }
-        for x in &tr.transitions {
-            cuts.push(frame_ceil(rate, x.start));
-            cuts.push(frame_ceil(rate, x.end()));
         }
     }
     cuts.sort_unstable();
@@ -160,43 +140,16 @@ pub fn video_segments(project: &Project, seq_id: ItemId) -> Vec<Segment> {
         h.json(&seq.settings);
         h.json(&(fb - fa));
         let mut clips = Vec::new();
-        let mut absolute = false;
-        for l in &layers {
-            match l {
-                Layer::Item(ti, it) => {
-                    h.json(&("item", ti));
-                    hash_item(&mut h, project, it, t, TrackKind::Video, 0);
-                    absolute |= prints_time(it);
-                    clips.push(it.id);
-                }
-                Layer::Transition(ti, x, a, b) => {
-                    let mut xc = (*x).clone();
-                    xc.id = Default::default();
-                    xc.start -= t;
-                    xc.from = None;
-                    xc.to = None;
-                    h.json(&("transition", ti, &xc));
-                    for side in [a, b] {
-                        match side {
-                            Some(it) => {
-                                hash_item(&mut h, project, it, t, TrackKind::Video, 0);
-                                absolute |= prints_time(it);
-                                clips.push(it.id);
-                            }
-                            None => h.json(&"none"),
-                        }
-                    }
-                }
-            }
-        }
-        if absolute {
-            h.json(&("absolute", fa));
+        for (ti, it) in &layers {
+            h.json(&("item", ti));
+            hash_item(&mut h, project, it, t, TrackKind::Video, 0);
+            clips.push(it.id);
         }
         let cost_ms = estimate_cost(project, seq, &layers);
         let budget = rate.frame_duration().seconds() * 1000.0 * REALTIME_BUDGET;
         let need = if cost_ms > budget {
             Need::Render
-        } else if layers.len() == 1 && matches!(layers[0], Layer::Item(_, it) if native(project, seq, it)) {
+        } else if layers.len() == 1 && native(project, seq, layers[0].1) {
             Need::None
         } else {
             Need::Realtime
@@ -295,10 +248,6 @@ pub fn audio_segments(project: &Project, seq_id: ItemId) -> Vec<AudioSegment> {
     out
 }
 
-fn prints_time(it: &TrackItem) -> bool {
-    it.effects.iter().any(|e| e.enabled && e.effect == "timecode")
-}
-
 /// Hash a clip and its source as heard (`kind` Audio) or seen (`kind` Video): a nested sequence
 /// contributes only the tracks of that kind, so editing its picture keeps its sound's previews.
 fn hash_item(h: &mut Fnv128, project: &Project, it: &TrackItem, origin: Tick, kind: TrackKind, depth: u32) {
@@ -309,9 +258,7 @@ fn hash_item(h: &mut Fnv128, project: &Project, it: &TrackItem, origin: Tick, ki
     c.markers.clear();
     c.link = None;
     c.group = None;
-    if !c.effects.iter().any(|e| e.effect == "clip_name") {
-        c.name.clear();
-    }
+    c.name.clear();
     h.json(&c);
     hash_source(h, project, it.item, kind, depth);
 }
@@ -366,69 +313,12 @@ fn hash_source(h: &mut Fnv128, project: &Project, id: ItemId, kind: TrackKind, d
                 for it in &tr.items {
                     hash_item(h, project, it, Tick::ZERO, kind, depth + 1);
                 }
-                for x in &tr.transitions {
-                    let mut xc = x.clone();
-                    xc.id = Default::default();
-                    h.json(&xc);
-                }
             }
         }
     }
 }
 
 // ---------------------------------------------------------------- cost
-
-/// Estimated cost of one standard video effect on a 1080p frame (CPU reference), in ms.
-///
-/// Three tiers from timing every effect at its defaults on a 1920×1080 frame on an M4 Pro
-/// (`cargo test -p waltcut-render --release -- --ignored effect_costs --nocapture` prints the
-/// table): heavy ≥ 30 ms (blurs/sharpen at real radii, Levels, keyers…), medium 10–30 ms,
-/// light < 10 ms. Unknown ids count as medium.
-pub fn effect_cost_ms(id: &str) -> f64 {
-    match id {
-        "sharpen"
-        | "unsharp_mask"
-        | "posterize"
-        | "leave_color"
-        | "levels"
-        | "drop_shadow"
-        | "emboss"
-        | "invert"
-        | "ultra_key"
-        | "four_color_gradient"
-        | "color_balance"
-        | "gamma_correction"
-        | "wave_warp"
-        | "gaussian_blur"
-        | "directional_blur"
-        | "camera_blur"
-        | "median"
-        // M5.11 (multi-pass, multi-frame or analysis effects)
-        | "bokeh_blur"
-        | "compound_blur"
-        | "focus_blur"
-        | "channel_blur"
-        | "turbulent_displace"
-        | "warp_stabilizer"
-        | "auto_reframe"
-        | "echo"
-        | "echo_glow"
-        | "glint"
-        | "wonder_glow"
-        | "edge_glow"
-        | "volumetric_rays"
-        | "brush_strokes"
-        | "roughen_edges"
-        | "lighting_effects"
-        | "vr_blur"
-        | "vr_glow"
-        | "vr_denoise"
-        | "vr_sharpen" => 50.0,
-        "vertical_flip" | "horizontal_flip" | "crop" | "timecode" | "black_white" | "extract" | "clip_name" | "strobe" | "mosaic" | "mirror"
-        | "simple_text" | "track_matte" => 6.0,
-        _ => 20.0,
-    }
-}
 
 fn decode_cost_ms(project: &Project, id: ItemId, depth: u32) -> f64 {
     let Some(pi) = project.item(id) else { return 0.0 };
@@ -467,47 +357,31 @@ fn decode_cost_ms(project: &Project, id: ItemId, depth: u32) -> f64 {
                 .iter()
                 .filter(|t| t.enabled)
                 .flat_map(|t| t.items.iter())
-                .map(|it| decode_cost_ms(project, it.item, depth + 1) + item_fx_cost(it, 1.0))
+                .map(|it| decode_cost_ms(project, it.item, depth + 1))
                 .fold(0.0, f64::max);
             10.0 + id_cost
         }
     }
 }
 
-fn item_fx_cost(it: &TrackItem, px: f64) -> f64 {
-    it.effects.iter().filter(|e| e.enabled && e.def().is_some_and(|d| !d.intrinsic)).map(|e| effect_cost_ms(&e.effect) * px).sum()
-}
-
 fn cpu_layer(project: &Project, it: &TrackItem) -> bool {
-    let fx = it.effects.iter().any(|e| e.enabled && e.def().is_some_and(|d| !d.intrinsic));
-    let blend = crate::opacity_blend(it, it.source_in).1 != crate::Blend::Normal;
     let nested = project.item(it.item).is_some_and(|p| matches!(p.kind, ItemKind::Sequence(_)));
-    fx || blend || nested
+    let drawn = project.item(it.item).is_some_and(|p| matches!(p.kind, ItemKind::Graphic { .. } | ItemKind::Drawing(_)));
+    drawn || nested
 }
 
-fn layer_cost(project: &Project, it: &TrackItem, px: f64, force_cpu: bool) -> f64 {
+fn layer_cost(project: &Project, it: &TrackItem, px: f64) -> f64 {
     let decode = decode_cost_ms(project, it.item, 0);
-    let path = if force_cpu || cpu_layer(project, it) { 10.0 * px } else { 0.5 };
-    decode + path + item_fx_cost(it, px)
+    let path = if cpu_layer(project, it) { 10.0 * px } else { 0.5 };
+    decode + path
 }
 
 fn estimate_cost(project: &Project, seq: &Sequence, layers: &[Layer]) -> f64 {
     let px = (seq.settings.width as f64 * seq.settings.height as f64) / HD_PIXELS;
-    let mut total = 0.0;
-    for l in layers {
-        total += match l {
-            Layer::Item(_, it) => layer_cost(project, it, px, false),
-            Layer::Transition(_, x, a, b) => {
-                let simple = matches!(x.effect.effect.as_str(), "cross_dissolve" | "dip_to_black" | "dip_to_white" | "non_additive_dissolve");
-                let sides: f64 = [a, b].iter().filter_map(|s| s.map(|it| layer_cost(project, it, px, !simple))).sum();
-                sides + if simple { 1.0 } else { 12.0 * px }
-            }
-        };
-    }
-    total
+    layers.iter().map(|(_, it)| layer_cost(project, it, px)).sum()
 }
 
-/// A single clip that plays natively: no standard effects, untouched fixed effects, normal speed,
+/// A single clip that plays natively: untouched intrinsic effects, normal speed,
 /// source frame size and rate equal to the sequence's.
 fn native(project: &Project, seq: &Sequence, it: &TrackItem) -> bool {
     if it.has_standard_effects() || it.has_modified_intrinsics() || (it.speed - 1.0).abs() > 1e-9 || it.reverse || it.frame_hold.is_some() {

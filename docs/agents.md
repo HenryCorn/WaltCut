@@ -138,7 +138,7 @@ JSON request per line and get one JSON reply per line. Full method table:
 {"id":2,"method":"engine.execute","params":{"command":"file.openDemoProject"}}
 {"id":3,"method":"engine.execute","params":{"command":"playhead.set","params":{"seconds":2}}}
 {"id":4,"method":"engine.execute","params":{"command":"sequence.addEdit"}}
-{"id":5,"method":"engine.execute","params":{"command":"effects.apply","params":{"effect":"Gaussian Blur"}}}
+{"id":5,"method":"engine.execute","params":{"command":"effects.setParam","params":{"clip":1,"effect":"opacity","param":"opacity","value":75}}}
 {"id":6,"method":"ui.elements","params":{"prefix":"tools."}}
 {"id":7,"method":"ui.click","params":{"id":"tools.Razor"}}
 {"id":8,"method":"ui.key","params":{"key":"Cmd+Z"}}

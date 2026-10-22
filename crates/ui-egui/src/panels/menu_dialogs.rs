@@ -316,14 +316,14 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
             (json!({}), json!({"count": n}))
         }
         "clip.automateToSequence" => (
-            json!({"ordering": "sort", "placement": "sequentially", "method": "insert", "overlapFrames": 30, "stillFrames": 150, "videoTransition": true, "audioTransition": true, "ignoreAudio": false, "ignoreVideo": false}),
+            json!({"ordering": "sort", "placement": "sequentially", "method": "insert", "overlapFrames": 30, "stillFrames": 150, "audioTransition": true, "ignoreAudio": false, "ignoreVideo": false}),
             json!({"sequence": s.active_sequence().map(|_| s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| i.name.clone()).unwrap_or_default())}),
         ),
         "sequence.normalizeMixTrack" => (json!({"db": 0.0}), Value::Null),
         "sequence.simplify" => {
             let name = s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| tlf!("{name} (Simplified)", name = i.name)).unwrap_or_default();
             (
-                json!({"name": name, "removeDisabled": true, "removeEmptyTracks": true, "closeGaps": false, "moveClipsDown": false, "removeVideoEffects": false, "removeAudioEffects": false, "removeText": false, "keep": "both"}),
+                json!({"name": name, "removeDisabled": true, "removeEmptyTracks": true, "closeGaps": false, "moveClipsDown": false, "removeAudioEffects": false, "removeText": false, "keep": "both"}),
                 Value::Null,
             )
         }
@@ -652,47 +652,29 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             }
             "clip.automateToSequence" => {
                 ui.label(tlf!("To {name}", name = d.info["sequence"].as_str().unwrap_or_default()));
-                radios(ui, &mut elems, pre, p, "ordering", tl!("Ordering:"), &[("sort", tl!("Sort Order")), ("selection", tl!("Selection Order"))]);
-                radios(
-                    ui,
-                    &mut elems,
-                    pre,
-                    p,
-                    "placement",
-                    tl!("Placement:"),
-                    &[("sequentially", tl!("Sequentially")), ("unnumberedMarkers", tl!("At Unnumbered Markers"))],
-                );
-                radios(ui, &mut elems, pre, p, "method", tl!("Method:"), &[("insert", tl!("Insert Edit")), ("overwrite", tl!("Overwrite Edit"))]);
-                number(ui, &mut elems, pre, p, "overlapFrames", tl!("Clip Overlap:"), 0.0..=600.0, " frames");
-                number(ui, &mut elems, pre, p, "stillFrames", tl!("Frames per Still:"), 1.0..=100_000.0, " frames");
-                ui.label(RichText::new(tl!("Transitions")).strong());
-                check(ui, &mut elems, pre, p, "audioTransition", tl!("Apply Default Audio Transition"));
-                check(ui, &mut elems, pre, p, "videoTransition", tl!("Apply Default Video Transition"));
-                ui.label(RichText::new(tl!("Ignore Options")).strong());
-                check(ui, &mut elems, pre, p, "ignoreAudio", tl!("Ignore Audio"));
-                check(ui, &mut elems, pre, p, "ignoreVideo", tl!("Ignore Video"));
+                radios(ui, &mut elems, pre, p, "ordering", "Ordering:", &[("sort", "Sort Order"), ("selection", "Selection Order")]);
+                radios(ui, &mut elems, pre, p, "placement", "Placement:", &[("sequentially", "Sequentially"), ("unnumberedMarkers", "At Unnumbered Markers")]);
+                radios(ui, &mut elems, pre, p, "method", "Method:", &[("insert", "Insert Edit"), ("overwrite", "Overwrite Edit")]);
+                number(ui, &mut elems, pre, p, "overlapFrames", "Clip Overlap:", 0.0..=600.0, " frames");
+                number(ui, &mut elems, pre, p, "stillFrames", "Frames per Still:", 1.0..=100_000.0, " frames");
+                ui.label(RichText::new("Transitions").strong());
+                check(ui, &mut elems, pre, p, "audioTransition", "Apply Default Audio Transition");
+                ui.label(RichText::new("Ignore Options").strong());
+                check(ui, &mut elems, pre, p, "ignoreAudio", "Ignore Audio");
+                check(ui, &mut elems, pre, p, "ignoreVideo", "Ignore Video");
             }
             "sequence.normalizeMixTrack" => number(ui, &mut elems, pre, p, "db", tl!("Normalize Mix Track to:"), -96.0..=24.0, " dB"),
             "sequence.simplify" => {
-                text(ui, &mut elems, pre, p, "name", tl!("Sequence Name:"), 240.0);
-                ui.label(RichText::new(tl!("Remove")).strong());
-                check(ui, &mut elems, pre, p, "removeDisabled", tl!("Disabled clips"));
-                check(ui, &mut elems, pre, p, "removeEmptyTracks", tl!("Empty tracks"));
-                check(ui, &mut elems, pre, p, "closeGaps", tl!("Gaps"));
-                check(ui, &mut elems, pre, p, "removeVideoEffects", tl!("Video effects"));
-                check(ui, &mut elems, pre, p, "removeAudioEffects", tl!("Audio effects"));
-                check(ui, &mut elems, pre, p, "removeText", tl!("Text (graphics)"));
-                ui.label(RichText::new(tl!("Clips")).strong());
-                check(ui, &mut elems, pre, p, "moveClipsDown", tl!("Move clips to the lowest track possible"));
-                radios(
-                    ui,
-                    &mut elems,
-                    pre,
-                    p,
-                    "keep",
-                    tl!("Keep:"),
-                    &[("both", tl!("Video and Audio")), ("video", tl!("Video Only")), ("audio", tl!("Audio Only"))],
-                );
+                text(ui, &mut elems, pre, p, "name", "Sequence Name:", 240.0);
+                ui.label(RichText::new("Remove").strong());
+                check(ui, &mut elems, pre, p, "removeDisabled", "Disabled clips");
+                check(ui, &mut elems, pre, p, "removeEmptyTracks", "Empty tracks");
+                check(ui, &mut elems, pre, p, "closeGaps", "Gaps");
+                check(ui, &mut elems, pre, p, "removeAudioEffects", "Audio effects");
+                check(ui, &mut elems, pre, p, "removeText", "Text (graphics)");
+                ui.label(RichText::new("Clips").strong());
+                check(ui, &mut elems, pre, p, "moveClipsDown", "Move clips to the lowest track possible");
+                radios(ui, &mut elems, pre, p, "keep", "Keep:", &[("both", "Video and Audio"), ("video", "Video Only"), ("audio", "Audio Only")]);
             }
             "file.saveAsTemplate" => text(ui, &mut elems, pre, p, "name", tl!("Template Name:"), 240.0),
             "file.newColorMatte" => {

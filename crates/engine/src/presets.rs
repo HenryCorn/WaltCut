@@ -8,7 +8,7 @@
 //!   Saving with `keyframes: "none"` stores every parameter as its value at the playhead.
 //! - **Geometry.** Point parameters are in clip pixels; they are scaled by the
 //!   target / source frame-size ratio so a preset made on 4K media lands in the same place on HD.
-//! - **Intrinsic effects** (Motion, Opacity, Time Remapping) replace the target clip's own instance;
+//! - **Intrinsic effects** (Motion, Opacity) replace the target clip's own instance;
 //!   standard effects are added before the intrinsic ones (render order), like `effects.apply`.
 //! - **Library.** Built-in presets are authored in code ([`builtin_presets`]); user presets persist
 //!   in `<data dir>/effect-presets.json`. Preset files (export/import) are JSON:
@@ -137,11 +137,6 @@ fn parse_file(bytes: &[u8]) -> std::result::Result<Vec<EffectPreset>, String> {
     if f.version > 1 {
         return Err(format!("preset file version {} is newer than this build reads (1)", f.version));
     }
-    for p in &f.presets {
-        if p.effects.iter().any(|e| e.def().is_none()) {
-            return Err(format!("preset `{}` uses an effect this build doesn't have", p.name));
-        }
-    }
     Ok(f.presets)
 }
 
@@ -151,32 +146,9 @@ fn kf(t_secs: f64, v: ParamValue) -> Keyframe {
     Keyframe::new(Tick((t_secs * TICKS_PER_SECOND as f64).round() as i64), v)
 }
 
-/// A fresh instance of a built-in effect (a bare instance named `id` if the registry lacks it,
-/// which the preset tests rule out).
-pub(crate) fn effect_instance(id: &str) -> EffectInstance {
-    waltcut_project::find_effect(id).map(|d| d.instance()).unwrap_or_else(|| EffectInstance {
-        effect: id.to_string(),
-        enabled: true,
-        params: Default::default(),
-        post_fader: false,
-        essential: false,
-        layer: None,
-    })
-}
-
-fn effect(id: &str, params: &[(&str, ParamValue)]) -> EffectInstance {
-    let mut e = effect_instance(id);
-    for (k, v) in params {
-        if let Some(p) = e.params.get_mut(*k) {
-            p.value = v.clone();
-        }
-    }
-    e
-}
-
 fn animate(e: &mut EffectInstance, param: &str, keys: Vec<Keyframe>) {
-    if let Some(p) = e.params.get_mut(param) {
-        p.value = keys[0].value.clone();
+    if let (Some(p), Some(first)) = (e.params.get_mut(param), keys.first()) {
+        p.value = first.value.clone();
         p.keyframes = keys;
     }
 }
@@ -196,30 +168,29 @@ fn preset(name: &str, description: &str, keyframes: KeyframeMode, secs: f64, eff
 /// Presets that ship with FilmCraft (original work: parameter values chosen by us).
 pub fn builtin_presets() -> Vec<EffectPreset> {
     let f = ParamValue::Float;
-    let mut blur_in = effect("gaussian_blur", &[]);
-    animate(&mut blur_in, "blurriness", vec![kf(0.0, f(60.0)), kf(1.0, f(0.0))]);
-    let mut blur_out = effect("gaussian_blur", &[]);
-    animate(&mut blur_out, "blurriness", vec![kf(9.0, f(0.0)), kf(10.0, f(60.0))]);
-    let mut fade_in = effect("opacity", &[]);
-    animate(&mut fade_in, "opacity", vec![kf(0.0, f(0.0)), kf(1.0, f(100.0))]);
-    let mut fade_out = effect("opacity", &[]);
-    animate(&mut fade_out, "opacity", vec![kf(9.0, f(100.0)), kf(10.0, f(0.0))]);
-    let mut mosaic_in = effect("mosaic", &[]);
-    animate(&mut mosaic_in, "horizontal", vec![kf(0.0, f(8.0)), kf(1.0, f(400.0))]);
-    animate(&mut mosaic_in, "vertical", vec![kf(0.0, f(5.0)), kf(1.0, f(225.0))]);
-    let warm =
-        effect("tint", &[("black", ParamValue::Color([0.08, 0.04, 0.02, 1.0])), ("white", ParamValue::Color([1.0, 0.93, 0.8, 1.0])), ("amount", f(35.0))]);
-    let mut pip = effect("motion", &[("scale", f(35.0)), ("position", ParamValue::Vec2(Vec2::new(1530.0, 270.0)))]);
-    pip.enabled = true;
-    vec![
-        preset("Blur In", "Gaussian Blur from 60 to 0 over the first second", KeyframeMode::AnchorToIn, 10.0, vec![blur_in]),
-        preset("Blur Out", "Gaussian Blur from 0 to 60 over the last second", KeyframeMode::AnchorToOut, 10.0, vec![blur_out]),
-        preset("Fade In", "Opacity 0 → 100 % over the first second", KeyframeMode::AnchorToIn, 10.0, vec![fade_in]),
-        preset("Fade Out", "Opacity 100 → 0 % over the last second", KeyframeMode::AnchorToOut, 10.0, vec![fade_out]),
-        preset("Mosaic In", "Large blocks resolving to the picture over the first second", KeyframeMode::AnchorToIn, 10.0, vec![mosaic_in]),
-        preset("Warm Tint", "Warm highlights, brown shadows", KeyframeMode::Scale, 10.0, vec![warm]),
-        preset("PiP 35% Upper Right", "Picture-in-picture: 35 % scale in the upper right", KeyframeMode::Scale, 10.0, vec![pip]),
-    ]
+    let mut presets = Vec::new();
+    for mut e in waltcut_project::effect::intrinsic_video() {
+        match e.effect.as_str() {
+            "opacity" => {
+                let mut fade_in = e.clone();
+                animate(&mut fade_in, "opacity", vec![kf(0.0, f(0.0)), kf(1.0, f(100.0))]);
+                animate(&mut e, "opacity", vec![kf(9.0, f(100.0)), kf(10.0, f(0.0))]);
+                presets.push(preset("Fade In", "Opacity 0 → 100 % over the first second", KeyframeMode::AnchorToIn, 10.0, vec![fade_in]));
+                presets.push(preset("Fade Out", "Opacity 100 → 0 % over the last second", KeyframeMode::AnchorToOut, 10.0, vec![e]));
+            }
+            "motion" => {
+                if let Some(p) = e.param_mut("scale") {
+                    p.value = f(35.0);
+                }
+                if let Some(p) = e.param_mut("position") {
+                    p.value = ParamValue::Vec2(Vec2::new(1530.0, 270.0));
+                }
+                presets.push(preset("PiP 35% Upper Right", "Picture-in-picture: 35 % scale in the upper right", KeyframeMode::Scale, 10.0, vec![e]));
+            }
+            _ => {}
+        }
+    }
+    presets
 }
 
 // ---------------------------------------------------------------- save / apply

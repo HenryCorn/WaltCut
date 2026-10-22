@@ -1157,6 +1157,9 @@ pub fn set_speed_group(seq: &mut Sequence, clips: &[ClipId], speed: f64, reverse
 /// Add a transition at the cut between `from` and `to` (or at a single clip edge).
 pub fn add_transition(seq: &mut Sequence, track: TrackId, mut tr: Transition, ctx: &mut EditCtx) -> Result<TransitionId> {
     let t = seq.track_mut(track).ok_or(EditError::NoTrack(track))?;
+    if t.kind != waltcut_project::TrackKind::Audio || tr.effect.def().is_none_or(|d| d.kind != waltcut_project::EffectKind::AudioTransition) {
+        return Err(EditError::Other("transitions require an audio transition and an audio track".into()));
+    }
     if t.locked {
         return Err(EditError::Locked);
     }

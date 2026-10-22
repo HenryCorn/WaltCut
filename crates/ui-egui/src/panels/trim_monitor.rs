@@ -293,6 +293,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ("trimMonitor.forward", "+1".into(), tl!("Trim Forward"), 40.0),
         ("trimMonitor.forwardMany", format!("+{n}"), tl!("Trim Forward Many"), 40.0),
     ];
+    let buttons: Vec<_> =
+        buttons.into_iter().filter(|b| b.0 != "trimMonitor.applyTransition" || app.session.is_enabled("trim.applyDefaultTransition")).collect();
     let total: f32 = buttons.iter().map(|b| b.3 + 4.0).sum();
     let mut x = bar.center().x - total / 2.0;
     let ctx = ui.ctx().clone();

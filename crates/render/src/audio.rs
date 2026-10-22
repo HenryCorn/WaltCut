@@ -16,7 +16,7 @@ use waltcut_project::{AudioChannels, Project, Sequence, Track, TrackId, TrackIte
 use waltcut_time::{Tick, TimeRange};
 
 use crate::mixer::Override;
-use crate::{SourceProvider, transitions};
+use crate::{SourceProvider, audio_transition};
 
 /// Live Clip Mixer lanes ([`crate::mixer::LiveMix`] overrides keyed by the track id): the clip
 /// Volume level (dB) and Panner balance of the clip under the playhead while a Clip Mixer control
@@ -136,7 +136,7 @@ pub(crate) fn track_input_at(
         let base = (s0 - tr.start.to_units_floor(sr as i64)) as f32;
         for i in 0..n {
             let p = (base + i as f32) / dur;
-            let (ga, gb) = transitions::audio_gains(&tr.effect.effect, p);
+            let (ga, gb) = audio_transition::audio_gains(&tr.effect.effect, p);
             for c in 0..w {
                 tbuf.channels[c][off + i] += a.channels[c][i] * ga + b.channels[c][i] * gb;
             }

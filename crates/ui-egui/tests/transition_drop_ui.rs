@@ -61,7 +61,8 @@ fn harness(effect: &str) -> Harness<'static, FilmcraftApp> {
 
 #[test]
 fn transition_drag_previews_both_edges_of_short_clips_and_commits_that_span() {
-    for (kind, effect, name) in [(TrackKind::Video, "cross_dissolve", "Cross Dissolve"), (TrackKind::Audio, "constant_power", "Constant Power")] {
+    for (effect, name) in [("constant_power", "Constant Power"), ("constant_gain", "Constant Gain"), ("exponential_fade", "Exponential Fade")] {
+        let kind = TrackKind::Audio;
         let mut h = harness(name);
         let clip = h.state().session.active_sequence().unwrap().tracks(kind)[0].items[1].id;
         let clip_rect = rect(&h, &format!("timeline.clip.{}", clip.0));
@@ -90,14 +91,7 @@ fn transition_drag_previews_both_edges_of_short_clips_and_commits_that_span() {
                 preview.rect,
                 h.state().ui.timeline.pps
             );
-            assert_eq!(
-                planned.duration,
-                if kind == TrackKind::Video {
-                    h.state().session.prefs.timeline.video_transition_duration(rate)
-                } else {
-                    h.state().session.prefs.timeline.audio_transition_duration(rate)
-                }
-            );
+            assert_eq!(planned.duration, h.state().session.prefs.timeline.audio_transition_duration(rate));
             if let Some(dir) = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR") {
                 let dir = std::path::PathBuf::from(dir);
                 std::fs::create_dir_all(&dir).unwrap();
@@ -119,8 +113,8 @@ fn transition_drag_previews_both_edges_of_short_clips_and_commits_that_span() {
 #[test]
 fn incompatible_and_locked_tracks_do_not_offer_a_transition_preview() {
     for locked in [false, true] {
-        let mut h = harness("Cross Dissolve");
-        let kind = if locked { TrackKind::Video } else { TrackKind::Audio };
+        let mut h = harness("Constant Power");
+        let kind = if locked { TrackKind::Audio } else { TrackKind::Video };
         let q = h.state().session.active_sequence().unwrap();
         let (track, clip) = (q.tracks(kind)[0].id, q.tracks(kind)[0].items[1].id);
         if locked {
@@ -129,7 +123,7 @@ fn incompatible_and_locked_tracks_do_not_offer_a_transition_preview() {
             step(&mut h);
         }
         let to = rect(&h, &format!("timeline.clip.{}", clip.0)).center();
-        let from = rect(&h, "effects.item.cross_dissolve").center();
+        let from = rect(&h, "effects.item.constant_power").center();
         let before = h.state().session.project.to_json();
         pointer(&mut h, from, Some(true));
         pointer(&mut h, from + vec2(0.0, 10.0), None);

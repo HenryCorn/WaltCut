@@ -660,12 +660,12 @@ fn effects_are_indented_under_their_folders() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Effects"}));
     d.frames(3);
-    for folder in ["Video Effects", "Video Effects/Blur & Sharpen", "Presets"] {
+    for folder in ["Audio Effects/Amplitude and Compression", "Presets"] {
         d.click(&format!("effects.folder.{folder}"));
     }
     d.frames(2);
     let preset = d.app().session.presets.all()[0].name.clone();
-    for (outer, inner) in [("Video Effects", "Blur & Sharpen"), ("Blur & Sharpen", "Gaussian Blur"), ("Presets", preset.as_str())] {
+    for (outer, inner) in [("Audio Effects", "Amplitude and Compression"), ("Amplitude and Compression", "Amplify"), ("Presets", preset.as_str())] {
         let (a, b) = (text_x(&mut d, outer), text_x(&mut d, inner));
         assert!(b >= a + 12.0, "`{inner}` ({b}) is not indented under `{outer}` ({a})");
     }

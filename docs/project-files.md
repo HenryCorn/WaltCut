@@ -325,4 +325,9 @@ effects are added. Applying is one undo step; saving, renaming, deleting and imp
 library, not the project, and are not undoable. Files with another `format`, a newer `version` or
 unknown effect ids are refused. Effect instances reject unknown fields, including removed mask
 data, rather than silently changing their appearance. Mask-dependent built-in presets (Soft
-Vignette and Spotlight) are removed; other presets remain until the later #24 catalogue slice.
+Vignette and Spotlight), Blur In/Out, Mosaic In and Warm Tint are removed in the #24 stacked
+draft. Only Fade In, Fade Out and PiP 35% Upper Right ship as built-ins. User presets may still
+capture retained Motion/Opacity/blend and audio parameters. Broad video effect and transition IDs
+are unsupported; projects or presets containing them fail to load/import with an actionable error,
+without rewriting or silently discarding the data. Video-track transitions are also rejected by
+project validation. Audio transitions remain until #23. Native macOS validation is pending.
