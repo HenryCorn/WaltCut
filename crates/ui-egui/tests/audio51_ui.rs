@@ -178,7 +178,7 @@ fn surround_panner_puck_and_six_channel_meters() {
 }
 
 #[test]
-fn show_hide_tracks_and_meter_input_only() {
+fn show_hide_tracks() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
     d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
@@ -198,11 +198,6 @@ fn show_hide_tracks_and_meter_input_only() {
     assert!(d.has("mixer.A2.fader"), "shown again");
     // Meter Input(s) Only: a UI toggle in the panel menu
     d.click("mixer.menu");
-    d.click("mixer.menu.meterInputOnly");
-    let st = d.ok("ui.inspect", json!({})).to_string();
-    assert!(st.contains("\"mixer_meter_input_only\":true") || st.contains("\"mixerMeterInputOnly\":true"), "{st}");
-    // the transport record button is wired to voice-over recording
-    assert!(d.has("mixer.transport.voiceover.recordToggle"));
     d.snapshot("audio51-show-hide");
 }
 

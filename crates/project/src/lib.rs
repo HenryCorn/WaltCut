@@ -743,7 +743,7 @@ pub struct Track {
     /// Track-level audio effects (mixer inserts, slots 1–5; `EffectInstance::post_fader` picks the side).
     #[serde(default)]
     pub effects: Vec<EffectInstance>,
-    /// Audio Track Mixer state: automation mode and lanes, sends, output, record arm.
+    /// Audio Track Mixer state: automation mode and lanes, sends, output.
     #[serde(default)]
     pub mixer: MixerStrip,
     /// Colour label tinting the track's header and lane background (`None` = no colour).
@@ -1134,7 +1134,7 @@ fn capture_format_default() -> String {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ScratchDisks {
-    /// Captured and Generated media: voice-over takes, Extract Audio.
+    /// Captured and generated media, including pasted images and Extract Audio.
     pub captured: Option<String>,
     /// Video and audio render previews (`<dir>/<project name>`).
     pub video_previews: Option<String>,

@@ -79,8 +79,6 @@ pub struct LiveMix {
     overrides: Mutex<HashMap<(TrackId, String), Override>>,
     active: AtomicBool,
     meters: Mutex<HashMap<TrackId, Vec<f32>>>,
-    /// Peak levels of the recording input (voice-over), per input channel.
-    input_meter: Mutex<Vec<f32>>,
     project: Mutex<Option<Arc<Project>>>,
 }
 
@@ -143,20 +141,6 @@ impl LiveMix {
                 *a = a.max(*b);
             }
         }
-    }
-    /// Post the peak levels of the recording input (voice-over capture), per input channel.
-    pub fn post_input_meter(&self, peaks: &[f32]) {
-        let mut g = lock(&self.input_meter);
-        if g.len() < peaks.len() {
-            g.resize(peaks.len(), 0.0);
-        }
-        for (a, b) in g.iter_mut().zip(peaks) {
-            *a = a.max(*b);
-        }
-    }
-    /// Input peak levels since the last call (Audio Track Mixer ▸ Meter Input(s) Only).
-    pub fn take_input_meter(&self) -> Vec<f32> {
-        std::mem::take(&mut *lock(&self.input_meter))
     }
     /// Publish the newest project snapshot (playback picks up edits made while it runs).
     pub fn publish_project(&self, p: Arc<Project>) {

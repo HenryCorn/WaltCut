@@ -1,6 +1,6 @@
 //! Paste media from the system clipboard (#611). The desktop app reads the clipboard: copied files
 //! paste by path, and an image is first saved by [`save_pasted_image`] as `Pasted Image <n>.png`
-//! where voice-over takes go (Scratch Disks ▸ Captured Audio and Video, else next
+//! in the project's trusted capture folder (Scratch Disks ▸ Captured Audio and Video, else next
 //! to the project).
 //!
 //! `edit.pasteMedia` imports the files and puts them on the Timeline at the playhead, end to end,
@@ -15,11 +15,25 @@ use waltcut_time::Tick;
 use crate::commands::{CommandSpec, always, bad, bool_p, u64_p};
 use crate::{EngineError, Result, Session};
 
+/// Directory for generated clipboard images.
+pub(crate) fn media_dir(s: &Session, fallback: &str) -> String {
+    if let Some(d) =
+        crate::project_tools::trusted_scratch(s.project.settings.scratch.captured.as_deref(), s.path.as_deref(), &s.prefs.auto_save.scratch_folders)
+    {
+        return d.to_string_lossy().into_owned();
+    }
+    if let Some(d) = s.path.as_deref().and_then(|x| std::path::Path::new(x).parent()).filter(|d| !d.as_os_str().is_empty()) {
+        return d.to_string_lossy().into_owned();
+    }
+    let base = s.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.to_path_buf()).unwrap_or_else(|| crate::temp_dir().join("FilmCraft"));
+    base.join(fallback).to_string_lossy().into_owned()
+}
+
 /// Write a pasted image (PNG bytes) to a new `Pasted Image <n>.png`; returns its path.
 pub fn save_pasted_image(s: &mut Session, png: &[u8]) -> Result<String> {
-    let dir = crate::voiceover::media_dir(s, &Value::Null, "Pasted Images");
+    let dir = media_dir(s, "Pasted Images");
     let names: std::collections::HashSet<String> = s.project.items.values().map(|i| i.name.clone()).collect();
-    // bounded like voiceover::unique_wav_path: `file_size` is a filesystem call per try
+    // Bounded: `file_size` is a filesystem call per try
     let path = (1..=99_999u32)
         .map(|k| format!("Pasted Image {k}.png"))
         .map(|file| (std::path::Path::new(&dir).join(&file).to_string_lossy().into_owned(), file))

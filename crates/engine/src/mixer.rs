@@ -601,7 +601,6 @@ pub fn strip_json(s: &Session, seq: &Sequence, id: TrackId, t: Tick) -> Value {
         "pan": tr.pan,
         "muted": tr.muted,
         "solo": tr.solo,
-        "recordArm": tr.mixer.record_arm,
         "soloSafe": tr.mixer.solo_safe,
         "inputMap": tr.mixer.input_map.label(),
         "output": tr.mixer.output.map(|o| strip_label(seq, o)).unwrap_or_else(|| if id == MASTER_STRIP { String::new() } else { "Mix".into() }),
@@ -670,9 +669,6 @@ fn set_strip(s: &mut Session, p: &Value) -> Result<Value> {
             }
             if let Some(v) = bool_p(&p, "solo") {
                 t.solo = v;
-            }
-            if let Some(v) = bool_p(&p, "recordArm") {
-                t.mixer.record_arm = v;
             }
             if let Some(v) = bool_p(&p, "soloSafe") {
                 t.mixer.solo_safe = v;
@@ -1183,7 +1179,7 @@ pub fn commands() -> Vec<CommandSpec> {
             "Track Mixer Settings",
             &[],
             None,
-            r#"{"strip":"A1"|"S1"|"Mix"|id,"name":str?,"volumeDb":f64?,"pan":f64?,"muted":bool?,"solo":bool?,"recordArm":bool?,"soloSafe":bool?,"mode":"Off|Read|Latch|Touch|Write"?,"output":"Mix"|"S1"?,"inputMap":"Stereo|Left|Right|Swap|Mono"?,"channels":"Mono|Stereo|5.1"?}"#,
+            r#"{"strip":"A1"|"S1"|"Mix"|id,"name":str?,"volumeDb":f64?,"pan":f64?,"muted":bool?,"solo":bool?,"soloSafe":bool?,"mode":"Off|Read|Latch|Touch|Write"?,"output":"Mix"|"S1"?,"inputMap":"Stereo|Left|Right|Swap|Mono"?,"channels":"Mono|Stereo|5.1"?}"#,
             has_seq,
             set_strip,
             true,

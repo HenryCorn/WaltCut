@@ -130,7 +130,7 @@ Track
 ├─ items: Vec<TrackItem>             sorted, never overlapping
 ├─ transitions: Vec<Transition>
 └─ audio: volume_db, pan, effects (mixer inserts), mixer: MixerStrip
-     (automation mode + lanes, sends, output, record arm, solo safe, input map)
+     (automation mode + lanes, sends, output, solo safe, input map)
 Sequence (audio) ─ submix_tracks: Vec<Track>, master_volume_db / master_effects / master_mixer
 TrackItem (a clip instance)
 ├─ item: ItemId, start (timeline ticks), source_in (media ticks), duration, speed
@@ -380,8 +380,8 @@ Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts �
   thinning, optional minimum time interval) and written over its time range as one undo step,
   with boundary keyframes that keep the automation outside the range unchanged.
 - **Live state.** `PreviewStore::live` (`LiveMix`) also carries per-strip meter peaks posted by the
-  mix (one per channel; Track Mixer and Audio Meters read them), the voice-over input level (Meter
-  Input(s) Only) and the newest project snapshot, which the audio callback uses, so edits made
+  mix (one per channel; Track Mixer and Audio Meters read them) and the newest project snapshot,
+  which the audio callback uses, so edits made
   during playback are heard.
 - **Audio Clip Mixer automation.** Each audio track has a Clip Mixer mode (`clipMixer.setMode`,
   session state `EditorState::clip_mixer_modes`, Read by default). During a pass the Clip Mixer's
@@ -391,9 +391,8 @@ Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts �
   `mixer.recordStop` each stream is thinned and written as **clip keyframes** (Volume `level`,
   Panner `balance`, in media time) into every clip it covers, with boundary keyframes that keep the
   clip's values outside the range; one undo step for the whole pass.
-- **Track Mixer view.** The panel menu (`mixer.menu`) has Show/Hide Tracks (`UiState::mixer_hidden`)
-  and Meter Input(s) Only (`UiState::mixer_meter_input_only`: record-armed tracks meter the
-  voice-over input). The transport's record button runs `voiceover.recordToggle`.
+- **Track Mixer view.** The panel menu (`mixer.menu`) has Show/Hide Tracks (`UiState::mixer_hidden`).
+  Input capture, record arming and recording meters have been removed in the #23 draft train.
 
 ### 5.1.1 Multichannel and 5.1
 
@@ -432,10 +431,6 @@ stereo / mono track ──5.1 panner───┼─► 5.1 submix / 5.1 Mix ─�
   (`kAudioChannelLayoutTag_MPEG_5_1_A`); AAC uses channel configuration 6 (our encoder already
   supported 1–8 channels; the exporter reorders to AAC's C, L, R, Ls, Rs, LFE). A stereo export of a
   5.1 Mix is the BS.775 downmix.
-
-### 5.1.2 Voice-over recording
-
-**Voice-over recording** (`engine::voiceover`, `audio.voiceover.*`). The record point R is the playhead, or the In point when In/Out are set (punch-in; punch-out at Out). Playback starts the pre-roll before it (C = max(0, R − pre-roll)) and the input is captured from C. When the UI's audio clock really starts, `audio.voiceover.sync` restarts the capture there. `audio.voiceover.stop` keeps the audio from R to min(stop, Out), writes a mono 32-bit float WAV `<Name> <n>.wav` (Scratch Disks ▸ Captured, else next to the project, else the data or temporary directory), imports it and overwrites it onto the record track at R as one undo step. The record track is the given one, else the record-armed one, else the first targeted one. Input goes through the `AudioInput` trait: cpal in the desktop app (`apps/waltcut/src/audio_in.rs`, on its own thread), and `SyntheticInput` headless, which produces exactly the samples the timeline asks for so recordings land sample-accurately. Voice-Over Record Settings (Source, Input channel, Name, Countdown Sound Cues, Pre-/Post-roll) are preferences (`voiceOver`). The track header's microphone records or stops, and a right-click opens the settings dialog. Countdown beeps (1 kHz, 100 ms, each whole second of pre-roll and at R) are mixed into playback, an overlay counts down, and playback stops at Out + post-roll. A take records anywhere, also on the empty timeline past the end of the sequence: starting it never returns the playhead to the beginning, and playback keeps going past the end until the take is stopped.
 
 ### 5.2 Essential Sound
 

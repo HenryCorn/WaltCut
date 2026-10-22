@@ -84,8 +84,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.guideTemplates.apply", "Apply Guide Template", [], None),
     uic!("view.guideTemplates.delete", "Delete Guide Template", [], None),
     uic!("view.dynamicAudioWaveforms", "Dynamic Audio Waveforms", ["View"], None),
-    uic!("voiceover.recordToggle", "Voice-over Record", [], None),
-    uic!("voiceover.settingsDialog", "Voice-Over Record Settings…", [], None),
     // ids follow `ThemeKind`, labels follow Settings ▸ Appearance ▸ Color Theme (`darkest`, `dark`, `light`)
     uic!("view.theme.dark", "Darkest", ["View", "Appearance"], None),
     uic!("view.theme.medium", "Dark", ["View", "Appearance"], None),
@@ -199,9 +197,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if !targets_source(app, &params)
         && let Some(r) = crate::panels::trim_monitor::route_transport(app, ctx, id)
     {
-        return r;
-    }
-    if let Some(r) = crate::panels::voiceover::route(app, ctx, id, &params) {
         return r;
     }
     if let Some(r) = crate::panels::clip_dialogs::route(app, id, &params) {

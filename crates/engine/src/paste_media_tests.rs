@@ -21,7 +21,7 @@ fn write_png(path: &Path) -> String {
 }
 
 fn write_wav(path: &Path, seconds: f32) -> String {
-    std::fs::write(path, crate::voiceover::write_wav_f32(&vec![0.0; (48_000.0 * seconds) as usize], 48_000)).unwrap();
+    std::fs::write(path, crate::previews::write_wav_f32(&vec![0.0; (96_000.0 * seconds) as usize], 48_000)).unwrap();
     path.to_string_lossy().into_owned()
 }
 

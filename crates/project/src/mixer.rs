@@ -178,8 +178,6 @@ pub struct MixerStrip {
     pub sends: Vec<TrackSend>,
     /// Output assignment: a submix track, or `None` for the Mix track.
     pub output: Option<TrackId>,
-    /// Record-arm (R): the track records voice-over input.
-    pub record_arm: bool,
     /// Solo safe: never solo-muted, and keeps its sources audible while other strips are soloed.
     pub solo_safe: bool,
     /// How clip audio feeds the track.

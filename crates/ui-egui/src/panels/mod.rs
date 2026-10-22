@@ -44,7 +44,6 @@ pub mod tools;
 pub mod transform_handles;
 pub mod transition_controls;
 pub mod trim_monitor;
-pub mod voiceover;
 pub mod workspaces;
 
 use egui::{Align2, Color32, Rect};

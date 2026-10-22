@@ -17,7 +17,7 @@
 //! listening square (`mixer.A1.pan51`, drag; double-click: front centre) with Center % and LFE
 //! controls (`mixer.A1.pan51.center`, `mixer.A1.pan51.lfe`). Meters show one bar per channel
 //! (six for 5.1 strips). The panel menu (`mixer.menu`) holds Show/Hide Tracks (`mixer.menu.showHide`,
-//! then `mixer.showHide.<A1|S1>` per strip) and Meter Input(s) Only (`mixer.menu.meterInputOnly`).
+//! then `mixer.showHide.<A1|S1>` per strip).
 
 use std::collections::HashMap;
 
@@ -82,12 +82,9 @@ fn db_text(db: f64) -> String {
 
 // ------------------------------------------------------------------------------------- meters
 
-/// Meter key of the recording input (Meter Input(s) Only).
-pub const INPUT_METER: u64 = u64::MAX - 1;
-
 /// Per-strip meter state, `strip id → [level, peak]` per channel (dBFS; 2 channels, or 6 for 5.1
 /// strips), fed by the playing mix ([`waltcut_render::mixer::LiveMix`]) with fast attack and a
-/// 20 dB/s fall. [`INPUT_METER`] holds the voice-over input.
+/// 20 dB/s fall.
 pub fn poll_meters(app: &mut FilmcraftApp, ui: &egui::Ui) -> HashMap<u64, Vec<[f32; 2]>> {
     let id = egui::Id::new("mixer-meters");
     let frame = ui.ctx().cumulative_frame_nr();
@@ -97,11 +94,7 @@ pub fn poll_meters(app: &mut FilmcraftApp, ui: &egui::Ui) -> HashMap<u64, Vec<[f
     }
     // without an audio device, the loudness feed is what mixes the programme (and posts meters)
     super::meters::feed_loudness(app);
-    let mut fresh: Vec<(u64, Vec<f32>)> = app.session.previews.live.take_meters().into_iter().map(|(k, v)| (k.0, v)).collect();
-    let input = app.session.previews.live.take_input_meter();
-    if !input.is_empty() {
-        fresh.push((INPUT_METER, input));
-    }
+    let fresh: Vec<(u64, Vec<f32>)> = app.session.previews.live.take_meters().into_iter().map(|(k, v)| (k.0, v)).collect();
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     for v in st.values_mut() {
         for m in v.iter_mut() {
@@ -110,7 +103,7 @@ pub fn poll_meters(app: &mut FilmcraftApp, ui: &egui::Ui) -> HashMap<u64, Vec<[f
         }
     }
     // scrubbing plays through the same mixer, so its grains move the meters too
-    let live = app.playback.playing || app.session.voiceover.recording() || app.scrub.is_open();
+    let live = app.playback.playing || app.scrub.is_open();
     if live {
         for (k, p) in fresh {
             let e = st.entry(k).or_default();
@@ -242,12 +235,6 @@ pub fn track_mixer(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         if r.clicked() {
             show_hide = true;
         }
-        let on = app.ui.mixer_meter_input_only;
-        let r = ui.selectable_label(on, tl!("Meter Input(s) Only"));
-        app.auto.add("mixer.menu.meterInputOnly", r.rect, "Meter Input(s) Only");
-        if r.clicked() {
-            app.ui.mixer_meter_input_only = !on;
-        }
     });
     if show_hide {
         let mut open = true;
@@ -323,13 +310,7 @@ pub fn track_mixer(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             continue;
         }
         let sr = Rect::from_min_size(pos2(sx, clip.min.y + 2.0 - voff), vec2(STRIP_W, (clip.height() - 4.0).max(need)));
-        let is_track = seq.audio_tracks.iter().any(|t| t.id == *id && t.mixer.record_arm);
-        let m = if app.ui.mixer_meter_input_only {
-            // Meter Input(s) Only: armed tracks show the recording input; other meters are idle
-            if is_track { meters.get(&INPUT_METER).cloned().unwrap_or_default() } else { Vec::new() }
-        } else {
-            meters.get(&id.0).cloned().unwrap_or_default()
-        };
+        let m = meters.get(&id.0).cloned().unwrap_or_default();
         strip(app, &mut cui, &mut cx, *id, sr, &m);
     }
     transport(app, ui, footer, &mut cx);
@@ -682,13 +663,6 @@ fn strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, cx: &mut Ctx, id: TrackId, s
             if r_r.clicked() {
                 cx.cmd("mixer.setStrip", json!({"strip": sid, "soloSafe": !tr.mixer.solo_safe}));
             }
-        } else {
-            let r_r = crate::widgets::letter_toggle(ui, b(2.0), "R", tr.mixer.record_arm, RED, &t, egui::Id::new((&ap, "R")))
-                .on_hover_text(tl!("Enable track for recording"));
-            app.auto.add(&format!("{ap}.record"), b(2.0), "Enable Track for Recording");
-            if r_r.clicked() {
-                cx.cmd("mixer.setStrip", json!({"strip": sid, "recordArm": !tr.mixer.record_arm}));
-            }
         }
     }
     y += 24.0;
@@ -851,13 +825,12 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, cx: &mut Ctx)
     let dur = format_time(seq.duration(), seq.settings.frame_rate, seq.settings.drop_frame, TimeDisplay::Timecode, seq.settings.sample_rate as i64);
     ui.painter().text(pos2(row.max.x - 12.0, row.center().y), Align2::RIGHT_CENTER, dur, Tokens::mono(12.0), t.text_dim);
     let playing = app.playback.playing;
-    let buttons: [(Icon, &str, &str); 6] = [
+    let buttons: [(Icon, &str, &str); 5] = [
         (Icon::GoToIn, "markers.goToIn", tl!("Go to In Point")),
         (Icon::GoToOut, "markers.goToOut", tl!("Go to Out Point")),
         (if playing { Icon::Pause } else { Icon::Play }, "playback.toggle", tl!("Play-Stop Toggle (Space)")),
         (Icon::Play, "playback.inToOut", tl!("Play In to Out")),
         (Icon::Loop, "playback.loop", tl!("Loop")),
-        (Icon::Mic, "voiceover.recordToggle", tl!("Record (voice-over on the record-enabled track)")),
     ];
     let bw = 30.0;
     let mut x = row.center().x - bw * buttons.len() as f32 / 2.0;
@@ -876,17 +849,11 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, cx: &mut Ctx)
         } else {
             t.icon
         };
-        if cmd == "voiceover.recordToggle" {
-            let on = app.session.voiceover.recording();
-            ui.painter().circle_filled(r.center(), 6.0, if on { RED } else { RED.gamma_multiply(0.55) });
-        } else {
-            icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(14.0, 14.0)), icon, col);
-            if cmd == "playback.inToOut" {
-                // braces around the play triangle
-                let c = r.center();
-                for s in [-1.0f32, 1.0] {
-                    ui.painter().line_segment([pos2(c.x + s * 10.0, c.y - 6.0), pos2(c.x + s * 10.0, c.y + 6.0)], Stroke::new(1.5, col));
-                }
+        icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(14.0, 14.0)), icon, col);
+        if cmd == "playback.inToOut" {
+            let c = r.center();
+            for s in [-1.0f32, 1.0] {
+                ui.painter().line_segment([pos2(c.x + s * 10.0, c.y - 6.0), pos2(c.x + s * 10.0, c.y + 6.0)], Stroke::new(1.5, col));
             }
         }
         if resp.clicked() {

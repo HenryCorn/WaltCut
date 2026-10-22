@@ -174,8 +174,6 @@ pub struct Preferences {
     pub trim: TrimPrefs,
     pub essential_sound: EssentialSoundPrefs,
     pub guides: GuidePrefs,
-    /// Voice-Over Record Settings (timeline track header ▸ right-click the microphone).
-    pub voice_over: crate::voiceover::VoiceOverPrefs,
     /// Project panel: view, List view columns and sort, view presets, Freeform options.
     pub project_panel: crate::project_panel::ProjectPanelPrefs,
     /// AI re-style provider and model (the API key is stored separately, see `ai`).
@@ -203,7 +201,6 @@ impl Default for Preferences {
             trim: Default::default(),
             essential_sound: Default::default(),
             guides: Default::default(),
-            voice_over: Default::default(),
             project_panel: Default::default(),
             ai: Default::default(),
         }

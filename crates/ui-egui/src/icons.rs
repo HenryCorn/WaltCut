@@ -46,7 +46,6 @@ pub enum Icon {
     Lock,
     Unlock,
     SyncLock,
-    Mic,
     Folder,
     Film,
     Sequence,
@@ -437,11 +436,6 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             pen.arc(8.0, 7.0, 3.0, 180.0, 360.0);
             pen.line(&[(5.5, 10.5), (7.0, 12.0), (10.5, 9.0)]);
         }
-        Mic => {
-            pen.rect(6.0, 2.0, 10.0, 10.0);
-            pen.arc(8.0, 8.0, 4.5, 0.0, 180.0);
-            pen.line(&[(8.0, 12.5), (8.0, 14.5)]);
-        }
         Folder => pen.closed(&[(1.5, 4.0), (6.0, 4.0), (7.5, 5.5), (14.5, 5.5), (14.5, 13.0), (1.5, 13.0)]),
         Film => {
             pen.rect(2.0, 3.0, 14.0, 13.0);
@@ -803,7 +797,6 @@ mod tests {
         Lock,
         Unlock,
         SyncLock,
-        Mic,
         Folder,
         Film,
         Sequence,

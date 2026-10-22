@@ -14,7 +14,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     crate::panels::monitor_view::dialogs(app, ctx);
     crate::panels::graphics::dialogs(app, ctx);
     crate::panels::workspaces::dialogs(app, ctx);
-    crate::panels::voiceover::show(app, ctx);
     crate::links::show_failed(app, ctx);
     crate::panels::frame_export::show(app, ctx);
     crate::panels::project_dialogs::show(app, ctx);
