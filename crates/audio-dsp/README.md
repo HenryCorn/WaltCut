@@ -6,6 +6,15 @@ Real-time audio DSP for FilmCraft. Layer **L1**, **no dependencies**, compiles f
 Householder FDN, phase vocoder, spectral subtraction with the statistical late-reverberation
 model).
 
+## Reduction status
+
+The first draft slice of [#23](https://github.com/HenryCorn/WaltCut/issues/23) deletes the music
+retiming analysis, planner, plan serialization and crossfade renderer. This crate is not yet the
+minimal retained audio path: effects, loudness, ducking, channel mixing and streaming playback
+resampling still have production callers. Their reduction remains pending; see the current
+[audio status](../../docs/animation.md#audio-reduction-status). No dependency or crate is removed
+in this first slice.
+
 ## Conventions
 
 - Planar `f32` audio: `&mut [&mut [f32]]`, one slice per channel, equal lengths.

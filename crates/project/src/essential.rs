@@ -59,7 +59,7 @@ impl AudioType {
     pub fn sections(self) -> &'static [Section] {
         match self {
             AudioType::Dialogue => &[Section::Loudness, Section::Repair, Section::Clarity, Section::Creative],
-            AudioType::Music => &[Section::Loudness, Section::Duration, Section::Ducking],
+            AudioType::Music => &[Section::Loudness, Section::Ducking],
             AudioType::Sfx => &[Section::Loudness, Section::Creative, Section::Pan],
             AudioType::Ambience => &[Section::Loudness, Section::Creative, Section::Ducking],
         }
@@ -77,7 +77,6 @@ pub enum Section {
     Clarity,
     Creative,
     Ducking,
-    Duration,
     Pan,
 }
 
@@ -89,21 +88,19 @@ impl Section {
             Section::Clarity => "Clarity",
             Section::Creative => "Creative",
             Section::Ducking => "Ducking",
-            Section::Duration => "Duration",
             Section::Pan => "Pan",
         }
     }
-    /// Settings key of the section's on/off switch (`None` for Duration, which has none).
-    pub fn key(self) -> Option<&'static str> {
-        Some(match self {
+    /// Settings key of the section's on/off switch.
+    pub fn key(self) -> &'static str {
+        match self {
             Section::Loudness => "loudness.enabled",
             Section::Repair => "repair.enabled",
             Section::Clarity => "clarity.enabled",
             Section::Creative => "creative.enabled",
             Section::Ducking => "ducking.enabled",
             Section::Pan => "pan.enabled",
-            Section::Duration => return None,
-        })
+        }
     }
 }
 

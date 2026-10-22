@@ -233,7 +233,7 @@ pub(crate) fn time_p(s: &Session, p: &Value, prefix: &str) -> Option<Tick> {
     time_p_at(p, prefix, rate, df, s.playhead())
 }
 
-/// Same formats as [`time_p`], against an explicit rate (Source monitor, remix duration, …).
+/// Same formats as [`time_p`], against an explicit rate (Source monitor).
 pub(crate) fn time_p_at(p: &Value, prefix: &str, rate: FrameRate, drop_frame: bool, current: Tick) -> Option<Tick> {
     let k = |n: &str| if prefix.is_empty() { n.to_string() } else { format!("{prefix}{}{}", n[..1].to_uppercase(), &n[1..]) };
     if let Some(t) = p.get(k("time")).and_then(Value::as_i64) {
@@ -3273,7 +3273,6 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::presets::commands());
     v.extend(crate::export_tools::commands());
     v.extend(crate::panels::commands());
-    v.extend(crate::remix::commands());
     v.extend(crate::voiceover::commands());
     v.extend(crate::keyboard::commands());
     v.extend(crate::project_panel::commands());

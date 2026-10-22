@@ -108,7 +108,6 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("tool.ripple", "Ripple Edit Tool", [], Some("B")),
     uic!("tool.rolling", "Rolling Edit Tool", [], Some("N")),
     uic!("tool.rateStretch", "Rate Stretch Tool", [], Some("R")),
-    uic!("tool.remix", "Remix Tool", [], None),
     uic!("tool.razor", "Razor Tool", [], Some("C")),
     uic!("tool.slip", "Slip Tool", [], Some("Y")),
     uic!("tool.slide", "Slide Tool", [], Some("U")),
@@ -395,11 +394,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             crate::panels::color_dialogs::open_interpret(app, &params);
             return Ok(json!({"dialog": "interpretFootage"}));
-        }
-        // Remix Properties… from the menu opens the dialog; with params it applies directly.
-        "clip.remix.properties" if params.as_object().is_none_or(|m| m.is_empty()) => {
-            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
-            return crate::panels::remix::open(app, ctx);
         }
         // Add Tracks… from the menu opens the dialog (new tracks after the last ones, as Premiere
         // offers); with params it adds the tracks directly.

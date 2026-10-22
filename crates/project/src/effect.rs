@@ -385,7 +385,7 @@ mod tests {
     fn persisted_removed_effects_are_rejected_not_silently_discarded() {
         let instance = find_effect("opacity").unwrap().instance();
         let original = serde_json::to_value(&instance).unwrap();
-        for id in ["gaussian_blur", "crop", "ultra_key", "warp_stabilizer", "cross_dissolve", "wipe", "time_remap", "unknown"] {
+        for id in ["gaussian_blur", "crop", "ultra_key", "warp_stabilizer", "cross_dissolve", "wipe", "time_remap", "remix", "unknown"] {
             let mut removed = original.clone();
             removed["effect"] = serde_json::json!(id);
             let error = serde_json::from_value::<EffectInstance>(removed).unwrap_err();

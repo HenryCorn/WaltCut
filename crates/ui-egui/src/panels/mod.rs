@@ -32,7 +32,6 @@ pub mod presets;
 pub mod project;
 pub mod project_dialogs;
 pub mod project_views;
-pub mod remix;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;

@@ -1,5 +1,5 @@
 //! Essential Sound panel: Browse / Edit tabs, audio-type assignment, per-type collapsible sections
-//! (Loudness, Repair, Clarity, Creative, Ducking, Duration, Pan) with switch + slider rows, presets,
+//! (Loudness, Repair, Clarity, Creative, Ducking, Pan) with switch + slider rows, presets,
 //! and the Clip Volume / Mute footer. Every control runs an `essentialSound.*` command (slider drags
 //! are one undo step), so the panel, MCP and the control channel share one code path.
 //!
@@ -267,9 +267,9 @@ fn typed_body(ui: &mut egui::Ui, cx: &mut Ctx, st: &EssentialSound, items: &[Tra
     ui.add_space(10.0);
     for sec in kind.sections() {
         let key = format!("essentialSound:{}", sec.label());
-        let default_open = !matches!(sec, Section::Loudness | Section::Pan | Section::Duration);
+        let default_open = !matches!(sec, Section::Loudness | Section::Pan);
         let open = if default_open { !collapsed.contains(&key) } else { expanded.contains(&key) };
-        let enabled = sec.key().and_then(|k| st.get(k)).and_then(|v| v.as_bool());
+        let enabled = st.get(sec.key()).and_then(|v| v.as_bool());
         if section_header(ui, cx, *sec, open, enabled, &key) {
             ui.add_space(4.0);
             let on = enabled.unwrap_or(true);
@@ -314,13 +314,6 @@ fn typed_body(ui: &mut egui::Ui, cx: &mut Ctx, st: &EssentialSound, items: &[Tra
                     }
                 }
                 Section::Ducking => ducking(ui, cx, st, on),
-                Section::Duration => {
-                    ui.label(
-                        egui::RichText::new(tl!("Remixing music to a target duration is not available yet. Trim the clip and add a crossfade instead."))
-                            .color(t.text_faint)
-                            .size(11.5),
-                    );
-                }
                 Section::Pan => slider(ui, cx, tl!("Pan"), "pan.value", st.pan.value, (-100.0, 100.0), 1, "", on),
             }
             ui.add_space(8.0);
@@ -448,10 +441,10 @@ fn section_header(ui: &mut egui::Ui, cx: &mut Ctx, sec: Section, open: bool, ena
     );
     ui.painter().text(pos2(r.min.x + 30.0, r.center().y), Align2::LEFT_CENTER, crate::i18n::t(sec.label()), Tokens::semibold(13.0), t.text);
     cx.auto.add(&format!("essentialSound.section.{}", sec.label()), r, sec.label());
-    if let (Some(on), Some(k)) = (enabled, sec.key()) {
+    if let Some(on) = enabled {
         let sw = Rect::from_center_size(pos2(r.max.x - 16.0, r.center().y), vec2(30.0, 15.0));
         if switch(ui, cx, sw, on, &format!("essentialSound.section.{}.toggle", sec.label()), sec.label()) {
-            cx.set(k, json!(!on), true);
+            cx.set(sec.key(), json!(!on), true);
             return open;
         }
     }
