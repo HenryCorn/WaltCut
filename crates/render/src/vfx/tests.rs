@@ -1147,7 +1147,7 @@ mod pipeline {
 
 #[test]
 fn transform_shutter_uses_the_sequence_frame_rate_without_env() {
-    // An adjustment layer has no env: the shutter must still span one 60 fps frame at 360°, so
+    // An isolated effect has no env: the shutter must still span one 60 fps frame at 360°, so
     // the frames just before the motion starts and just after it ends stay sharp (#1088).
     let mut e = inst("transform");
     set(&mut e, "shutter_override", ParamValue::Bool(true));

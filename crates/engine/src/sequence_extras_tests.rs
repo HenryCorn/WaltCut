@@ -12,6 +12,21 @@ fn demo() -> Session {
     s
 }
 
+#[test]
+fn removed_adjustment_layer_command_cannot_modify_the_project() {
+    let mut s = demo();
+    let before = s.project.clone();
+    assert!(crate::find_command("file.newAdjustmentLayer").is_none());
+    assert!(s.execute("file.newAdjustmentLayer", json!({"seconds": 1})).is_err());
+    assert_eq!(s.project, before);
+    assert!(
+        serde_json::from_value::<ItemKind>(json!({
+            "AdjustmentLayer": {"width": 320, "height": 180, "rate": {"num": 24, "den": 1}, "duration": 1}
+        }))
+        .is_err()
+    );
+}
+
 fn menu_ids(path: &[&str]) -> Vec<&'static str> {
     crate::commands::command_specs().iter().filter(|c| c.menu == path).map(|c| c.id).collect()
 }
@@ -230,41 +245,4 @@ fn flash_cue_markers_round_trip() {
     s.execute("edit.undo", json!({})).unwrap();
     s.execute("edit.undo", json!({})).unwrap();
     assert!(s.active_sequence().unwrap().markers.iter().all(|m| m.kind != MarkerKind::FlashCue));
-}
-
-/// Apply Video Transition (Cmd+D) at both ends of an adjustment layer with a Brightness & Contrast effect fades the
-/// grade in and out, as on a clip: halfway through each dissolve the picture is about halfway
-/// between the original and the graded frame, not the original with a hard cut after it.
-#[test]
-fn cmd_d_on_an_adjustment_layer_fades_its_effects_in_and_out() {
-    let mut s = demo();
-    let item = s.execute("file.newAdjustmentLayer", json!({"seconds": 4})).unwrap()["item"].as_u64().unwrap();
-    let layer = s.execute("timeline.place", json!({"item": item, "track": "V3", "seconds": 1.5})).unwrap()["clips"][0].as_u64().unwrap();
-    s.execute("effects.apply", json!({"clips": [layer], "effect": "brightness_contrast"})).unwrap();
-    s.execute("effects.setParam", json!({"clip": layer, "effect": "brightness_contrast", "param": "brightness", "value": 60.0})).unwrap();
-    s.execute("timeline.select", json!({"clips": [layer]})).unwrap();
-    for edge in ["in", "out"] {
-        s.execute("sequence.applyVideoTransition", json!({"clip": layer, "edge": edge, "frames": 24})).unwrap();
-    }
-    let transitions: Vec<_> = s.active_sequence().unwrap().video_tracks[2].transitions.clone();
-    assert_eq!(transitions.len(), 2, "a dissolve at each end");
-    let mean = |s: &Session, t: Tick| {
-        let img = s.render_program_at(0.25, t).unwrap();
-        img.px.chunks(4).map(|c| f64::from(c[0] + c[1] + c[2])).sum::<f64>() / (img.w * img.h) as f64
-    };
-    for tr in &transitions {
-        let mid = tr.start + Tick(tr.duration.0 / 2);
-        let mf = mean(&s, mid);
-        // the original frame: the layer switched off; the graded frame: without the dissolves
-        s.execute("clip.enable", json!({"clips": [layer]})).unwrap();
-        let m0 = mean(&s, mid);
-        s.execute("edit.undo", json!({})).unwrap();
-        let ids: Vec<u64> = transitions.iter().map(|t| t.id.0).collect();
-        s.execute("sequence.removeTransition", json!({"transitions": ids})).unwrap();
-        let m1 = mean(&s, mid);
-        s.execute("edit.undo", json!({})).unwrap();
-        assert!(m1 > m0 * 1.2, "the grade brightens the frame: {m0} → {m1}");
-        let k = (mf - m0) / (m1 - m0);
-        assert!((0.25..0.75).contains(&k), "halfway through the dissolve the grade is about half on: {k:.3}");
-    }
 }

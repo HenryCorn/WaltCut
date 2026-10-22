@@ -25,7 +25,7 @@ pub struct FxCtx<'a> {
     pub timecode: &'a str,
     pub clip_name: &'a str,
     /// The clip's surroundings (other frames, other tracks, sequence geometry) for temporal,
-    /// track-reading and reframing effects; `None` in isolated tests and adjustment layers.
+    /// track-reading and reframing effects; `None` in isolated tests.
     pub env: Option<&'a dyn crate::vfx::FxEnv>,
     /// Sequence frame rate (shutter-angle motion blur); also known where `env` is `None`.
     pub frame_rate: f64,

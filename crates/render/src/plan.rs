@@ -6,8 +6,8 @@
 //! clip whose enabled standard effects all have a GPU implementation ([`crate::gpufx`]) carries
 //! them as a [`LayerFx`]: their parameters evaluated at the frame's time, run by the GPU on the
 //! clip's working image before Motion places it, in the CPU's order (effects → Motion → Opacity /
-//! blend). Anything the shaders don't cover yet — other standard effects, masks, adjustment
-//! layers, nested sequences, transitions other than dissolves, dips and Push — is rendered on the CPU
+//! blend). Anything the shaders don't cover yet — other standard effects, masks,
+//! nested sequences, transitions other than dissolves, dips and Push — is rendered on the CPU
 //! for that layer (or the whole frame) and handed over as a pre-composited image, so the GPU path
 //! is always exact with respect to the CPU reference.
 //!
@@ -195,7 +195,7 @@ fn gpu_chain<'a>(project: &Project, item: &'a TrackItem, opts: RenderOptions) ->
 pub fn plan_frame(project: &Project, seq_id: ItemId, t: Tick, opts: RenderOptions, sources: &dyn SourceProvider) -> FramePlan {
     let Some(seq) = project.sequence(seq_id) else { return FramePlan::Image(crate::Image::new(1, 1)) };
     let (w, h) = output_size(seq, opts.scale);
-    if whole_frame_on_cpu(project, seq, t) {
+    if whole_frame_on_cpu(seq, t) {
         return FramePlan::Image(crate::render_sequence(project, seq_id, t, opts, sources));
     }
     let mut layers = PlanStack::default();
@@ -207,35 +207,26 @@ pub fn plan_frame(project: &Project, seq_id: ItemId, t: Tick, opts: RenderOption
 /// GPU renderer gains nothing on such a frame, so a caller with only a few of them (the export's
 /// pool) can render it on the CPU without taking one.
 pub fn is_cpu_frame(project: &Project, seq_id: ItemId, t: Tick) -> bool {
-    project.sequence(seq_id).is_none_or(|seq| whole_frame_on_cpu(project, seq, t))
+    project.sequence(seq_id).is_none_or(|seq| whole_frame_on_cpu(seq, t))
 }
 
 /// The frames [`plan_frame`] does not plan: an HDR / wide-gamut sequence composites and converts
-/// on the CPU, and so does a frame with an adjustment layer or a complex transition anywhere at
+/// on the CPU, and so does a frame with a complex transition anywhere at
 /// `t` (whole-frame fallback).
-fn whole_frame_on_cpu(project: &Project, seq: &Sequence, t: Tick) -> bool {
-    !seq.settings.color.is_plain() || !layered_at(project, seq, t)
+fn whole_frame_on_cpu(seq: &Sequence, t: Tick) -> bool {
+    !seq.settings.color.is_plain() || !layered_at(seq, t)
 }
 
-/// Whether the frame of `seq` at `t` can be planned as layers: no adjustment layer and no
-/// transition the compositor cannot mix itself is showing (a transition into or out of an
-/// adjustment layer counts, also on the side of the cut where the other clip is).
-pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick) -> bool {
-    let adjustment = |it: &TrackItem| project.item(it.item).is_some_and(|p| matches!(p.kind, ItemKind::AdjustmentLayer { .. }));
+/// Whether the frame of `seq` at `t` can be planned as layers: no transition the compositor
+/// cannot mix itself is showing.
+pub(crate) fn layered_at(seq: &Sequence, t: Tick) -> bool {
     for tr in &seq.video_tracks {
         if !tr.enabled {
             continue;
         }
-        if let Some(trn) = tr.transitions.iter().find(|x| x.range().contains(t)) {
-            if !simple_transition(&trn.effect.effect) && trn.effect.effect != "push" {
-                return false;
-            }
-            if [trn.from, trn.to].into_iter().flatten().filter_map(|c| tr.item(c)).any(adjustment) {
-                return false;
-            }
-        }
-        if let Some(it) = tr.item_at(t)
-            && adjustment(it)
+        if let Some(trn) = tr.transitions.iter().find(|x| x.range().contains(t))
+            && !simple_transition(&trn.effect.effect)
+            && trn.effect.effect != "push"
         {
             return false;
         }
@@ -307,10 +298,10 @@ fn push_tracks(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, 
 /// by one over what is below gives the same picture as compositing them together first only when
 /// they all blend Normal, and the frame must be one that plans as layers in the same colour
 /// pipeline.
-fn nest_is_plain(project: &Project, seq: &Sequence, nested: &Sequence, ft: Tick) -> bool {
+fn nest_is_plain(seq: &Sequence, nested: &Sequence, ft: Tick) -> bool {
     nested.settings.color == seq.settings.color
         && (nested.settings.width, nested.settings.height) == (seq.settings.width, seq.settings.height)
-        && layered_at(project, nested, ft)
+        && layered_at(nested, ft)
         && !nested.video_tracks.iter().any(|tr| tr.enabled && tr.transitions.iter().any(|t| t.range().contains(ft) && !simple_transition(&t.effect.effect)))
         && nested.video_tracks.iter().filter(|tr| tr.enabled).all(|tr| {
             tr.transitions.iter().any(|x| x.range().contains(ft))
@@ -350,7 +341,7 @@ fn push_item(
         && bl == Blend::Normal
         && extra_opacity * op >= 1.0 - 1e-6
         && near_identity(&motion_matrix(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt))
-        && nest_is_plain(project, seq, nested, ft)
+        && nest_is_plain(seq, nested, ft)
     {
         push_tracks(project, nested, ft, opts, sources, nest + 1, out);
         return;

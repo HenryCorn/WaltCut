@@ -37,7 +37,7 @@ use serde_json::{Value, json};
 use waltcut_edit as edit;
 pub use waltcut_export::still::StillFormat;
 use waltcut_geom::Vec2;
-use waltcut_project::{ClipId, ItemKind, ParamValue, Sequence, TrackId, TrackKind};
+use waltcut_project::{ClipId, ParamValue, Sequence, TrackId, TrackKind};
 use waltcut_time::Tick;
 
 use crate::commands::{CommandSpec, always, bad, has_selection, has_seq, item_p, slip_together, time_p, with_links};
@@ -684,9 +684,6 @@ fn poster_target(s: &Session, p: &Value) -> Option<(waltcut_project::ItemId, Tic
 fn set_poster(s: &mut Session, p: &Value, clear: bool) -> Result<Value> {
     let (item, t) = poster_target(s, p).ok_or_else(|| EngineError::Other("open a clip in the Source monitor or select one in the Project panel".into()))?;
     let it = s.project.item(item).ok_or_else(|| bad("clip.setPosterFrame", "no such item"))?;
-    if matches!(it.kind, ItemKind::AdjustmentLayer { .. }) {
-        return Err(EngineError::Other("adjustment layers have no poster frame".into()));
-    }
     let snapped = it.frame_rate().snap(t);
     s.edit(if clear { "Clear Poster Frame" } else { "Set Poster Frame" }, |pr, _| {
         let it = pr.item_mut(item).ok_or_else(|| bad("clip.setPosterFrame", "no such item"))?;

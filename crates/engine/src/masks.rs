@@ -161,7 +161,7 @@ fn source_size(s: &Session, clip: ClipId) -> (f64, f64) {
     let dims = it.and_then(|i| s.project.item(i.item)).and_then(|pi| match &pi.kind {
         waltcut_project::ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
         waltcut_project::ItemKind::Sequence(q) => Some((q.settings.width, q.settings.height)),
-        waltcut_project::ItemKind::AdjustmentLayer { width, height, .. } | waltcut_project::ItemKind::Graphic { width, height, .. } => Some((*width, *height)),
+        waltcut_project::ItemKind::Graphic { width, height, .. } => Some((*width, *height)),
         waltcut_project::ItemKind::Drawing(d) => Some((d.width, d.height)),
         waltcut_project::ItemKind::Subclip { parent, .. } => {
             s.project.item(*parent).and_then(|pp| pp.as_media()).and_then(|m| m.info.video.as_ref()).map(|v| (v.width, v.height))

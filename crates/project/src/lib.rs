@@ -266,12 +266,6 @@ pub enum ItemKind {
         #[serde(default)]
         restrict_trims: bool,
     },
-    AdjustmentLayer {
-        width: u32,
-        height: u32,
-        rate: FrameRate,
-        duration: Tick,
-    },
     /// The source of graphic clips: a transparent canvas of the sequence frame size. The clip's
     /// text and shape layers are effect instances on the track item (see [`graphic`]). Not shown
     /// in the Project panel; unlimited duration.
@@ -343,7 +337,7 @@ impl ProjectItem {
     pub fn has_video(&self) -> bool {
         match &self.kind {
             ItemKind::Media(m) => m.info.has_video(),
-            ItemKind::Sequence(_) | ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } | ItemKind::Drawing(_) => true,
+            ItemKind::Sequence(_) | ItemKind::Graphic { .. } | ItemKind::Drawing(_) => true,
             ItemKind::Subclip { .. } => true,
         }
     }
@@ -359,7 +353,6 @@ impl ProjectItem {
             ItemKind::Media(m) => m.duration(),
             ItemKind::Sequence(s) => s.duration(),
             ItemKind::Subclip { range, .. } => range.duration,
-            ItemKind::AdjustmentLayer { duration, .. } => *duration,
             ItemKind::Graphic { .. } | ItemKind::Drawing(_) => Tick(3600 * TICKS_PER_SECOND),
         }
     }
@@ -367,7 +360,7 @@ impl ProjectItem {
         match &self.kind {
             ItemKind::Media(m) => m.frame_rate(),
             ItemKind::Sequence(s) => s.settings.frame_rate,
-            ItemKind::AdjustmentLayer { rate, .. } | ItemKind::Graphic { rate, .. } => *rate,
+            ItemKind::Graphic { rate, .. } => *rate,
             ItemKind::Drawing(d) => d.rate,
             ItemKind::Subclip { .. } => FrameRate::default(),
         }
@@ -384,7 +377,6 @@ impl ProjectItem {
             },
             ItemKind::Sequence(_) => "Sequence",
             ItemKind::Subclip { .. } => "Subclip",
-            ItemKind::AdjustmentLayer { .. } => "Adjustment Layer",
             ItemKind::Graphic { .. } => "Graphic",
             ItemKind::Drawing(_) => "Drawing",
         }
@@ -1613,8 +1605,8 @@ impl Project {
         None
     }
 
-    /// Size in pixels of what an item shows: a media clip's picture, a sequence's frame, an
-    /// adjustment layer or graphic; a subclip has the size of its parent. `None` without
+    /// Size in pixels of what an item shows: a media clip's picture, a sequence's frame, a
+    /// graphic; a subclip has the size of its parent. `None` without
     /// picture. This is the size the renderer centres a clip's "auto" anchor in.
     pub fn source_size(&self, item: ItemId) -> Option<(u32, u32)> {
         let mut id = item;
@@ -1623,7 +1615,7 @@ impl Project {
             return match &self.item(id)?.kind {
                 ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
                 ItemKind::Sequence(q) => Some((q.settings.width, q.settings.height)),
-                ItemKind::AdjustmentLayer { width, height, .. } | ItemKind::Graphic { width, height, .. } => Some((*width, *height)),
+                ItemKind::Graphic { width, height, .. } => Some((*width, *height)),
                 ItemKind::Drawing(d) => Some((d.width, d.height)),
                 ItemKind::Subclip { parent, .. } => {
                     id = *parent;
@@ -1637,7 +1629,7 @@ impl Project {
     /// Pixel aspect ratio of what an item shows, in lowest terms: a media clip's
     /// ([`MediaClip::pixel_aspect`], Interpret Footage first), a nested sequence's, a subclip its
     /// parent's. `None` for items drawn in the pixels of whatever sequence they are in (graphics,
-    /// adjustment layers) and for an item that doesn't exist.
+    /// drawings) and for an item that doesn't exist.
     pub fn source_par(&self, item: ItemId) -> Option<(u32, u32)> {
         let mut id = item;
         // subclips of subclips: bounded, as in `source_size`
@@ -1645,7 +1637,7 @@ impl Project {
             return match &self.item(id)?.kind {
                 ItemKind::Media(m) => Some(m.pixel_aspect()),
                 ItemKind::Sequence(q) => Some(sane_par(q.settings.par)),
-                ItemKind::AdjustmentLayer { .. } | ItemKind::Graphic { .. } | ItemKind::Drawing(_) => None,
+                ItemKind::Graphic { .. } | ItemKind::Drawing(_) => None,
                 ItemKind::Subclip { parent, .. } => {
                     id = *parent;
                     continue;
@@ -1903,7 +1895,7 @@ mod tests {
     fn bins() {
         let mut p = Project::new("x");
         let b = p.add_bin("Footage", None);
-        let i = p.add_item("a", Label::Iris, ItemKind::AdjustmentLayer { width: 10, height: 10, rate: FrameRate::FPS_24, duration: Tick(1) }, Some(b));
+        let i = p.add_item("a", Label::Iris, ItemKind::Graphic { width: 10, height: 10, rate: FrameRate::FPS_24 }, Some(b));
         assert_eq!(p.root.parent_of(i), Some(b));
         assert!(p.root.remove_item(i));
         assert_eq!(p.root.parent_of(i), None);
@@ -1915,7 +1907,7 @@ mod tests {
         let outer = p.add_bin("Footage", None);
         let inner = p.add_bin("B-Roll", None);
         let deep = p.add_bin("Drone", Some(inner));
-        let i = p.add_item("a", Label::Iris, ItemKind::AdjustmentLayer { width: 10, height: 10, rate: FrameRate::FPS_24, duration: Tick(1) }, Some(deep));
+        let i = p.add_item("a", Label::Iris, ItemKind::Graphic { width: 10, height: 10, rate: FrameRate::FPS_24 }, Some(deep));
         assert_eq!(p.move_to_bin(&[ItemId(inner.0)], Some(outer)), Some(1));
         let o = p.root.find_bin(outer).unwrap();
         assert!(o.children.iter().any(|c| matches!(c, BinEntry::Bin(b) if b.id == inner)));
@@ -2073,7 +2065,7 @@ mod tests {
         p.sequence_mut(seq).unwrap().settings.par = (8, 6);
         assert_eq!(p.source_par(seq), Some((4, 3)));
         assert_eq!(p.conformed_source_size(seq, (1, 1)), Some((2560.0, 1080.0)));
-        let adj = p.add_item("Adj", Label::Iris, ItemKind::AdjustmentLayer { width: 1440, height: 1080, rate: FrameRate::FPS_24, duration: Tick(100) }, None);
+        let adj = p.add_item("Adj", Label::Iris, ItemKind::Graphic { width: 1440, height: 1080, rate: FrameRate::FPS_24 }, None);
         assert_eq!(p.source_par(adj), None);
         assert_eq!(p.conformed_source_size(adj, (4, 3)), Some((1440.0, 1080.0)));
         assert_eq!(p.source_par(ItemId(987_654_321)), None);
