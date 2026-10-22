@@ -214,13 +214,11 @@ pub enum AudioCodec {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct AudioSettings {
     pub codec: AudioCodec,
     /// Output sample rate (None = the sequence's).
     pub sample_rate: Option<u32>,
-    /// 1 (mono), 2 (stereo) or 6 (5.1: L, R, C, LFE, Ls, Rs).
-    pub channels: u32,
     /// AAC bitrate.
     pub bitrate_kbps: u32,
     /// PCM and FLAC sample size: 16, 24 or 32 (other values round down to one of them, 16 at least).
@@ -233,7 +231,7 @@ pub struct AudioSettings {
 
 impl Default for AudioSettings {
     fn default() -> Self {
-        AudioSettings { codec: AudioCodec::Auto, sample_rate: None, channels: 2, bitrate_kbps: 320, bits: 16, float: false, flac_level: 5 }
+        AudioSettings { codec: AudioCodec::Auto, sample_rate: None, bitrate_kbps: 320, bits: 16, float: false, flac_level: 5 }
     }
 }
 
@@ -423,32 +421,14 @@ impl Default for VideoLimiter {
     }
 }
 
-/// Export ▸ Effects ▸ Loudness Normalization (ITU-R BS.1770-4 integrated loudness).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct LoudnessNormalization {
-    pub enabled: bool,
-    /// Target integrated loudness (LUFS).
-    pub target_lufs: f64,
-    /// True-peak ceiling (dBTP) enforced by a look-ahead limiter.
-    pub true_peak_dbtp: f64,
-}
-
-impl Default for LoudnessNormalization {
-    fn default() -> Self {
-        LoudnessNormalization { enabled: false, target_lufs: -23.0, true_peak_dbtp: -2.0 }
-    }
-}
-
 /// Export ▸ Effects.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ExportEffects {
     pub image_overlay: ImageOverlay,
     pub name_overlay: TextOverlay,
     pub timecode_overlay: TextOverlay,
     pub video_limiter: VideoLimiter,
-    pub loudness: LoudnessNormalization,
 }
 
 impl ExportEffects {
@@ -546,11 +526,7 @@ impl ExportSettings {
             _ => self.max_bitrate_kbps.filter(|m| *m >= target).unwrap_or_else(|| (u64::from(target) * 3 / 2).min(u64::from(u32::MAX)) as u32),
         };
         let keyint = self.keyframe_distance.filter(|k| *k > 0).unwrap_or_else(|| (fps * 2.0).round().max(1.0) as u32);
-        let channels = match self.audio.channels {
-            0 | 1 => 1,
-            6.. => 6,
-            _ => 2,
-        };
+        let channels = 2;
         Resolved { width: w, height: h, rate, sample_rate: self.audio.sample_rate.unwrap_or(seq_sr), channels, target_kbps: target, max_kbps: max, keyint }
     }
 
@@ -733,11 +709,7 @@ impl ExportSettings {
             v
         };
         let audio = if self.has_audio() || self.format.is_audio_only() {
-            let ch = match r.channels {
-                1 => "Mono",
-                6 => "5.1",
-                _ => "Stereo",
-            };
+            let ch = "Stereo";
             match self.audio_codec() {
                 AudioCodec::Aac => format!("AAC, {} kbps, {} Hz, {ch}", self.audio.bitrate_kbps, r.sample_rate),
                 AudioCodec::Flac => {

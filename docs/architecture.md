@@ -61,7 +61,7 @@ and `filmcraft-cli`.
 | `frame` | L1 | `VideoFrame` (planar YUV / RGBA8 / linear RGBA f32, colour metadata), `AudioBuffer` |
 | `media` | L1 | `MediaSource` trait, probing/openers, frame cache, generators, stills, image sequences, WAV / Broadcast WAV |
 | `project` | L1 | document model, effect definitions, keyframes |
-| `audio-dsp` | L1 | output-rate resampling and scrub/pitch; active export loudness/limiter and output/source-monitor channel conversion remain pending their later #23 cut |
+| `audio-dsp` | L1 | dependency-free output-rate resampling and pitch-preserving shuttle helpers used by live playback |
 | `text` | L1 | text engine: font database (bundled OFL fonts + system fonts), shaping (harfrust), bidi, line breaking, paragraph layout, glyph/path rasteriser, strokes ([crates/text/README.md](../crates/text/README.md)) |
 | `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…) |
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
@@ -343,7 +343,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
 ```text
 decoded mono/stereo source pair → source-time mapping → Audio Gain + intrinsic Volume (dB)
     → sum enabled clips on enabled/unmuted tracks → stereo soundtrack
-    → device-rate resampling / physical output mapping, or export output conversion
+    → stereo soundtrack → device-rate resampling / physical output mapping, or stereo export
 ```
 
 - **Model** (`project::mixer`). Every audio track, submix and the Mix has a `MixerStrip`. Static
@@ -394,18 +394,16 @@ Volume/keyframe, source-map and mute edits invalidate audio-preview hashes. Wave
 scrub/shuttle retain the same gain semantics. Device-rate resampling and pitch correction are
 live DSP dependencies, not audio-effect catalogue entries.
 
-### 5.1.1 Deferred active output processing
+### 5.1.1 Fixed stereo soundtrack
 
-Export loudness normalisation measures the soundtrack, applies gain and a true-peak limiter,
-remeasures, then writes the result. Output channel conversion remains real: a six-channel
-export puts the stereo soundtrack on L/R and silence on the other channels, and container writers
-emit the corresponding layout metadata. This is not surround mixing or a surround panner.
-The separate Source monitor still downmixes multichannel source media according to its mixdown
-preference. These export/source-monitor controls, shared layout types and their DSP utilities
-remain for a later #23 slice. The now-ignored sequence Mix selector/parameters and `audio_master`
-field are deleted.
+Mono sources (or one selected source channel) are duplicated to left/right; a multichannel source
+defaults to its first stereo pair. The Source monitor follows its selected mono/stereo source pair.
+There is no multichannel source mixdown preference, shared layout/conversion DSP, export channel
+selector, surround track format, or surround output path. Exports write the retained stereo mix
+without loudness measurement or true-peak limiting. Removed output-layout and loudness settings
+are rejected by export commands rather than ignored.
 
-### 5.2 Audio reduction boundary (#23, partial draft)
+### 5.2 Audio reduction boundary (#23, draft implementation)
 
 Essential Sound has no panel, UI state, command registry, audio-type model, owned effects or
 preferences. Its automatic loudness matching and ducking detector/keyframe generator are deleted,
@@ -422,7 +420,7 @@ an audio effect, alongside shared Motion/Opacity/keyframe/graphic data.
 `crates/ui-egui/tests/audio_timing.rs` compares actual callback samples and decoded float WAV
 samples for mono/stereo timing, source In, live gain/mute, additive Volume, bypass/disable,
 channel selection and keyframes across irregular blocks. Engine/project/format/UI tests cover
-removed commands/IDs/fields and hostile source maps. This is **DRAFT IMPLEMENTATION**:
+removed commands/IDs/fields and hostile source maps. This is **DRAFT IMPLEMENTATION — native macOS acceptance pending**:
 native macOS CI, actual sample-test execution and animation-flow visual acceptance remain
 pending. #23 is not complete, accepted or merged.
 
@@ -486,8 +484,7 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
   → engine::export_tools: preset ⊕ settings JSON ⊕ flat overrides → ExportSettings; range resolved
   → a Job {id, label, progress, result} on a background thread (export.queue.* runs them in order)
   → export: per output frame render (output rate) → fit into the output frame → overlays → limiter
-            → encode in order → mux; audio mixed at the output rate, folded to mono/stereo,
-            loudness-normalized (measuring pass + gain + true-peak limiter) per batch
+            → encode in order → mux; audio mixed and written as stereo, with no loudness pass
   → jobs.list shows progress; jobs.cancel sets the shared cancel flag
 ```
 
@@ -502,7 +499,7 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 | `mxf-opatom` | as `mxf-op1a` | Avid-style MXF OP-Atom: clip-wrapped picture at `path`, one mono PCM file per channel (`<stem>_A1.mxf` …, `Report::extra_files`) |
 | `png`, `tiff`, `bmp`, `jpg` | `image` | numbered stills `<name>000.<ext>`, `<name>001.<ext>` … |
 | `tga`, `dpx`, `exr` | built in (`raster.rs`: uncompressed Targa 24/32-bit; DPX 10-bit RGB, SMPTE ST 268; OpenEXR half-float linear RGB(A), uncompressed scan lines) | numbered stills, as above |
-| `gif`, `wav`, `aiff` | built in / `image` | GIF / RIFF WAVE (`WAVE_FORMAT_EXTENSIBLE` for 5.1; `WAVE_FORMAT_IEEE_FLOAT` + `fact` for float) / AIFF (16-, 24- or 32-bit PCM; 32-bit float as AIFF-C `fl32`) |
+| `gif`, `wav`, `aiff` | built in / `image` | GIF / stereo RIFF WAVE (`WAVE_FORMAT_IEEE_FLOAT` + `fact` for float) / stereo AIFF (16-, 24- or 32-bit PCM; 32-bit float as AIFF-C `fl32`) |
 
 - **Reproducible.** The same project and settings give the same file on every machine. Frames render
   in batches of one per core, but the muxer gets them in fixed groups of 16 output frames
@@ -512,11 +509,11 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 - **Settings.** `ExportSettings` (serde, camelCase, every field optional) holds Video (frame size or
   Match Source, frame rate, Scale to Fit / Fill / Stretch, pixel aspect, field order — progressive
   only, profile / level, bitrate encoding, target / maximum / adaptive bitrate, keyframe distance,
-  maximum render quality), Audio (codec, sample rate, channels, AAC bitrate, PCM / FLAC sample size: `bits` 16, 24 or 32
+  maximum render quality), Audio (codec, sample rate, AAC bitrate, PCM / FLAC sample size: `bits` 16, 24 or 32
   and `float` for 32-bit float PCM in WAV, AIFF and QuickTime — `supports_sample_format` says
   which a codec and container store, and Export mode greys out the rest),
-  Multiplexer (audio channels: mono, stereo or 5.1, §5.1.1), Effects (image / name / timecode
-  overlays, video limiter, loudness normalization), Metadata (`udta` `©nam`, `©ART`, `©cpy`, `©des`,
+  Multiplexer (container choice), Effects (image / name / timecode overlays, video limiter),
+  Metadata (`udta` `©nam`, `©ART`, `©cpy`, `©des`,
   `©cmt`). `settings.summary()` / `estimate_bytes()` feed Export mode's Summary.
 - **Presets.** `export::presets::builtin_presets()` are our own definitions (Match Source adaptive
   H.264 at 0.2 / 0.1 / 0.05 bits per pixel, 1080p / 2160p delivery, vertical 1080×1920, ProRes,

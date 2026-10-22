@@ -27,7 +27,6 @@ pub mod presets;
 mod raster;
 pub mod settings;
 pub mod still;
-pub use audio_out::LoudnessReport;
 pub use job::{Exporter, Step, stepped};
 pub use mxf_out::opatom_audio_paths;
 pub use pcm::{image_sequence_path, write_aiff, write_wav};
@@ -305,7 +304,7 @@ pub enum H264Pass {
 
 /// Every Export-mode setting. Serialized in camelCase; every field is optional on input.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExportSettings {
     pub format: Format,
     pub path: String,
@@ -661,8 +660,6 @@ pub struct Progress {
     pub finished: AtomicBool,
     pub status: Mutex<String>,
     pub error: Mutex<Option<String>>,
-    /// What loudness normalization measured (when it ran).
-    pub loudness: Mutex<Option<LoudnessReport>>,
     /// Readings of `done` over time, for [`Progress::eta`].
     pace: Mutex<pace::Pace>,
 }
@@ -820,8 +817,6 @@ pub fn note_hw_encode_declined() {
 pub enum Stage {
     /// [`Exporter::new`]: settings, pipeline, encoder and audio set-up.
     Setup,
-    /// The loudness pass before the first frame (normalised audio only).
-    Loudness,
     /// Rendering a batch of frames (parallel; includes decoding the sources, effects, colour).
     Render,
     /// Encoding the rendered frames, colour conversion included (serial).
@@ -839,17 +834,15 @@ pub enum Stage {
     Wait,
 }
 
-const STAGES: usize = 9;
+const STAGES: usize = 8;
 
 impl Stage {
-    pub const ALL: [Stage; STAGES] =
-        [Stage::Setup, Stage::Loudness, Stage::Render, Stage::Encode, Stage::Convert, Stage::Audio, Stage::Mux, Stage::Finish, Stage::Wait];
+    pub const ALL: [Stage; STAGES] = [Stage::Setup, Stage::Render, Stage::Encode, Stage::Convert, Stage::Audio, Stage::Mux, Stage::Finish, Stage::Wait];
 
     /// The name in `perf.stats`.
     pub fn name(self) -> &'static str {
         match self {
             Stage::Setup => "setup",
-            Stage::Loudness => "loudness",
             Stage::Render => "render",
             Stage::Encode => "encode",
             Stage::Convert => "convert",
@@ -1873,8 +1866,6 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
                 progress.total.store(frames.div_ceil(chunk as u64).max(1), Ordering::Relaxed);
                 progress.set_status(format!("Exporting audio ({})", settings.format.label()));
             }
-            a.measure(settings, sources, &cancelled)?;
-            *progress.loudness.lock().unwrap_or_else(|e| e.into_inner()) = a.loudness;
             let mut out = Out::create(settings)?;
             let io = |e: std::io::Error| ExportError::Io(e.to_string());
             out.write_all(&head).map_err(io)?;
@@ -1997,8 +1988,6 @@ mod tests;
 mod settings_tests;
 
 #[cfg(test)]
-mod surround_tests;
-
 #[cfg(test)]
 mod mxf_tests;
 

@@ -140,7 +140,6 @@ impl FilmcraftApp {
             return;
         }
         let map = [self.session.prefs.audio_hardware.map_left, self.session.prefs.audio_hardware.map_right];
-        let mixdown = waltcut_audio_dsp::channels::Mixdown::from_id(&self.session.prefs.audio.mixdown_type).unwrap_or_default();
         let channels = media.interpret.audio_channels.as_ref().and_then(|m| m.clips.first()).cloned().unwrap_or_default();
         // A seek gets its own failure slot: a late callback from the old stream cannot stop it.
         self.source_playback.failure = Arc::new(Mutex::new(None));
@@ -158,13 +157,14 @@ impl FilmcraftApp {
             }
             let frames = (buf.len() / ch).min(usize::try_from(end.saturating_sub(cursor)).unwrap_or(0));
             match source.audio(cursor, frames, sr) {
-                Ok(mut sound) => {
-                    if !channels.is_empty() {
-                        sound.channels = channels.iter().filter_map(|c| sound.channels.get(usize::from(*c)).cloned()).collect();
-                    }
-                    let sound = waltcut_render::audio::to_layout(sound, waltcut_audio_dsp::channels::Layout::Stereo, mixdown);
-                    let Some(left) = sound.channels.first() else { return };
-                    let right = sound.channels.get(1).unwrap_or(left);
+                Ok(sound) => {
+                    let left_index = channels.first().copied().map(usize::from).unwrap_or(0);
+                    let right_index = channels.get(1).copied().map(usize::from).unwrap_or(left_index.max(1));
+                    let Some(left) = sound.channels.get(left_index).or_else(|| sound.channels.first()) else {
+                        *failure.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some("Source audio contains no channels".into());
+                        return;
+                    };
+                    let right = if channels.len() == 1 { left } else { sound.channels.get(right_index).or_else(|| sound.channels.first()).unwrap_or(left) };
                     waltcut_engine::settings::map_output(left, right, buf, ch, map);
                 }
                 Err(e) => {

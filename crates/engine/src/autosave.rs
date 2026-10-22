@@ -285,9 +285,6 @@ impl Default for MediaPrefs {
 pub struct AudioPrefs {
     /// "Large Volume Adjustment" (dB) for the Increase/Decrease Clip Volume Many commands.
     pub large_volume_adjustment: f64,
-    /// "5.1 Mixdown Type": `front` | `frontRear` | `frontLfe` | `frontRearLfe`.
-    pub mixdown_type: String,
-    pub sum_to_mono_in_source: bool,
     pub scrub_audio: bool,
     pub maintain_pitch_shuttling: bool,
     pub generate_waveforms_on_import: bool,
@@ -301,8 +298,6 @@ impl Default for AudioPrefs {
     fn default() -> Self {
         Self {
             large_volume_adjustment: 6.0,
-            mixdown_type: "frontRear".into(),
-            sum_to_mono_in_source: true,
             scrub_audio: true,
             maintain_pitch_shuttling: true,
             generate_waveforms_on_import: true,

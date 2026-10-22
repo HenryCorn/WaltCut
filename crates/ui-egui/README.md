@@ -35,15 +35,19 @@ presets only; generic Effect Controls/keyframe and graphic editing remain.
 The timeline line edits static Audio Gain (`gain_db`), independent of intrinsic Volume in Effect
 Controls/Properties. The minimal renderer adds enabled/non-bypassed Volume to Audio Gain in dB
 per sample, evaluating keyframes in source time. Mute silences the track. Mono/stereo source
-mapping, waveform and scrub remain; unsupported multichannel source maps and removed sequence
-mix-format parameters reject requests. Export loudness and actual output/source-monitor channel
-conversion remain for another slice, not a surround mixer.
+mapping, waveform and scrub remain. Multichannel sources default to their first stereo pair
+(mono sources to their sole channel); Source playback follows the selected pair. Unsupported
+surround/adaptive mappings and removed sequence mix-format parameters reject requests. The
+retained soundtrack and exports are stereo; export loudness/normalisation/true-peak limiting,
+output layout conversion, and Source-monitor multichannel mixdown are deleted. The export UI has
+no channel-layout or surround-authoring controls.
 
 `tests/audio_timing.rs` checks actual callback samples and written float WAV samples for mono and
 stereo sources, offsets/source In, gain/mute, additive Volume, bypass/disable, channel selection
 and keyframes. `clip_audio_ui` checks the independent gain line and retained Volume controls.
-**Native macOS test execution, full CI and animation-flow screenshots are pending.** These stacked
-drafts are not complete, accepted or merged.
+The final bounded #23 deletion slice removes the active loudness, output-layout and Source-monitor
+mixdown paths. **Native macOS test execution, full CI, sample export tests and animation-flow
+screenshots are pending.** These stacked drafts are not complete, accepted or merged.
 
 ## Language
 

@@ -184,7 +184,6 @@ impl<'de> Deserialize<'de> for AudioChannelMap {
         let width = match data.format {
             AudioChannels::Mono => 1,
             AudioChannels::Stereo => 2,
-            _ => return Err(serde::de::Error::custom("source mapping supports only mono/stereo clips")),
         };
         if data.clips.is_empty() || data.clips.len() > 64 || data.clips.iter().any(|channels| channels.is_empty() || channels.len() > width) {
             return Err(serde::de::Error::custom("source mapping needs 1–64 mono/stereo source pairs"));
@@ -194,14 +193,12 @@ impl<'de> Deserialize<'de> for AudioChannelMap {
 }
 
 impl AudioChannelMap {
-    /// The default mapping of a source with `channels` channels in `format`: mono = one clip per
-    /// channel, stereo = channel pairs, 5.1 / adaptive = one clip with every channel.
+    /// The default mapping is mono clips per channel or one stereo clip for the first source pair.
     pub fn for_format(format: AudioChannels, channels: u16) -> Self {
         let n = channels.max(1);
         let clips = match format {
             AudioChannels::Mono => (0..n).map(|c| vec![c]).collect(),
-            AudioChannels::Stereo => (0..n).step_by(2).map(|c| if c + 1 < n { vec![c, c + 1] } else { vec![c] }).collect(),
-            AudioChannels::Surround51 | AudioChannels::Adaptive => vec![(0..n).collect()],
+            AudioChannels::Stereo => vec![if n > 1 { vec![0, 1] } else { vec![0] }],
         };
         Self { format, clips }
     }
@@ -508,8 +505,6 @@ pub enum AudioChannels {
     Mono,
     #[default]
     Stereo,
-    Surround51,
-    Adaptive,
 }
 
 /// A clip instance on a track.
@@ -1621,6 +1616,8 @@ mod tests {
 
     #[test]
     fn source_channel_maps_accept_only_bounded_mono_stereo_pairs() {
+        assert_eq!(AudioChannelMap::for_format(AudioChannels::Stereo, 6).clips, vec![vec![0, 1]]);
+        assert_eq!(AudioChannelMap::for_format(AudioChannels::Stereo, 1).clips, vec![vec![0]]);
         for value in [serde_json::json!({"format": "Mono", "clips": [[1], [0]]}), serde_json::json!({"format": "Stereo", "clips": [[1, 0], [2]]})] {
             let map: AudioChannelMap = serde_json::from_value(value.clone()).unwrap();
             assert_eq!(serde_json::to_value(map).unwrap(), value);

@@ -863,17 +863,6 @@ fn audio_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
             s.audio.sample_rate = rates[i];
         }
     });
-    row(ui, t, tl!("Channels"), |ui| {
-        let names = [tl!("Mono"), tl!("Stereo"), "5.1"];
-        let cur = match s.audio.channels {
-            1 => names[0],
-            6 => names[2],
-            _ => names[1],
-        };
-        if let Some(i) = combo(ui, reg, "export.audio.channels", cur, &opts(&names), 120.0) {
-            s.audio.channels = [1, 2, 6][i.min(2)];
-        }
-    });
     if s.audio_codec() == AudioCodec::Aac {
         row(ui, t, tl!("Audio Bitrate"), |ui| {
             let rates = [128u32, 160, 192, 256, 320];
@@ -936,7 +925,6 @@ fn text_overlay(ui: &mut egui::Ui, reg: &mut Reg, key: &str, o: &mut TextOverlay
 /// Returns whether the image overlay's Browse… was clicked.
 fn effects_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &Tokens) -> bool {
     let mut browse = false;
-    let audio = s.has_audio() || !s.has_video();
     let video = s.has_video();
     let fx = &mut s.effects;
     if video {
@@ -972,17 +960,6 @@ fn effects_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: 
                 drag(ui, reg, "export.effects.videoLimiter.min", &mut lo, 0.0..=50.0, 0.5, " %", 1);
                 drag(ui, reg, "export.effects.videoLimiter.max", &mut hi, 50.0..=100.0, 0.5, " %", 1);
                 (fx.video_limiter.min_percent, fx.video_limiter.max_percent) = (lo as f32, hi as f32);
-            });
-        }
-    }
-    if audio {
-        check(ui, reg, "export.effects.loudness", &mut fx.loudness.enabled, tl!("Loudness Normalization"));
-        if fx.loudness.enabled {
-            row(ui, t, tl!("Target Loudness"), |ui| {
-                drag(ui, reg, "export.effects.loudness.target", &mut fx.loudness.target_lufs, -40.0..=-5.0, 0.1, " LUFS", 1);
-            });
-            row(ui, t, tl!("True Peak Limit"), |ui| {
-                drag(ui, reg, "export.effects.loudness.truePeak", &mut fx.loudness.true_peak_dbtp, -9.0..=0.0, 0.1, " dBTP", 1);
             });
         }
     }

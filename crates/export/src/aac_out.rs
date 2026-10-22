@@ -124,8 +124,6 @@ pub(crate) fn export(
         progress.total.store(frames.div_ceil(chunk as u64).max(1), Ordering::Relaxed);
         progress.set_status(format!("Exporting audio ({})", settings.format.label()));
     }
-    a.measure(settings, sources, &cancelled)?;
-    *progress.loudness.lock().unwrap_or_else(|e| e.into_inner()) = a.loudness;
     let mut sink = if is_adts_path(&settings.path) {
         let CodecConfig::Aac(cfg) = &entry.codec else {
             return Err(ExportError::Encode("AAC: the encoder's sample entry is not AAC".into()));

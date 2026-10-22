@@ -161,6 +161,23 @@ fn essential_sound_preferences_are_absent_and_reject_writes() {
 }
 
 #[test]
+fn removed_surround_layout_preferences_are_absent_and_reject_writes() {
+    let mut prefs = autosave::Preferences::default();
+    let before = prefs.clone();
+    let serialized = serde_json::to_value(&prefs).unwrap();
+    assert!(serialized["audio"].get("mixdownType").is_none());
+    assert!(serialized["audio"].get("sumToMonoInSource").is_none());
+    assert!(serialized["timeline"].get("surroundMediaTracks").is_none());
+    for key in ["audio.mixdownType", "audio.sumToMonoInSource", "timeline.surroundMediaTracks"] {
+        assert!(prefs.get(key).is_none(), "{key}");
+        for value in [json!(null), json!("frontRear"), json!({"channels": [0, 1, 2]})] {
+            assert!(prefs.set(key, value).is_err(), "{key}");
+            assert_eq!(prefs, before);
+        }
+    }
+}
+
+#[test]
 fn removed_capture_commands_cannot_mutate_the_project() {
     let mut s = Session::default();
     let project = s.project.clone();

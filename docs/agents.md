@@ -111,7 +111,7 @@ progress and stop it:
   when none. The export itself still succeeds; deciding what to do about it is up to the caller.
 - Every job in `jobs.list`, and every encoding item of `export.queue.list`, carries `etaSeconds`: the
   time left at the job's speed over the last 15 seconds, `null` until a second of progress has been
-  measured (a loudness pass, a seek) and once it is done. The app shows it as `37% · 2:05 left` in the
+  measured (a seek) and once it is done. The app shows it as `37% · 2:05 left` in the
   status bar, the Export queue and the Progress panel.
 - With `"_meta": {"progressToken": T}` on the `tools/call`, the server sends
   `notifications/progress` `{progressToken: T, progress: <frames done>, total: <frames>, message:
