@@ -1,4 +1,4 @@
-//! Premiere-style docking: a tree of splits and tab groups. Panels are rounded frames separated by
+//! Adjustable WaltCut layout: a tree of splits and tab groups. Panels are rounded frames separated by
 //! thin gutters; each group has a tab strip (active tab bright, with a panel menu "≡"); the focused
 //! panel gets a blue outline. Gutters drag to resize; workspaces are serialized trees.
 
@@ -13,15 +13,12 @@ use crate::theme::Tokens;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PanelKind {
     Project,
-    Libraries,
-    Info,
     Effects,
     Markers,
     History,
     Source,
     EffectControls,
     AudioClipMixer,
-    Metadata,
     Program,
     Timeline,
     Tools,
@@ -32,22 +29,17 @@ pub enum PanelKind {
     Properties,
     Events,
     Progress,
-    Timecode,
-    ProjectNotes,
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 22] = [
+    pub const ALL: [PanelKind; 17] = [
         PanelKind::Project,
-        PanelKind::Libraries,
-        PanelKind::Info,
         PanelKind::Effects,
         PanelKind::Markers,
         PanelKind::History,
         PanelKind::Source,
         PanelKind::EffectControls,
         PanelKind::AudioClipMixer,
-        PanelKind::Metadata,
         PanelKind::Program,
         PanelKind::Timeline,
         PanelKind::Tools,
@@ -58,21 +50,16 @@ impl PanelKind {
         PanelKind::Properties,
         PanelKind::Events,
         PanelKind::Progress,
-        PanelKind::Timecode,
-        PanelKind::ProjectNotes,
     ];
     pub fn title(self) -> &'static str {
         match self {
             PanelKind::Project => "Project",
-            PanelKind::Libraries => "Libraries",
-            PanelKind::Info => "Info",
             PanelKind::Effects => "Effects",
             PanelKind::Markers => "Markers",
             PanelKind::History => "History",
             PanelKind::Source => "Source",
             PanelKind::EffectControls => "Effect Controls",
             PanelKind::AudioClipMixer => "Audio Clip Mixer",
-            PanelKind::Metadata => "Metadata",
             PanelKind::Program => "Program",
             PanelKind::Timeline => "Timeline",
             PanelKind::Tools => "Tools",
@@ -83,8 +70,6 @@ impl PanelKind {
             PanelKind::Properties => "Properties",
             PanelKind::Events => "Events",
             PanelKind::Progress => "Progress",
-            PanelKind::Timecode => "Timecode",
-            PanelKind::ProjectNotes => "Project Notes",
         }
     }
     pub fn id(self) -> String {
@@ -94,7 +79,7 @@ impl PanelKind {
         let n = s.to_ascii_lowercase().replace([' ', '_', '-'], "");
         Self::ALL.iter().copied().find(|p| format!("{p:?}").to_ascii_lowercase() == n || p.title().to_ascii_lowercase().replace(' ', "") == n)
     }
-    /// Window-menu shortcut (Premiere: Shift+1..9).
+    /// Window-menu shortcut.
     pub fn window_shortcut(self) -> Option<&'static str> {
         match self {
             PanelKind::Project => Some("Shift+1"),
@@ -158,7 +143,7 @@ fn vsplit(size: SplitSize, a: DockNode, b: DockNode) -> DockNode {
     DockNode::Split { vertical: true, size, a: Box::new(a), b: Box::new(b) }
 }
 
-pub const WORKSPACES: [&str; 9] = ["Editing", "Assembly", "Color", "Effects", "Audio", "Captions and Graphics", "Learning", "Review", "All Panels"];
+pub const WORKSPACES: [&str; 1] = ["WaltCut"];
 
 /// The user's workspaces file, beside `preferences.json` in the data directory.
 pub const WORKSPACES_FILE: &str = "workspaces.json";
@@ -208,26 +193,14 @@ impl WorkspacePrefs {
     }
 }
 
-/// A workspace's command-id key: `Captions and Graphics` → `captionsandgraphics`.
+/// A layout's case-insensitive command-id key.
 pub fn slug(name: &str) -> String {
     name.to_ascii_lowercase().replace(' ', "")
 }
 
-pub fn is_builtin(name: &str) -> bool {
-    WORKSPACES.contains(&name)
-}
-
-/// Every workspace, built-in and the user's own, in one alphabetical list (Premiere's Window ▸
-/// Workspaces).
-pub fn names(prefs: &WorkspacePrefs) -> Vec<String> {
-    let mut v: Vec<String> = WORKSPACES.iter().map(|s| s.to_string()).collect();
-    for s in &prefs.saved {
-        if !v.contains(&s.name) {
-            v.push(s.name.clone());
-        }
-    }
-    v.sort_by_key(|n| n.to_lowercase());
-    v
+/// The single layout available in the UI and automation.
+pub fn names(_prefs: &WorkspacePrefs) -> Vec<String> {
+    vec!["WaltCut".into()]
 }
 
 /// The workspace called `query` (any case, spaces optional).
@@ -235,135 +208,30 @@ pub fn find(prefs: &WorkspacePrefs, query: &str) -> Option<String> {
     names(prefs).into_iter().find(|n| slug(n) == slug(query))
 }
 
-/// The saved layout of a workspace: the user's saved version, else the built-in default.
-pub fn saved_layout(prefs: &WorkspacePrefs, name: &str) -> DockNode {
-    saved_docking(prefs, name).root
-}
-
 pub fn saved_docking(prefs: &WorkspacePrefs, name: &str) -> Layout {
-    let saved = prefs.saved.iter().find(|saved| saved.name == name).and_then(|saved| {
-        let mut layout = Layout {
+    let saved = prefs.saved.iter().find(|saved| name == "WaltCut" && saved.name == name).and_then(|saved| {
+        let layout = Layout {
             root: serde_json::from_value(saved.layout.clone()).ok()?,
             floating: if saved.floating.is_null() { vec![] } else { serde_json::from_value(saved.floating.clone()).ok()? },
         };
-        if layout.floating.is_empty() {
-            migrate_legacy_effects(&mut layout.root);
-        }
         layout.validate().ok().map(|()| layout)
     });
     saved.unwrap_or_else(|| Layout { root: workspace(name), floating: vec![] })
 }
 
-/// Older Effects workspaces stored the same Effect Controls panel twice: selected beside
-/// Source, and an inactive duplicate beside Essential Graphics. Remove only that known
-/// duplicate shape; unrelated malformed or ambiguous saved layouts still fail validation.
-fn migrate_legacy_effects(root: &mut DockNode) {
-    let Ok(shared) = crate::dock_shared::encode(root, &[]) else { return };
-    if shared.panels().iter().filter(|panel| ***panel == PanelKind::EffectControls).count() != 2 {
-        return;
-    }
-    fn selected_source(node: &DockNode) -> bool {
-        match node {
-            DockNode::Tabs { panels, active } => {
-                panels.contains(&PanelKind::Source) && panels.contains(&PanelKind::AudioClipMixer) && panels.get(*active) == Some(&PanelKind::EffectControls)
-            }
-            DockNode::Split { a, b, .. } => selected_source(a) || selected_source(b),
-        }
-    }
-    fn remove_inactive(node: &mut DockNode) {
-        match node {
-            DockNode::Tabs { panels, active } if panels.as_slice() == [PanelKind::EffectControls, PanelKind::EssentialGraphics] && *active == 1 => {
-                panels.remove(0);
-                *active = 0;
-            }
-            DockNode::Split { a, b, .. } => {
-                remove_inactive(a);
-                remove_inactive(b);
-            }
-            DockNode::Tabs { .. } => {}
-        }
-    }
-    if selected_source(root) {
-        remove_inactive(root);
-    }
-}
-
-/// The default layout of a named workspace.
-pub fn workspace(name: &str) -> DockNode {
+/// The animation layout; obsolete names never select an alternate preset.
+pub fn workspace(_name: &str) -> DockNode {
     use PanelKind::*;
     use SplitSize::*;
-    let bottom_editing = || hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0)));
-    match name {
-        "Assembly" => vsplit(
-            Ratio(0.52),
-            hsplit(
-                Ratio(0.46),
-                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
-            ),
-            bottom_editing(),
+    vsplit(
+        Ratio(0.57),
+        hsplit(FixedB(360.0), hsplit(Ratio(0.42), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)), tabs(&[Properties, EssentialGraphics], 0)),
+        hsplit(
+            Ratio(0.27),
+            tabs(&[Project, Effects, Markers, History], 0),
+            hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
         ),
-        "Color" => hsplit(
-            FixedB(340.0),
-            vsplit(
-                Ratio(0.58),
-                hsplit(Ratio(0.42), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Info, Markers, History], 0), bottom_editing()),
-            ),
-            tabs(&[Effects], 0),
-        ),
-        "Effects" => hsplit(
-            FixedB(320.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer], 1), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Info, Markers, History], 0), bottom_editing()),
-            ),
-            vsplit(Ratio(0.5), tabs(&[Effects], 0), tabs(&[EssentialGraphics], 0)),
-        ),
-        "Audio" => hsplit(
-            FixedB(320.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.5), tabs(&[AudioTrackMixer, Source, AudioClipMixer, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Effects, Markers, History], 0), bottom_editing()),
-            ),
-            tabs(&[EssentialSound], 0),
-        ),
-        "Captions and Graphics" => hsplit(
-            FixedB(330.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(Ratio(0.4), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)),
-                hsplit(Ratio(0.3), tabs(&[Project, Libraries], 0), bottom_editing()),
-            ),
-            tabs(&[EssentialGraphics, Properties], 0),
-        ),
-        "All Panels" => vsplit(
-            Ratio(0.5),
-            hsplit(
-                Ratio(0.5),
-                tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0),
-                hsplit(Ratio(0.6), tabs(&[Program], 0), tabs(&[EssentialGraphics, EssentialSound, Properties, AudioTrackMixer], 0)),
-            ),
-            hsplit(Ratio(0.26), tabs(&[Project, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),
-        ),
-        // Editing (default), Learning, Review — Premiere 26 factory layout:
-        // top: Source group | Program | Properties; bottom: Project group | Tools | Timeline | Meters.
-        _ => vsplit(
-            Ratio(0.57),
-            hsplit(
-                FixedB(450.0),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
-                tabs(&[Properties, EssentialGraphics], 0),
-            ),
-            hsplit(
-                Ratio(0.29),
-                tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
-                hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
-            ),
-        ),
-    }
+    )
 }
 
 impl DockNode {
@@ -528,7 +396,7 @@ fn layout_inner(
             let Some(split) = split_rect(rect, axis, size.shared(), t.gap, 20.0) else { return };
             let id = egui::Id::new(("dock-gutter", path.to_string()));
             let handle_style = ResizeHandleStyle { hovered: t.focus.gamma_multiply(0.4), dragged: t.focus.gamma_multiply(0.9), focused: t.focus };
-            let label = if *vertical { tl!("Height:") } else { tl!("Width:") };
+            let label = if *vertical { "Height:" } else { "Width:" };
             let response = ResizeHandle::new(id, axis, split.divider, label, handle_style).value(split.first_size(), 0.0..=split.available()).show(ui);
             reg.add_response(&format!("dock.gutter.{path}"), &response.response, "gutter");
             if response.delta != 0.0
@@ -612,9 +480,9 @@ pub fn draw_group_chrome_details(ui: &mut egui::Ui, g: &Group, seqs: &SeqTabs, t
                 tabs.extend(seqs.open.iter().map(|(id, name)| Tab { panel: *p, seq: Some(*id), title: name.clone(), active: seqs.active == Some(*id) }));
             } else if *p == PanelKind::Timeline {
                 let name = seqs.open.iter().find(|(id, _)| seqs.active == Some(*id)).map(|(_, n)| n.clone());
-                tabs.push(Tab { panel: *p, seq: None, title: name.unwrap_or_else(|| tl!("Timeline: (no sequences)").into()), active });
+                tabs.push(Tab { panel: *p, seq: None, title: name.unwrap_or_else(|| "Timeline: (no sequences)".into()), active });
             } else {
-                tabs.push(Tab { panel: *p, seq: None, title: crate::i18n::t(p.title()).to_string(), active });
+                tabs.push(Tab { panel: *p, seq: None, title: p.title().to_string(), active });
             }
         }
         let activate = |tab: &Tab, actions: &mut Vec<DockAction>| match tab.seq {
@@ -914,10 +782,10 @@ mod tests {
     #[test]
     fn close_and_open() {
         let mut d = workspace("Editing");
-        d.close(PanelKind::Metadata);
-        assert!(!d.contains(PanelKind::Metadata));
-        d.open_near(PanelKind::Metadata, PanelKind::Program);
-        assert!(d.is_visible(PanelKind::Metadata));
+        d.close(PanelKind::Progress);
+        assert!(!d.contains(PanelKind::Progress));
+        d.open_near(PanelKind::Progress, PanelKind::Program);
+        assert!(d.is_visible(PanelKind::Progress));
         let s = serde_json::to_string(&d).unwrap();
         let back: DockNode = serde_json::from_str(&s).unwrap();
         assert_eq!(back, d);
@@ -939,8 +807,8 @@ mod tests {
         assert!(d.is_visible(PanelKind::Timeline));
         // a tree without Project or Program: the panel joins the first group
         let mut d = hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects], 0), tabs(&[PanelKind::Markers], 0));
-        d.open_near(PanelKind::Info, PanelKind::Source);
-        assert!(d.is_visible(PanelKind::Info));
-        assert_eq!(d, hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects, PanelKind::Info], 1), tabs(&[PanelKind::Markers], 0)));
+        d.open_near(PanelKind::Properties, PanelKind::Source);
+        assert!(d.is_visible(PanelKind::Properties));
+        assert_eq!(d, hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects, PanelKind::Properties], 1), tabs(&[PanelKind::Markers], 0)));
     }
 }

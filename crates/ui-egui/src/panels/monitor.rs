@@ -38,12 +38,12 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     let (target, frame_size, rate, time, duration, drop_frame, mark_in, mark_out, name) = match which {
         Which::Program => {
             let Some(seq_id) = app.session.state.active_sequence else {
-                crate::dock::placeholder(ui, rect, &t, tl!("(no sequences)"));
+                crate::dock::placeholder(ui, rect, &t, "(no sequences)");
                 return;
             };
             // A damaged project can name an active sequence that no longer exists.
             let Some(q) = app.session.active_sequence() else {
-                crate::dock::placeholder(ui, rect, &t, tl!("(no sequences)"));
+                crate::dock::placeholder(ui, rect, &t, "(no sequences)");
                 return;
             };
             (
@@ -60,7 +60,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         }
         Which::Source => {
             let Some(item) = app.session.state.source_item else {
-                crate::dock::placeholder(ui, rect, &t, tl!("(no clips)"));
+                crate::dock::placeholder(ui, rect, &t, "(no clips)");
                 return;
             };
             let Some(pi) = app.session.project.item(item) else { return };
@@ -218,13 +218,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         }
         if display != DisplayMode::Composite {
             let label = match display {
-                DisplayMode::Composite => tl!("Composite"),
-                DisplayMode::Alpha => tl!("Alpha"),
-                DisplayMode::Red => tl!("Red"),
-                DisplayMode::Green => tl!("Green"),
-                DisplayMode::Blue => tl!("Blue"),
-                DisplayMode::AudioWaveform => tl!("Audio Waveform"),
-                DisplayMode::VideoAndWaveform => tl!("Video and Waveform"),
+                DisplayMode::Composite => "Composite",
+                DisplayMode::Alpha => "Alpha",
+                DisplayMode::Red => "Red",
+                DisplayMode::Green => "Green",
+                DisplayMode::Blue => "Blue",
+                DisplayMode::AudioWaveform => "Audio Waveform",
+                DisplayMode::VideoAndWaveform => "Video and Waveform",
             };
             ui.painter().text(pos2(video_area.max.x - 8.0, video_area.min.y + 6.0), Align2::RIGHT_TOP, label, Tokens::ui(10.0), t.text_dim);
         }
@@ -302,7 +302,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     };
     let zr = Rect::from_min_size(pos2(zoom_x, settings_y), vec2(70.0, 24.0));
     let zoom_label = match mv.zoom {
-        None => tl!("Fit").to_string(),
+        None => "Fit".to_string(),
         Some(z) => format!("{}%", (z * 100.0).round() as i32),
     };
     let zresp = crate::widgets::dropdown_text(ui, zr, &zoom_label, &t, egui::Id::new((prefix, "zoom")));
@@ -323,11 +323,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if separate_source_drag {
         crate::panels::source_drag::controls(app, ui, Rect::from_min_size(pos2(row1.center().x - 52.0, settings_y + 26.0), vec2(104.0, 24.0)));
     }
-    let rresp = crate::widgets::dropdown_text(ui, rr, crate::i18n::t(res.label()), &t, egui::Id::new((prefix, "res")));
+    let rresp = crate::widgets::dropdown_text(ui, rr, res.label(), &t, egui::Id::new((prefix, "res")));
     app.auto.add(&format!("{prefix}.resolution"), rr, "Select Playback Resolution");
     egui::Popup::menu(&rresp).show(|ui| {
         for r in PlaybackRes::ALL {
-            if ui.selectable_label(r == res, crate::i18n::t(r.label())).clicked() {
+            if ui.selectable_label(r == res, r.label()).clicked() {
                 monitor_view::view_mut(app, which).res = r;
             }
         }
@@ -340,11 +340,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         ui.set_min_width(240.0);
         monitor_view::wrench_items(app, ui, which);
         let mv = monitor_view::view_mut(app, which);
-        ui.checkbox(&mut mv.safe_margins, tl!("Safe Margins"));
-        ui.checkbox(&mut mv.show_transport, tl!("Show Transport Controls"));
+        ui.checkbox(&mut mv.safe_margins, "Safe Margins");
+        ui.checkbox(&mut mv.show_transport, "Show Transport Controls");
         if which == Which::Source {
             let mut looping = app.source_playback.clock.looping;
-            let response = ui.checkbox(&mut looping, tl!("Loop marked range"));
+            let response = ui.checkbox(&mut looping, "Loop marked range");
             app.auto.add("source.settings.loop", response.rect, "Loop marked range");
             if response.changed()
                 && let Err(e) = crate::menus::invoke(app, &ctx, "playback.loop", json!({"monitor":"source"}))
@@ -354,7 +354,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         }
         if which == Which::Program {
             ui.separator();
-            ui.checkbox(&mut app.playback.looping, tl!("Loop"));
+            ui.checkbox(&mut app.playback.looping, "Loop");
             ui.separator();
         }
     });
@@ -486,7 +486,7 @@ fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, 
     ctx.data_mut(|d| d.remove::<EyedropperPick>(pending_id));
     app.ui.eyedropper = None;
     let Some(rgb) = sample_rgb(&img, pick.uv) else {
-        app.ui.status = tl!("Eyedropper: no picture to sample").to_string();
+        app.ui.status = "Eyedropper: no picture to sample".to_string();
         return;
     };
     // the parameter stores linear values, like the colour picker beside it
@@ -827,36 +827,36 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
     let src = which == Which::Source;
     let buttons: Vec<(Icon, &str, &str)> = if src {
         vec![
-            (Icon::Marker, "markers.add", tl!("Add Marker (M)")),
-            (Icon::MarkIn, "src.markIn", tl!("Mark In (I)")),
-            (Icon::MarkOut, "src.markOut", tl!("Mark Out (O)")),
-            (Icon::GoToIn, "src.goIn", tl!("Go to In (Shift+I)")),
-            (Icon::StepBack, "src.stepBack", tl!("Step Back 1 Frame (Left)")),
-            (if app.source_playback.clock.playing { Icon::Pause } else { Icon::Play }, "source.playback.toggle", tl!("Play-Stop Toggle (Space)")),
-            (Icon::StepFwd, "src.stepFwd", tl!("Step Forward 1 Frame (Right)")),
-            (Icon::GoToOut, "src.goOut", tl!("Go to Out (Shift+O)")),
-            (Icon::Insert, "source.insert", tl!("Insert (,)")),
-            (Icon::Overwrite, "source.overwrite", tl!("Overwrite (.)")),
-            (Icon::Camera, "exportFrame", tl!("Export Frame")),
+            (Icon::Marker, "markers.add", "Add Marker (M)"),
+            (Icon::MarkIn, "src.markIn", "Mark In (I)"),
+            (Icon::MarkOut, "src.markOut", "Mark Out (O)"),
+            (Icon::GoToIn, "src.goIn", "Go to In (Shift+I)"),
+            (Icon::StepBack, "src.stepBack", "Step Back 1 Frame (Left)"),
+            (if app.source_playback.clock.playing { Icon::Pause } else { Icon::Play }, "source.playback.toggle", "Play-Stop Toggle (Space)"),
+            (Icon::StepFwd, "src.stepFwd", "Step Forward 1 Frame (Right)"),
+            (Icon::GoToOut, "src.goOut", "Go to Out (Shift+O)"),
+            (Icon::Insert, "source.insert", "Insert (,)"),
+            (Icon::Overwrite, "source.overwrite", "Overwrite (.)"),
+            (Icon::Camera, "exportFrame", "Export Frame"),
         ]
     } else {
         vec![
-            (Icon::Marker, "markers.add", tl!("Add Marker (M)")),
-            (Icon::MarkIn, "markers.markIn", tl!("Mark In (I)")),
-            (Icon::MarkOut, "markers.markOut", tl!("Mark Out (O)")),
-            (Icon::GoToIn, "markers.goToIn", tl!("Go to In (Shift+I)")),
-            (Icon::StepBack, "playhead.stepBack", tl!("Step Back 1 Frame (Left)")),
-            (if app.playback.playing { Icon::Pause } else { Icon::Play }, "playback.toggle", tl!("Play-Stop Toggle (Space)")),
-            (Icon::StepFwd, "playhead.stepForward", tl!("Step Forward 1 Frame (Right)")),
-            (Icon::GoToOut, "markers.goToOut", tl!("Go to Out (Shift+O)")),
-            (Icon::Lift, "sequence.lift", tl!("Lift (;)")),
-            (Icon::Extract, "sequence.extract", tl!("Extract (')")),
-            (Icon::Camera, "exportFrame", tl!("Export Frame")),
+            (Icon::Marker, "markers.add", "Add Marker (M)"),
+            (Icon::MarkIn, "markers.markIn", "Mark In (I)"),
+            (Icon::MarkOut, "markers.markOut", "Mark Out (O)"),
+            (Icon::GoToIn, "markers.goToIn", "Go to In (Shift+I)"),
+            (Icon::StepBack, "playhead.stepBack", "Step Back 1 Frame (Left)"),
+            (if app.playback.playing { Icon::Pause } else { Icon::Play }, "playback.toggle", "Play-Stop Toggle (Space)"),
+            (Icon::StepFwd, "playhead.stepForward", "Step Forward 1 Frame (Right)"),
+            (Icon::GoToOut, "markers.goToOut", "Go to Out (Shift+O)"),
+            (Icon::Lift, "sequence.lift", "Lift (;)"),
+            (Icon::Extract, "sequence.extract", "Extract (')"),
+            (Icon::Camera, "exportFrame", "Export Frame"),
         ]
     };
     let mut buttons = buttons;
     if !src {
-        buttons.push((Icon::Loop, "playback.loop", tl!("Loop")));
+        buttons.push((Icon::Loop, "playback.loop", "Loop"));
     }
     let hidden = monitor_view::view(app, which).transport_hidden.clone();
     let all_buttons = buttons.clone();
@@ -866,7 +866,7 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
         // Keep the existing button-editor affordance only when it has its own space.
         // Customize this monitor's transport separately from the other monitor.
         let r = Rect::from_min_size(pos2(row.max.x - 30.0, row.min.y + 5.0), vec2(22.0, 22.0));
-        let resp = ui.interact(r, egui::Id::new((prefix, "btn-editor")), Sense::click()).on_hover_text(tl!("Button Editor"));
+        let resp = ui.interact(r, egui::Id::new((prefix, "btn-editor")), Sense::click()).on_hover_text("Button Editor");
         app.auto.add(&format!("{prefix}.transport.editor"), r, "Button Editor");
         icons::paint(ui.painter(), r.shrink(5.0), Icon::Plus, if resp.hovered() { t.tab_text_active } else { t.text_dim });
         let mut edited_hidden = hidden.clone();
@@ -885,7 +885,7 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
                     }
                 }
                 ui.separator();
-                let reset = ui.button(tl!("Reset"));
+                let reset = ui.button("Reset");
                 app.auto.add(&format!("{prefix}.transport.editor.reset"), reset.rect, "Reset");
                 if reset.clicked() {
                     edited_hidden = crate::state::MonitorView::default().transport_hidden;
@@ -930,8 +930,8 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
     }
     if !fit.overflow.is_empty() {
         let rect = Rect::from_min_size(pos2(x, row.min.y + 2.0), vec2(TRANSPORT_BUTTON, TRANSPORT_BUTTON));
-        let response = ui.interact(rect, egui::Id::new((prefix, "transport-more")), Sense::click()).on_hover_text(tl!("More transport controls"));
-        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("More transport controls")));
+        let response = ui.interact(rect, egui::Id::new((prefix, "transport-more")), Sense::click()).on_hover_text("More transport controls");
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "More transport controls"));
         if response.hovered() {
             ui.painter().rect_filled(rect, 4.0, t.hover);
         }
@@ -1012,7 +1012,7 @@ pub fn source_panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
     if !recent.is_empty() {
         ui.separator();
     }
-    for (cmd, id, label) in [("source.close", "close", tl!("Close")), ("source.closeAll", "closeAll", tl!("Close All"))] {
+    for (cmd, id, label) in [("source.close", "close", "Close"), ("source.closeAll", "closeAll", "Close All")] {
         let r = ui.add_enabled(current.is_some(), egui::Button::new(label));
         app.auto.add(&format!("panel.menu.Source.{id}"), r.rect, label);
         if r.clicked() {

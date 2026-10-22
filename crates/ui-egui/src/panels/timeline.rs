@@ -649,7 +649,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     // master track
     let master = Rect::from_min_max(pos2(rect.min.x, tracks_area.max.y - MASTER_H), pos2(content.max.x, tracks_area.max.y));
     painter.rect_filled(master, 0.0, t.tl_header_bg);
-    painter.text(pos2(rect.min.x + 44.0, master.center().y), Align2::LEFT_CENTER, tl!("Mix"), Tokens::ui(11.5), t.text);
+    painter.text(pos2(rect.min.x + 44.0, master.center().y), Align2::LEFT_CENTER, "Mix", Tokens::ui(11.5), t.text);
     painter.text(
         pos2(rect.min.x + header_w - 12.0, master.center().y),
         Align2::RIGHT_CENTER,
@@ -717,16 +717,16 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 
 fn empty_state(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
-    ui.painter().text(rect.center() - vec2(0.0, 12.0), Align2::CENTER_CENTER, tl!("Drop media here to create sequence."), Tokens::ui(13.0), t.text_dim);
+    ui.painter().text(rect.center() - vec2(0.0, 12.0), Align2::CENTER_CENTER, "Drop media here to create sequence.", Tokens::ui(13.0), t.text_dim);
     if app.session.project.items.values().any(|i| matches!(i.kind, waltcut_project::ItemKind::Sequence(_))) {
-        let hint = tl!("Double-click a sequence in the Project panel to open it here.");
+        let hint = "Double-click a sequence in the Project panel to open it here.";
         ui.painter().text(rect.center() + vec2(0.0, 50.0), Align2::CENTER_CENTER, hint, Tokens::ui(12.0), t.text_dim);
     }
     let b = Rect::from_center_size(rect.center() + vec2(0.0, 20.0), vec2(170.0, 26.0));
     let resp = ui.interact(b, egui::Id::new("tl-open-demo"), Sense::click());
     app.auto.add("timeline.openDemo", b, "Open Demo Project");
     ui.painter().rect_filled(b, 13.0, if resp.hovered() { t.accent_hover } else { t.accent });
-    ui.painter().text(b.center(), Align2::CENTER_CENTER, tl!("Open Demo Project"), Tokens::semibold(12.0), Color32::WHITE);
+    ui.painter().text(b.center(), Align2::CENTER_CENTER, "Open Demo Project", Tokens::semibold(12.0), Color32::WHITE);
     if resp.clicked() {
         let _ = app.session.execute("file.openDemoProject", json!({}));
     }
@@ -1239,14 +1239,14 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             p.rect_filled(hrect, 0.0, c.gamma_multiply(TRACK_HEADER_TINT));
             p.rect_filled(Rect::from_min_max(strip.min, pos2(strip.min.x + 5.0, strip.max.y)), 0.0, c);
         }
-        let cresp = ui.interact(strip.intersect(visible), egui::Id::new(("trackColor", r.track.0)), Sense::click()).on_hover_text(tl!("Track Color"));
+        let cresp = ui.interact(strip.intersect(visible), egui::Id::new(("trackColor", r.track.0)), Sense::click()).on_hover_text("Track Color");
         app.auto.add(&format!("timeline.track.{}{}.color", if r.kind == TrackKind::Video { "V" } else { "A" }, r.index + 1), strip, "Track Color");
         if cresp.hovered() && tr.label.is_none() {
             p.rect_filled(Rect::from_min_max(strip.min, pos2(strip.min.x + 5.0, strip.max.y)), 0.0, t.hover);
         }
         egui::Popup::menu(&cresp).show(|ui| {
             let prefix = format!("timeline.track.{}{}.color", if r.kind == TrackKind::Video { "V" } else { "A" }, r.index + 1);
-            let none = ui.selectable_label(tr.label.is_none(), tl!("None"));
+            let none = ui.selectable_label(tr.label.is_none(), "None");
             app.auto.add(&format!("{prefix}.None"), none.rect, "None");
             if none.clicked() {
                 actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "label": ""})));
@@ -1452,11 +1452,11 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
     let mut x = rect.min.x + 12.0;
     let y = rect.min.y + 26.0;
     let toggles: [(Icon, &str, bool, bool, &str); 5] = [
-        (Icon::Nest, "nest", !app.session.state.sequences_as_clips, true, tl!("Insert and overwrite sequences as nests or individual clips")),
-        (Icon::Magnet, "snap", app.session.state.snapping, true, tl!("Snap in Timeline (S)")),
-        (Icon::Link, "linked", app.session.state.linked_selection, true, tl!("Linked Selection")),
-        (Icon::Marker, "marker", false, false, tl!("Add Marker (M)")),
-        (Icon::Wrench, "settings", false, false, tl!("Timeline Display Settings")),
+        (Icon::Nest, "nest", !app.session.state.sequences_as_clips, true, "Insert and overwrite sequences as nests or individual clips"),
+        (Icon::Magnet, "snap", app.session.state.snapping, true, "Snap in Timeline (S)"),
+        (Icon::Link, "linked", app.session.state.linked_selection, true, "Linked Selection"),
+        (Icon::Marker, "marker", false, false, "Add Marker (M)"),
+        (Icon::Wrench, "settings", false, false, "Timeline Display Settings"),
     ];
     for (icon, key, on, toggle, tip) in toggles {
         let r = Rect::from_min_size(pos2(x, y), vec2(28.0, 28.0));
@@ -1479,12 +1479,12 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
         }
         if key == "settings" {
             egui::Popup::menu(&resp).show(|ui| {
-                let c = ui.checkbox(&mut app.ui.timeline.show_thumbnails, tl!("Show Video Thumbnails"));
+                let c = ui.checkbox(&mut app.ui.timeline.show_thumbnails, "Show Video Thumbnails");
                 app.auto.add("timeline.settings.showThumbnails", c.rect, "Show Video Thumbnails");
                 let on = app.ui.timeline.show_thumbnails;
                 ui.indent("timeline.settings.thumbnails", |ui| {
                     for (mode, label) in
-                        [(ThumbnailMode::Head, tl!("Head")), (ThumbnailMode::HeadAndTail, tl!("Head and Tail")), (ThumbnailMode::Continuous, tl!("Continuous"))]
+                        [(ThumbnailMode::Head, "Head"), (ThumbnailMode::HeadAndTail, "Head and Tail"), (ThumbnailMode::Continuous, "Continuous")]
                     {
                         let r = ui.add_enabled(on, egui::RadioButton::new(app.ui.timeline.thumbnail_mode == mode, label));
                         app.auto.add(&format!("timeline.settings.thumbnails.{}", mode.name()), r.rect, label);
@@ -1493,20 +1493,20 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
                         }
                     }
                 });
-                ui.checkbox(&mut app.ui.timeline.show_waveforms, tl!("Show Audio Waveform"));
+                ui.checkbox(&mut app.ui.timeline.show_waveforms, "Show Audio Waveform");
                 ui.separator();
                 let mut te = app.session.state.show_through_edits;
-                let c = ui.checkbox(&mut te, tl!("Show Through Edits"));
+                let c = ui.checkbox(&mut te, "Show Through Edits");
                 app.auto.add("timeline.settings.showThroughEdits", c.rect, "Show Through Edits");
                 if c.changed() {
                     let _ = app.session.execute("sequence.showThroughEdits", json!({"on": te}));
                 }
                 ui.separator();
-                if ui.button(tl!("Expand All Tracks")).clicked() {
+                if ui.button("Expand All Tracks").clicked() {
                     app.ui.timeline.video_track_h = 64.0;
                     app.ui.timeline.audio_track_h = 64.0;
                 }
-                if ui.button(tl!("Minimize All Tracks")).clicked() {
+                if ui.button("Minimize All Tracks").clicked() {
                     app.ui.timeline.video_track_h = 26.0;
                     app.ui.timeline.audio_track_h = 26.0;
                 }
@@ -1566,9 +1566,9 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
         use waltcut_engine::previews::BarState;
         let (c, what) = match span.state {
             BarState::None => continue,
-            BarState::Yellow => (t.render_yellow, tl!("Unrendered: should play back in real time")),
-            BarState::Red => (t.render_red, tl!("Unrendered: render to play back in real time")),
-            BarState::Green => (t.render_green, tl!("Rendered preview")),
+            BarState::Yellow => (t.render_yellow, "Unrendered: should play back in real time"),
+            BarState::Red => (t.render_red, "Unrendered: render to play back in real time"),
+            BarState::Green => (t.render_green, "Rendered preview"),
         };
         let r = Rect::from_min_max(pos2(layout.x_of(span.start), rb.min.y), pos2(layout.x_of(span.end), rb.max.y)).intersect(ruler);
         if r.width() <= 0.0 {
@@ -1975,7 +1975,6 @@ fn marker_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui, m
     super::misc::marker_label_menu(app, ui, &marker, "timeline.markerMenu");
     ui.separator();
     for (label, cmd) in [("Clear Selected Marker", "markers.clearCurrent"), ("Clear Markers", "markers.clearAll")] {
-        let label = crate::i18n::t(label);
         let r = ui.button(label);
         app.auto.add(&format!("timeline.markerMenu.{cmd}"), r.rect, label);
         if r.clicked() {
@@ -2063,7 +2062,6 @@ fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::U
         let clip = clip.filter(|_| kind != "roll" || (target.left.is_some() && target.right.is_some()));
         let out = edge == waltcut_edit::Edge::Out;
         let current = selected.is_some_and(|ep| Some(ep.clip) == clip && ep.out == out && serde_json::to_value(ep.kind).ok() == Some(json!(kind)));
-        let label = crate::i18n::t(label);
         let text = if current { format!("✓ {label}") } else { label.to_string() };
         let r = ui.add_enabled(clip.is_some(), egui::Button::new(text));
         app.auto.add(&format!("timeline.editPointMenu.{id}"), r.rect, label);
@@ -2078,7 +2076,7 @@ fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::U
         }
     }
     ui.separator();
-    let label = tl!("Apply Default Transitions");
+    let label = "Apply Default Transitions";
     let r = ui.add_enabled(app.session.is_enabled("trim.applyDefaultTransition"), egui::Button::new(label));
     app.auto.add("timeline.editPointMenu.applyDefaultTransitions", r.rect, label);
     if r.clicked() {
@@ -2089,7 +2087,7 @@ fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::U
     }
     // only this cut (and its linked partners), and only when it is a through edit
     let through = waltcut_edit::through::through_edits(seq).iter().any(|e| Some(e.left) == target.left && Some(e.right) == target.right);
-    let label = tl!("Join Through Edits");
+    let label = "Join Through Edits";
     let r = ui.add_enabled(through, egui::Button::new(label));
     app.auto.add("timeline.editPointMenu.joinThroughEdits", r.rect, label);
     if r.clicked()
@@ -2104,7 +2102,7 @@ fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::U
 
 /// The menu of a right-clicked gap: Ripple Delete closes it.
 fn gap_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui) {
-    let label = tl!("Ripple Delete");
+    let label = "Ripple Delete";
     let r = ui.add_enabled(app.session.state.gap_selection.is_some(), egui::Button::new(label));
     app.auto.add("timeline.gapMenu.edit.rippleDelete", r.rect, label);
     if r.clicked() {
@@ -2800,7 +2798,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             for &(label, cmd) in *group {
                 if cmd == "edit.label" {
                     ui.add_enabled_ui(!picked.is_empty(), |ui| {
-                        let menu = ui.menu_button(crate::i18n::t(label), |ui| {
+                        let menu = ui.menu_button(label, |ui| {
                             // the user's label names and colours, as in Edit ▸ Label (#786)
                             let labels = app.session.prefs.labels.clone();
                             for l in waltcut_project::Label::ALL {
@@ -2812,14 +2810,14 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                                 }
                             }
                         });
-                        app.auto.add_response("timeline.clipMenu.edit.label", &menu.response, crate::i18n::t(label));
+                        app.auto.add_response("timeline.clipMenu.edit.label", &menu.response, label);
                     });
                     continue;
                 }
                 let label = match cmd {
-                    "clip.enable" if all_enabled => tl!("✓ Enable"),
-                    "clip.link" if linked => tl!("Unlink"),
-                    _ => crate::i18n::t(label),
+                    "clip.enable" if all_enabled => "✓ Enable",
+                    "clip.link" if linked => "Unlink",
+                    _ => label,
                 };
                 let r = ui.add_enabled(!sel.is_empty() && app.session.is_enabled(cmd), egui::Button::new(label));
                 app.auto.add(&format!("timeline.clipMenu.{cmd}"), r.rect, label);
@@ -2873,7 +2871,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             ui.painter().rect_filled(r, 3.0, Color32::from_white_alpha(40));
             ui.painter().rect_stroke(r, 3.0, Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
             if mods.command {
-                ui.painter().text(r.left_top() + vec2(4.0, -2.0), Align2::LEFT_BOTTOM, tl!("Insert"), Tokens::ui(10.0), Color32::WHITE);
+                ui.painter().text(r.left_top() + vec2(4.0, -2.0), Align2::LEFT_BOTTOM, "Insert", Tokens::ui(10.0), Color32::WHITE);
             }
         }
         let target = match (&row, new_track) {
@@ -2961,7 +2959,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     let x = layout.x_of(cut);
                     painter.line_segment([pos2(x, r.top()), pos2(x, r.bottom())], Stroke::new(3.0, app.tokens.accent));
                     // Keep the edge label readable even when the clip/transition is only a few pixels wide.
-                    let label = if edge == "in" { tl!("In") } else { tl!("Out") };
+                    let label = if edge == "in" { "In" } else { "Out" };
                     let label_width = painter.layout_no_wrap(label.to_string(), Tokens::ui(11.0), app.tokens.accent).size().x + 8.0;
                     let label_rect = Rect::from_center_size(pos2(p.x, row.rect.top() + 10.0), vec2(label_width, 15.0));
                     painter.rect_filled(label_rect, 2.0, app.tokens.panel_bg);
@@ -3023,7 +3021,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             ui.painter().rect_filled(r, 3.0, Color32::from_white_alpha(40));
             ui.painter().rect_stroke(r, 3.0, Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
             app.auto.add("timeline.fileDropPreview", r, "tracks");
-            let label = if count == 1 { tl!("1 file").to_string() } else { tlf!("{n} files", n = count) };
+            let label = if count == 1 { "1 file".to_string() } else { format_placeholders!("{n} files", n = count) };
             ui.painter().text(r.left_top() + vec2(4.0, 2.0), Align2::LEFT_TOP, label, Tokens::ui(10.0), Color32::WHITE);
         }
     }

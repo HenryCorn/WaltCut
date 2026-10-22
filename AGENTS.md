@@ -78,7 +78,7 @@ reproduce an image (for example, point lists traced from someone else's icon).
    ```
    Also add one line for the asset to [`ATTRIBUTION.md`](ATTRIBUTION.md). `cargo xtask assets` (part of
    `cargo xtask ci`) fails if any asset lacks a sidecar or index entry.
-4. **Screenshots** in the repo may show only FilmCraft (or other open projects), with media we generated
+4. **Screenshots** in the repo may show only WaltCut (or other open projects), with media we generated
    or media that is itself openly licensed. Never commit screenshots of Adobe products.
 5. **Local reference material stays local.** Premiere reference screenshots and notes live only in
    `plan/premiere/` (gitignored). They must never be committed, bundled, embedded, traced or shipped.
@@ -86,12 +86,8 @@ reproduce an image (for example, point lists traced from someone else's icon).
    `crates/media`, procedural looks in `crates/render`) are original work under the project licence
    and are listed in `ATTRIBUTION.md`.
 7. **When in doubt, leave it out** and draw or generate it yourself.
-8. **The one exception: first-party ArtCraft brand marks.** The ArtCraft name and logos in `docs/brand/`
-   are trademarks of the ArtCraft Team, not open source, usable only unmodified and only in the context of
-   FilmCraft under `docs/brand/LICENSE-brand.txt`; forks and modified versions must remove them. They still
-   need a sidecar and an `ATTRIBUTION.md` row (licence `LicenseRef-ArtCraft-Trademark`). No other
-   non-open asset is allowed, and this exception never covers third-party marks (Adobe, Discord, GitHub
-   and other logos stay out; draw a generic icon instead).
+8. **No inherited trademark artwork.** ArtCraft marks have been removed from this fork. Third-party
+   marks (Adobe, Discord, GitHub and other logos) stay out; draw a generic icon instead.
 9. **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), never in this
    repo.** Don't commit new font files (the small Latin UI fonts already in `assets/fonts/` stay). A
    font FilmCraft needs is added to craft-fonts, which the app reads through the optional build input
@@ -142,7 +138,7 @@ as PhotoCraft does with `cargo xtask corpus`.
 - [docs/agents.md](docs/agents.md): driving FilmCraft over MCP / the control channel, and the agent work loop
 - [docs/control-protocol.md](docs/control-protocol.md): control-channel method reference
 - [ATTRIBUTION.md](ATTRIBUTION.md): asset index
-- [ROADMAP.md](ROADMAP.md), [docs/target-app-parity.md](docs/target-app-parity.md), [docs/gaps.md](docs/gaps.md): stage, parity with Premiere Pro and the ranked work list (craftrules `standards/progress-docs.md`)
+- [ROADMAP.md](ROADMAP.md), [docs/roadmap.md](docs/roadmap.md), and [docs/animation.md](docs/animation.md): reduction status and the retained WaltCut workflow
 
 ## Contributor credits (About window)
 

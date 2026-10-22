@@ -18,11 +18,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     for group in Tool::groups() {
         let current = if group.contains(&app.ui.tool) { app.ui.tool } else { group[0] };
         let r = Rect::from_min_size(pos2(rect.center().x - size / 2.0, y), vec2(size, size));
-        let tip = if current.shortcut().is_empty() {
-            app.ui.language.tr(current.label()).to_owned()
-        } else {
-            format!("{} ({})", app.ui.language.tr(current.label()), current.shortcut())
-        };
+        let tip = if current.shortcut().is_empty() { current.label().to_owned() } else { format!("{} ({})", current.label(), current.shortcut()) };
         let resp = ui.interact(r, egui::Id::new(("tool", format!("{:?}", group[0]))), Sense::click_and_drag()).on_hover_text(tip);
         resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, resp.enabled(), app.ui.tool == current, current.label()));
         for tl in &group {
@@ -74,7 +70,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             let close_behavior = if held && resp.clicked() { egui::PopupCloseBehavior::IgnoreClicks } else { egui::PopupCloseBehavior::CloseOnClickOutside };
             egui::Popup::menu(&resp).open_memory(command).close_behavior(close_behavior).show(|ui| {
                 for tl in &group {
-                    let row = ui.selectable_label(app.ui.tool == *tl, format!("{}   {}", app.ui.language.tr(tl.label()), tl.shortcut()));
+                    let row = ui.selectable_label(app.ui.tool == *tl, format!("{}   {}", tl.label(), tl.shortcut()));
                     app.auto.add_response(&format!("tools.select.{tl:?}"), &row, tl.label());
                     // letting go over a row of a flyout this press opened picks that tool
                     let released_on = held && ui.input(|i| i.pointer.primary_released() && i.pointer.interact_pos().is_some_and(|p| row.rect.contains(p)));

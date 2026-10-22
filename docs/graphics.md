@@ -1,7 +1,7 @@
 # Graphics
 
-FilmCraft's graphics work like Premiere's Essential Graphics: a **graphic clip** on a video track
-holds **text** and **shape** layers. Text is set by the text engine in `crates/text`
+WaltCut graphics use a **graphic clip** on a video track to hold **text** and **shape** layers.
+Text is set by the text engine in `crates/text`
 ([README](../crates/text/README.md)): bundled OFL fonts plus system fonts, OpenType shaping with
 kerning and ligatures, bidi, line breaking, all drawn as vectors in linear light.
 
@@ -37,7 +37,7 @@ Colours are `#rrggbb` (sRGB).
 
 ### Point text and paragraph text
 
-A text layer is one of two types, as in Premiere Pro (behaviour observed in Premiere Pro 26):
+A text layer is one of two types:
 
 | | Point text | Paragraph text |
 |---|---|---|
@@ -66,10 +66,9 @@ A text layer is one of two types, as in Premiere Pro (behaviour observed in Prem
   is and Position is untouched; only Anchor Point is renumbered. Vertical text is always point
   text.
 
-Known differences from Premiere: the first line of paragraph text sits one font ascent below the
-box's top (Premiere places it higher, about one cap height below); Premiere's smallest box and
-the box it fits when switching to paragraph text were not measured exactly; the 60 points were
-measured with the Program monitor at Fit only; Text Properties has no Hindi Digits option.
+Paragraph text begins one font ascent below the top of its box. The smallest box size and the box
+fitted when switching to paragraph text have not been measured exactly; the 60-point handle
+threshold was measured with the Program monitor at Fit. Text Properties has no Hindi Digits option.
 
 ## Rendering
 
@@ -190,7 +189,9 @@ These settings are `TrackItem::graphic` (`GraphicMeta`, schema v12).
 
 ## Graphics templates (`.fcgt`)
 
-FilmCraft's equivalent of motion graphics templates is its **own** format: a `.fcgt` file is
+This inherited feature is outside the retained scope; removal of graphics templates and the
+broad effects catalogue is pending in #24. The implementation details below are historical
+reference until that cut lands. WaltCut's format is its **own** format: a `.fcgt` file is
 documented, versioned JSON (`waltcut_project::gtemplate`):
 
 | Field | Meaning |
@@ -206,9 +207,9 @@ documented, versioned JSON (`waltcut_project::gtemplate`):
 Placing a template on a sequence of another size scales and centres its layers (pin distances
 scale too).
 
-**FilmCraft never reads or imports Adobe `.mogrt` files** (or any other application's template
+**WaltCut never reads or imports Adobe `.mogrt` files** (or any other application's template
 packages): Install refuses `.mogrt` paths without opening them, and the reader rejects ZIP
-archives. Built-in templates are original designs made for FilmCraft in code (no image, font or
+archives. Built-in templates are original designs made for WaltCut in code (no image, font or
 template files): lower thirds (Slab, Rule, Ticker crawl), titles (Centered, Boxed), end credits
 (Roll) and callouts (Pointer, Tag), with the bundled Inter font. Thumbnails are rendered by the
 engine at runtime.

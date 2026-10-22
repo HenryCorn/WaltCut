@@ -3,6 +3,8 @@
 WaltCut is a fork of [FilmCraft](https://github.com/storytold/filmcraft), refocused on drawing and
 2D frame-by-frame animation over video. It keeps FilmCraft's Rust editing engine and adds drawing
 cels, pressure-aware brushes, onion skinning, in-between generation, and AI Restyle.
+The interface is English-only with one WaltCut layout and shortcut map; title text supports
+multiple scripts.
 
 The general editing engine and much of the technical documentation come from FilmCraft. This
 repository's WaltCut-specific animation workflow is described in the [animation guide](docs/animation.md).
@@ -37,8 +39,9 @@ See [docs/contributing.md](docs/contributing.md) for Rust setup and build detail
 
 ## Upstream documentation
 
-The remaining architecture, command, and editing references describe the inherited FilmCraft
-engine and are retained for contributors:
+The [animation guide](docs/animation.md) defines the retained product scope. The architecture,
+command, and editing references describe shared engine systems; inherited features outside that
+allowlist are being removed and are not product commitments:
 
 - [Architecture](docs/architecture.md)
 - [Agent and control-channel guide](docs/agents.md)

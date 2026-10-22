@@ -41,7 +41,7 @@ fn harness(effect: &str) -> Harness<'static, FilmcraftApp> {
         s.execute("timeline.place", json!({"item":5,"time":rate.tick_of(at).0,"duration":rate.tick_of(frames).0})).unwrap();
     }
     let mut app = FilmcraftApp::new(s);
-    app.set_workspace("Effects");
+    app.show_panel(waltcut_ui_egui::dock::PanelKind::Effects);
     app.ui.effects_search = effect.to_string();
     let mut builder = Harness::builder().with_size(vec2(1600.0, 980.0)).with_max_steps(10_000);
     if std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").is_some() {

@@ -119,7 +119,7 @@ impl FilmcraftApp {
     /// another one is refused.
     pub fn pick(&mut self, dialog: FileDialog, then: impl FnOnce(&mut FilmcraftApp, Vec<String>) -> Result<Value, String> + 'static) -> Result<Value, String> {
         if self.native_dialog.is_some() {
-            return Err(tl!("A file dialog is already open").into());
+            return Err("A file dialog is already open".into());
         }
         if let Some(run) = self.hooks.run_dialog.as_mut() {
             self.native_dialog = Some(PendingDialog { answer: run(dialog), then: Box::new(then) });
@@ -135,7 +135,7 @@ impl FilmcraftApp {
     /// the end of the frame, which would overwrite a path written in the middle of it.
     pub fn pick_ui(&mut self, dialog: FileDialog, then: impl FnOnce(&mut FilmcraftApp, Vec<String>) + 'static) {
         if self.native_dialog.is_some() {
-            self.ui.status = tl!("A file dialog is already open").into();
+            self.ui.status = "A file dialog is already open".into();
             return;
         }
         let answer = match self.hooks.run_dialog.as_mut() {

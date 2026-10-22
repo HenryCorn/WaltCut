@@ -1,5 +1,10 @@
 # Testing
 
+This document describes the workspace's technical test approach. WaltCut's intended product
+scope is listed in [`animation.md`](animation.md). During the reduction, inherited test suites may
+remain until the corresponding removal is merged; their presence does not make those features part
+of the retained workflow.
+
 ```sh
 cargo test --workspace                          # everything; oracle tests skip without ffmpeg
 cargo test -p waltcut-h264                    # one crate
@@ -24,7 +29,7 @@ FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails 
 | Engine / command | `crates/engine/src/tests.rs` | run commands on the demo project, assert the sequence, undo/redo, disabled cases |
 | Render | `crates/render/src/tests.rs` | compositing, opacity, Motion, cross dissolve midpoint, ½-res vs full, GPU plan vs reference, audio mix, audio-effect continuity |
 | Project panel (M12.7) | `crates/engine/src/project_panel_tests.rs`, `crates/ui-egui/tests/project_panel_ui.rs` | view settings and their preference round trip; Metadata Display columns (custom fields, Freeform keys hidden), numeric vs text sorting, view presets (save / save as / restore / rename / delete, ten slots, persisted in `preferences.json`); Freeform moves keeping offsets, snapping, Align to Grid, Clip Size, stacks, arrangements, Reset (each one undo step, saved in the project); bin rename / nesting; the Media Browser against a fake filesystem (folders first, hidden and unsupported files left out, file-type filter, back / forward / up, recent directories, Favorites, import of a selection or a folder, Open in Source Monitor, ingest, probe columns). Headless: List view (sort by header, drag a column wider, inline rename), Icon view (hover scrub + I / O set the clip's In / Out, Shift+] / [), Freeform (drag a card, stack from the card menu, options dialog), panel menu, Metadata Display dialog, view presets, bins in place / tab / window, footer buttons, Media Browser navigation, Favorites, import, Shift+O, Edit Columns…, thumbnails, drag to the Timeline (`FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` writes `project-*.png`, `media-browser-*.png`) |
-| Menu long tail (M3.11) | `crates/engine/src/{sequence_extras,project_tools}_tests.rs`, `crates/project/src/find.rs`, `crates/ui-egui/tests/menus_ui.rs` | Normalize Mix Track to a target peak; Simplify Sequence; Find / Find Next and search bins; Automate to Sequence (overlap, transitions, insert, unnumbered markers); Project Settings and scratch disks; menu order and shortcuts against Premiere's; the dialogs by automation id |
+| Menu and command integration | `crates/engine/src/{sequence_extras,project_tools}_tests.rs`, `crates/project/src/find.rs`, `crates/ui-egui/tests/menus_ui.rs` | Command registration, menu wiring, shortcut uniqueness, dialog automation ids |
 | Mixer | `crates/render/src/mixer_tests.rs`, `crates/engine/src/mixer_tests.rs` | sample-exact fader gain and pan laws, automation at block boundaries (bit-identical however requests are cut), solo/mute/solo-safe, sends and submix routing, latency-compensation alignment, render-vs-playback identity, Touch ramp-back, recorder modes (Latch/Touch/Write), thinning, Audio Gain, transition curves; `perf_24_tracks_3_effects_realtime_factor` prints the realtime factor |
 | 5.1 / multichannel | `crates/audio-dsp/src/channels.rs`, `crates/render/src/mixer_tests.rs`, `crates/export/src/surround_tests.rs`, `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | BS.775 downmix / upmix coefficients exact, mixdown types; 5.1 panner point gains equal-power (Σg² = 1 over a 21×21 grid × 3 centre settings), speaker positions exact, 5.1 through the default puck bit-exact identity; graph: stereo/mono tracks into a 5.1 Mix (L/R, C, rear right, room centre −6 dB each, LFE = mean), 5.1 track through a 5.1 Mix and folded into stereo, a 5.1 submix, `pan51` automation block-invariant, six-channel meters; export: 6-ch WAV (`WAVE_FORMAT_EXTENSIBLE`, mask 0x3F) and ProRes MOV (6 × 24-bit PCM) decoded by ffmpeg **sample-exact**, ffprobe `channels` 6 / `channel_layout` 5.1; AAC 5.1 in MP4: every decoded channel's own tone ≥ 30 dB above the others' (no swapped channels), stereo export of a 5.1 Mix = BS.775 within 2·10⁻⁶; `sequence.settings {mix}`, `file.newSequence {mix, trackType}`, panner lanes, Write pass records the puck; UI: puck drag (one undo step), Center / LFE, six meter bars |
 | Audio Clip Mixer automation, Track Mixer view | `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | Touch: a 201-point fader ramp thins to ≤ 6 clip keyframes, values within 0.1 dB, live override while held, values outside the gesture unchanged, one undo step; Latch holds until stop; Write records volume and pan from the start; a gesture across two clips writes both; Read commits once without a pass; UI: Clip Mixer mode dropdown, a recorded fader drag writes clip keyframes; Show/Hide Tracks, Meter Input(s) Only, transport record button |
@@ -68,26 +73,9 @@ are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
   the matrix.
 - Fixture sources are synthetic: `testsrc2`, `mandelbrot`, SMPTE bars, noise and fades, sine tones.
   H.264 and HEVC fixtures need ffmpeg built with libx264 and libx265. VideoToolbox fixtures are
-  generated only on macOS. The Media Foundation parity tests (`crates/platform/tests/media_foundation.rs`,
-  Windows only) make their 640x360, 1080p and 2160p H.264 / HEVC / Main 10 fixtures with ffmpeg and skip
-  without a Direct3D 11 video device or the HEVC / VP9 / AV1 codec extensions of the Microsoft Store. The VP9 and
-  AV1 fixtures (libvpx-vp9, libaom-av1; 360p, 1080p, 2160p, hidden alt-ref frames, two GOPs) need an ffmpeg with those encoders.
-
-The NVENC tests (`crates/platform/tests/nvenc.rs` and `nvenc_export.rs` for H.264, `nvenc_rgba_input.rs` for
-the GPU's RGB → 4:2:0 conversion, `nvenc_hevc.rs`,
-`nvenc_hevc_export.rs`, `nvenc_hevc_probe.rs` and `nvenc_hevc_warm.rs` for H.265, `nvenc_hevc_main10.rs` and
-`nvenc_hevc_hdr_export.rs` for Main 10 HDR; Windows only) skip, printing `SKIPPED`, without an NVIDIA GPU
-with NVENC (H.265: when the HEVC probe says there is no HEVC encoder; Main 10: when the Main 10 probe says
-there is no 10-bit encoder; on a machine that has one, a configuration NVENC refuses fails the test). The FFI layout tests in
-`crates/platform/src/nvenc/abi_tests.rs` were generated from a C program built with MSVC
-(`cl` after `vcvars64.bat`) against NVIDIA's MIT-licensed `nvEncodeAPI.h` (12.1); the header and the
-program are not in the repository. To regenerate them, put the header in a scratch directory and
-write a program that prints, for every type, field, constant and GUID of `src/nvenc/ffi.rs` that the
-asserts name (H.264, HEVC and the HEVC picture parameters with their SEI payload array), `sizeof` / `alignof` / `offsetof`, the enum and macro values cast to
-64-bit integers and the GUIDs as 128-bit hex; for the bit-fields of the `flags` words, which
-`offsetof` cannot take, zero a structure, set that one field to its maximum and print the 32-bit word.
-Compare the numbers with the asserts (a difference is drift, which must be understood before
-anything is "fixed" to match) and add asserts for anything new.
+  generated only on macOS. VideoToolbox-specific integration tests run only when macOS hardware
+  decoding is available. VP9 and AV1 software fixtures (libvpx-vp9, libaom-av1; 360p, 1080p,
+  2160p, hidden alt-ref frames, two GOPs) need an ffmpeg build with those encoders.
 
 ### Pass criteria per codec
 
@@ -105,7 +93,7 @@ anything is "fixed" to match) and add asserts for anything new.
 | `isobmff` | `ffprobe -show_packets` on ffmpeg-made MP4/MOV | packet offsets, sizes, pts/dts, durations, key flags and stream parameters equal; remuxed files decode with `ffmpeg -v error` silent |
 | `matroska` | `ffprobe -show_packets` | every packet (stream, size, key flag, pts, duration) equal; seeks land on the latest keyframe ≤ target |
 | `audio-dsp` loudness | `tests/loudness_oracle.rs`: signals generated in Rust (997 Hz sine, pink noise at 48/96 kHz, speech-like bursts at 48/44.1 kHz, stereo with silence and sub-gate passages, an fs/4 inter-sample-peak tone) written as float WAV and measured with `ffmpeg -af ebur128=peak=true:metadata=1` | momentary and short-term every 100 ms **±0.1 LU**, integrated **±0.1 LU**, LRA **±0.5 LU**, true peak **±0.2 dB** (against the analytic value when one exists). Measured: ΔM/ΔS ≤ 0.0005 LU, ΔI ≤ 0.007 LU, ΔLRA ≤ 0.04 LU, ΔTP ≤ 0.045 dB against ffmpeg. On the fs/4 tone ffmpeg's own true peak is +0.6 dB high (−0.32 vs the analytic −0.92 dBTP); ours is −0.05 dB |
-| `audio-dsp` effects | `src/effects/premiere_tests.rs`, `src/design.rs`, registry tests in `src/effects/mod.rs`: generated tones, noise and impulses | every effect: neutral settings = delayed identity (≤ 2·10⁻⁴), bit-exact determinism, latency constant and equal to where an impulse lands, block-size independence, finite / denormal-free tails at extreme settings, > 1× realtime; per effect a level or frequency-response check (measured tone vs analytic `response_db` within 0.1–0.2 dB, Butterworth vs closed form 10⁻⁶ dB, Chebyshev/elliptic ripple and stop-band bounds, LR4 crossover sum flat within 0.02 dB, comb-notch depth, echo positions to the sample, Schroeder RT60 of generated impulses within 25 %, click repair −20 dB) |
+| `audio-dsp` effects | Effect tests in `src/effects/` and registry tests in `src/effects/mod.rs`: generated tones, noise and impulses | every effect: neutral settings = delayed identity (≤ 2·10⁻⁴), bit-exact determinism, latency constant and equal to where an impulse lands, block-size independence, finite / denormal-free tails at extreme settings, > 1× realtime; per effect a level or frequency-response check (measured tone vs analytic `response_db` within 0.1–0.2 dB, Butterworth vs closed form 10⁻⁶ dB, Chebyshev/elliptic ripple and stop-band bounds, LR4 crossover sum flat within 0.02 dB, comb-notch depth, echo positions to the sample, Schroeder RT60 of generated impulses within 25 %, click repair −20 dB) |
 | `mxf` (via `codecs/tests/mxf_oracle.rs`) | ffmpeg-written OP1a / OP-Atom / D-10 files decoded by ffmpeg | H.264 (long GOP, B pictures without temporal offsets) **bit-exact** every frame and at 25 random seeks; DNxHR ±2, ProRes ±1; PCM / AES3 **sample-exact**; frame count = ffprobe packets; timecode (25 fps, 29.97 DF); MPEG-2 long GOP, XDCAM HD422 (1080i 4:2:2) and D-10 / IMX (720×608 4:2:2) within ±4 (`mpeg2v` criterion); truncation/mutation never panics |
 | `mpeg2v` | ffmpeg-encoded MPEG-1/2 elementary streams (progressive, TFF/BFF interlaced, 4:2:2 intra and long GOP, 1080i, escapes + custom matrices, MPEG-1) and our synthetic streams with field pictures / 16x8 / dual prime / concealment vectors, decoded by ffmpeg (`-xerror`) | per frame max ±4 and PSNR ≥ 58 dB, ≤ 3 % of samples differing (ffmpeg's integer IDCT vs our IEEE 1180-accurate one; measured max ±1-3, 65-75 dB); frame count, display order, picture types, interlacing and field order **exact** (ffprobe); IEEE 1180 procedure passes |
 | MPEG TS / PS (via `codecs/tests/mpeg_oracle.rs`) | ffmpeg-written TS (MPEG-2 + MP2, H.264 + AAC, HEVC + LATM AAC), BDAV `.m2ts` / `.mts` (H.264 + Blu-ray LPCM / AC-3), VOB (MPEG-2 + MP2 / DVD LPCM 16 and 24-bit / AC-3), MPEG-1 system streams, `.m2v`; MPEG-2 in MOV (XDCAM `xd5c`), MP4 (`mp4v`), MKV | frame count and every frame's **PTS exact** (ffprobe); H.264 / HEVC **bit-exact**, MPEG-2 within the `mpeg2v` criterion; random seeks = sequential decode; LPCM **sample-exact**; AAC ≤ 2.1·10⁻⁷, MP2 (symphonia) ≤ 3.2·10⁻⁵, AC-3 ≤ 5·10⁻³ (decoder-specific dither; measured 2.3·10⁻³); random-access audio = sequential |
@@ -118,7 +106,7 @@ anything is "fixed" to match) and add asserts for anything new.
 
 Each codec README has the full fixture matrix and the measured results.
 
-## 3. Rendering: CPU reference and GPU parity
+## 3. Rendering: CPU reference and GPU comparisons
 
 - The CPU compositor in `waltcut-render` is the reference. Its tests check computed values
   (opacity blends, dissolve midpoints, Motion placement, ½-resolution against downsampled full
@@ -157,7 +145,7 @@ Each codec README has the full fixture matrix and the measured results.
   writes one contact-sheet PNG per folder for eyeballing (never commit them).
 - **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
-  References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
+  References are original work rendered by WaltCut, must stay under 50 KB (enforced on bless),
   and every one needs its sidecar and index row (`cargo xtask assets`). Look at a re-blessed PNG
   before committing it.
 - The same scenes run through `plan_frame` + `GpuCompositor` when a GPU adapter exists
@@ -347,8 +335,7 @@ real-time second (≈160 ms CPU per frame at 170 Mbit/s); the demo project's pro
 
 `perf_24_tracks_3_effects_realtime_factor` (24 tracks, 72 inserts and a compressed submix on one
 core) must run at least 4x realtime in release builds (1x in debug). On Unix it times the test
-thread's CPU time, so it runs with the rest of the suite. Hosts without a per-thread CPU clock
-(Windows) fall back to wall time, which depends on load, so there it is ignored by default; run it
-explicitly with
+thread's CPU time, so it runs with the rest of the suite. Hosts without a per-thread CPU clock fall back to wall time, which depends on load, so the
+benchmark is ignored by default; run it explicitly with
 `cargo test --release -p waltcut-render --lib perf_24_tracks_3_effects_realtime_factor -- --ignored --nocapture`
 and record the machine with the result.

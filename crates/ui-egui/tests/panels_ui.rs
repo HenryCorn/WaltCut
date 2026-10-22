@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_ui_egui::FilmcraftApp;
@@ -159,16 +158,10 @@ fn every_panel_opens_from_the_window_menu() {
     let menu = d.ok("ui.menu.list", json!({}));
     let window: Vec<String> =
         menu.as_array().unwrap().iter().filter(|m| m["path"] == json!(["Window"])).filter_map(|m| m["label"].as_str().map(str::to_string)).collect();
-    for p in ["Events", "Metadata", "Progress", "Project Notes", "Timecode"] {
+    for p in ["Events", "Progress"] {
         assert!(window.iter().any(|w| w == p), "{p} not in Window: {window:?}");
     }
-    for (panel, key) in [
-        ("Metadata", "metadata."),
-        ("Timecode", "timecode.row.0"),
-        ("Events", "events.clearAll"),
-        ("Progress", "progress.showFinished"),
-        ("ProjectNotes", "notes.text"),
-    ] {
+    for (panel, key) in [("Events", "events.clearAll"), ("Progress", "progress.showFinished")] {
         d.ok("ui.menu.invoke", json!({"id": format!("window.panel.{panel}")}));
         d.frames(3);
         assert!(d.has(&format!("panel.tab.{panel}")), "{panel} has no tab");
@@ -232,7 +225,7 @@ fn wheel_over_a_tab_strip_switches_tabs() {
     let mut d = Driver::demo();
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, -40.0);
-    assert_eq!(shown(&mut d), PanelKind::Libraries);
+    assert_eq!(shown(&mut d), PanelKind::Effects);
     wheel(&mut d, 40.0);
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, 120.0);
@@ -251,13 +244,13 @@ fn wheel_over_a_tab_strip_switches_tabs() {
             phase: egui::TouchPhase::Move,
         });
         d.frames(1);
-        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Libraries };
+        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Effects };
         assert_eq!(shown(&mut d), expect, "after {} pt", (step + 1) * 10);
     }
 
-    d.ok("ui.scroll", json!({"id": "panel.Libraries", "dy": -40.0}));
+    d.ok("ui.scroll", json!({"id": "panel.Effects", "dy": -40.0}));
     d.frames(2);
-    assert_eq!(shown(&mut d), PanelKind::Libraries, "the wheel over the content keeps the tab");
+    assert_eq!(shown(&mut d), PanelKind::Effects, "the wheel over the content keeps the tab");
 
     for _ in 0..10 {
         wheel(&mut d, -40.0);
@@ -265,106 +258,7 @@ fn wheel_over_a_tab_strip_switches_tabs() {
     assert_eq!(shown(&mut d), PanelKind::History, "no wrap past the last tab");
 }
 
-#[test]
-fn metadata_panel_edits_a_field_with_undo() {
-    let mut d = Driver::demo();
-    let item = d.app().session.project.items.values().filter(|i| i.as_media().is_some()).map(|i| i.id).min().unwrap();
-    d.app().session.state.project_selection = vec![item];
-    d.app().ui.focused = waltcut_ui_egui::dock::PanelKind::Project;
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.Metadata"}));
-    d.ok("ui.set", json!({"focused": "Project"}));
-    d.frames(3);
-    let name = d.app().session.project.item(item).unwrap().name.clone();
-    assert_eq!(d.label("metadata.header"), format!("Clip: {name}"));
-    for id in [
-        "metadata.field.Name",
-        "metadata.label",
-        "metadata.field.MediaStart",
-        "metadata.field.MediaDuration",
-        "metadata.field.Scene",
-        "metadata.field.LogNote",
-        "metadata.field.FilePath",
-        "metadata.section.File",
-    ] {
-        assert!(d.has(id), "{id} missing: {:?}", d.ids("metadata."));
-    }
-    d.snapshot("panels-metadata", Some("metadata."));
-    // type into Scene and commit with Enter: one undo step
-    let undo0 = d.app().session.history.undo.len();
-    d.click("metadata.field.Scene");
-    d.ok("ui.type", json!({"text": "42A"}));
-    d.frames(2);
-    d.ok("ui.key", json!({"key": "Enter"}));
-    d.frames(3);
-    assert_eq!(d.app().session.project.item(item).unwrap().metadata.get("Scene").map(String::as_str), Some("42A"));
-    assert_eq!(d.app().session.history.undo.len(), undo0 + 1);
-    assert_eq!(d.label("metadata.field.Scene"), "42A");
-    d.exec("edit.undo", json!({}));
-    d.frames(2);
-    assert!(!d.app().session.project.item(item).unwrap().metadata.contains_key("Scene"));
-    // the same edit from an agent
-    d.exec("metadata.set", json!({"item": item.0, "field": "Tape Name", "value": "A001"}));
-    d.frames(2);
-    assert_eq!(d.label("metadata.field.TapeName"), "A001");
-}
-
 /// #620: notes typed into Project Notes land in the project; one typing session is one undo step.
-#[test]
-fn project_notes_panel_types_into_the_project_with_undo() {
-    let mut d = Driver::demo();
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.ProjectNotes"}));
-    d.frames(3);
-    let undo0 = d.app().session.history.undo.len();
-    d.click("notes.text");
-    d.ok("ui.type", json!({"text": "Fix logo"}));
-    d.frames(2);
-    d.ok("ui.key", json!({"key": "Enter"}));
-    d.ok("ui.type", json!({"text": "at 1:02"}));
-    d.frames(3);
-    assert_eq!(d.app().session.project.notes, "Fix logo\nat 1:02");
-    assert_eq!(d.app().session.history.undo.len(), undo0 + 1);
-    assert_eq!(d.label("notes.text"), "Fix logo\nat 1:02");
-    d.exec("edit.undo", json!({}));
-    d.frames(2);
-    assert_eq!(d.app().session.project.notes, "");
-    // an agent writes them, the panel shows them
-    d.exec("project.setNotes", json!({"text": "From the script"}));
-    d.frames(2);
-    assert_eq!(d.label("notes.text"), "From the script");
-}
-
-#[test]
-fn timecode_panel_rows_and_modes() {
-    let mut d = Driver::demo();
-    d.exec("playhead.set", json!({"timecode": "00:00:02:00"}));
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.Timecode"}));
-    d.frames(3);
-    assert_eq!(d.label("timecode.row.0"), "00:00:02:00");
-    d.click("timecode.addRow");
-    assert_eq!(d.ui_panels()["timecode"]["rows"].as_array().unwrap().len(), 2);
-    // the new row is a duration: the sequence's
-    let (dur, df, rate) = {
-        let q = d.app().session.active_sequence().unwrap();
-        (q.duration(), q.settings.drop_frame, q.settings.frame_rate)
-    };
-    let want = waltcut_time::format_time(dur, rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
-    assert_eq!(d.label("timecode.row.1"), want);
-    // frames display and Remaining through ui.set
-    d.ok("ui.set", json!({"panels": {"timecode": {"rows": [{"mode": "current", "display": "Frames"}, {"mode": "remaining"}]}}}));
-    d.frames(2);
-    let frame = rate.frame_at(d.app().session.playhead());
-    assert_eq!(d.label("timecode.row.0"), frame.to_string());
-    let rem = waltcut_time::format_time(dur - d.app().session.playhead(), rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
-    assert_eq!(d.label("timecode.row.1"), rem);
-    d.snapshot("panels-timecode", Some("timecode."));
-    // right-click menu: Media Time
-    d.ok("ui.click", json!({"id": "timecode.row.1", "button": "right"}));
-    d.frames(2);
-    if d.has("timecode.row.1.mode.media") {
-        d.click("timecode.row.1.mode.media");
-        assert_eq!(d.ui_panels()["timecode"]["rows"][1]["mode"], json!("media"));
-    }
-}
 
 #[test]
 fn events_and_progress_panels() {
@@ -420,7 +314,7 @@ fn events_and_progress_panels() {
 }
 
 /// #1075: child backgrounds must not cover the focus outline shared with Program. Check the
-/// rendered primitives, including Media Browser's parent group, in both requested themes.
+/// rendered primitives in both requested themes.
 #[test]
 fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     fn rectangles<'a>(shape: &'a egui::Shape, clip: egui::Rect, out: &mut Vec<(&'a egui::epaint::RectShape, egui::Rect)>) {
@@ -433,7 +327,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     let mut d = Driver::demo();
     for theme in ["dark", "light"] {
         d.ok("ui.set", json!({"theme": theme}));
-        for panel in ["Program", "EssentialSound", "Timeline", "Libraries"] {
+        for panel in ["Program", "EssentialSound", "Timeline", "Effects"] {
             d.ok("ui.panel.show", json!({"panel": panel}));
             d.ok("ui.set", json!({"focused": panel}));
             d.frames(3);
@@ -468,178 +362,6 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
             }
         }
     }
-}
-
-/// Select two different sources using the same Project-row and Timeline-clip clicks as an editor.
-fn inspector_selection_driver() -> (Driver, waltcut_project::ItemId, waltcut_project::ItemId, waltcut_project::ClipId) {
-    let mut d = Driver::demo();
-    let seq = d.app().session.active_sequence().unwrap();
-    let a = seq.video_tracks[0].items[0].item;
-    let clip = seq.video_tracks[0].items.iter().find(|clip| clip.item != a).unwrap();
-    let (b, clip) = (clip.item, clip.id);
-    let bin = d
-        .app()
-        .session
-        .project
-        .root
-        .children
-        .iter()
-        .find_map(|entry| match entry {
-            waltcut_project::BinEntry::Bin(bin) if bin.name == "Footage" => Some(bin.id.0),
-            _ => None,
-        })
-        .unwrap();
-    d.exec("project.view.set", json!({"view":"list"}));
-    d.ok("ui.menu.invoke", json!({"id":"window.panel.Metadata"}));
-    d.ok("ui.menu.invoke", json!({"id":"window.panel.Info"}));
-    d.click("panel.tab.Project");
-    d.ok("ui.menu.invoke", json!({"id":"projectPanel.openBin","params":{"bin":bin,"how":"inPlace"}}));
-    d.click(&format!("project.item.{}", a.0));
-    assert_eq!(d.app().session.state.project_selection, vec![a]);
-    d.click(&format!("timeline.clip.{}", clip.0));
-    assert!(d.app().session.state.selection.contains(&clip));
-    (d, a, b, clip)
-}
-
-#[test]
-fn metadata_keeps_the_timeline_item_when_its_tab_and_field_take_focus() {
-    let (mut d, a, b, _) = inspector_selection_driver();
-    let b_name = d.app().session.project.item(b).unwrap().name.clone();
-    assert_eq!(d.label("metadata.header"), format!("Clip: {b_name}"));
-    d.click("panel.tab.Metadata");
-    assert_eq!(d.label("metadata.header"), format!("Clip: {b_name}"), "inspector focus must not reactivate the old Project selection");
-    let before = serde_json::to_value(&d.app().session.project).unwrap();
-    let undo = d.app().session.history.undo.len();
-    d.click("metadata.field.Scene");
-    d.ok("ui.type", json!({"text":"42B"}));
-    d.ok("ui.key", json!({"key":"Enter"}));
-    d.frames(3);
-    assert_eq!(d.app().session.project.item(b).unwrap().metadata.get("Scene").map(String::as_str), Some("42B"));
-    assert!(!d.app().session.project.item(a).unwrap().metadata.contains_key("Scene"));
-    assert_eq!(d.app().session.history.undo.len(), undo + 1);
-    let after = serde_json::to_value(&d.app().session.project).unwrap();
-    d.exec("edit.undo", json!({}));
-    assert_eq!(serde_json::to_value(&d.app().session.project).unwrap(), before);
-    d.exec("edit.redo", json!({}));
-    assert_eq!(serde_json::to_value(&d.app().session.project).unwrap(), after);
-    d.snapshot("panels-metadata-timeline-selection", Some("metadata."));
-}
-
-#[test]
-fn info_follows_the_timeline_item_and_keeps_sequence_information() {
-    let (mut d, _, b, _) = inspector_selection_driver();
-    let name = d.app().session.project.item(b).unwrap().name.clone();
-    d.click("panel.tab.Info");
-    assert!(d.harness.query_by_label(&name).is_some(), "Info must show the selected Timeline item's name");
-    assert_eq!(d.label("info.item"), name, "the item header belongs to Info, not another panel");
-    assert!(!d.label("info.sequence").is_empty());
-    assert!(d.harness.query_by_label("Settings:").is_some(), "Info keeps its lower sequence-information section");
-    d.snapshot("panels-info-timeline-selection", None);
-}
-
-#[test]
-fn inspectors_follow_reselected_project_items_and_clear_without_stale_targets() {
-    let (mut d, a, b, clip) = inspector_selection_driver();
-    let a_name = d.app().session.project.item(a).unwrap().name.clone();
-    let b_name = d.app().session.project.item(b).unwrap().name.clone();
-    let timeline_selection = d.app().session.state.selection.clone();
-    let undo = d.app().session.history.undo.len();
-    let playhead = d.app().session.playhead();
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), b_name);
-    // Selection ownership also follows actual source clicks while both inspectors are hidden.
-    d.ok("ui.menu.invoke", json!({"id":"window.panel.Source"}));
-    d.click("panel.tab.Project");
-    d.click(&format!("project.item.{}", a.0));
-    d.click(&format!("timeline.clip.{}", clip.0));
-    d.ok("ui.menu.invoke", json!({"id":"window.panel.Metadata"}));
-    d.frames(3);
-    assert_eq!(d.label("metadata.header"), format!("Clip: {b_name}"));
-    d.click("panel.tab.Project");
-    d.click(&format!("project.item.{}", a.0));
-    d.click("panel.tab.Metadata");
-    assert_eq!(d.label("metadata.header"), format!("Clip: {a_name}"));
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), a_name);
-    assert_eq!(d.app().session.state.selection, timeline_selection);
-    assert_eq!(d.app().session.state.project_selection, vec![a]);
-    assert_eq!(d.app().session.history.undo.len(), undo, "inspector focus does not create edits");
-    assert_eq!(d.app().session.playhead(), playhead);
-
-    // Preserve Metadata's existing fallback in both directions when a selection is cleared.
-    d.click(&format!("timeline.clip.{}", clip.0));
-    d.ok("ui.key", json!({"key":"Cmd+Shift+A"}));
-    assert!(d.app().session.state.selection.is_empty());
-    d.click("panel.tab.Metadata");
-    assert_eq!(d.label("metadata.header"), format!("Clip: {a_name}"));
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), a_name);
-    d.click(&format!("timeline.clip.{}", clip.0));
-    d.click("panel.tab.Project");
-    d.ok("ui.key", json!({"key":"Cmd+Shift+A"}));
-    assert!(d.app().session.state.project_selection.is_empty());
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), b_name);
-    d.click("panel.tab.Metadata");
-    assert_eq!(d.label("metadata.header"), format!("Clip: {b_name}"));
-    d.ok("ui.set", json!({"theme":"light"}));
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), b_name, "theme and inspector changes keep the selection source");
-    d.snapshot("panels-info-timeline-selection-light", Some("info."));
-
-    d.click(&format!("timeline.clip.{}", clip.0));
-    d.ok("ui.key", json!({"key":"Cmd+Shift+A"}));
-    assert!(d.app().session.state.selection.is_empty());
-    d.click("panel.tab.Metadata");
-    assert!(d.has("metadata.empty"));
-    d.click("panel.tab.Info");
-    assert!(!d.has("info.item"));
-    assert!(!d.label("info.sequence").is_empty(), "active sequence details remain with no clip selected");
-
-    d.click("panel.tab.Project");
-    d.click(&format!("project.item.{}", a.0));
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), a_name);
-    d.exec("file.newProject", json!({"name":"Fresh inspector project"}));
-    d.frames(3);
-    assert!(!d.has("info.item"), "no item identity is retained from the old project");
-    assert!(!d.has("info.sequence"));
-    d.click("panel.tab.Metadata");
-    assert!(d.has("metadata.empty"));
-}
-
-#[test]
-fn inspector_source_defaults_when_loading_an_older_ui_state() {
-    let ui = waltcut_ui_egui::state::UiState::default();
-    let mut saved = serde_json::to_value(&ui).unwrap();
-    saved["panels"].as_object_mut().unwrap().remove("inspectorSource");
-    let restored: waltcut_ui_egui::state::UiState = serde_json::from_value(saved).unwrap();
-    assert_eq!(restored.panels.inspector_source, waltcut_ui_egui::panels::panel_state::InspectorSource::Project);
-    assert_eq!(restored.panels.timecode, ui.panels.timecode);
-}
-
-#[test]
-fn middle_closing_an_inactive_project_tab_keeps_the_inspector_target() {
-    let (mut d, _, b, _) = inspector_selection_driver();
-    let name = d.app().session.project.item(b).unwrap().name.clone();
-    d.click("panel.tab.Info");
-    assert_eq!(d.label("info.item"), name);
-    assert!(d.has("panel.tab.Project"), "the inactive Project tab must be visible before closing it");
-    let project = serde_json::to_value(&d.app().session.project).unwrap();
-    let state = d.exec("state.inspect", json!({}));
-    let history = d.exec("history.list", json!({}));
-    let revision = d.app().session.revision;
-
-    d.ok("ui.click", json!({"id":"panel.tab.Project", "button":"middle"}));
-    d.frames(3);
-    assert!(!d.has("panel.tab.Project"), "middle-click closes the inactive tab");
-    assert_eq!(serde_json::to_value(&d.app().session.project).unwrap(), project);
-    assert_eq!(d.exec("state.inspect", json!({})), state);
-    assert_eq!(d.exec("history.list", json!({})), history);
-    assert_eq!(d.app().session.revision, revision);
-    let focused = d.app().ui.focused;
-    let source = d.app().ui.panels.inspector_source;
-    assert_eq!(d.label("info.item"), name, "closing a tab must not select its stale item; focused={focused:?}, source={source:?}");
 }
 
 /// #2329: in the Effects panel what a folder holds is indented under it: an effect's label starts

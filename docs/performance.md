@@ -4,6 +4,10 @@
 and `.md` (options and sections: [testing.md](testing.md) §5). Agents read live counters with
 `perf.stats` ([control-protocol.md](control-protocol.md)).
 
+This document includes historical measurements from platform backends that are no longer WaltCut
+targets. They are retained as engineering history, not as a support or release promise; the current
+platform scope is macOS with Apple Silicon release builds.
+
 ## Interactive builds and redraw work
 
 For interactive editing, build with `cargo build --release -p waltcut` and
@@ -34,8 +38,7 @@ to a 12 GB footprint, 10.8 GB of it live heap in three piles.
    `MediaPool::open_file` fell back to `read_file` and every clip's bytes stayed in memory for as
    long as its source was open. `FsServices::reader` now returns a
    `waltcut_media::reader::FileReader`: the file stays open and containers read their index and
-   then single samples with positional reads, as the web host already did through `BlobReader`
-   ([web.md](web.md)). Formats decoded in one go (stills, WAV, MPEG elementary streams) are still
+   then single samples with positional reads. Formats decoded in one go (stills, WAV, MPEG elementary streams) are still
    read whole through the reader.
 2. **A decoder per clip, for good (3.5 GB), MEM2.** Every source kept its decoder once it had
    decoded a frame, with its reference pictures and the pictures its frame threads have in flight:
@@ -126,7 +129,7 @@ Every Auto row rendered all its frames on the GPU, without fallbacks.
 On a plain clip the export is decoding- and encoding-bound and both take the same time; with
 layers and effects the GPU is 2.4× (1080p) to 3.2× (4K) faster, with a third to a quarter of the
 CPU. GPU rendering is nevertheless **Off by default** (opt-in per export) until it has been
-measured on Windows and macOS: the GPU result matches the CPU within the compositor's parity
+measured on Windows and macOS: the GPU result matches the CPU within the compositor's comparison
 tolerance, not bit for bit, and Off keeps exports byte-reproducible on every machine. (The 4K row used the same scene with the sequence, clip and positions scaled to 4K.)
 
 ### Memory after an export
@@ -171,7 +174,7 @@ Same commit, Settings ▸ Playback ▸ Hardware decoding switched with the bench
 `--hw auto` (`cargo xtask bench --sections decode --only dec_h --repeat 3 --hw …`, then
 `--sections playback --only h264` and `--only hevc-2160`), 2026-10-05, Apple M4 Pro, load average
 **150–190** throughout (shared with other agent builds). The decoded pictures are identical either
-way (bit-exact parity tests, `crates/platform/tests/videotoolbox.rs`); only who decodes changes.
+way (bit-exact comparison tests, `crates/platform/tests/videotoolbox.rs`); only who decodes changes.
 
 ### Decode (every frame through the media stack)
 
@@ -282,7 +285,7 @@ Wall time is about `max(render, encode + audio + mux)` instead of the sum. What 
   and with any step size, including one frame per step (tests in `determinism_tests.rs`: H.264, ProRes,
   Motion-JPEG, two-pass).
 - **Pending media.** A prefetched batch whose sources were not ready is dropped and rendered again by a
-  later step; nothing is encoded from an incomplete batch. The web app (no threads) never overlaps: it runs
+  later step; nothing is encoded from an incomplete batch. A single-threaded caller never overlaps: it runs
   the sequential render-then-encode as before.
 - **Cancel and errors.** Cancelling drops the prefetched frames; a panic while rendering ahead becomes an
   export error. The encoder stays on the thread that called `step`.
@@ -379,7 +382,7 @@ NVIDIA GeForce RTX 5060 8 GB (driver 617.14), Windows 11 Pro 26200, idle machine
 rounds; the table gives the range of the two (decode: best of 3 within each). Reproduce with
 `cargo xtask bench --sections decode --only dec_h264 --repeat 3 --hw off|auto` (likewise `dec_hevc`)
 and `--sections playback --only "h264-2160 full" --hw off|auto`; set `FILMCRAFT_FFMPEG` if ffmpeg is not
-on `PATH` for the fixture generator. Pictures are identical either way (bit-exact parity tests,
+on `PATH` for the fixture generator. Pictures are identical either way (bit-exact comparison tests,
 `crates/platform/tests/media_foundation.rs`). The decoder MFTs were Microsoft's H.264 decoder
 (`Microsoft H264 Video Decoder MFT`) and the `HEVCVideoExtension` decoder, both decoding with DXVA
 on the RTX 5060's NVDEC: `nvidia-smi dmon -s u` showed the decoder engine at 18–27 % during an
@@ -473,7 +476,7 @@ Same commit, Settings ▸ Playback ▸ Hardware decoding switched with the bench
 Core i5-13500H with Iris Xe graphics (Raptor Lake-P), 7.4 GB RAM, Intel iHD driver 26.1.2 through
 libva 2.22, load average 5–15. Only H.264 goes through VA-API so far; the HEVC rows decode in
 software either way and show the run-to-run spread. The decoded pictures are identical
-(bit-exact parity tests, `crates/platform/tests/vaapi.rs`).
+(bit-exact comparison tests, `crates/platform/tests/vaapi.rs`).
 
 | codec | size | CPU ms/frame Off → **Auto** | fps Off → **Auto** (best of 3) | hw frames |
 |---|---|---|---|---|

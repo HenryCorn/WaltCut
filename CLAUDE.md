@@ -1,11 +1,11 @@
-# FilmCraft — instructions for agents
+# WaltCut — instructions for agents
 
-FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor targeting Adobe Premiere Pro parity (and beyond). Native on macOS (Apple silicon). Sibling of `../photocraft` (Photoshop), `../pdfcraft` (Acrobat) and `../vectorcraft` (Illustrator; formerly DrawCraft), with the same conventions.
+WaltCut is a clean-room, open-source, pure-Rust video editor focused on drawing and 2D frame-by-frame animation over video. Its retained product scope is listed in [`docs/animation.md`](docs/animation.md). The interface is English-only, has one WaltCut layout and shortcut map, and title text continues to support multiple scripts. Native on macOS (Apple silicon).
 
 ## Start every session here
 `plan/` is maintainer-local (gitignored, not in the repo). Each step names the public equivalent to use if you don't have it.
-1. Read `plan/STATUS.md` (current milestone, next unchecked task, blockers). Public: [`ROADMAP.md`](ROADMAP.md), then [`docs/gaps.md`](docs/gaps.md) (ranked shortfalls) and [`docs/roadmap.md`](docs/roadmap.md) (current focus).
-2. Read the task in `plan/execution-plan.md` §3, the relevant section of `plan/architecture.md`, and the README/docs of the crate you touch. Public: [`docs/architecture.md`](docs/architecture.md), [`docs/contributing.md`](docs/contributing.md), [`docs/testing.md`](docs/testing.md). Visual/behaviour reference: `plan/premiere/` (local only, never committed).
+1. Read `plan/STATUS.md` (current milestone, next unchecked task, blockers). Public: [`ROADMAP.md`](ROADMAP.md), [`docs/roadmap.md`](docs/roadmap.md), and the retained-scope allowlist in [`docs/animation.md`](docs/animation.md).
+2. Read the task in `plan/execution-plan.md` §3, the relevant section of `plan/architecture.md`, and the README/docs of the crate you touch. Public: [`docs/architecture.md`](docs/architecture.md), [`docs/contributing.md`](docs/contributing.md), [`docs/testing.md`](docs/testing.md), and the retained workflow in [`docs/animation.md`](docs/animation.md).
 3. Follow the autonomous operation protocol (`plan/execution-plan.md` §7; public summary: [`docs/agents.md`](docs/agents.md) §5–7). Don't stop to ask unless it lists the decision as the user's.
 
 ## Non-negotiables
@@ -24,6 +24,6 @@ FilmCraft is a clean-room, open-source, pure-Rust non-linear video editor target
 
 ## Running and looking at the app
 - `cargo run -p waltcut -- --control 9876` opens the desktop app with the JSON-lines control server (see `docs/control-protocol.md`).
-- For UI work, **look at the result**: drive via the control channel and take `ui.screenshot`, compare with `plan/premiere/screenshots/` (maintainer-local; see [`docs/agents.md`](docs/agents.md) §3).
+- For UI work, **look at the result**: drive via the control channel and take `ui.screenshot`; verify the WaltCut workflow and layout documented in [`docs/animation.md`](docs/animation.md) (see [`docs/agents.md`](docs/agents.md) §3).
 - Parallel agents: separate git worktrees and `CARGO_TARGET_DIR=target/agent-<name>`; keep every `Cargo.toml` valid at all times (the `crates/*` glob means one broken manifest breaks everyone).
 - Test fixtures: generate with ffmpeg into `target/fixtures/` (never commit media). See [`docs/testing.md`](docs/testing.md).

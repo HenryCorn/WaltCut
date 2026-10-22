@@ -380,7 +380,8 @@ fn a_click_in_the_edited_text_moves_the_caret() {
 #[test]
 fn text_properties_switches_between_point_and_paragraph_text() {
     let mut d = Driver::new();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     let (clip, pre) = d.paragraph_text();
     let tl = d.handle(&pre, 0);
     d.ok("ui.click", json!({"id": "graphics.textProperties"}));

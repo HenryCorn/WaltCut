@@ -82,7 +82,7 @@ fn duration_field(ui: &mut egui::Ui, frames: &mut i64, max: i64, rate: FrameRate
 pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id: TransitionId) {
     let t = app.tokens;
     let Some((x, align, max_frames)) = lookup(app, id) else {
-        crate::dock::placeholder(ui, rect, &t, tl!("(no clip selected)"));
+        crate::dock::placeholder(ui, rect, &t, "(no clip selected)");
         return;
     };
     let Some(seq) = app.session.active_sequence() else { return };
@@ -114,7 +114,7 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
     };
     egui::ScrollArea::vertical().id_salt(("tr-ec-scroll", id.0)).auto_shrink([false, false]).show(&mut child, |ui| {
         egui::Grid::new(("tr-ec-grid", id.0)).num_columns(2).spacing([14.0, 8.0]).show(ui, |ui| {
-            ui.label(tl!("Duration"));
+            ui.label("Duration");
             let mut frames = rate.frame_at(x.duration).max(1);
             let r = duration_field(ui, &mut frames, max_frames, rate, drop_frame);
             elems.push(("effectControls.transition.duration".into(), r.rect, timecode(frames as f64, rate, drop_frame)));
@@ -124,7 +124,7 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
             ui.end_row();
             row_line(ui);
 
-            ui.label(tl!("Alignment"));
+            ui.label("Alignment");
             let shown = align.label();
             let r = ui
                 .add_enabled_ui(!one_sided, |ui| {
@@ -147,7 +147,7 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
             ui.end_row();
             row_line(ui);
 
-            ui.label(tl!("Reverse"));
+            ui.label("Reverse");
             let mut rev = x.reverse;
             let r = ui.checkbox(&mut rev, "");
             elems.push(("effectControls.transition.reverse".into(), r.rect, rev.to_string()));
@@ -159,7 +159,7 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
 
             for pd in def.map(|d| d.params.as_slice()).unwrap_or(&[]) {
                 let value = x.effect.params.get(pd.id).map_or(&pd.default, |p| &p.value);
-                ui.label(crate::i18n::t(pd.label));
+                ui.label(pd.label);
                 if let Some(v) = param_widget(ui, &mut elems, pd.id, &pd.kind, value, (fw, fh)) {
                     changes.push(v);
                 }
@@ -168,7 +168,7 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
             }
         });
         ui.add_space(8.0);
-        let r = ui.button(tl!("Reset"));
+        let r = ui.button("Reset");
         elems.push(("effectControls.transition.reset".into(), r.rect, "Reset".into()));
         if r.clicked() {
             changes.push(json!({"reset": true}));
@@ -285,7 +285,7 @@ fn timeline(app: &mut FilmcraftApp, ui: &mut egui::Ui, lane: Rect, id: Transitio
         painter.with_clip_rect(span.shrink(2.0).intersect(lane)).text(
             pos2(span.min.x + 5.0, span.center().y),
             Align2::LEFT_CENTER,
-            crate::i18n::t(name),
+            name,
             Tokens::ui(10.0),
             t.text,
         );
@@ -434,9 +434,9 @@ fn param_widget(ui: &mut egui::Ui, elems: &mut Elems, pid: &str, kind: &ParamKin
             let shown = opts.get(*c as usize).copied().unwrap_or("");
             let mut picked = None;
             let mut options = Vec::new();
-            let r = egui::ComboBox::from_id_salt(("tr-param", pid.to_string())).selected_text(crate::i18n::t(shown)).show_ui(ui, |ui| {
+            let r = egui::ComboBox::from_id_salt(("tr-param", pid.to_string())).selected_text(shown).show_ui(ui, |ui| {
                 for (i, o) in opts.iter().enumerate() {
-                    let r = ui.selectable_label(i == *c as usize, crate::i18n::t(o));
+                    let r = ui.selectable_label(i == *c as usize, *o);
                     if r.clicked() && i != *c as usize {
                         picked = Some(i);
                     }
@@ -503,7 +503,7 @@ pub fn duration_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
     let accent = app.tokens.accent;
     let (mut keep, mut apply) = (true, false);
     let mut elems: Elems = Vec::new();
-    egui::Window::new(tl!("Set Transition Duration"))
+    egui::Window::new("Set Transition Duration")
         .collapsible(false)
         .resizable(false)
         .default_width(260.0)
@@ -511,7 +511,7 @@ pub fn duration_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
         .default_pos(crate::widgets::dialog_center(ctx))
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(tl!("Duration:"));
+                ui.label("Duration:");
                 let r = duration_field(ui, &mut d.frames, max_frames, rate, drop_frame);
                 elems.push(("transitionDuration.value".into(), r.rect, timecode(d.frames as f64, rate, drop_frame)));
             });
@@ -519,10 +519,10 @@ pub fn duration_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
             // one row high: a right-to-left layout would otherwise take the window's whole height
             let row = egui::vec2(ui.available_width().max(220.0), ui.spacing().interact_size.y);
             ui.allocate_ui_with_layout(row, egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let o = ui.add(egui::Button::new(RichText::new(tl!("OK")).color(egui::Color32::WHITE)).fill(accent));
+                let o = ui.add(egui::Button::new(RichText::new("OK").color(egui::Color32::WHITE)).fill(accent));
                 elems.push(("transitionDuration.ok".into(), o.rect, "OK".into()));
                 apply |= o.clicked();
-                let c = ui.button(tl!("Cancel"));
+                let c = ui.button("Cancel");
                 elems.push(("transitionDuration.cancel".into(), c.rect, "Cancel".into()));
                 keep &= !c.clicked();
             });

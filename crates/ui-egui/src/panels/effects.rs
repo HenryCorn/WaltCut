@@ -13,7 +13,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let sr = Rect::from_min_size(rect.min + vec2(8.0, 6.0), vec2(rect.width() - 16.0, 22.0));
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(sr));
     let mut q = app.ui.effects_search.clone();
-    crate::widgets::search_field(&mut child, &mut q, tl!("Search effects"), sr.width(), &t);
+    crate::widgets::search_field(&mut child, &mut q, "Search effects", sr.width(), &t);
     app.ui.effects_search = q.clone();
     let body = Rect::from_min_max(pos2(rect.min.x, sr.max.y + 6.0), rect.max);
     let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(body).id_salt("fx-body"));
@@ -27,13 +27,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     egui::ScrollArea::vertical().id_salt("fx-scroll").auto_shrink([false, false]).show(&mut bui, |ui| {
         for &top in tops {
             if top == "Presets" {
-                let any = app.session.presets.all().iter().any(|p| crate::i18n::matches_query(&p.name, &filter));
+                let any = app.session.presets.all().iter().any(|p| p.name.to_lowercase().contains(filter.as_str()));
                 if any && folder_row(app, ui, top, 0, &filter) {
                     preset_action = crate::panels::presets::folder_rows(app, ui, &filter).or(preset_action.take());
                 }
                 continue;
             }
-            let mut items: Vec<_> = defs.iter().filter(|d| d.category.first() == Some(&top)).filter(|d| crate::i18n::matches_query(d.name, &filter)).collect();
+            let mut items: Vec<_> =
+                defs.iter().filter(|d| d.category.first() == Some(&top)).filter(|d| d.name.to_lowercase().contains(filter.as_str())).collect();
             // Premiere lists effect folders and effects alphabetically (obsolete ones last)
             if top == "Video Effects" || top == "Legacy" {
                 items.sort_by_key(|d| (d.category.get(1) == Some(&"Obsolete"), d.category.get(1).copied().unwrap_or(""), d.name.to_ascii_lowercase()));
@@ -76,7 +77,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     } else {
                         ui.painter().text(icon_r.center(), Align2::CENTER_CENTER, "fx", Tokens::ui(8.0), t.text_dim);
                     }
-                    ui.painter().text(pos2(x, r.center().y), Align2::LEFT_CENTER, crate::i18n::t(d.name), Tokens::ui(12.0), t.text);
+                    ui.painter().text(pos2(x, r.center().y), Align2::LEFT_CENTER, d.name, Tokens::ui(12.0), t.text);
                     // badges: accelerated / 32-bit / YUV
                     let mut bx = r.max.x - 8.0;
                     for (on, label) in [(d.yuv, "YUV"), (d.float32, "32"), (d.accelerated, "⚡")] {
@@ -134,7 +135,7 @@ fn folder_row(app: &mut FilmcraftApp, ui: &mut egui::Ui, key: &str, depth: usize
     // a sub-folder key is `<top>/<folder>`; folder names may themselves contain a slash
     // (Audio Effects ▸ Noise Reduction/Restoration), so split once, after the top folder
     let name = if depth == 0 { key } else { key.split_once('/').map_or(key, |(_, folder)| folder) };
-    ui.painter().text(pos2(x + 30.0, r.center().y), Align2::LEFT_CENTER, crate::i18n::t(name), Tokens::ui(12.0), t.text);
+    ui.painter().text(pos2(x + 30.0, r.center().y), Align2::LEFT_CENTER, name, Tokens::ui(12.0), t.text);
     app.auto.add(&format!("effects.folder.{key}"), r, name);
     if resp.clicked() {
         if open {

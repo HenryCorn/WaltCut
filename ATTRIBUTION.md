@@ -9,13 +9,6 @@ iconography, images or other Adobe assets; open licences only; every asset attri
 
 | Asset | Author | Source | Licence |
 |---|---|---|---|
-| `crates/ui-egui/src/i18n/it.tsv` | FilmCraft contributors | Original work: clean-room Italian interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/id.tsv` | FilmCraft contributors | Original work: clean-room Indonesian interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/ko.tsv` | FilmCraft contributors | Original work: clean-room Korean interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/fr.tsv` | FilmCraft contributors | Original work: clean-room French interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/pt-br.tsv` | FilmCraft contributors | Original work: clean-room Brazilian Portuguese interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/ru.tsv` | FilmCraft contributors | Original work: clean-room Russian interface translations | MIT OR Apache-2.0 |
-| `crates/ui-egui/src/i18n/uk.tsv` | FilmCraft contributors | Original work: clean-room Ukrainian interface translations | MIT OR Apache-2.0 |
 | `assets/fonts/Inter-Regular.ttf` | The Inter Project Authors | https://github.com/rsms/inter | OFL-1.1 (`assets/fonts/OFL-Inter.txt`) |
 | `assets/fonts/Inter-Medium.ttf` | The Inter Project Authors | https://github.com/rsms/inter | OFL-1.1 (`assets/fonts/OFL-Inter.txt`) |
 | `assets/fonts/Inter-SemiBold.ttf` | The Inter Project Authors | https://github.com/rsms/inter | OFL-1.1 (`assets/fonts/OFL-Inter.txt`) |
@@ -108,27 +101,9 @@ carry each font's licence as `OFL-<family>.txt`.
 
 | Font | Use in FilmCraft | Licence |
 |---|---|---|
-| BIZ UDPGothic Regular, Bold (Morisawa) | Japanese UI text; Japanese fallback for sans titles (the web build embeds only Regular) | OFL-1.1 |
+| BIZ UDPGothic Regular, Bold (Morisawa) | Japanese project/media names and fallback for sans titles | OFL-1.1 |
 | Shippori Mincho Regular (FONTDASU) | Japanese fallback for serif titles (native builds) | OFL-1.1 |
 | BIZ UDMincho Regular (Morisawa) | Japanese fallback for serif titles (native builds) | OFL-1.1 |
-
-## First-party brand marks
-
-The ArtCraft name, wordmark and logos are trademarks of the ArtCraft Team. They are not open source and
-are not covered by the project licence; they may be used only unmodified and only in the context of
-FilmCraft, under [`docs/brand/LICENSE-brand.txt`](docs/brand/LICENSE-brand.txt). Forks and modified versions must
-remove them (AGENTS.md §1.8).
-
-| File | Author | Source | Licence |
-|---|---|---|---|
-| `docs/brand/artcraft-logo-white.png` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft wordmark, light ink for dark backgrounds) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-logo-white.svg` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft wordmark, light ink for dark backgrounds) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-logo.png` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft wordmark (symbol + "ARTCRAFT"), dark ink for light backgrounds) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-logo.svg` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft wordmark (symbol + "ARTCRAFT"), dark ink for light backgrounds) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-mark-black.png` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft symbol ("A" mark), black) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-mark-black.svg` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft symbol ("A" mark), black) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-mark.png` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft symbol ("A" mark), blue) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
-| `docs/brand/artcraft-mark.svg` | ArtCraft Team | Original work: first-party ArtCraft brand mark (ArtCraft symbol ("A" mark), blue) | ArtCraft trademark, not open source; `docs/brand/LICENSE-brand.txt` (not MIT/Apache) |
 
 ## Third-party source code
 

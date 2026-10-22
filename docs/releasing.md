@@ -1,5 +1,8 @@
 # Releasing FilmCraft
 
+Until the later product-branding and release step in [ROADMAP.md](../ROADMAP.md), the existing
+release workflow and `filmcraft` / `filmcraft-cli` identifiers remain unchanged.
+
 Every push to the `release` branch runs `.github/workflows/release.yml`. The workflow builds
 the macOS installer and creates or updates a **draft**
 GitHub Release named `FilmCraft v<version>`. Nobody sees a draft until a maintainer publishes it.

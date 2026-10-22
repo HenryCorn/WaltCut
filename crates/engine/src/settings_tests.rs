@@ -18,54 +18,16 @@ fn demo() -> Session {
     s
 }
 
+#[test]
+fn interface_language_is_not_a_preference() {
+    let mut s = Session::default();
+    assert!(settings::field("general.interfaceLanguage").is_none());
+    assert!(s.prefs.get("general.interfaceLanguage").is_none());
+    assert!(s.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": "ja"})).is_err());
+}
+
 fn set(s: &mut Session, key: &str, value: Value) {
     s.execute("prefs.set", json!({"key": key, "value": value})).unwrap_or_else(|e| panic!("{key}: {e}"));
-}
-
-#[test]
-fn interface_language_persists_and_rejects_hostile_values() {
-    let dir = tmp_dir("interface-language");
-    let path = dir.join("preferences.json");
-    let mut s = Session { prefs_path: Some(path.clone()), ..Session::default() };
-    set(&mut s, "general.interfaceLanguage", json!("es"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "es");
-    for value in [json!("xx"), json!("es-MX"), json!("de-DE"), json!("fr-FR"), json!(null), json!(-1), json!({}), json!("x".repeat(4096))] {
-        assert!(s.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": value})).is_err());
-        assert_eq!(s.prefs.general.interface_language, "es");
-    }
-    assert_eq!(Preferences::load(&path).general.interface_language, "es");
-    set(&mut s, "general.interfaceLanguage", json!("de"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "de");
-    set(&mut s, "general.interfaceLanguage", json!("fr"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "fr");
-    // Indonesian is stored as `id`, not a locale tag or the legacy `in` code
-    for value in [json!("id-ID"), json!("in"), json!("ID")] {
-        assert!(s.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": value})).is_err());
-    }
-    set(&mut s, "general.interfaceLanguage", json!("id"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "id");
-    // Italian is stored as `it`, not a locale tag
-    for value in [json!("it-IT"), json!("IT")] {
-        assert!(s.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": value})).is_err());
-    }
-    set(&mut s, "general.interfaceLanguage", json!("it"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "it");
-    // back to following the operating system (#218)
-    set(&mut s, "general.interfaceLanguage", json!("system"));
-    assert_eq!(Preferences::load(&path).general.interface_language, "system");
-    std::fs::remove_dir_all(dir).unwrap();
-}
-
-/// A new installation follows the operating system's language (#218); a saved choice is kept.
-#[test]
-fn interface_language_defaults_to_the_system_language() {
-    assert_eq!(Preferences::default().general.interface_language, "system");
-    let dir = tmp_dir("interface-language-default");
-    let path = dir.join("preferences.json");
-    assert_eq!(Preferences::load(&path).general.interface_language, "system", "no preferences file yet");
-    std::fs::write(&path, r#"{"general":{"interfaceLanguage":"en"}}"#).unwrap();
-    assert_eq!(Preferences::load(&path).general.interface_language, "en");
-    std::fs::remove_dir_all(dir).unwrap();
 }
 
 fn write_png(path: &Path, w: u32, h: u32) {

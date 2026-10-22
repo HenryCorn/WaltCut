@@ -1,6 +1,8 @@
 # Contributing to WaltCut
 
 WaltCut is a fork of FilmCraft focused on drawing and 2D animation. Thanks for helping improve it.
+See [docs/animation.md](docs/animation.md) for the retained product scope; contributions should
+support that workflow or complete an ordered reduction task, not expand inherited feature areas.
 Before you start:
 
 1. Read **[AGENTS.md](AGENTS.md)**. Its rules are absolute. In particular: no Adobe assets of any
@@ -10,8 +12,7 @@ Before you start:
    `expect()`, `panic!`, `unreachable!`, `todo!`, `unimplemented!` or `unsafe` in production code;
    return `Result` and treat every input as hostile. See [AGENTS.md](AGENTS.md) §0.
 3. Follow **[docs/contributing.md](docs/contributing.md)**: setup per OS, building and running,
-   the quality gates (`cargo xtask ci`), commit conventions, and how to add commands, effects,
-   transitions, codecs, panels and assets.
+   the quality gates (`cargo xtask ci`), and commit conventions.
 
 More reading: [docs/architecture.md](docs/architecture.md), [docs/testing.md](docs/testing.md),
 [docs/agents.md](docs/agents.md), [ROADMAP.md](ROADMAP.md).

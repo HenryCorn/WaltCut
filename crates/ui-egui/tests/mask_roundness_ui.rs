@@ -104,7 +104,8 @@ fn vertex_count(m: &Value) -> usize {
 #[test]
 fn roundness_handle_rounds_mask_corners_in_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Effects"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EffectControls"}));
     let seq = d.exec("sequence.inspect", json!({}));
     let clip = &seq["video"][0]["items"][0];
     let (id, start, dur) = (clip["clip"].as_u64().unwrap(), clip["start"].as_i64().unwrap(), clip["duration"].as_i64().unwrap());

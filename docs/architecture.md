@@ -1,10 +1,15 @@
 # Architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** trivial (status line, revision history and roadmap link added; content checked against the crate list) · **Target:** Adobe Premiere Pro 2026 (26.5.2)
+> **Last reviewed:** 2026-10-22 · **Last updated:** 2026-10-22 · **Change:** scope and obsolete progress links updated for WaltCut reduction.
 
-FilmCraft is a Cargo workspace of small crates with strictly enforced layering. The engine is
+WaltCut is a Cargo workspace of small crates with strictly enforced layering. The engine is
 headless: every feature can be reached without a window, and the egui UI is one client among the
 CLI, the JSON control channel and the MCP server.
+
+This architecture describes systems that remain in the code during the reduction; it is not a
+product feature list. The audio and Essential Sound panel cuts are pending in #23, and the graphics
+template and broad effects-catalogue cuts are pending in #24. WaltCut keeps a single adjustable
+layout that is saved and resettable, and one built-in shortcut map with user customization.
 
 Design principles:
 
@@ -67,12 +72,12 @@ and `filmcraft-cli`.
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
 | `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
-| `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU parity; empty library, dev-dependencies only |
+| `golden` | L3 | test-only: golden-image tests of the CPU renderer and CPU/GPU rendering comparisons; empty library, dev-dependencies only |
 | `export` | L3 | render → encode → mux pipeline, progress/cancel |
 | `engine` | L4 | `Session`, command registry, undo history, media pool, jobs |
 | `ui-egui` | L5 | the egui frontend: docking, panels, timeline, monitors, playback, control-channel handlers |
 | `automation` | L5 | MCP server (`rmcp`, stdio), headless or bridged to the running app |
-| `platform` | L5 | OS media FFI only: hardware video decoding (VideoToolbox H.264 / HEVC on macOS; Media Foundation / Direct3D 11 H.264 / HEVC / VP9 / AV1 on Windows; VA-API H.264 / HEVC on Linux, with our own parsers and DPBs driving the stateless hardware; a no-op elsewhere) behind `codecs::VideoDecoder`, with transparent fallback to our decoders, and hardware H.264 encoding (VideoToolbox, opt-in) and H.265 encoding (VideoToolbox, the only H.265 encoder; the format exists only where a hardware encoder does) and NVIDIA NVENC H.264 (Windows and 64-bit Linux, opt-in) and H.265 (Windows, FilmCraft's only H.265 encoder there) encoding behind `export::VideoEncoder`; H.264 declines to the built-in encoder for what the hardware does not take. The one crate allowed `unsafe` ([ADR 0001](adr/0001-platform-ffi.md), [README](../crates/platform/README.md)) |
+| `platform` | L5 | macOS media FFI through VideoToolbox for hardware video decoding and encoding, behind `codecs::VideoDecoder` and `export::VideoEncoder`; decoding falls back to the built-in Rust decoders. The one crate allowed `unsafe` ([ADR 0001](adr/0001-platform-ffi.md), [README](../crates/platform/README.md)) |
 | `filmcraft` | L6 | desktop binary: eframe/wgpu window, cpal audio output, file dialogs, native macOS menu, TCP control server |
 | `filmcraft-cli` | L6 | headless CLI: `exec`, `run`, `inspect`, `describe`, `commands`, `import`, `export`, `render`, `probe`, `mcp`; `--bridge` targets the running app |
 
@@ -187,7 +192,7 @@ pub struct CommandSpec {
   disabled one is a warning), messages and error toasts, auto-save errors, and background jobs
   starting, finishing, failing or being cancelled. Repeats of the newest entry bump its count. The
   Events panel shows it; `events.list {level?, since?}` and `events.clear` reach it headless.
-- **UI-only commands** (tools, playback, zoom, panels, workspaces) live in
+- **UI-only commands** (tools, playback, zoom, panels) live in
   `crates/ui-egui/src/menus.rs` (`UI_COMMANDS`). The menu bar is built from the engine registry plus
   this table, and `menus::invoke` is the single entry point for menus, shortcuts and the control
   channel.
@@ -196,8 +201,8 @@ pub struct CommandSpec {
 
 ```text
 file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware seek
-          │   decoder registry: h264, hevc, vp9, av1, prores, dnx, mjpeg (+ any registered first:
-          │   platform's VideoToolbox (macOS) or Media Foundation (Windows) H.264 / HEVC, falling back to ours)
+          │   decoder registry: h264, hevc, vp9, av1, prores, dnx, mjpeg (+ VideoToolbox on macOS,
+          │   falling back to the built-in decoders)
           ▼
         media::MediaSource ──► frame cache (byte-budgeted LRU, shared)
           ▼
@@ -236,8 +241,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   hardware decoder can take precedence. The GOP cache never holds its lock while decoding.
 - **Hardware decoding.** The apps (desktop, CLI / headless MCP, bench) call
   `waltcut_platform::register()` at startup, which on macOS registers a VideoToolbox factory for
-  `avcC` / `hvcC` streams (8 / 10-bit, 4:2:0 and 4:2:2; elsewhere it does nothing), and on Windows a
-  Media Foundation one (below). The factory
+  `avcC` / `hvcC` streams (8 / 10-bit, 4:2:0 and 4:2:2). The factory
   declines (our decoder is used) when Settings ▸ Playback ▸ Hardware decoding is Off
   (`codecs::hw::set_hardware_decoding`, applied by the engine whenever preferences change), for
   formats it does not take, and when the OS cannot create a *hardware* session for the stream.
@@ -247,46 +251,20 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   the decoded biplanar `CVPixelBuffer` is copied into planar `Yuv8` / `Yuv16`. Colour, pixel
   aspect, random-access and disposable answers come from the same helpers as the software
   decoders (`video::vui_color`, `sar_par`, `h264_disposable`, `hevc_disposable`), so the two are
-  interchangeable (bit-exact in the parity tests). If the hardware fails mid-stream (decode error,
+  interchangeable (bit-exact in comparison tests). If the hardware fails mid-stream (decode error,
   session lost to a GPU change or sleep, changed in-band parameter sets), the hybrid builds
   `codecs::software_video_decoder` (built-in factories only), replays the samples since the last
   restart point and continues in software for that instance; it is logged and counted. A source
   already open keeps its decoder when the setting changes, until it is reopened. `perf.stats`
   `decode.hardware` reports hardware vs software frames, sessions, declines and fallbacks, and the
-  registered `backend`.
-  On Windows the decoder (`platform::media_foundation`) is a Direct3D-aware decoder MFT driven at
-  the level of single access units (no Source Reader: the demuxer above already delivers the
-  samples): the `avcC` / `hvcC` sample becomes Annex B, the MFT is given the process's Direct3D 11
-  video device through an `IMFDXGIDeviceManager` so it decodes with DXVA, and its NV12 (8-bit) /
-  P010 (10-bit) texture is read back through a staging texture (the one GPU to CPU copy) into
-  planar `Yuv8` / `Yuv16`. H.264 Baseline / Main / High, HEVC Main / Main 10, VP9 profiles 0 / 2 and AV1 main
-  (8- and 10-bit), 4:2:0, progressive (VP9 / AV1 samples go in as they are, not as Annex B);
-  everything else, and any stream the GPU's DXVA decoder does not list, is declined. A decoder that
-  would hand back system-memory pictures (Microsoft's decoder MFTs do that when DXVA is not
-  available) fails the stream, so the hybrid continues with our decoder and Windows' software
-  decoding is never used in its place. Zero-copy (the texture straight to wgpu) is not done yet.
-  Decoders run slices on rayon, so an export worker waiting inside a decode can pick up another
-  frame of the same source. A request that finds the shared decoder busy decodes with a private
-  decoder.
-- **Hardware encoding.** On Windows and 64-bit Linux, `platform::nvenc::export::factory` is registered with
-  `waltcut_export::register_encoder` (`register()` does this once), in front of the software H.264
-  encoder. It takes an export only when Export ▸ Hardware encoding (`ExportSettings.hardwareEncoding`,
-  `HardwareEncoding::Auto`) is Auto, which is off by default: hardware streams differ from ours, and
-  exports are otherwise byte-identical from run to run. NVENC (`platform::nvenc`, the driver's
-  `nvEncodeAPI64.dll` / `libnvidia-encode.so.1` loaded at run time) then takes RGBA frames, converted to 4:2:0 by the software
-  encoder's own conversion, and produces the H.264 samples and `avcC` of an MP4 / MOV. It declines
-  (the software encoder runs, counted in `export.hardware.declined`) two-pass VBR, HDR, MXF,
-  interlaced output, sizes outside NVENC's limits, and systems without an NVIDIA GPU or driver.
-  A failure during an export ends it with an error: the software encoder cannot take over a hardware
-  stream. The same NVENC session also encodes H.265 (HEVC Main 8-bit 4:2:0 SDR, or Main 10 HDR: PQ / HLG,
-  BT.2020, limited range, from the float R'G'B' pictures through `rgbf_to_yuv420_10` into P010 input
-  buffers, with the HDR10 static metadata as SEI on every IDR for PQ; the `hvcC` is built from the SPS
-  the encoder wrote). An HDR sequence exports as HDR H.265 only where a registered probe says so
-  (`waltcut_export::register_hdr_probe`, `hdr_available`; NVENC with 10-bit support), otherwise it is
-  tone-mapped to SDR as on macOS: `register()` hands `platform::nvenc::hevc_available` to
-  `waltcut_export::register_format_probe`, so the H.265 format exists where an HEVC encoder does,
-  and choosing it is the opt-in (the Hardware encoding toggle governs H.264 only). With no software
-  H.265 encoder, what NVENC declines is counted and ends the export with an error that says why.
+  registered `backend`. If hardware decoding fails mid-stream, the hybrid decoder replays samples
+  from its restart point through the built-in decoder and continues in software for that source.
+  The fallback is logged and counted. A source already open keeps its decoder when the setting
+  changes, until it is reopened.
+- **Hardware encoding.** On macOS, VideoToolbox encoders are registered behind the export encoder
+  interface. H.264 can fall back to the built-in encoder when hardware does not accept the request;
+  HEVC is available only when a compatible hardware encoder is present. Hardware selection and
+  fallback behavior are reported through export status.
 - **Compositor.** `render` is the reference for monitors, thumbnails and export. `render::plan`
   turns a frame into GPU layers, each with its opacity and blend mode. All 27 blend modes run on the
   GPU (`waltcut-gpu`): Normal and Dissolve with fixed-function "over" blending, the others by
@@ -381,7 +359,7 @@ Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts �
   tracks and sends use balance. Solo keeps soloed and solo-safe strips plus everything feeding them
   or fed by them. 24 tracks × (EQ + Dynamics + Studio Reverb) + a compressed submix renders at
   ~6× realtime on one core (release).
-- **Automation modes** (Premiere semantics). Off ignores lanes; Read plays them; Latch records from
+- **Automation modes.** Off ignores lanes; Read plays them; Latch records from
   the first touch and holds the last value until playback stops; Touch records while held and ramps
   back to the existing automation over the **automatch time** (Preferences ▸ Audio, 1 s); Write
   records every control from playback start (then switches to Touch unless "Switch to Touch after
@@ -634,15 +612,16 @@ All of these dispatch the same command ids.
 - **Automation ids.** Every interactive widget calls `app.auto.add(id, rect, label)` each frame
   (`crates/ui-egui/src/automation.rs`). Agents click by id, e.g. `tools.Razor`,
   `timeline.clip.<id>`, `effects.item.gaussian_blur`, `panel.Timeline`.
-- **UI state** that is not project data (tool, workspace, dock layout, zoom, scroll, monitor
+- **UI state** that is not project data (tool, dock layout, zoom, scroll, monitor
   settings) is in `crates/ui-egui/src/state.rs` as serde structs, so `ui.inspect` and `ui.set` can
   read and write it.
 
-- **Panels with engine data** (M8.9 / M12.6): Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
-  `ProjectItem::metadata`), Events (`events.list` / `events.clear`), Progress (`jobs.list` /
-  `jobs.cancel`), Project Notes (`project.notes` / `project.setNotes`, plain text in
-  `Project::notes`, schema v15; one typing session is one undo step). The Timecode panel is a frontend-only view. Their settings are
-  `UiState::panels` (`ui.set {"panels": {...}}`).
+- **Panels with engine data.** Events and Progress provide diagnostics (`events.list` /
+  `events.clear`, `jobs.list` / `jobs.cancel`). History, Markers, and drawing/animation panels
+  provide their workflow-specific views. Specialist Info, Metadata, Timecode, Project Notes, and
+  Libraries panels are not part of the WaltCut layout. Shared metadata and bin operations remain
+  available through engine APIs; project item metadata stays in `ProjectItem::metadata`.
+  Panel visibility and arrangement are UI state, not project data.
 - **Project panel** (M12.7). View settings (List / Icon / Freeform, thumbnail
   and font size, Preview Area, Hover Scrub), the List view's columns, widths and sort, and ten view
   presets are preferences (`Preferences::project_panel`; `project.view.*`, `project.columns.*`,
@@ -662,7 +641,8 @@ The layer table reserves names for crates that don't exist yet: `riff`, `mjpeg`,
 other OS integration stays in `apps/waltcut`.)
 Until they exist, that work lives elsewhere: keyframes and effect definitions in `project`, effects
 and the audio mix in `render`, playback in `ui-egui`, and OS integration (cpal, rfd,
-native menus) in `apps/waltcut`. [roadmap.md](roadmap.md) has the milestone status and [gaps.md](gaps.md) what is missing.
+native menus) in `apps/waltcut`. [roadmap.md](roadmap.md) records the reduction status and
+[`animation.md`](animation.md) defines the retained scope.
 
 ## Revision history
 

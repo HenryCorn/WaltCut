@@ -1,9 +1,9 @@
 # Agents
 
-FilmCraft is built to be driven by AI agents, and largely built by them. Part 1 covers using
-FilmCraft from an agent. Part 2 covers developing FilmCraft as an agent.
+WaltCut is built to be driven by AI agents, and largely built by them. Part 1 covers using
+WaltCut from an agent. Part 2 covers developing WaltCut as an agent.
 
-# Part 1: driving FilmCraft
+# Part 1: driving WaltCut
 
 ## 1. MCP server
 
@@ -63,7 +63,7 @@ claude mcp add filmcraft -- filmcraft-cli mcp
 | `sequence_inspect` | both | the active sequence: tracks, clips (`start` / `end` and `sourceIn` / `sourceOut` in ticks, frames, `speed`, `reverse`: the clip plays its `sourceIn` to `sourceOut` stretch backward, `gainDb`), effects, transitions, markers (name and `comment`), playhead, selection |
 | `media_import` | both | import files by absolute path (`paths`, an array; optional `bin`, `image_sequence`) |
 | `render_frame` | both | PNG of the program frame at `seconds` (headless renders; bridge screenshots the Program monitor). Read-only: the playhead and selection are left as they were |
-| `ui_inspect` | bridge | UI state: tool, workspace, panels, zoom, playback, fps |
+| `ui_inspect` | bridge | UI state: tool, panels, zoom, playback, fps |
 | `ui_elements` | bridge | on-screen interactive elements with id, label and rect (`prefix` filter) |
 | `ui_click` | bridge | click by `id` or `x`,`y`; `button`, `count`, `modifiers` |
 | `ui_drag` | bridge | press–move–release between points or element ids |
@@ -78,11 +78,11 @@ Typical loop: `project_inspect` / `sequence_inspect` → get ids → `command_ru
 ### Conventions
 
 The server follows a few conventions that make it predictable for agents. They are not
-FilmCraft-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
+WaltCut-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
 driven one app can drive the others.
 
 - **Core tools.** `command_list`, `command_run`, `command_batch`, `doc_inspect` and `render_preview`
-  work in both modes. The FilmCraft tools above stay as they are.
+  work in both modes. The existing tool names and contracts remain stable.
 - **Titles and annotations.** Every tool has a `title` and the four MCP hints (`readOnlyHint`,
   `destructiveHint`, `idempotentHint`, `openWorldHint`), so a client can let the read-only tools
   (lists, inspects, renders, screenshots) run without asking and ask before edits. When you add a
@@ -140,7 +140,7 @@ JSON request per line and get one JSON reply per line. Full method table:
 {"id":4,"method":"engine.execute","params":{"command":"sequence.addEdit"}}
 {"id":5,"method":"engine.execute","params":{"command":"effects.apply","params":{"effect":"Gaussian Blur"}}}
 {"id":6,"method":"ui.elements","params":{"prefix":"tools."}}
-{"id":7,"method":"ui.click","params":{"id":"tools.Razor"}}
+{"id":7,"method":"ui.click","params":{"id":"tools.Brush"}}
 {"id":8,"method":"ui.key","params":{"key":"Cmd+Z"}}
 {"id":9,"method":"ui.screenshot","params":{"path":"/tmp/timeline.png","panel":"Timeline"}}
 ```
@@ -170,8 +170,8 @@ Notes:
   nearest frame.
 - `sequence.inspect` reports `durationFrames` as the number of frames export renders: a sequence
   that ends partway through a frame counts that frame.
-- `engine.execute` also runs UI-only commands (`tool.razor`, `playback.toggle`,
-  `window.workspace.color`, `window.panel.<name>`).
+- `engine.execute` also runs UI-only commands (`tool.brush`, `playback.toggle`,
+  `window.panel.<name>`).
 - A command that works on the selection is disabled ("no clips selected", "select a clip in the
   Project panel") until something is selected, unless the call names its targets under a key the
   command documents (`clips` / `clip` for timeline clips, `items` / `item` for project items):
@@ -197,19 +197,12 @@ of its output but still finishes the work, saves included, and the exit status s
 failures; any other stdout write error is reported and makes the status 1.
 
 ```sh
-filmcraft-cli commands razor                     # find ids (add --json for machine output)
-filmcraft-cli describe timeline.razor            # one command: menu, shortcut, params, enabled now
+filmcraft-cli commands drawing                   # find retained drawing command ids
+filmcraft-cli describe drawing.newCel            # one command: menu, shortcut, params, enabled now
 filmcraft-cli --demo inspect sequence            # project / sequence as JSON
-filmcraft-cli --project p.fcproj --save exec timeline.razor seconds=3.5
-filmcraft-cli --project p.fcproj exec effects.apply '{"effect":"Gaussian Blur"}'
-filmcraft-cli --project p.fcproj exec markers.exportCsv path=review.csv
-filmcraft-cli --project p.fcproj --save import a.mov b.wav
-filmcraft-cli --project p.fcproj export out.mp4  # format from the extension; waits for the job
-filmcraft-cli --project p.fcproj export out --preset "YouTube 1080p Full HD" --start 0 --end 10
-filmcraft-cli export --list-presets prores       # built-in + user presets (--data-dir for another library)
-filmcraft-cli --project p.fcproj exec export.queue.add preset="Apple ProRes 422 HQ" path=renders/ start=true wait=true
-echo '{"id":"file.newBin","params":{"name":"Selects"}}' | filmcraft-cli --project p.fcproj --save run -
-filmcraft-cli --bridge 127.0.0.1:9876 exec window.workspace.color   # the running app
+filmcraft-cli --project p.fcproj --save import reference.mov
+filmcraft-cli --project p.fcproj describe drawing.newCel
+filmcraft-cli --bridge 127.0.0.1:9876 commands drawing   # the running app
 ```
 
 `key=value` values are parsed as JSON when they can be (`3.5`, `true`, `[1,2]`), otherwise taken as
@@ -252,17 +245,17 @@ For any UI change, look at the result:
 3. Assert on `ui.inspect`, `ui.elements` and `sequence.inspect`.
 4. Take `ui.screenshot` (the whole window and the panel you changed) and open the PNG.
 
-Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: FilmCraft only, openly licensed
+Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: WaltCut only, openly licensed
 media, sidecar and `ATTRIBUTION.md` entry.
 
-# Part 2: developing FilmCraft
+# Part 2: developing WaltCut
 
 ## 4. Orientation, in this order
 
 1. [AGENTS.md](../AGENTS.md): absolute rules (assets, clean-room, licences).
-2. [CLAUDE.md](../CLAUDE.md): working instructions and non-negotiables.
-3. [ROADMAP.md](../ROADMAP.md) for the summary, then [gaps.md](gaps.md) (the ranked shortfalls) first,
-   [target-app-parity.md](target-app-parity.md) and [roadmap.md](roadmap.md) (milestones, current focus).
+2. [CLAUDE.md](../CLAUDE.md): WaltCut workflow, working instructions and non-negotiables.
+3. [ROADMAP.md](../ROADMAP.md) and [roadmap.md](roadmap.md) for reduction status; then
+   [animation.md](animation.md) for the retained-scope allowlist.
 4. [architecture.md](architecture.md), then the README and tests of the crate you'll touch.
 5. [contributing.md](contributing.md) (how to add things, gates) and [testing.md](testing.md).
 
@@ -272,17 +265,17 @@ everything you need to contribute is in the public docs above. Ask a maintainer 
 
 ## 5. Autonomous work loop
 
-1. **Orient.** Pick the next task: the next unchecked task in the maintainer status file, or an open
-   [gaps.md](gaps.md) entry. Prefer those gaps (stability, `.prproj`, camera media, measurement,
-   hardware) over adding more checklist items. Read the relevant
-   architecture section and crate README.
+1. **Orient.** Pick the next task from the maintainer status file or the ordered reduction work in
+   [roadmap.md](roadmap.md). Keep changes within the retained-scope allowlist in [animation.md](animation.md).
+   Read the relevant architecture section and crate README. Do not treat inherited, not-yet-removed
+   systems as WaltCut product scope.
 2. **Plan tests first.** Write down the acceptance test before writing code.
 3. **Implement and test.**
 4. **Verify.** Run all gates (`cargo xtask ci`). For UI work, run the app with `--control`, drive it
    and look at the screenshots (§3).
-5. **Record.** Update the crate README (behaviour decisions, test results, limitations) and
-   the progress docs when a milestone moves (ROADMAP.md, docs/roadmap.md, the relevant parity doc
-   and gaps.md, with their timestamps). Commit as `M<n>.<k>: …`, then move on to the next task.
+5. **Record.** Update the crate README (behaviour decisions, test results, limitations) and the
+   progress docs when reduction status changes (ROADMAP.md and docs/roadmap.md). Commit with the
+   task id, then move on to the next task.
 
 For parallel agents, use one git worktree and one `CARGO_TARGET_DIR` per agent, and keep each crate
 with one owner ([contributing.md §5](contributing.md#5-parallel-work-several-agents-or-worktrees)).
@@ -291,10 +284,10 @@ with one owner ([contributing.md §5](contributing.md#5-parallel-work-several-ag
 
 Don't block on choices you can make yourself:
 
-- **Behaviour.** Match the publicly documented and observable behaviour of professional editors
-  (help pages, published shortcut lists, using the app). Never inspect application internals
-  ([AGENTS.md](../AGENTS.md) §2). If behaviour is undocumented, choose what editors most commonly
-  expect and record the choice in the crate README.
+- **Behaviour.** Follow the documented WaltCut workflow and make choices that support the retained
+  drawing and animation use cases. Use public specifications and observable behaviour only; never
+  inspect application internals ([AGENTS.md](../AGENTS.md) §2). Record non-obvious choices in the
+  relevant crate README.
 - **Ask a human only about:**
   - licences outside the allowlist;
   - spending money;
@@ -313,17 +306,12 @@ A feature is done when:
 - [ ] every new interactive widget has an automation id;
 - [ ] you have driven it through the control channel and reviewed a screenshot;
 - [ ] all gates pass (`cargo xtask ci`), and new assets have sidecars;
-- [ ] the crate README and the progress docs (ROADMAP.md, docs/gaps.md, the parity docs) are updated where relevant;
+- [ ] the crate README and reduction status docs (ROADMAP.md and docs/roadmap.md) are updated where relevant;
 - [ ] it is committed with its task id.
 
 ### Reporting progress honestly
 
-ROADMAP.md and [target-app-parity.md](target-app-parity.md) keep two numbers: **feature breadth**
-(does it exist?) and **ready for real work** (does it hold up?). When you update either:
-
-- say how a number was obtained: *measured* (a test, a diff, a benchmark you ran) or *estimated*;
-- count an approximation, a stub or a partly wired setting as such, never as done;
-- record known bugs and limitations in the crate README and [gaps.md](gaps.md), not only
-  what works;
-- benchmarks state the machine, the load average and before/after on the same build;
-- don't raise a percentage without evidence a reviewer can rerun.
+Report each reduction task as pending, in progress, merged, or complete according to its actual
+state. Do not describe planned removals as landed or infer completion from a roadmap entry. Record
+known behavior, test evidence, and limitations in the crate README and the relevant retained-scope
+documentation. Benchmarks state the machine and compare before/after on the same build.

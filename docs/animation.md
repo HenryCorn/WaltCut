@@ -58,8 +58,10 @@ WaltCut is being reduced to the code this workflow needs (epic
 > import footage, images and audio → arrange a simple timeline → draw and manage cels → preview →
 > export
 
-This section is the allowlist the reduction follows. Anything not listed here is removed from the
-repository, not hidden or put behind a flag. The decisions were made in
+This section is the allowlist the reduction follows. Anything not listed here is outside the
+intended product scope and is scheduled for removal, not hidden or put behind a flag. Because the
+reduction is still in progress, inherited code may remain until its removal issue is merged. The
+decisions were made in
 [#17](https://github.com/HenryCorn/WaltCut/issues/17). Until the reduction is finished, the app
 still contains the inherited FilmCraft features.
 
@@ -89,9 +91,10 @@ workflows' commands once the reduction is finished.
 | Images | PNG, JPEG, WebP, TIFF, GIF, BMP |
 | Export | H.264 + AAC in MP4, ProRes 4444 MOV with alpha, PNG sequence with alpha, still frame (PNG/JPEG) |
 
-Removed: MXF and Ogg containers; DNxHD/HR, APV, VP8 and DNG/CinemaDNG video; AC-3/E-AC-3 audio
-(MPEG-2 files with Dolby audio import without sound); FLAC export; broadcast and cinema delivery
-presets.
+Outside the retained format scope: MXF and Ogg containers; DNxHD/HR, APV, VP8 and DNG/CinemaDNG
+video; AC-3/E-AC-3 audio (MPEG-2 files with Dolby audio import without sound); FLAC export; and
+broadcast and cinema delivery presets. Remaining codec and container cuts are pending in #25;
+this list does not claim those removals have all landed.
 
 ### Kept from shared systems
 
@@ -103,17 +106,21 @@ presets.
 - Text and shape graphic clips, with per-character styles and responsive layout, for titles and
   artwork.
 
-### Removed
+### Outside the retained scope
 
-- Masks, tracking, adjustment layers, and the broad effects and transitions catalogue.
+These exclusions describe the target, not a claim that every code removal has landed. In
+particular, audio and Essential Sound panel cuts are pending in #23; graphics templates and the
+broad effects catalogue cuts are pending in #24.
+
+- Masks, tracking, adjustment layers, and the broad effects and transitions catalogue (#24).
 - Proxies, multicam, clip synchronisation, scene edit detection, professional ingest and the media
   browser.
-- Audio post-production: mixers, sends, automation, Essential Sound, voice-over recording, Remix,
-  surround and loudness tools.
+- Audio post-production: mixer and Essential Sound panels, sends, automation, voice-over recording,
+  Remix, surround and loudness tools (#23).
 - Captions, speech-to-text, transcripts and text-to-speech.
 - Colour grading, scopes and reference monitoring.
 - AAF, OMF, EDL, FCP XML/FCPXML and OTIO interchange.
-- Graphics templates (`.fcgt`).
+- Graphics templates (`.fcgt`; #24).
 - UI translations: the interface is English only. Titles can still use other scripts.
 
 ### Platforms
@@ -126,7 +133,8 @@ removed ([#29](https://github.com/HenryCorn/WaltCut/issues/29)).
 Projects created before the reduction don't open in later versions
 ([#18](https://github.com/HenryCorn/WaltCut/issues/18)). Open them in
 [v0.0.1-legacy](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy), the last build
-from before the reduction. New projects use the `.waltcut` extension
+from before the reduction. Projects continue to use the `.fcproj` extension until the later
+product-branding and release step
 ([#2](https://github.com/HenryCorn/WaltCut/issues/2)).
 
 ### Size measurements

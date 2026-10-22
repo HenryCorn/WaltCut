@@ -16,9 +16,8 @@
 //! are converted on import: their `Ctrl` is the primary modifier (`Cmd`) and `Win`/`Meta` maps to
 //! the macOS Control key.
 //!
-//! Built-in presets: **FilmCraft Default** (each command's default plus the Premiere-default audit,
-//! see [`Shortcuts::audit`]), **Premiere Pro Compatible**, **Final Cut Pro Compatible** and
-//! **Avid Media Composer Compatible** ([`crate::shortcut_presets`]). Custom presets are JSON files in
+//! One built-in map: **WaltCut Default** (command defaults plus unbound additions).
+//! Custom presets are JSON files in
 //! `<data dir>/Keyboard Shortcuts/`; the active set persists in `active.json` there.
 //!
 //! Commands the frontend owns (tools, transport, panels, workspaces) are registered with
@@ -31,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::commands::{CommandSpec, always, bad, bool_p, str_p};
-use crate::shortcut_presets::{self as presets, Entry};
+use crate::shortcut_presets as presets;
 use crate::{EngineError, Session};
 
 pub const APPLICATION: &str = "Application";
@@ -46,18 +45,14 @@ pub const PANELS: &[&str] = &[
     "Effects",
     "History",
     "Markers",
-    "Metadata",
     "Audio Track Mixer",
     "Audio Clip Mixer",
     "Essential Graphics",
     "Properties",
 ];
 
-pub const DEFAULT_PRESET: &str = "FilmCraft Default";
-pub const PREMIERE_PRESET: &str = "Premiere Pro Compatible";
-pub const FCP_PRESET: &str = "Final Cut Pro Compatible";
-pub const AVID_PRESET: &str = "Avid Media Composer Compatible";
-pub const BUILTIN_PRESETS: [&str; 4] = [DEFAULT_PRESET, PREMIERE_PRESET, FCP_PRESET, AVID_PRESET];
+pub const DEFAULT_PRESET: &str = "WaltCut Default";
+pub const BUILTIN_PRESETS: [&str; 1] = [DEFAULT_PRESET];
 
 const FILE_FORMAT: &str = "filmcraft-keyboard-shortcuts";
 const DIR_NAME: &str = "Keyboard Shortcuts";
@@ -559,7 +554,7 @@ impl Shortcuts {
 
     // ---------------------------------------------------------------- presets
 
-    /// Default bindings of every known command, plus FilmCraft's panel shortcuts.
+    /// Default bindings of every known command, plus WaltCut's panel shortcuts.
     fn base_defaults(&self) -> Vec<Binding> {
         let mut out = Vec::new();
         for c in self.commands() {
@@ -567,7 +562,7 @@ impl Shortcuts {
                 out.push(Binding::new(&c.id, k, p.as_deref()));
             }
         }
-        for (c, k, p) in presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL) {
+        for (c, k, p) in presets::PANEL.iter().chain(presets::CONTEXT) {
             if self.known(c) {
                 out.push(Binding::new(c, k, panel_opt(p)));
             }
@@ -575,19 +570,16 @@ impl Shortcuts {
         out
     }
 
-    /// Premiere-default entries FilmCraft Default adopts: commands with no shortcut of their own
-    /// whose Premiere key is free in that context on this platform.
+    /// Additional bindings for commands and keys not already assigned.
     pub fn audit(&self) -> Vec<Binding> {
         self.audit_for(Platform::current())
     }
 
-    /// [`Self::audit`] for platform `p`. The Premiere table is Premiere's macOS keyboard: off macOS
-    /// the Control and Command keys are the same key, so an entry whose key would collide there
-    /// with one already taken (`⌃T` vs `⌘T`) is left out, and the command keeps no default key.
+    /// Additional bindings that do not collide on platform `platform`.
     pub(crate) fn audit_for(&self, platform: Platform) -> Vec<Binding> {
         let base = self.base_defaults();
         let mut added: Vec<Binding> = Vec::new();
-        for (c, k, p) in presets::PREMIERE {
+        for (c, k, p) in presets::ADDITIONAL {
             if !self.known(c) || base.iter().any(|b| b.command == *c) {
                 continue;
             }
@@ -608,33 +600,13 @@ impl Shortcuts {
 
     /// [`Self::builtin`] as it is built on platform `p`.
     pub(crate) fn builtin_for(&self, name: &str, p: Platform) -> Option<Vec<Binding>> {
+        if name != DEFAULT_PRESET {
+            return None;
+        }
         let mut b = self.base_defaults();
         b.extend(self.audit_for(p));
-        let table: Vec<Entry> = match name {
-            DEFAULT_PRESET => Vec::new(),
-            PREMIERE_PRESET => presets::premiere(),
-            FCP_PRESET => presets::FINAL_CUT.to_vec(),
-            AVID_PRESET => presets::AVID.to_vec(),
-            _ => return None,
-        };
-        self.apply_table(&mut b, &table);
         drop_control_collisions(&mut b, p);
         Some(b)
-    }
-
-    /// Apply a preset table: listed commands get exactly the listed keys, and a listed key is taken
-    /// away from whatever else had it in that context.
-    fn apply_table(&self, b: &mut Vec<Binding>, table: &[Entry]) {
-        let listed: Vec<&str> = table.iter().map(|e| e.0).filter(|c| self.known(c)).collect();
-        b.retain(|x| !listed.contains(&x.command.as_str()));
-        for (c, k, p) in table {
-            if !self.known(c) {
-                continue;
-            }
-            let nb = Binding::new(c, k, panel_opt(p));
-            b.retain(|o| !(o.context() == nb.context() && o.chord() == nb.chord()));
-            b.push(nb);
-        }
     }
 
     fn presets_dir(&self) -> Option<PathBuf> {

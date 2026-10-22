@@ -149,7 +149,8 @@ fn es(d: &mut Driver, clip: u64) -> Value {
 #[test]
 fn essential_sound_panel_by_id_and_by_drag() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialSound"}));
     d.frames(3);
     let seq = d.exec("sequence.inspect", json!({}));
     let a1 = seq["audio"][0]["items"][0]["clip"].as_u64().unwrap();

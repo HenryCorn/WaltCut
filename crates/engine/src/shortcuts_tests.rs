@@ -43,14 +43,14 @@ fn chords_parse_normalise_and_display_per_os() {
 }
 
 #[test]
-fn defaults_follow_the_registry_and_the_premiere_audit() {
+fn defaults_follow_the_registry_and_unbound_additions() {
     let mut s = Session::default();
     with_ui_commands(&mut s);
     let sc = &s.shortcuts;
-    assert_eq!(sc.preset, "FilmCraft Default");
+    assert_eq!(sc.preset, "WaltCut Default");
     assert_eq!(sc.primary("sequence.addEdit").as_deref(), Some("Cmd+K"));
     assert_eq!(sc.primary("playback.toggle").as_deref(), Some("Space"));
-    // the audit adopts Premiere defaults for commands that had none
+    // the map adopts additional bindings for commands that had none
     let audit = sc.audit();
     let has = |c: &str, k: &str, p: Option<&str>| audit.iter().any(|b| b.command == c && b.keys == k && b.panel.as_deref() == p);
     assert!(has("trim.applyDefaultTransition", "Shift+D", None), "{audit:?}");
@@ -205,24 +205,14 @@ fn delete_clears_timeline_clips_and_project_items() {
 }
 
 #[test]
-fn compat_presets_map_other_editors() {
+fn only_the_waltcut_builtin_map_is_available() {
     let mut s = Session::default();
-    with_ui_commands(&mut s);
-    s.execute("shortcuts.loadPreset", json!({"name": "Premiere Pro Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("markers.clearIn").as_deref(), Some("Alt+I"));
-    assert_eq!(s.shortcuts.primary("edit.clear").as_deref(), Some("Delete"));
-    assert!(s.shortcuts.for_command("edit.clear").iter().any(|b| b.panel.as_deref() == Some("Timeline") && b.keys == "Backspace"));
-    s.execute("shortcuts.loadPreset", json!({"name": "Final Cut Pro Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("source.insert").as_deref(), Some("W"));
-    assert_eq!(s.shortcuts.primary("tool.razor").as_deref(), Some("B"));
-    assert!(s.shortcuts.primary("trim.rippleNext").is_none(), "W was taken by Insert");
-    s.execute("shortcuts.loadPreset", json!({"name": "Avid Media Composer Compatible"})).unwrap();
-    assert_eq!(s.shortcuts.primary("sequence.lift").as_deref(), Some("Z"));
-    assert_eq!(s.shortcuts.for_command("markers.markIn").len(), 2, "I and E");
-    assert!(!s.shortcuts.modified);
-    assert!(s.execute("shortcuts.loadPreset", json!({"name": "Nope"})).is_err());
-    s.execute("shortcuts.loadPreset", json!({"name": "FilmCraft Default"})).unwrap();
-    assert_eq!(s.shortcuts.primary("source.insert").as_deref(), Some(","));
+    assert_eq!(crate::shortcuts::BUILTIN_PRESETS, ["WaltCut Default"]);
+    for removed in ["Premiere Pro Compatible", "Final Cut Pro Compatible", "Avid Media Composer Compatible"] {
+        assert!(s.execute("shortcuts.loadPreset", json!({"name": removed})).is_err());
+    }
+    s.execute("shortcuts.loadPreset", json!({"name": "WaltCut Default"})).unwrap();
+    assert_eq!(s.shortcuts.primary("sequence.addEdit").as_deref(), Some("Cmd+K"));
 }
 
 #[test]
@@ -236,14 +226,14 @@ fn custom_presets_persist_export_and_import() {
     let p = s.execute("shortcuts.presets", json!({})).unwrap();
     assert_eq!(p["active"], json!("My Keys"));
     assert_eq!(p["custom"], json!(["My Keys"]));
-    assert!(s.execute("shortcuts.savePreset", json!({"name": "FilmCraft Default"})).is_err());
+    assert!(s.execute("shortcuts.savePreset", json!({"name": "WaltCut Default"})).is_err());
     // the active set survives a restart
     let mut t = Shortcuts::new();
     t.set_dir(&dir);
     assert_eq!(t.preset, "My Keys");
     assert_eq!(t.primary("sequence.addEdit").as_deref(), Some("Cmd+Shift+B"));
     // switch away and back
-    s.execute("shortcuts.loadPreset", json!({"name": "FilmCraft Default"})).unwrap();
+    s.execute("shortcuts.loadPreset", json!({"name": "WaltCut Default"})).unwrap();
     assert_eq!(s.shortcuts.primary("sequence.addEdit").as_deref(), Some("Cmd+K"));
     s.execute("shortcuts.loadPreset", json!({"name": "My Keys"})).unwrap();
     assert_eq!(s.shortcuts.primary("sequence.addEdit").as_deref(), Some("Cmd+Shift+B"));
@@ -266,7 +256,7 @@ fn custom_presets_persist_export_and_import() {
     assert_eq!(s.shortcuts.primary("sequence.addEdit").as_deref(), Some("Cmd+Alt+K"));
     assert_eq!(s.shortcuts.bindings.len(), 2, "unknown commands dropped");
     s.execute("shortcuts.deletePreset", json!({"name": "My Keys"})).unwrap();
-    assert!(s.execute("shortcuts.deletePreset", json!({"name": "FilmCraft Default"})).is_err());
+    assert!(s.execute("shortcuts.deletePreset", json!({"name": "WaltCut Default"})).is_err());
     assert_eq!(s.execute("shortcuts.presets", json!({})).unwrap()["custom"], json!(["From Windows"]));
     let _ = std::fs::remove_dir_all(&dir);
 }

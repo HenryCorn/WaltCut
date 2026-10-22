@@ -62,7 +62,7 @@ Registering a hardware decoder never makes a file undecodable, and never changes
   restart point through it and drops pictures already returned. It is logged and counted
   (`perf.stats` `decode.hardware.fallbacks`).
 - Pictures are interchangeable with the software decoder's: same planes (bit-exact on the H.264
-  High, HEVC Main and Main 10 parity fixtures, including after seeks and flushes), colour, pixel
+  High, HEVC Main and Main 10 conformance fixtures, including after seeks and flushes), colour, pixel
   aspect, pts and presentation order. Tests compare the two on every run on macOS, and the
   fallback logic is tested on every platform with a stand-in hardware decoder.
 

@@ -1,4 +1,4 @@
-//! Keyboard parity commands (M3.12): the shortcut tables, navigation, selection, trimming,
+//! Keyboard commands: the shortcut tables, navigation, selection, trimming,
 //! nudging, targeting, clip volume, text layers, poster and export frames.
 
 use super::*;
@@ -38,12 +38,7 @@ fn target_v1(s: &mut Session) {
 
 #[test]
 fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
-    let tables: [(&str, Vec<presets::Entry>); 4] = [
-        ("Premiere", presets::premiere()),
-        ("FilmCraft panels", presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL).copied().collect()),
-        ("Final Cut", presets::FINAL_CUT.to_vec()),
-        ("Avid", presets::AVID.to_vec()),
-    ];
+    let tables = [("Additional", presets::ADDITIONAL.to_vec()), ("Panels", presets::PANEL.iter().chain(presets::CONTEXT).copied().collect())];
     for (name, table) in tables {
         let mut seen: std::collections::BTreeMap<(String, String), &str> = Default::default();
         for (id, keys, panel) in table {
@@ -53,7 +48,7 @@ fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
             }
         }
     }
-    // the FilmCraft Default set (registry defaults + panel tables + the Premiere audit) has no
+    // the WaltCut Default set (registry defaults + panel tables + additional keys) has no
     // same-context conflicts for the new commands either
     let s = Session::default();
     let new_ids: Vec<&str> = keyboard::commands().iter().map(|c| c.id).collect();
@@ -63,18 +58,18 @@ fn shortcut_tables_have_no_key_used_twice_in_one_scope() {
 }
 
 #[test]
-fn premiere_engine_entries_exist() {
+fn shortcut_engine_entries_exist() {
     // UI-owned ids (tools, transport, panels…) are checked by the ui-egui keyboard test
     let ui_prefixes = ["tool.", "playback.", "window.", "view.", "app.", "help.", "mode.", "projectPanel.", "textPanel.", "panel."];
     let ui_ids = ["timeline.expandAllTracks", "timeline.minimizeAllTracks", "graphics.beginTextEditing"];
-    for (id, _, _) in presets::premiere() {
+    for (id, _, _) in presets::ADDITIONAL.iter().chain(presets::CONTEXT).copied() {
         if id.starts_with("timeline.") && (id.contains("Height") || id.contains("Screen")) || ui_ids.contains(&id) {
             continue;
         }
         if ui_prefixes.iter().any(|p| id.starts_with(p)) && commands::find(id).is_none() {
             continue;
         }
-        assert!(commands::find(id).is_some(), "Premiere table names unknown engine command `{id}`");
+        assert!(commands::find(id).is_some(), "Shortcut table names unknown engine command `{id}`");
     }
 }
 

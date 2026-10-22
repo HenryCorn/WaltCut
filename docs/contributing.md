@@ -1,7 +1,10 @@
 # Contributing to WaltCut
 
-WaltCut is a fork of FilmCraft focused on drawing and 2D animation. The Rust workspace retains its
-upstream `filmcraft-*` crate and package names to keep upstream integration practical.
+WaltCut is a fork of FilmCraft focused on drawing and 2D animation. Its retained product scope is
+listed in [animation.md](animation.md). The Rust workspace retains its upstream `filmcraft-*`
+crate and package names until the later product-branding step.
+Implement work only within that allowlist or the ordered reduction plan. The technical examples
+below describe inherited systems and are not permission to expand product scope.
 
 Read [AGENTS.md](../AGENTS.md) first. Its rules on assets, clean-room code and licences are
 absolute and override everything here. Then read [architecture.md](architecture.md) and the README
@@ -9,7 +12,7 @@ of the crate you will change.
 
 ## 1. Setup
 
-| | All platforms |
+| | macOS (Apple silicon release target) |
 |---|---|
 | Rust | stable ≥ 1.95 (edition 2024; egui 0.36 requires it), via [rustup](https://rustup.rs) |
 | Components | `rustup component add rustfmt clippy` |
@@ -33,7 +36,6 @@ cargo run --release -p waltcut -- a.mp4 b.wav       # import media (or open a .f
 cargo run --release -p waltcut-cli -- commands      # list engine commands
 cargo run --release -p waltcut-cli -- render --demo --seconds 3 --out frame.png
 cargo run --release -p waltcut-cli -- mcp --demo    # headless MCP server on stdio
-cargo xtask web --serve 8765                          # the web app on http://127.0.0.1:8765/ (docs/web.md)
 ```
 
 | Variable | Effect |
@@ -60,12 +62,11 @@ warnings all land there. Each launch moves the previous log to `filmcraft.1.log`
 `filmcraft.2.log`), so the log of a run that crashed survives the next start. The file stops growing
 at 16 MiB. `--help`, `--version` and command-line errors write no file.
 
-By default FilmCraft's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces
+By default WaltCut's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces
 that with env_logger-style directives, for example `RUST_LOG=debug`,
 `RUST_LOG=warn,waltcut_codecs=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*`
 covers every target starting with it (`filmcraft*=debug`). The logger is
-`apps/waltcut/src/logging.rs`; the realtime audio callbacks do not log. The web app logs to the
-browser console instead.
+`apps/waltcut/src/logging.rs`; the realtime audio callbacks do not log.
 
 ### Building with craft-fonts
 
@@ -83,12 +84,12 @@ resolve from there. `crates/text/build.rs` reads its `fonts/manifest.txt` and em
 `waltcut_text::fonts::CRAFT_FONTS` (all of them). The Japanese ones become the last fallback of every UI font family
 (`crates/ui-egui/src/theme.rs`, BIZ UDPGothic first) and fallback faces in the text engine (Gothic
 for sans text, Mincho for serif text). Without `CRAFT_FONTS_DIR`, `CRAFT_FONTS` is empty and
-FilmCraft uses its bundled and system fonts. A `CRAFT_FONTS_DIR` that is not a checkout is a build
+WaltCut uses its bundled and system fonts. A `CRAFT_FONTS_DIR` that is not a checkout is a build
 warning, or an error with `CRAFT_FONTS_REQUIRED=1` (release builds set both). Tests on these fonts'
 glyphs skip when it is empty; when you touch fonts, run the gates both with and without it.
 
 Chinese media names and track labels use the `Hans` / `Hant` craft-fonts faces after the Japanese
-fallbacks in every UI font family, regardless of interface language (Japanese and Chinese share code
+fallbacks in every UI font family (Japanese and Chinese share code
 points, so Japanese text keeps Japanese glyph forms; the Chinese faces cover hanzi the Japanese ones lack). Without those build inputs,
 native builds look up an installed Chinese face (for example Microsoft YaHei or Noto Sans CJK SC)
 once and reuse it across theme changes. No system font files are bundled or copied into the app.
@@ -131,7 +132,9 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
   [ROADMAP.md](../ROADMAP.md). If your change has no task id, use the area: `docs: …`,
   `README: …`, `ROADMAP: …`.
 - Commit only green states (all gates pass).
-- When a milestone lands, update its row in [roadmap.md](roadmap.md) (status, what's done, estimates), the summary in `ROADMAP.md`, and the parity doc and [gaps.md](gaps.md) entry it moves, with their "Last updated" lines and revision history.
+- When a reduction task lands, update its status in [roadmap.md](roadmap.md) and the summary in
+  `ROADMAP.md`. Keep [`animation.md`](animation.md) accurate about the retained scope and record
+  evidence without marking pending removals complete.
 - AI agents end commit messages with the attribution line their environment requires.
 
 ## 5. Pull requests and repository checks
@@ -205,7 +208,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 4. The GPU path needs no change: `render::plan` pre-renders layers with standard effects on the CPU.
    To run it on the GPU too, make it an `FxOp` in `crates/render/src/gpufx.rs` instead (parameter
    evaluation in `FxOp::eval`, the CPU reference in `FxOp::apply`, the id in `GPU_EFFECTS`), add
-   its passes to `crates/gpu/src/fx.rs` and its math to `fx.wgsl`, and a parity case to
+   its passes to `crates/gpu/src/fx.rs` and its math to `fx.wgsl`, and a CPU/GPU comparison case to
    `crates/gpu/src/fx_tests.rs`.
 
 Audio effects implement `AudioEffect` in `crates/audio-dsp` and register in its `effects()`
@@ -216,8 +219,8 @@ stream is cut into blocks (there are tests for this).
 ### A transition
 
 1. Define video transitions with `tr(id, name, FOLDER, badges, params)` in
-   `crates/project/src/vtransition.rs` (folders follow Premiere 26: ten `Video Transitions/*`
-   folders plus `Legacy/Video Transitions`). Parameters are not animatable. Never rename an id:
+   `crates/project/src/vtransition.rs` (folders group related video transitions). Parameters are
+   not animatable. Never rename an id:
    projects store it. Audio transitions are `EffectKind::AudioTransition` defs in `effect.rs`.
 2. Implement it in the matching module of `crates/render/src/transitions/` (`wipe`, `motion`,
    `dissolve`, `lights`, `grunge`, `special`): read params through `Tx`, build pixels with `paint`,
@@ -272,7 +275,7 @@ In short:
   traced or "inspired-by" copies.
 - Open licences only (MIT, Apache-2.0, BSD, ISC, zlib, OFL, CC0, CC BY, CC BY-SA, or your own
   work under MIT OR Apache-2.0). No NC or ND licences. If the licence is unclear, leave the asset out.
-- Screenshots show only FilmCraft (or other open projects) with media we generated or that is
+- Screenshots show only WaltCut (or other open projects) with media we generated or that is
   openly licensed.
 
 - **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), not here.**

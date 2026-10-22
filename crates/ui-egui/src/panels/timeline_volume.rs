@@ -297,7 +297,7 @@ pub fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layou
                     tip(ui, db);
                 }
                 resp.context_menu(|ui| {
-                    let b = ui.button(tl!("Delete"));
+                    let b = ui.button("Delete");
                     app.auto.add(&format!("timeline.clip.{}.volume.kf.{i}.delete", it.id.0), b.rect, "Delete");
                     if b.clicked() {
                         acts.push(("effects.deleteKeyframe", json!({"clip": it.id.0, "effect": "volume", "param": "level", "mediaTime": time.0})));

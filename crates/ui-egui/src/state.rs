@@ -362,19 +362,6 @@ impl MonitorView {
     }
 }
 
-/// Window ▸ Workspaces dialogs: Save as New Workspace… and Edit Workspaces….
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum WorkspaceDialog {
-    SaveAs {
-        name: String,
-    },
-    /// `selected`: the workspace picked in the list; `name`: its new name being typed.
-    Edit {
-        selected: Option<String>,
-        name: String,
-    },
-}
-
 /// Guide dialogs (View ▸ Add Guide…, Guide Templates ▸ Save Guides as Template… / Manage Guides…).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum GuideDialog {
@@ -421,8 +408,6 @@ pub struct KeyframeRef {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UiState {
-    #[serde(default)]
-    pub language: crate::i18n::Language,
     pub tool: Tool,
     /// Brush tool options.
     #[serde(default)]
@@ -543,9 +528,6 @@ pub struct UiState {
     /// Open Text Properties dialog (the wrench in the Properties panel's Text section).
     #[serde(default)]
     pub text_props_dialog: Option<TextPropsDialog>,
-    /// Open Window ▸ Workspaces dialog.
-    #[serde(default)]
-    pub workspace_dialog: Option<WorkspaceDialog>,
     /// Edit / Clip / File menu dialog (Paste Attributes, Make Subclip, Frame Hold Options, …;
     /// open when Some). See `panels::clip_dialogs`.
     #[serde(default)]
@@ -811,15 +793,14 @@ fn yes() -> bool {
 impl Default for UiState {
     fn default() -> Self {
         Self {
-            language: crate::i18n::Language::default(),
             tool: Tool::Selection,
             brush: Default::default(),
             ai: Default::default(),
             mode: Mode::Edit,
-            workspace: "Editing".into(),
+            workspace: "WaltCut".into(),
             floating: vec![],
             closed_floating: vec![],
-            dock: crate::dock::workspace("Editing"),
+            dock: crate::dock::workspace("WaltCut"),
             focused: PanelKind::Timeline,
             timeline: TimelineView::default(),
             program: MonitorView::default(),
@@ -860,7 +841,6 @@ impl Default for UiState {
             audio_fx_editors: Vec::new(),
             guide_dialog: None,
             text_props_dialog: None,
-            workspace_dialog: None,
             clip_dialog: None,
             extras: Default::default(),
             gfx_templates: Default::default(),

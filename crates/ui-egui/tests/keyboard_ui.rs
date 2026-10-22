@@ -7,7 +7,7 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::shortcut_presets as presets;
-use waltcut_engine::shortcuts::{PREMIERE_PRESET, Platform};
+use waltcut_engine::shortcuts::Platform;
 use waltcut_ui_egui::FilmcraftApp;
 use waltcut_ui_egui::control::ControlRequest;
 
@@ -79,28 +79,19 @@ fn new_ids() -> Vec<String> {
 }
 
 #[test]
-fn premiere_table_has_no_dangling_ids_or_new_conflicts() {
+fn shortcut_table_has_no_dangling_ids_or_new_conflicts() {
     let ui: Vec<String> = waltcut_ui_egui::menus::external_commands().into_iter().map(|c| c.id).collect();
-    for (id, keys, panel) in presets::premiere() {
-        assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "Premiere table: `{id}` ({keys} {panel}) is not a command");
+    for (id, keys, panel) in presets::ADDITIONAL.iter().chain(presets::CONTEXT).copied() {
+        assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "Shortcut table: `{id}` ({keys} {panel}) is not a command");
     }
-    for (id, _, _) in presets::FILMCRAFT_PANEL.iter().chain(presets::PREMIERE_PANEL) {
+    for (id, _, _) in presets::PANEL.iter().chain(presets::CONTEXT) {
         assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "panel table: `{id}` is not a command");
     }
     let mut s = Session::default();
     s.shortcuts.register_external(waltcut_ui_egui::menus::external_commands());
     let new = new_ids();
-    for preset in [None, Some(PREMIERE_PRESET)] {
-        if let Some(p) = preset {
-            s.shortcuts.load_preset(p).unwrap();
-        }
-        for (ctx, key, ids) in s.shortcuts.conflicts(Platform::Mac) {
-            assert!(!ids.iter().any(|i| new.contains(i)), "{preset:?}: {key} in {ctx} is bound to {ids:?}");
-        }
-    }
-    // the Premiere preset binds every new command that Premiere has a key for
-    for id in ["timeline.selectClipAtPlayhead", "file.exportFrame", "window.maximizeFrame", "timeline.nudgeRight", "clip.volumeUp"] {
-        assert!(!s.shortcuts.for_command(id).is_empty(), "{id} has no key in the Premiere preset");
+    for (ctx, key, ids) in s.shortcuts.conflicts(Platform::Mac) {
+        assert!(!ids.iter().any(|i| new.contains(i)), "{key} in {ctx} is bound to {ids:?}");
     }
 }
 

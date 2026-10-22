@@ -100,7 +100,7 @@ pub fn cycle_appearance(app: &mut FilmcraftApp, ctx: &egui::Context) {
 
 /// Favorite shortcuts use a stable light-then-dark order, independently of insertion order.
 pub fn appearance_context_menu(app: &mut FilmcraftApp, ui: &mut Ui) {
-    if ui.button(tl!("Appearance Settings…")).clicked() {
+    if ui.button("Appearance Settings…").clicked() {
         if let Err(error) = open(app, "appearance") {
             app.ui.status = error;
         }
@@ -114,7 +114,7 @@ pub fn appearance_context_menu(app: &mut FilmcraftApp, ui: &mut Ui) {
         }
         for (id, label) in group {
             let kind = crate::theme::ThemeKind::from_pref(id);
-            if ui.selectable_label(app.tokens.kind == kind, crate::i18n::t(label)).clicked() {
+            if ui.selectable_label(app.tokens.kind == kind, *label).clicked() {
                 set_theme(app, ui.ctx(), kind);
                 ui.close();
             }
@@ -257,9 +257,9 @@ fn theme_card(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, key: &
             ui.vertical(|ui| {
                 ui.set_width(width - 20.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(crate::i18n::t(title)).size(12.5).strong());
+                    ui.label(RichText::new(title).size(12.5).strong());
                     if active {
-                        ui.label(RichText::new(tl!("Active")).size(11.0).color(t.accent));
+                        ui.label(RichText::new("Active").size(11.0).color(t.accent));
                     }
                 });
                 ui.add_space(4.0);
@@ -269,7 +269,7 @@ fn theme_card(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, key: &
                     let row = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), 24.0));
                     let hovered = ui.ctx().pointer_hover_pos().is_some_and(|pos| row.contains(pos));
                     ui.horizontal(|ui| {
-                        let r = ui.radio(current == *v, RichText::new(crate::i18n::t(l)).size(12.5));
+                        let r = ui.radio(current == *v, RichText::new(*l).size(12.5));
                         app.auto.add(&format!("settings.{key}.{v}"), r.rect, l);
                         if r.clicked() {
                             put(&mut d.values, key, json!(v));
@@ -277,8 +277,8 @@ fn theme_card(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, key: &
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             let mut favorites: Vec<String> = serde_json::from_value(get(&d.values, "appearance.favoriteThemes").clone()).unwrap_or_default();
                             let favorite = favorites.iter().any(|id| id == v);
-                            let action = if favorite { tl!("Remove from favorites") } else { tl!("Add to favorites") };
-                            let label = format!("{action}: {}", crate::i18n::t(l));
+                            let action = if favorite { "Remove from favorites" } else { "Add to favorites" };
+                            let label = format!("{action}: {}", l);
                             let r = crate::theme_favorites::star(ui, favorite, favorite || hovered, t.accent, &label);
                             app.auto.add(&format!("settings.favorite.{v}"), r.rect, &label);
                             if r.clicked() {
@@ -394,7 +394,7 @@ fn group(ui: &mut Ui, t: &Tokens, title: &str, add: impl FnOnce(&mut Ui)) {
             add(ui);
         });
     let rect = r.response.rect;
-    let galley = ui.painter().layout_no_wrap(crate::i18n::t(title).to_string(), Tokens::ui(12.0), t.text_dim);
+    let galley = ui.painter().layout_no_wrap(title.to_string(), Tokens::ui(12.0), t.text_dim);
     let pos = rect.left_top() + vec2(12.0, -galley.size().y / 2.0);
     ui.painter().rect_filled(Rect::from_min_size(pos - vec2(4.0, 0.0), galley.size() + vec2(8.0, 0.0)), 0.0, t.panel_bg);
     ui.painter().galley(pos, galley, t.text_dim);
@@ -407,14 +407,14 @@ fn field_label(ui: &mut Ui, text: &str) {
     let w = LABEL_W.min(ui.available_width() * 0.45);
     ui.allocate_ui_with_layout(vec2(w, 24.0), Layout::right_to_left(Align::Center), |ui| {
         if !text.is_empty() {
-            ui.add(egui::Label::new(RichText::new(format!("{}:", crate::i18n::t(text))).size(12.5)).wrap());
+            ui.add(egui::Label::new(RichText::new(format!("{}:", text)).size(12.5)).wrap());
         }
     });
 }
 
 fn unit(ui: &mut Ui, u: &str) {
     if !u.is_empty() {
-        ui.label(RichText::new(crate::i18n::t(u)).size(12.5));
+        ui.label(RichText::new(u).size(12.5));
     }
 }
 
@@ -434,13 +434,13 @@ fn combo(app: &mut FilmcraftApp, ui: &mut Ui, key: &str, current: &str, opts: &[
     let mut items: Vec<(String, Rect, String)> = Vec::new();
     // the current choice is cut to the box's width (the open list shows it whole)
     let r = egui::ComboBox::from_id_salt(("settings", key))
-        .selected_text(RichText::new(crate::i18n::t(&shown)).size(12.5))
+        .selected_text(RichText::new(&shown).size(12.5))
         .width(width.min(ui.available_width()))
         .truncate()
         .height(480.0)
         .show_ui(ui, |ui| {
             for (v, l) in opts {
-                let r = ui.selectable_label(v == current, crate::i18n::t(l));
+                let r = ui.selectable_label(v == current, l);
                 items.push((format!("settings.{key}.{v}"), r.rect, l.clone()));
                 if r.clicked() {
                     chosen = Some(v.clone());
@@ -468,7 +468,7 @@ fn device_opts(app: &mut FilmcraftApp, d: &mut SettingsDraft, list: DeviceList) 
         DeviceList::Inputs => dev.inputs,
         DeviceList::Outputs => dev.outputs,
     };
-    let mut v = vec![(String::new(), tl!("System Default").to_string())];
+    let mut v = vec![(String::new(), "System Default".to_string())];
     v.extend(names.into_iter().map(|n| (n.clone(), n)));
     v
 }
@@ -495,7 +495,7 @@ fn draw_field(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, f: &Fi
                     // a long label wraps at the page edge
                     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                     let mut b = cur.as_bool().unwrap_or(false);
-                    let r = ui.checkbox(&mut b, RichText::new(crate::i18n::t(f.label)).size(12.5));
+                    let r = ui.checkbox(&mut b, RichText::new(f.label).size(12.5));
                     app.auto.add(&format!("settings.{}", f.key), r.rect, f.label);
                     if r.changed() {
                         put(&mut d.values, f.key, json!(b));
@@ -557,11 +557,11 @@ fn draw_field(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, f: &Fi
                     field_label(ui, f.label);
                     let mut s = choice_text(&cur);
                     let hint = match f.kind {
-                        Kind::Path => tl!("Default location"),
-                        Kind::Font => tl!("Font family"),
+                        Kind::Path => "Default location",
+                        Kind::Font => "Font family",
                         _ => "",
                     };
-                    let browse = tl!("Browse…");
+                    let browse = "Browse…";
                     let width = if matches!(f.kind, Kind::Path) {
                         // leave room for Browse… on the page, however long its translation
                         let text = egui::WidgetText::from(browse).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Button);
@@ -635,37 +635,37 @@ fn label_presets(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft) {
     let modified = selected.is_some_and(|p| !p.matches(&labels));
     let folder = app.session.label_presets_dir();
     let mut pick = None;
-    group(ui, &t, tl!("Label Color Presets"), |ui| {
+    group(ui, &t, "Label Color Presets", |ui| {
         ui.horizontal(|ui| {
             let opts: Vec<(String, String)> = presets.iter().map(|p| (p.name.clone(), p.name.clone())).collect();
-            let shown = if modified { tlf!("{name} (Modified)", name = labels.preset) } else { labels.preset.clone() };
+            let shown = if modified { format_placeholders!("{name} (Modified)", name = labels.preset) } else { labels.preset.clone() };
             if let Some(name) = combo(app, ui, "labels.preset", &shown, &opts, 150.0) {
                 pick = presets.iter().find(|p| p.name == name).cloned();
             }
-            if preset_button(app, ui, "revert", Icon::Reset, tl!("Revert to the preset's colors and names"), modified) {
+            if preset_button(app, ui, "revert", Icon::Reset, "Revert to the preset's colors and names", modified) {
                 pick = selected.cloned();
             }
-            if preset_button(app, ui, "import", Icon::Import, tl!("Import a preset file…"), true)
-                && let Some(path) = app.hooks.pick_open_file.as_mut().and_then(|f| f(tl!("Label Color Presets"), &["json"]))
+            if preset_button(app, ui, "import", Icon::Import, "Import a preset file…", true)
+                && let Some(path) = app.hooks.pick_open_file.as_mut().and_then(|f| f("Label Color Presets", &["json"]))
             {
                 d.label_presets = None;
                 match app.session.import_label_preset(std::path::Path::new(&path)) {
                     Ok(p) => {
-                        d.preset_message = tlf!("Imported “{name}”", name = p.name);
+                        d.preset_message = format_placeholders!("Imported “{name}”", name = p.name);
                         pick = Some(p);
                     }
                     Err(e) => d.preset_message = e,
                 }
             }
-            if preset_button(app, ui, "export", Icon::Export, tl!("Export the labels to a preset file…"), true)
-                && let Some(path) = app.hooks.pick_save_as.as_mut().and_then(|f| f(tl!("Label Color Presets"), &["json"], &format!("{}.json", labels.preset)))
+            if preset_button(app, ui, "export", Icon::Export, "Export the labels to a preset file…", true)
+                && let Some(path) = app.hooks.pick_save_as.as_mut().and_then(|f| f("Label Color Presets", &["json"], &format!("{}.json", labels.preset)))
             {
                 d.preset_message = match settings::LabelPreset::export(std::path::Path::new(&path), &labels) {
-                    Ok(_) => tlf!("Exported to {path}", path),
+                    Ok(_) => format_placeholders!("Exported to {path}", path),
                     Err(e) => e,
                 };
             }
-            if preset_button(app, ui, "folder", Icon::Folder, tl!("Show the presets folder"), folder.is_some())
+            if preset_button(app, ui, "folder", Icon::Folder, "Show the presets folder", folder.is_some())
                 && let Some(dir) = &folder
             {
                 let ctx = ui.ctx().clone();
@@ -677,14 +677,14 @@ fn label_presets(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft) {
                 }
             }
             let user = selected.filter(|p| !settings::is_builtin_label_preset(&p.name));
-            if preset_button(app, ui, "delete", Icon::Trash, tl!("Delete this preset"), user.is_some())
+            if preset_button(app, ui, "delete", Icon::Trash, "Delete this preset", user.is_some())
                 && let Some(p) = user
             {
                 d.label_presets = None;
                 d.preset_message = match app.session.delete_label_preset(&p.name) {
                     Ok(()) => {
                         put(&mut d.values, "labels.preset", json!(settings::DEFAULT_LABEL_PRESET));
-                        tlf!("Deleted preset “{active}”", active = p.name)
+                        format_placeholders!("Deleted preset “{active}”", active = p.name)
                     }
                     Err(e) => e,
                 };
@@ -712,7 +712,7 @@ fn preset_button(app: &mut FilmcraftApp, ui: &mut Ui, id: &str, icon: Icon, tip:
 }
 
 fn note(ui: &mut Ui, t: &Tokens, text: &str) {
-    ui.add(egui::Label::new(RichText::new(crate::i18n::t(text)).size(11.5).color(t.text_dim)).wrap());
+    ui.add(egui::Label::new(RichText::new(text).size(11.5).color(t.text_dim)).wrap());
 }
 
 fn mb(bytes: u64) -> String {
@@ -724,7 +724,7 @@ fn custom(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, name: &str
     match name {
         "labelColors" => {
             let tt = t;
-            group(ui, &tt, tl!("Label Colors"), |ui| {
+            group(ui, &tt, "Label Colors", |ui| {
                 egui::Grid::new("settings-label-colors").num_columns(2).spacing(vec2(10.0, 5.0)).show(ui, |ui| {
                     for l in Label::ALL.iter() {
                         let id = settings::label_id(*l);
@@ -749,27 +749,35 @@ fn custom(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, name: &str
         }
         "memoryInfo" => {
             let (used, budget) = app.frames.cache_usage();
-            note(ui, &t, &tlf!("Decoded frames held for the monitors and thumbnails: {used} of {budget}.", used = mb(used as u64), budget = mb(budget as u64)));
-            note(ui, &t, tl!("FilmCraft keeps the rest of the RAM free for other applications."));
+            note(
+                ui,
+                &t,
+                &format_placeholders!(
+                    "Decoded frames held for the monitors and thumbnails: {used} of {budget}.",
+                    used = mb(used as u64),
+                    budget = mb(budget as u64)
+                ),
+            );
+            note(ui, &t, "FilmCraft keeps the rest of the RAM free for other applications.");
         }
         "mediaCacheInfo" => {
             if d.cache_info.is_null() {
                 d.cache_info = app.session.execute("mediaCache.info", json!({})).unwrap_or(json!({}));
             }
-            let loc = d.cache_info["location"].as_str().unwrap_or(tl!("not available in this session")).to_string();
+            let loc = d.cache_info["location"].as_str().unwrap_or("not available in this session").to_string();
             let size = mb(d.cache_info["bytes"].as_u64().unwrap_or(0));
             let files = d.cache_info["files"].as_u64().unwrap_or(0);
-            note(ui, &t, &tlf!("Currently: {loc} — {files} file(s), {size}", loc, files, size));
+            note(ui, &t, &format_placeholders!("Currently: {loc} — {files} file(s), {size}", loc, files, size));
         }
         "outputMapping" => {
             let ch = d.devices.as_ref().map(|x| x.output_channels).unwrap_or(0);
             let l = get(&d.values, "audioHardware.mapLeft").as_u64().unwrap_or(0) + 1;
             let r = get(&d.values, "audioHardware.mapRight").as_u64().unwrap_or(1) + 1;
-            let dev = if ch > 0 { tlf!(" ({ch} output channels)", ch) } else { String::new() };
+            let dev = if ch > 0 { format_placeholders!(" ({ch} output channels)", ch) } else { String::new() };
             note(
                 ui,
                 &t,
-                &tlf!(
+                &format_placeholders!(
                     "Programme left → device output {l}, right → device output {r}{dev}. Outputs beyond the device's channels fall back to 1 and 2.",
                     l,
                     r,
@@ -782,15 +790,15 @@ fn custom(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, name: &str
         "autoSaveStatus" => {
             let status = app.session.execute("file.autoSaveStatus", json!({})).unwrap_or_default();
             if let Some(dir) = status["autoSaveDir"].as_str() {
-                note(ui, &t, &tlf!("Auto-saves go to: {dir}", dir));
+                note(ui, &t, &format_placeholders!("Auto-saves go to: {dir}", dir));
             }
             if let Some(dir) = status["sessionDir"].as_str() {
-                note(ui, &t, &tlf!("Recovery copy: {dir}", dir));
+                note(ui, &t, &format_placeholders!("Recovery copy: {dir}", dir));
             }
             let last = match (status["lastAutoSaveAt"].as_str(), status["lastJournalAt"].as_str()) {
-                (Some(a), Some(j)) => tlf!("Last auto-save {a} · last recovery copy {j}", a, j),
-                (Some(a), None) => tlf!("Last auto-save {a}", a),
-                (None, Some(j)) => tlf!("Last recovery copy {j}", j),
+                (Some(a), Some(j)) => format_placeholders!("Last auto-save {a} · last recovery copy {j}", a, j),
+                (Some(a), None) => format_placeholders!("Last auto-save {a}", a),
+                (None, Some(j)) => format_placeholders!("Last recovery copy {j}", j),
                 (None, None) => String::new(),
             };
             if !last.is_empty() {
@@ -824,12 +832,16 @@ fn rows(app: &mut FilmcraftApp, ui: &mut Ui, d: &mut SettingsDraft, list: &[Row]
             Row::Note(text) => note(ui, &t, text),
             Row::Button { id, label, command } => {
                 ui.horizontal(|ui| {
-                    field_label(ui, tl!("Remove Media Cache Files"));
-                    let b = ui.button(crate::i18n::t(label));
+                    field_label(ui, "Remove Media Cache Files");
+                    let b = ui.button(*label);
                     app.auto.add(&format!("settings.{id}"), b.rect, label);
                     if b.clicked() {
                         d.message = match app.session.execute(command, json!({})) {
-                            Ok(v) => tlf!("Deleted {n} file(s), {size}.", n = v["files"].as_u64().unwrap_or(0), size = mb(v["bytes"].as_u64().unwrap_or(0))),
+                            Ok(v) => format_placeholders!(
+                                "Deleted {n} file(s), {size}.",
+                                n = v["files"].as_u64().unwrap_or(0),
+                                size = mb(v["bytes"].as_u64().unwrap_or(0))
+                            ),
                             Err(e) => e.to_string(),
                         };
                         d.cache_info = Value::Null;
@@ -854,7 +866,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
         // title bar (Premiere keeps "Preferences" as the window title)
         let (bar, _) = ui.allocate_exact_size(vec2(W, 30.0), Sense::hover());
         ui.painter().rect_filled(bar, CornerRadius { nw: 10, ne: 10, sw: 0, se: 0 }, t.header_bg);
-        ui.painter().text(bar.center(), Align2::CENTER_CENTER, tl!("Preferences"), Tokens::semibold(13.0), t.text_dim);
+        ui.painter().text(bar.center(), Align2::CENTER_CENTER, "Preferences", Tokens::semibold(13.0), t.text_dim);
         app.auto.add("settings.window", bar, "Preferences");
         ui.add_space(14.0);
         ui.horizontal_top(|ui| {
@@ -872,7 +884,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
                     ui.painter().rect_filled(row, 0.0, t.hover.gamma_multiply(0.6));
                 }
                 // a name too long for the list ends in "…" and shows whole in a tooltip
-                let title = crate::i18n::t(c.title);
+                let title = c.title;
                 let color = if sel { t.text } else { t.text_dim };
                 let mut job = egui::text::LayoutJob::simple_singleline(title.to_string(), Tokens::ui(12.5), color);
                 job.wrap = egui::text::TextWrapping::truncate_at_width(row.width() - 16.0);
@@ -906,10 +918,10 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
             ui.add_space(20.0);
-            if button(app, ui, "settings.help", tl!("Help"), false) {
+            if button(app, ui, "settings.help", "Help", false) {
                 crate::links::open(app, ctx, &format!("{}/blob/main/docs/project-files.md#settings", crate::links::GITHUB));
             }
-            if button(app, ui, "settings.reset", tl!("Reset…"), false) {
+            if button(app, ui, "settings.reset", "Reset…", false) {
                 // this category back to its defaults (OK applies it)
                 let defaults = waltcut_engine::autosave::Preferences::default().to_value();
                 let keep = get(&d.values, "general.recentProjects").clone();
@@ -918,10 +930,10 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.add_space(20.0);
-                if button(app, ui, "settings.ok", tl!("OK"), true) {
+                if button(app, ui, "settings.ok", "OK", true) {
                     apply = true;
                 }
-                if button(app, ui, "settings.cancel", tl!("Cancel"), false) {
+                if button(app, ui, "settings.cancel", "Cancel", false) {
                     close = true;
                 }
             });

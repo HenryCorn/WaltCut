@@ -5,7 +5,7 @@
 //! Automation ids: `graphics.notice` (the notice), `graphics.notice.reset` (Use Default Graphics),
 //! `graphics.notice.close`.
 
-use crate::{FilmcraftApp, i18n};
+use crate::FilmcraftApp;
 
 /// Puts the default graphics mode back for the next start; the error says what could not be saved.
 pub type ResetFn = Box<dyn FnMut() -> Result<(), String>>;
@@ -41,7 +41,7 @@ pub(crate) fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         app.graphics_notice = Some(notice);
         return;
     }
-    let title = tlf!("Safe graphics mode: {mode}", mode = i18n::t(&notice.mode));
+    let title = format_placeholders!("Safe graphics mode: {mode}", mode = &notice.mode);
     let (mut reset, mut close) = (false, false);
     let shown = egui::Window::new("graphics-notice")
         .id(egui::Id::new("graphics-notice"))
@@ -54,19 +54,19 @@ pub(crate) fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             ui.label(egui::RichText::new(&title).strong());
             ui.add_space(4.0);
             if notice.reset_done {
-                ui.label(tl!("The default graphics are used from the next start."));
+                ui.label("The default graphics are used from the next start.");
             } else {
-                ui.label(tl!("An earlier start failed with the default graphics. Updating the graphics driver usually fixes this."));
+                ui.label("An earlier start failed with the default graphics. Updating the graphics driver usually fixes this.");
             }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if !notice.reset_done {
-                    let label = tl!("Use Default Graphics");
+                    let label = "Use Default Graphics";
                     let r = ui.button(label);
                     app.auto.add_response("graphics.notice.reset", &r, label);
                     reset = r.clicked();
                 }
-                let label = tl!("Close");
+                let label = "Close";
                 let c = ui.button(label);
                 app.auto.add_response("graphics.notice.close", &c, label);
                 close = c.clicked();

@@ -48,13 +48,10 @@ pub(crate) fn effect_rows(
     let (r, _) = ui.allocate_exact_size(vec2(body.width(), ROW_H), Sense::hover());
     crate::panels::effect_controls::row_line(ui, r, lane, &t);
     let pen_on = app.ui.mask_pen.as_ref().is_some_and(|p| p.clip == clip.0 && p.effect == idx);
-    for (i, (icon, kind, tip)) in [
-        (Icon::Ellipse, "ellipse", tl!("Create ellipse mask")),
-        (Icon::Rectangle, "polygon", tl!("Create 4-point polygon mask")),
-        (Icon::Pen, "pen", tl!("Free draw bezier")),
-    ]
-    .into_iter()
-    .enumerate()
+    for (i, (icon, kind, tip)) in
+        [(Icon::Ellipse, "ellipse", "Create ellipse mask"), (Icon::Rectangle, "polygon", "Create 4-point polygon mask"), (Icon::Pen, "pen", "Free draw bezier")]
+            .into_iter()
+            .enumerate()
     {
         let br = Rect::from_center_size(pos2(r.min.x + 40.0 + i as f32 * 24.0, r.center().y), vec2(20.0, 18.0));
         let resp = ui.interact(br, egui::Id::new(("mask-new", clip.0, idx, kind)), Sense::click()).on_hover_text(tip);
@@ -68,8 +65,7 @@ pub(crate) fn effect_rows(
             if kind == "pen" {
                 app.ui.mask_pen = if on { None } else { Some(crate::state::MaskPenDraft { clip: clip.0, effect: idx, points: vec![] }) };
                 if !on {
-                    app.ui.status =
-                        tl!("Click in the Program monitor to place mask points (drag for curves); click the first point or press Enter to close").into();
+                    app.ui.status = "Click in the Program monitor to place mask points (drag for curves); click the first point or press Enter to close".into();
                 }
             } else {
                 actions.push(("masks.add".into(), json!({"clip": clip.0, "effect": idx, "shape": kind})));
@@ -118,9 +114,9 @@ pub(crate) fn effect_rows(
         let mut mui = ui.new_child(egui::UiBuilder::new().max_rect(mr).layout(egui::Layout::left_to_right(egui::Align::Center)));
         let mut mode = m.mode;
         crate::panels::effect_controls::fit_to_row(&mut mui);
-        egui::ComboBox::from_id_salt(("mask-mode", clip.0, idx, k)).selected_text(crate::i18n::t(mode.label())).width(88.0).show_ui(&mut mui, |ui| {
+        egui::ComboBox::from_id_salt(("mask-mode", clip.0, idx, k)).selected_text(mode.label()).width(88.0).show_ui(&mut mui, |ui| {
             for md in MaskMode::ALL {
-                if ui.selectable_value(&mut mode, md, crate::i18n::t(md.label())).changed() {
+                if ui.selectable_value(&mut mode, md, md.label()).changed() {
                     actions.push(("masks.set".into(), json!({"clip": clip.0, "effect": idx, "mask": k, "mode": md.label()})));
                 }
             }
@@ -140,7 +136,7 @@ pub(crate) fn effect_rows(
             }
         }
         resp.context_menu(|ui| {
-            if ui.button(tl!("Delete Mask")).clicked() {
+            if ui.button("Delete Mask").clicked() {
                 actions.push(("masks.remove".into(), json!({"clip": clip.0, "effect": idx, "mask": k})));
                 ui.close();
             }
@@ -161,7 +157,7 @@ pub(crate) fn effect_rows(
         // Inverted
         let (r, _) = ui.allocate_exact_size(vec2(body.width(), ROW_H), Sense::hover());
         crate::panels::effect_controls::row_line(ui, r, lane, &t);
-        ui.painter().text(pos2(r.min.x + 40.0, r.center().y), Align2::LEFT_CENTER, tl!("Inverted"), Tokens::ui(12.0), t.text);
+        ui.painter().text(pos2(r.min.x + 40.0, r.center().y), Align2::LEFT_CENTER, "Inverted", Tokens::ui(12.0), t.text);
         let cr = Rect::from_min_size(pos2(r.min.x + (r.width() * 0.5).max(150.0), r.min.y + 2.0), vec2(20.0, ROW_H - 4.0));
         let mut cui = ui.new_child(egui::UiBuilder::new().max_rect(cr).layout(egui::Layout::left_to_right(egui::Align::Center)));
         crate::panels::effect_controls::fit_to_row(&mut cui);
@@ -391,9 +387,9 @@ pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, fra
         painter.rect_filled(vr, 0.0, if selected { col } else { Color32::WHITE });
         painter.rect_stroke(vr, 0.0, Stroke::new(1.0, col), egui::StrokeKind::Middle);
         let r = ui.interact(vr.expand(3.0), egui::Id::new(("mask-vertex", i)), Sense::click_and_drag()).on_hover_text(if cfg!(target_os = "macos") {
-            tl!("Drag: move · Alt-click: smooth/corner · Cmd-click: delete")
+            "Drag: move · Alt-click: smooth/corner · Cmd-click: delete"
         } else {
-            tl!("Drag: move · Alt-click: smooth/corner · Ctrl-click: delete")
+            "Drag: move · Alt-click: smooth/corner · Ctrl-click: delete"
         });
         app.auto.add(&format!("program.mask.vertex.{i}"), vr, "Mask vertex");
         if r.drag_started_by(LEFT) {
@@ -532,7 +528,7 @@ fn roundness_handle(
     let dir = if dir.length() > 1e-6 { dir.normalized() } else { egui::Vec2::new(1.0, 1.0).normalized() };
     let hp = sp(to_screen, c.p + c.bisector * (radius / c.sin_half.max(1e-9))) + dir * 18.0;
     let hr = Rect::from_center_size(hp, vec2(9.0, 9.0));
-    let r = ui.interact(hr.expand(3.0), id, Sense::drag()).on_hover_text(tl!("Drag inward to round the corners"));
+    let r = ui.interact(hr.expand(3.0), id, Sense::drag()).on_hover_text("Drag inward to round the corners");
     app.auto.add("program.mask.roundness", hr, "Mask corner roundness");
     let col = Color32::from_rgb(0x5a, 0xb4, 0xff);
     if dragging && radius > 0.0 {
@@ -762,13 +758,13 @@ pub fn path_value(app: &mut FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, effec
     let target = waltcut_engine::masks::MaskSel { clip, effect, mask: k };
     let running = app.session.mask_jobs.iter().find(|j| j.target == target).map(|j| j.job);
     for (icon, dir, frames, id, tip) in [
-        (Icon::TrackMaskBack, "backward", None, "back", tl!("Track selected mask backward")),
-        (Icon::TrackMaskBackFrame, "backward", Some(1), "backFrame", tl!("Track selected mask backward 1 frame")),
-        (Icon::TrackMaskFwdFrame, "forward", Some(1), "fwdFrame", tl!("Track selected mask forward 1 frame")),
-        (Icon::TrackMaskFwd, "forward", None, "fwd", tl!("Track selected mask forward")),
+        (Icon::TrackMaskBack, "backward", None, "back", "Track selected mask backward"),
+        (Icon::TrackMaskBackFrame, "backward", Some(1), "backFrame", "Track selected mask backward 1 frame"),
+        (Icon::TrackMaskFwdFrame, "forward", Some(1), "fwdFrame", "Track selected mask forward 1 frame"),
+        (Icon::TrackMaskFwd, "forward", None, "fwd", "Track selected mask forward"),
     ] {
         let (r, resp) = ui.allocate_exact_size(vec2(20.0, 18.0), Sense::click());
-        let resp = resp.on_hover_text(if running.is_some() { tl!("Stop tracking") } else { tip });
+        let resp = resp.on_hover_text(if running.is_some() { "Stop tracking" } else { tip });
         if resp.hovered() {
             ui.painter().rect_filled(r, 3.0, t.hover);
         }
@@ -791,10 +787,10 @@ pub fn path_value(app: &mut FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, effec
     let (r, resp) = ui.allocate_exact_size(vec2(20.0, 18.0), Sense::click());
     icons::paint(ui.painter(), r.shrink(3.0), Icon::Wrench, if resp.hovered() { t.tab_text_active } else { t.icon });
     app.auto.add(&format!("{base}.trackMethod"), r, "Tracking method");
-    let resp = resp.on_hover_text(tlf!("Tracking method: {method}", method = crate::i18n::t(m.track_method.label())));
+    let resp = resp.on_hover_text(format_placeholders!("Tracking method: {method}", method = m.track_method.label()));
     egui::Popup::menu(&resp).show(|ui| {
         for tm in waltcut_project::TrackMethod::ALL {
-            if ui.selectable_label(tm == m.track_method, crate::i18n::t(tm.label())).clicked() {
+            if ui.selectable_label(tm == m.track_method, tm.label()).clicked() {
                 actions.push(("masks.set".into(), json!({"clip": clip.0, "effect": effect, "mask": k, "trackMethod": tm.label()})));
             }
         }

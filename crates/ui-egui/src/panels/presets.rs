@@ -19,7 +19,7 @@ pub fn folder_rows(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> O
     let t = app.tokens;
     let mut action = None;
     for p in app.session.presets.all() {
-        if !crate::i18n::matches_query(&p.name, filter) {
+        if !p.name.to_lowercase().contains(filter) {
             continue;
         }
         let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 20.0), Sense::click_and_drag());
@@ -34,9 +34,9 @@ pub fn folder_rows(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> O
             Icon::Sparkle,
             if p.builtin { t.text_dim } else { t.accent },
         );
-        ui.painter().text(pos2(x + 12.0, r.center().y), Align2::LEFT_CENTER, crate::i18n::t(&p.name), Tokens::ui(12.0), t.text);
+        ui.painter().text(pos2(x + 12.0, r.center().y), Align2::LEFT_CENTER, &p.name, Tokens::ui(12.0), t.text);
         app.auto.add(&format!("effects.preset.{}", p.name), r, &p.name);
-        let tip = crate::i18n::t(if p.description.is_empty() { &p.name } else { &p.description }).to_string();
+        let tip = if p.description.is_empty() { &p.name } else { &p.description }.to_string();
         let resp = resp.on_hover_text(tip);
         if resp.drag_started() {
             crate::panels::start_drag_effect(ui, &format!("preset:{}", p.name));
@@ -45,15 +45,15 @@ pub fn folder_rows(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> O
             action = Some(("presets.apply".to_string(), p.name.clone()));
         }
         resp.context_menu(|ui| {
-            if !p.builtin && ui.button(tl!("Delete Preset")).clicked() {
+            if !p.builtin && ui.button("Delete Preset").clicked() {
                 action = Some(("presets.delete".to_string(), p.name.clone()));
                 ui.close();
             }
-            if ui.button(tl!("Export Preset…")).clicked() {
+            if ui.button("Export Preset…").clicked() {
                 action = Some(("presets.export".to_string(), p.name.clone()));
                 ui.close();
             }
-            if ui.button(tl!("Import Presets…")).clicked() {
+            if ui.button("Import Presets…").clicked() {
                 action = Some(("presets.import".to_string(), String::new()));
                 ui.close();
             }
@@ -69,7 +69,7 @@ pub fn run(app: &mut FilmcraftApp, cmd: &str, name: &str) {
         "presets.delete" => app.session.execute(cmd, json!({"name": name})),
         "presets.export" => {
             let name = name.to_string();
-            app.pick_ui(FileDialog::save_as(tl!("Effect presets"), &["json"], &format!("{name}.json")), move |app, paths| {
+            app.pick_ui(FileDialog::save_as("Effect presets", &["json"], &format!("{name}.json")), move |app, paths| {
                 let Some(path) = paths.into_iter().next() else { return };
                 if let Err(e) = app.session.execute("presets.export", json!({"path": path, "names": [name]})) {
                     app.ui.status = e.to_string();
@@ -78,7 +78,7 @@ pub fn run(app: &mut FilmcraftApp, cmd: &str, name: &str) {
             return;
         }
         "presets.import" => {
-            app.pick_ui(FileDialog::open_file(tl!("Effect presets"), &["json"]), |app, paths| {
+            app.pick_ui(FileDialog::open_file("Effect presets", &["json"]), |app, paths| {
                 let Some(path) = paths.into_iter().next() else { return };
                 if let Err(e) = app.session.execute("presets.import", json!({"path": path})) {
                     app.ui.status = e.to_string();
@@ -103,22 +103,17 @@ pub fn save_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut open = true;
     let mut close = false;
     let mut apply = false;
-    egui::Window::new(tl!("Save Preset")).id(egui::Id::new("Save Preset")).open(&mut open).collapsible(false).resizable(false).default_width(340.0).show(
+    egui::Window::new("Save Preset").id(egui::Id::new("Save Preset")).open(&mut open).collapsible(false).resizable(false).default_width(340.0).show(
         ctx,
         |ui| {
             ui.horizontal(|ui| {
-                ui.label(tl!("Name:"));
+                ui.label("Name:");
                 let r = ui.text_edit_singleline(&mut d.name);
                 app.auto.add("savePreset.name", r.rect, "Name");
             });
             ui.add_space(4.0);
-            ui.label(egui::RichText::new(tl!("Type")).strong());
-            for (key, label) in [
-                ("scale", tl!("Scale")),
-                ("anchorIn", tl!("Anchor to In Point")),
-                ("anchorOut", tl!("Anchor to Out Point")),
-                ("none", tl!("Without keyframes")),
-            ] {
+            ui.label(egui::RichText::new("Type").strong());
+            for (key, label) in [("scale", "Scale"), ("anchorIn", "Anchor to In Point"), ("anchorOut", "Anchor to Out Point"), ("none", "Without keyframes")] {
                 let r = ui.radio(d.keyframes == key, label);
                 app.auto.add(&format!("savePreset.keyframes.{key}"), r.rect, label);
                 if r.clicked() {
@@ -126,14 +121,14 @@ pub fn save_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 }
             }
             ui.add_space(4.0);
-            ui.label(tl!("Description:"));
+            ui.label("Description:");
             let r = ui.text_edit_multiline(&mut d.description);
             app.auto.add("savePreset.description", r.rect, "Description");
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                let c = ui.button(tl!("Cancel"));
+                let c = ui.button("Cancel");
                 app.auto.add("savePreset.cancel", c.rect, "Cancel");
-                let o = ui.add_enabled(!d.name.trim().is_empty(), egui::Button::new(tl!("OK")));
+                let o = ui.add_enabled(!d.name.trim().is_empty(), egui::Button::new("OK"));
                 app.auto.add("savePreset.ok", o.rect, "OK");
                 apply = o.clicked();
                 close = apply || c.clicked();
@@ -147,7 +142,7 @@ pub fn save_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
             json!({"clip": d.clip, "effects": d.effects, "name": d.name.trim(), "description": d.description, "keyframes": d.keyframes}),
         );
         match r {
-            Ok(_) => app.ui.status = tlf!("Saved preset “{name}”", name = d.name.trim()),
+            Ok(_) => app.ui.status = format_placeholders!("Saved preset “{name}”", name = d.name.trim()),
             Err(e) => app.ui.status = e.to_string(),
         }
     }

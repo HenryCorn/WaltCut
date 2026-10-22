@@ -131,11 +131,9 @@ fn tiny_windows_and_squeezed_panels_do_not_panic() {
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let app = FilmcraftApp::new(session);
         let mut harness = Harness::builder().with_size(egui::vec2(w, h)).with_max_steps(10_000).build_eframe(move |_cc| app);
-        for ws in ["Editing", "Color", "Audio", "Effects", "Captions and Graphics", "Assembly"] {
-            harness.state_mut().set_workspace(ws);
-            for _ in 0..3 {
-                harness.step();
-            }
+        harness.state_mut().set_workspace("WaltCut").unwrap();
+        for _ in 0..3 {
+            harness.step();
         }
         assert!(harness.state().ui_error.is_none(), "{w}x{h}: {:?}", harness.state().ui_error);
     }

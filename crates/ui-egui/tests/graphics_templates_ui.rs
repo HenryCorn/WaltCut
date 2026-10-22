@@ -92,7 +92,8 @@ impl Driver {
 #[test]
 fn browse_search_apply_and_edit_template_properties() {
     let mut d = Driver::demo("browse");
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.ok("ui.menu.invoke", json!({"id": "window.panel.EssentialGraphics"}));
     d.ok("ui.set", json!({"gfxTemplates": {"tab": "browse"}}));
     d.frames(4);
@@ -134,7 +135,8 @@ fn browse_search_apply_and_edit_template_properties() {
 #[test]
 fn drag_template_onto_the_timeline() {
     let mut d = Driver::demo("drag");
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.ok("ui.menu.invoke", json!({"id": "window.panel.EssentialGraphics"}));
     d.ok("ui.set", json!({"gfxTemplates": {"tab": "browse", "query": "tag"}}));
     d.frames(4);
@@ -167,7 +169,8 @@ fn export_dialog_and_install_round_trip() {
     assert_eq!(list[0]["name"], "UI Title", "{list}");
     assert_eq!(list[0]["controls"][0]["kind"], "text");
     // the new template shows in Browse
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.ok("ui.menu.invoke", json!({"id": "window.panel.EssentialGraphics"}));
     d.ok("ui.set", json!({"gfxTemplates": {"tab": "browse", "query": ""}}));
     d.frames(130);
@@ -191,7 +194,8 @@ fn type_tool_selection_styles_characters() {
     d.exec("playhead.set", json!({"seconds": 300}));
     let r = d.exec("graphics.newText", json!({"text": "Hello World"}));
     let clip = r["clip"].as_u64().unwrap();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
     // a Type-tool selection of "World" (bytes 6..11)
     d.ok("ui.set", json!({"tool": "Type", "gfxEdit": {"clip": clip, "layer": 0, "caret": 11, "anchor": 6}}));
@@ -213,7 +217,8 @@ fn install_refused_shows_the_reason_on_the_status_bar() {
     std::fs::write(&file, [0x50u8, 0x4b, 0x03, 0x04]).unwrap();
     let picked = file.to_string_lossy().to_string();
     d.harness.state_mut().hooks.pick_open_file = Some(Box::new(move |_, _| Some(picked.clone())));
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.ok("ui.set", json!({"gfxTemplates": {"tab": "browse"}}));
     d.ok("ui.click", json!({"id": "gfxTemplates.install"}));
     let st = d.ok("ui.inspect", json!({}));

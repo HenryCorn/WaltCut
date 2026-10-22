@@ -247,7 +247,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         app.audio = Some(Box::new(audio::CpalOut::new()));
         app.hooks.pick_files = Some(Box::new(|exts: &[&str]| {
             rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t("Media"), &file_filters::extensions(exts))
+                .add_filter("Media", &file_filters::extensions(exts))
                 .pick_files()
                 .unwrap_or_default()
                 .into_iter()
@@ -256,14 +256,11 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         }));
         // Link Media ▸ Locate…: one path, not imported.
         app.hooks.pick_file_for_relink = Some(Box::new(|exts: &[&str], _hint| {
-            rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t("Media"), &file_filters::extensions(exts))
-                .pick_file()
-                .map(|p| p.to_string_lossy().to_string())
+            rfd::FileDialog::new().add_filter("Media", &file_filters::extensions(exts)).pick_file().map(|p| p.to_string_lossy().to_string())
         }));
         app.hooks.pick_save = Some(Box::new(|name: &str| {
             rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t("FilmCraft Project"), &file_filters::extensions(&["fcproj"]))
+                .add_filter("FilmCraft Project", &file_filters::extensions(&["fcproj"]))
                 .set_file_name(name)
                 .save_file()
                 .map(|p| p.to_string_lossy().to_string())
@@ -272,7 +269,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             // a full path (Quick Export, Export mode) opens the dialog in its folder
             let path = std::path::Path::new(name);
             let mut dialog = rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t(filter), &file_filters::extensions(exts))
+                .add_filter(filter, &file_filters::extensions(exts))
                 .set_file_name(path.file_name().map_or(name.into(), |n| n.to_string_lossy()));
             if let Some(dir) = path.parent().filter(|d| d.is_dir()) {
                 dialog = dialog.set_directory(dir);
@@ -291,21 +288,14 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         if waltcut_platform::pen::install_pen_monitor() {
             app.hooks.pen_pressure = Some(Box::new(waltcut_platform::pen::pen_pressure));
         }
-        app.hooks.system_languages = Some(Box::new(|| sys_locale::get_locales().collect()));
         app.hooks.raise_without_focus = Some(Box::new(|| {
             window_raise::raise_without_focus();
         }));
         app.hooks.pick_open_file = Some(Box::new(|filter: &str, exts: &[&str]| {
-            rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t(filter), &file_filters::extensions(exts))
-                .pick_file()
-                .map(|p| p.to_string_lossy().to_string())
+            rfd::FileDialog::new().add_filter(filter, &file_filters::extensions(exts)).pick_file().map(|p| p.to_string_lossy().to_string())
         }));
         app.hooks.pick_open_project = Some(Box::new(|| {
-            rfd::FileDialog::new()
-                .add_filter(waltcut_ui_egui::i18n::t("FilmCraft Project"), &file_filters::extensions(&["fcproj"]))
-                .pick_file()
-                .map(|p| p.to_string_lossy().to_string())
+            rfd::FileDialog::new().add_filter("FilmCraft Project", &file_filters::extensions(&["fcproj"])).pick_file().map(|p| p.to_string_lossy().to_string())
         }));
         {
             let (rx, update) = native_menu::install(&app, cc.egui_ctx.clone());

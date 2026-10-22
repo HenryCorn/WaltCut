@@ -1,7 +1,7 @@
 # FilmCraft interface
 
 The egui frontend draws panels and dialogs, and dispatches project changes through the engine.
-Interactive controls keep stable automation ids regardless of the interface language.
+Interactive controls keep stable automation ids.
 
 ## Transition drop previews
 
@@ -15,32 +15,11 @@ outline. `timeline.transitionDropPreview` exposes the span and edge to automatio
 `transition_drop_ui` covers both edges of short video/audio clips, hover without project edits,
 the committed span and undo. Set `FILMCRAFT_UI_SNAPSHOT_DIR` to render screenshots with wgpu.
 
-## Localisation
+## UI language
 
-Edit > Language offers English, Japanese, Spanish, Brazilian Portuguese, Ukrainian, Simplified
-Chinese, German, Russian, French, Indonesian, Korean and Italian (all but Ukrainian and Russian cover
-the whole interface; those two cover the core menus). The language is stored in the engine's `general.interfaceLanguage` preference,
-restored on startup, and also available in Settings > General.
-Its default, System Language (`system`), follows the operating system: the first of the user's
-preferred languages that the interface has (the host supplies them through
-`HostHooks::system_languages`: `sys-locale` on the desktop, `navigator.languages` on the web),
-otherwise English.
-The `app.language.*` UI commands and `prefs.set` reach it through the control channel.
-Japanese requires a craft-fonts build or a suitable installed font.
-
-English source strings are lookup keys in `src/i18n/<code>.tsv`. `tl!` translates literals, `tlf!`
-fills translated templates, and `i18n::t` translates names from registries. Placeholder values
-(including user filenames containing braces) are inserted literally. Catalog translations are
-original work using ordinary language, without proprietary localisation resources.
-
-Spanish, Japanese, Simplified Chinese, French, Brazilian Portuguese and German cover menus, panels, dialogs, settings and registry labels. Searches accept both the
-translated label and its English source, including Unicode capitals. Project content, command ids
-and preference values retain their original values. Engine errors, CLI and MCP messages remain
-English. Ukrainian and Russian currently cover the core menus; they fall back to English elsewhere.
-
-Verification: `cargo test -p waltcut-ui-egui` checks catalog syntax, duplicate keys, placeholders,
-literal/menu/registry coverage and UI behaviour; `cargo xtask ci` runs the workspace gates. Visual
-checks use the control channel to switch language and capture the resulting panels.
+The interface is English-only. Project content, media names, and title text remain Unicode and are
+rendered with available system fonts and optional craft-fonts; command ids and automation ids are
+stable and English.
 
 ## Source playback
 

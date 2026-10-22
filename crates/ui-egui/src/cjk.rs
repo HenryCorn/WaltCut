@@ -1,4 +1,4 @@
-//! Chinese fallback fonts for document text in the interface, independent of UI language.
+//! CJK fallback fonts keep multilingual project and media names legible in the interface.
 //! Optional craft-fonts are preferred; native builds without them reuse one installed face.
 
 use std::sync::{Arc, OnceLock};
@@ -18,6 +18,24 @@ const PREFERRED: &[&str] = &[
     "Microsoft JhengHei UI",
     "Microsoft JhengHei",
 ];
+const JAPANESE_SAMPLE: &str = "日本語ファイル編集あア";
+const JAPANESE_PREFERRED: &[&str] = &[
+    "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN",
+    "Hiragino Kaku Gothic Pro",
+    "Yu Gothic UI",
+    "Yu Gothic",
+    "Meiryo UI",
+    "Meiryo",
+    "Noto Sans CJK JP",
+    "Noto Sans JP",
+    "Source Han Sans JP",
+    "Source Han Sans",
+    "IPAexGothic",
+    "IPAGothic",
+    "TakaoGothic",
+    "VL Gothic",
+];
 
 pub(crate) fn craft_fonts() -> impl Iterator<Item = &'static waltcut_text::fonts::CraftFont> {
     waltcut_text::fonts::CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| matches!(*s, "Hans" | "Hant")))
@@ -31,6 +49,11 @@ const KOREAN_PREFERRED: &[&str] = &["Malgun Gothic", "Apple SD Gothic Neo", "Not
 fn system_font() -> Option<Arc<FontData>> {
     static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
     FONT.get_or_init(|| find_system_font(SAMPLE, PREFERRED)).clone()
+}
+
+fn japanese_font() -> Option<Arc<FontData>> {
+    static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
+    FONT.get_or_init(|| find_system_font(JAPANESE_SAMPLE, JAPANESE_PREFERRED)).clone()
 }
 
 fn korean_font() -> Option<Arc<FontData>> {
@@ -50,28 +73,28 @@ fn find_system_font(sample: &str, preferred: &[&str]) -> Option<Arc<FontData>> {
     Some(Arc::new(FontData { font: std::borrow::Cow::Owned(face.data()?), index: face.info.index, tweak: Default::default() }))
 }
 
-/// Whether [`install`] has a Hangul face to add (an installed system face; none is bundled).
-/// The Korean interface needs one.
-pub(crate) fn korean_available() -> bool {
-    korean_font().is_some()
-}
-
-/// Whether [`install`] has a Chinese face to add: craft-fonts Hans/Hant faces, or an installed
-/// system face (scanned once per process). The Simplified Chinese interface needs one.
-pub(crate) fn available() -> bool {
-    craft_fonts().next().is_some() || system_font().is_some()
-}
-
 /// Append Chinese faces after the Latin UI fonts and the Japanese fallbacks. This keeps the
 /// interface's Latin typography and Japanese glyph forms, and covers the simplified and
 /// traditional hanzi in media and track names that Japanese fonts lack.
 pub(crate) fn install(fonts: &mut FontDefinitions) {
+    install_japanese(fonts);
     install_chinese(fonts);
     if let Some(font) = korean_font() {
         fonts.font_data.insert("system-korean".into(), font);
         for stack in fonts.families.values_mut() {
             stack.push("system-korean".into());
         }
+    }
+}
+
+fn install_japanese(fonts: &mut FontDefinitions) {
+    if waltcut_text::fonts::craft_japanese().next().is_some() {
+        return;
+    }
+    let Some(font) = japanese_font() else { return };
+    fonts.font_data.insert("system-japanese".into(), font);
+    for stack in fonts.families.values_mut() {
+        stack.push("system-japanese".into());
     }
 }
 

@@ -160,7 +160,8 @@ impl Driver {
 #[test]
 fn audio_chrome_switches_between_themes() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "AudioTrackMixer"}));
     for theme in ["light", "dark", "medium"] {
         d.ok("ui.set", json!({"theme": theme}));
         d.frames(3);
@@ -173,7 +174,8 @@ fn audio_chrome_switches_between_themes() {
 #[test]
 fn track_mixer_controls_by_id_and_by_drag() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "AudioTrackMixer"}));
     d.frames(3);
     let ids = d.ids("mixer.");
     for id in [
@@ -223,7 +225,8 @@ fn track_mixer_controls_by_id_and_by_drag() {
 #[test]
 fn recording_a_touch_pass_from_the_fader() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Audio"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "AudioTrackMixer"}));
     d.frames(3);
     d.exec("mixer.setStrip", json!({"strip": "A1", "mode": "Touch"}));
     d.exec("playhead.set", json!({"seconds": 1.0}));
@@ -464,20 +467,20 @@ fn audio_gain_dialog_normalizes_the_selection() {
 /// window sleep. Run only frames requested by egui; forcing frames would hide the original bug.
 #[test]
 fn paused_meters_repaint_without_input_and_settle_after_release() {
-    for workspace in ["Editing", "Audio"] {
+    for panel in ["AudioMeters", "AudioTrackMixer"] {
         let mut d = Driver::demo_with_step_dt(Some(0.1));
-        d.ok("ui.set", json!({"workspace": workspace}));
+        d.ok("ui.panel.show", json!({"panel": panel}));
         d.ok("ui.playback", json!({"action": "play"}));
         d.frames(10);
-        let prefix = if workspace == "Audio" { "mixer.Mix.meter" } else { "audioMeters.channel." };
+        let prefix = if panel == "AudioTrackMixer" { "mixer.Mix.meter" } else { "audioMeters.channel." };
         let playing = d.ok("ui.elements", json!({"prefix": prefix}));
         let labels = |elements: &Value| elements.as_array().unwrap().iter().map(|e| e["label"].as_str().unwrap().to_string()).collect::<Vec<_>>();
         let active = labels(&playing);
-        assert!(!active.is_empty(), "{workspace}: the meters must be visible");
-        assert!(active.iter().any(|label| !label.contains("-90.0")), "{workspace}: the demo must feed the meters: {active:?}");
+        assert!(!active.is_empty(), "{panel}: the meters must be visible");
+        assert!(active.iter().any(|label| !label.contains("-90.0")), "{panel}: the demo must feed the meters: {active:?}");
         d.ok("ui.playback", json!({"action": "stop"}));
         assert!(!d.harness.state().playback.playing);
-        d.snapshot(&format!("meters-{workspace}-paused-start"), None);
+        d.snapshot(&format!("meters-{panel}-paused-start"), None);
         // Harness::run follows immediate repaint requests, adding no mouse or keyboard input.
         let steps = d.harness.run();
         // Inspect both values that drive the bars: a silent level alone must not strand its
@@ -485,14 +488,14 @@ fn paused_meters_repaint_without_input_and_settle_after_release() {
         let (_, meters): (u64, std::collections::HashMap<u64, Vec<[f32; 2]>>) =
             d.harness.ctx.data(|data| data.get_temp(egui::Id::new("mixer-meters"))).unwrap();
         assert!(!meters.is_empty());
-        assert!(meters.values().flatten().all(|meter| *meter == [-90.0; 2]), "{workspace}: meters stopped after {steps} requested frames: {meters:?}");
+        assert!(meters.values().flatten().all(|meter| *meter == [-90.0; 2]), "{panel}: meters stopped after {steps} requested frames: {meters:?}");
         assert_ne!(
             d.harness.output().viewport_output[&egui::ViewportId::ROOT].repaint_delay,
             std::time::Duration::ZERO,
-            "{workspace}: silent meters must not keep repainting"
+            "{panel}: silent meters must not keep repainting"
         );
         let quiet = d.ok("ui.elements", json!({"prefix": prefix}));
-        assert!(labels(&quiet).iter().all(|label| label.contains("-90.0")), "{workspace}: {:?}", labels(&quiet));
-        d.snapshot(&format!("meters-{workspace}-paused-silent"), None);
+        assert!(labels(&quiet).iter().all(|label| label.contains("-90.0")), "{panel}: {:?}", labels(&quiet));
+        d.snapshot(&format!("meters-{panel}-paused-silent"), None);
     }
 }

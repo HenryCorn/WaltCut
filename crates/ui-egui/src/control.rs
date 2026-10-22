@@ -131,7 +131,11 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
             }
             if let Some(w) = s("workspace") {
                 match crate::dock::find(&app.workspaces, w) {
-                    Some(w) => app.set_workspace(&w),
+                    Some(w) => {
+                        if let Err(error) = app.set_workspace(&w) {
+                            return err(error);
+                        }
+                    }
                     None => return err(format!("unknown workspace `{w}`")),
                 }
             }
@@ -237,7 +241,7 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
                     Err(e) => return err(format!("`export`: {e}")),
                 }
             }
-            // panel settings (`panels::panel_state`): {"scopes": {...}, "timecode": {...}, …}, merged
+            // Events and Progress settings (`panels::panel_state`), merged.
             if let Some(patch) = p.get("panels") {
                 let mut cur = serde_json::to_value(&app.ui.panels).unwrap_or_default();
                 merge(&mut cur, patch);

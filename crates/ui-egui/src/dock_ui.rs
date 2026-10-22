@@ -323,7 +323,7 @@ impl FilmcraftApp {
             ui.painter().rect_stroke(rect, t.radius, Stroke::new(1.0, t.focus), StrokeKind::Outside);
             let grip = Rect::from_min_max(rect.max - vec2(14.0, 14.0), rect.max);
             let response = ui.interact(grip, id.with("resize"), Sense::click_and_drag());
-            response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, response.enabled(), tl!("Resize floating panel")));
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, response.enabled(), "Resize floating panel"));
             self.auto.add_response(&format!("panel.float.{index}.resize"), &response, "Resize floating panel");
             for step in 0..3 {
                 let offset = 4.0 + step as f32 * 4.0;

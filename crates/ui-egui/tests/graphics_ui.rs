@@ -81,7 +81,8 @@ impl Driver {
 #[test]
 fn type_tool_edit_style_and_move() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.exec("playhead.set", json!({"seconds": 2}));
     d.ok("ui.set", json!({"tool": "Type"}));
     d.frames(3);
@@ -167,7 +168,8 @@ fn text_param(d: &mut Driver, clip: u64, param: &str) -> Option<waltcut_project:
 #[test]
 fn a_property_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     let r = d.exec("graphics.newText", json!({"text": "Title"}));
     let clip = r["clip"].as_u64().unwrap();
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
@@ -197,7 +199,8 @@ fn a_property_drag_is_one_undo_step() {
 #[test]
 fn shadow_color_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     let r = d.exec("graphics.newText", json!({"text": "Title"}));
     let clip = r["clip"].as_u64().unwrap();
     d.exec("graphics.selectLayer", json!({"clip": clip, "layers": [0]}));
@@ -235,7 +238,8 @@ fn shadow_color_drag_is_one_undo_step() {
 #[test]
 fn selected_character_size_drag_is_one_undo_step() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace":"Captions and Graphics","tool":"Type"}));
+    d.ok("ui.set", json!({"workspace":"WaltCut","tool":"Type"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.exec("playhead.set", json!({"seconds":2}));
     d.frames(3);
     let p = d.rect("program.picture");
@@ -264,7 +268,8 @@ fn selected_character_size_drag_is_one_undo_step() {
 #[test]
 fn the_tracking_stopwatch_animates_letter_spacing() {
     let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Captions and Graphics"}));
+    d.ok("ui.set", json!({"workspace": "WaltCut"}));
+    d.ok("ui.panel.show", json!({"panel": "EssentialGraphics"}));
     d.exec("playhead.set", json!({"seconds": 0.0}));
     let r = d.exec("graphics.newText", json!({"text": "Title", "seconds": 4}));
     let clip = r["clip"].as_u64().unwrap();

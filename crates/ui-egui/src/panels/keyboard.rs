@@ -64,8 +64,6 @@ pub const COMMANDS: &[UiCommand] = &[
     uic!("window.toggleMonitorFocus", "Toggle Source/Program Monitor Focus", [], None),
     uic!("window.openSearch", "Open Search", [], Some("Cmd+Shift+F")),
     uic!("panel.selectFindBox", "Select Find Box", [], Some("Shift+F")),
-    uic!("window.workspace.learning", "Learning", ["Window", "Workspaces"], Some("Alt+Shift+7")),
-    uic!("window.workspace.review", "Review", ["Window", "Workspaces"], Some("Alt+Shift+8")),
     uic!("view.programZoom100", "Zoom Program Monitor to 100%", [], Some("Cmd+Shift+1")),
     uic!("view.programZoomFit", "Zoom Program Monitor to Fit", [], Some("Cmd+Shift+0")),
     uic!("view.sourceZoom100", "Zoom Source Monitor to 100%", [], Some("Cmd+Alt+Shift+1")),
@@ -117,7 +115,7 @@ pub const COMMANDS: &[UiCommand] = &[
 ];
 
 /// FilmCraft's documentation (Help ▸ FilmCraft Help…, F1).
-pub const HELP_URL: &str = "https://github.com/storytold/filmcraft/tree/main/docs";
+pub const HELP_URL: &str = "https://github.com/HenryCorn/WaltCut/tree/main/docs";
 
 const HEIGHT_STEP: f32 = 12.0;
 const MIN_TRACK_H: f32 = 24.0;
@@ -151,11 +149,6 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
             Ok(focus_find_box(app, ctx))
         }
         "panel.selectFindBox" => Ok(focus_find_box(app, ctx)),
-        "window.workspace.learning" | "window.workspace.review" => {
-            let name = if id.ends_with("learning") { "Learning" } else { "Review" };
-            app.set_workspace(name);
-            Ok(json!({"workspace": name}))
-        }
         "view.programZoom100" | "view.programZoomFit" | "view.sourceZoom100" | "view.sourceZoomFit" => {
             let v = if id.starts_with("view.program") { &mut app.ui.program } else { &mut app.ui.source };
             v.zoom = id.ends_with("100").then_some(1.0);

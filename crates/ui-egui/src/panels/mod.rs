@@ -21,13 +21,11 @@ pub mod keyboard;
 pub mod masks;
 pub mod media_dialogs;
 pub mod menu_dialogs;
-pub mod metadata;
 pub mod meters;
 pub mod misc;
 pub mod mixer;
 pub mod monitor;
 pub mod monitor_view;
-pub mod notes;
 pub mod panel_state;
 pub mod presets;
 pub mod project;
@@ -37,7 +35,6 @@ pub mod remix;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;
-pub mod timecode;
 pub mod timeline;
 pub mod timeline_automation;
 pub mod timeline_hit;
@@ -58,7 +55,7 @@ use crate::theme::Tokens;
 
 /// ` · 2:05 left`: the time a job has left, as it follows a percentage.
 pub fn left_text(d: std::time::Duration) -> String {
-    tlf!(" · {time} left", time = waltcut_engine::export::format_eta(d))
+    format_placeholders!(" · {time} left", time = waltcut_engine::export::format_eta(d))
 }
 
 /// [`left_text`] for a job or queue item whose JSON has `etaSeconds`, nothing while it is null.
@@ -82,16 +79,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::EssentialGraphics => graphics_templates::essential_graphics(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
         PanelKind::Markers => misc::markers(app, ui, rect),
-        PanelKind::Info => misc::info(app, ui, rect),
         PanelKind::AudioTrackMixer => mixer::track_mixer(app, ui, rect),
         PanelKind::AudioClipMixer => mixer::clip_mixer(app, ui, rect),
-        PanelKind::Metadata => metadata::show(app, ui, rect),
-        PanelKind::Timecode => timecode::show(app, ui, rect),
         PanelKind::Events => events::events(app, ui, rect),
         PanelKind::Progress => events::progress(app, ui, rect),
         PanelKind::EssentialSound => essential_sound::show(app, ui, rect),
-        PanelKind::ProjectNotes => notes::show(app, ui, rect),
-        other => crate::dock::placeholder(ui, rect, &app.tokens, &tlf!("{panel} — coming in a later milestone", panel = crate::i18n::t(other.title()))),
     }
 }
 
@@ -265,50 +257,52 @@ pub fn panel_menu_popup(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
                     // the Timeline's tabs are its open sequences: Close Panel closes the active one and
                     // keeps the panel (Premiere's wording and behaviour)
                     if p == PanelKind::Timeline && app.session.state.active_sequence.is_some() {
-                        let r = ui.button(tl!("Close Panel"));
+                        let r = ui.button("Close Panel");
                         app.auto.add("panel.menu.Timeline.close", r.rect, "Close Panel");
                         if r.clicked() {
                             let _ = app.session.execute("sequence.close", serde_json::json!({}));
                             close = true;
                         }
-                        let r = ui.add_enabled(app.session.state.open_sequences.len() > 1, egui::Button::new(tl!("Close Other Timeline Panels")));
+                        let r = ui.add_enabled(app.session.state.open_sequences.len() > 1, egui::Button::new("Close Other Timeline Panels"));
                         app.auto.add("panel.menu.Timeline.closeOthers", r.rect, "Close Other Timeline Panels");
                         if r.clicked() {
                             let _ = app.session.execute("sequence.closeOthers", serde_json::json!({}));
                             close = true;
                         }
-                    } else if ui.button(tl!("Close Panel")).clicked() {
+                    } else if ui.button("Close Panel").clicked() {
                         let _ = crate::menus::invoke(app, ui.ctx(), "window.closePanel", serde_json::json!({"panel": p.id()}));
                         close = true;
                     }
-                    let undock = ui.button(tl!("Undock Panel"));
+                    let undock = ui.button("Undock Panel");
                     app.auto.add_response(&format!("panel.menu.{}.undock", p.id()), &undock, "Undock Panel");
                     if undock.clicked() {
                         let _ = crate::menus::invoke(app, ui.ctx(), "window.floatPanel", serde_json::json!({"panel": p.id()}));
                         close = true;
                     }
                     let maximized = app.ui.keys.maximized.is_some_and(|q| app.ui.dock.contains(q) || app.ui.floating.iter().any(|g| g.panels.contains(&q)));
-                    let r = ui.button(if maximized { tl!("Restore Frame") } else { tl!("Maximize Frame") });
+                    let r = ui.button(if maximized { "Restore Frame" } else { "Maximize Frame" });
                     app.auto.add(&format!("panel.menu.{}.maximize", p.id()), r.rect, if maximized { "Restore Frame" } else { "Maximize Frame" });
                     if r.clicked() {
                         keyboard::toggle_maximize(app, p);
                         close = true;
                     }
-                    if ui.button(tl!("Restore Workspace")).clicked() {
+                    if ui.button("Restore Workspace").clicked() {
                         let w = app.ui.workspace.clone();
-                        app.set_workspace(&w);
+                        if let Err(error) = app.set_workspace(&w) {
+                            app.ui.status = error;
+                        }
                         close = true;
                     }
                     if p == PanelKind::Timeline {
                         ui.separator();
-                        let r = ui.add_enabled(app.session.state.active_sequence.is_some(), egui::Button::new(tl!("Reveal Sequence in Project")));
+                        let r = ui.add_enabled(app.session.state.active_sequence.is_some(), egui::Button::new("Reveal Sequence in Project"));
                         app.auto.add("panel.menu.Timeline.revealSequence", r.rect, "Reveal Sequence in Project");
                         if r.clicked() {
                             let _ = app.session.execute("sequence.revealInProject", serde_json::json!({}));
                             close = true;
                         }
-                        ui.checkbox(&mut app.ui.timeline.show_thumbnails, tl!("Video Thumbnails"));
-                        ui.checkbox(&mut app.ui.timeline.show_waveforms, tl!("Audio Waveforms"));
+                        ui.checkbox(&mut app.ui.timeline.show_thumbnails, "Video Thumbnails");
+                        ui.checkbox(&mut app.ui.timeline.show_waveforms, "Audio Waveforms");
                     }
                     if p == PanelKind::Project {
                         ui.separator();
