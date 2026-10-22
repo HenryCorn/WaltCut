@@ -1494,7 +1494,7 @@ pub fn graphic_selected(app: &FilmcraftApp) -> bool {
     selected_graphic(app).is_some()
 }
 
-/// The graphic editor (Properties panel / Essential Graphics ▸ Edit).
+/// The graphic editor (Properties / Essential Graphics panel).
 pub fn properties(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let Some((clip, it)) = selected_graphic(app) else {
@@ -1584,13 +1584,9 @@ pub fn properties(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 }
             }
         }
-        // ---- template properties (a graphic made from a graphics template)
-        if it.graphic.as_ref().is_some_and(|m| m.template.is_some()) && section(ui, app, "Template Properties", &t) {
-            crate::panels::graphics_templates::template_controls(app, ui, clip, &it, mt, &mut autos, &mut actions);
-        }
         let Some(l) = sel else {
             if section(ui, app, "Responsive Design - Time", &t) {
-                crate::panels::graphics_templates::responsive_time(app, ui, clip, &it, &mut autos, &mut actions);
+                crate::panels::graphic_design::responsive_time(app, ui, clip, &it, &mut autos, &mut actions);
             }
             ui.add_space(12.0);
             ui.label(egui::RichText::new(tl!("Select a layer to edit its properties.")).color(t.text_faint));
@@ -1608,7 +1604,7 @@ pub fn properties(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         });
         let mut cx = Ctx { clip, layer: l, eidx: idx[l], e, mt, t, actions: Vec::new(), autos: Vec::new(), range };
         if section(ui, app, "Responsive Design - Position", &t) {
-            crate::panels::graphics_templates::responsive_position(app, ui, clip, &it, l, &mut cx.autos, &mut cx.actions);
+            crate::panels::graphic_design::responsive_position(app, ui, clip, &it, l, &mut cx.autos, &mut cx.actions);
         }
         // ---- align and transform
         if section(ui, app, "Align and Transform", &t) {

@@ -15,7 +15,6 @@ pub mod essential;
 pub mod find;
 pub mod graphic;
 pub mod graphic_design;
-pub mod gtemplate;
 pub mod keyframe;
 pub mod mask;
 pub mod mixer;

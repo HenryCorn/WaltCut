@@ -31,8 +31,8 @@ fn is_zero(v: &u64) -> bool {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LayerExtra {
-    /// Stable id of the layer within its clip (0 = not assigned yet). Pins and template controls
-    /// refer to layers by it, so they survive reordering.
+    /// Stable id of the layer within its clip (0 = not assigned yet). Pins refer to layers by it,
+    /// so they survive reordering.
     #[serde(skip_serializing_if = "is_zero")]
     pub uid: u64,
     /// Per-character style overrides of a text layer.
@@ -47,6 +47,25 @@ impl LayerExtra {
     pub fn is_empty(&self) -> bool {
         self.uid == 0 && self.runs.is_empty() && self.pin.is_none()
     }
+}
+
+/// A layer's uid (0 = none).
+pub fn layer_uid(e: &EffectInstance) -> u64 {
+    e.layer.as_ref().map_or(0, |x| x.uid)
+}
+
+/// Assign missing layer ids without overflowing ids read from a project file.
+pub fn ensure_uids(layers: &mut [EffectInstance]) -> Result<(), &'static str> {
+    let missing = u64::try_from(layers.iter().filter(|l| layer_uid(l) == 0).count()).map_err(|_| "too many graphic layers")?;
+    let mut next = layers.iter().map(layer_uid).max().unwrap_or(0);
+    next.checked_add(missing).ok_or("graphic layer ids exhausted")?;
+    for layer in layers {
+        if layer_uid(layer) == 0 {
+            next = next.checked_add(1).ok_or("graphic layer ids exhausted")?;
+            layer.layer.get_or_insert_with(Default::default).uid = next;
+        }
+    }
+    Ok(())
 }
 
 /// Character formatting overrides (None = inherit the layer's value).
@@ -398,9 +417,6 @@ pub struct GraphicMeta {
     pub design_in: Tick,
     /// Clip length (media time) when the intro / outro were set.
     pub design_duration: Tick,
-    /// The graphics template this graphic was made from, with its editable properties.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub template: Option<crate::gtemplate::TemplateLink>,
 }
 
 fn is_roll_off(r: &Roll) -> bool {
@@ -455,6 +471,29 @@ pub type SourceGraphics = BTreeMap<crate::ItemId, SourceGraphic>;
 mod tests {
     use super::*;
     use waltcut_time::TICKS_PER_SECOND;
+
+    #[test]
+    fn layer_ids_preserve_pins_and_assign_only_missing_ids() {
+        let mut layers = vec![crate::graphic::new_text_layer("Pinned", waltcut_geom::Vec2::new(0.0, 0.0), 12.0); 3];
+        layers[0].layer = Some(Box::new(LayerExtra { uid: 7, ..Default::default() }));
+        ensure_uids(&mut layers).unwrap();
+        assert_eq!(layers.iter().map(layer_uid).collect::<Vec<_>>(), vec![7, 8, 9]);
+        let saved = layers.clone();
+        ensure_uids(&mut layers).unwrap();
+        assert_eq!(layers, saved);
+    }
+
+    #[test]
+    fn hostile_layer_ids_report_exhaustion_without_partial_changes_or_panic() {
+        let mut layers = vec![crate::graphic::new_text_layer("Pinned", waltcut_geom::Vec2::new(0.0, 0.0), 12.0); 2];
+        layers[0].layer = Some(Box::new(LayerExtra { uid: u64::MAX, ..Default::default() }));
+        let saved = layers.clone();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ensure_uids(&mut layers)));
+        assert!(result.unwrap().is_err());
+        assert_eq!(layers, saved);
+        // A fully assigned list at the limit needs no allocation of an id.
+        ensure_uids(&mut layers[..1]).unwrap();
+    }
 
     fn sec(s: f64) -> Tick {
         Tick((s * TICKS_PER_SECOND as f64).round() as i64)

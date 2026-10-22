@@ -255,13 +255,13 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
                     return err(format!("`{k}`: {e}"));
                 }
             }
-            // Essential Graphics ▸ Browse and the template / font dialogs (`panels::graphics_templates`), merged
-            if let Some(patch) = p.get("gfxTemplates") {
-                let mut cur = serde_json::to_value(&app.ui.gfx_templates).unwrap_or_default();
+            // Replace Fonts dialog draft, merged.
+            if let Some(patch) = p.get("replaceFonts") {
+                let mut cur = serde_json::to_value(&app.ui.replace_fonts).unwrap_or_default();
                 merge(&mut cur, patch);
                 match serde_json::from_value(cur) {
-                    Ok(v) => app.ui.gfx_templates = v,
-                    Err(e) => return err(format!("`gfxTemplates`: {e}")),
+                    Ok(v) => app.ui.replace_fonts = v,
+                    Err(e) => return err(format!("`replaceFonts`: {e}")),
                 }
             }
             // the Type tool's text editing state: {"clip", "layer", "caret", "anchor"} (byte offsets) or null

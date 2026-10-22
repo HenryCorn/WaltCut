@@ -3,6 +3,15 @@
 The egui frontend draws panels and dialogs, and dispatches project changes through the engine.
 Interactive controls keep stable automation ids.
 
+## Graphic clips
+
+Essential Graphics opens the text/shape editor directly, without a template browser. Responsive
+layout, per-character styles, source graphics and Replace Fonts remain available. The font dialog
+draft is `UiState::replace_fonts`; the control channel edits it with `ui.set {"replaceFonts": …}`.
+`graphic_design_ui` covers the editor, font dialog, character styles and absent template commands.
+Native macOS execution and screenshots are pending for the #24 draft; cross-target Clippy only
+typechecks those tests on Windows.
+
 ## Transition drop previews
 
 Dragging a video or audio transition over a compatible clip shows its actual time span, the
