@@ -344,7 +344,7 @@ fn has_project_items(s: &Session) -> std::result::Result<(), String> {
     if s.project.items.values().any(|i| !matches!(i.kind, ItemKind::Graphic { .. })) { Ok(()) } else { Err("the project is empty".into()) }
 }
 fn is_clip_item(p: &Project, id: ItemId) -> bool {
-    p.item(id).is_some_and(|i| matches!(i.kind, ItemKind::Media(_) | ItemKind::Subclip { .. } | ItemKind::Sequence(_) | ItemKind::AdjustmentLayer { .. }))
+    p.item(id).is_some_and(|i| matches!(i.kind, ItemKind::Media(_) | ItemKind::Subclip { .. } | ItemKind::Sequence(_)))
 }
 fn has_clip_items(s: &Session) -> std::result::Result<(), String> {
     if s.state.project_selection.iter().any(|i| is_clip_item(&s.project, *i)) { Ok(()) } else { Err("select a clip in the Project panel".into()) }
@@ -569,7 +569,7 @@ fn used_items(p: &Project) -> BTreeSet<ItemId> {
 
 /// Remove Unused removes clips only: never sequences or graphic sources.
 fn is_removable(p: &Project, id: ItemId) -> bool {
-    p.item(id).is_some_and(|i| matches!(i.kind, ItemKind::Media(_) | ItemKind::Subclip { .. } | ItemKind::AdjustmentLayer { .. }))
+    p.item(id).is_some_and(|i| matches!(i.kind, ItemKind::Media(_) | ItemKind::Subclip { .. }))
 }
 
 fn remove_items(p: &mut Project, ids: &[ItemId]) {
@@ -613,15 +613,10 @@ fn sequence_from_clip(s: &mut Session, p: &Value) -> Result<Value> {
     let items: Vec<ItemId> = items_p(s, p).into_iter().filter(|i| is_clip_item(&s.project, *i)).collect();
     let first = *items.first().ok_or_else(|| bad("file.newSequenceFromClip", "select a clip in the Project panel"))?;
     let pi = s.project.item(first).ok_or_else(|| bad("file.newSequenceFromClip", "no such item"))?.clone();
-    let mut settings = match &pi.kind {
+    let settings = match &pi.kind {
         ItemKind::Sequence(q) => q.settings.clone(),
         _ => media_root(&s.project, first).map(|(_, m, _)| crate::commands::default_seq_settings_for(m)).unwrap_or_default(),
     };
-    if let ItemKind::AdjustmentLayer { width, height, rate, .. } = &pi.kind {
-        settings.width = *width;
-        settings.height = *height;
-        settings.frame_rate = *rate;
-    }
     let channels = media_root(&s.project, first).and_then(|(_, m, _)| m.info.audio().map(|a| a.channels)).unwrap_or(2);
     let n_audio = media_root(&s.project, first)
         .map(|(_, m, _)| {

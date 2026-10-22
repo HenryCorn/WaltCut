@@ -13,7 +13,7 @@
 //! visible layer (bottom to top, with its track index) the track item (source in, speed, reverse,
 //! frame hold, effects with every keyframe…, its timeline offset from the segment start) and its
 //! source (the media reference and stream info, interpretation, nested sequences recursively,
-//! adjustment layer settings). Ids, names, labels, markers, link/group membership and source
+//! drawing settings). Ids, names, labels, markers, link/group membership and source
 //! In/Out marks are excluded because they don't change pixels. Because positions are relative, a
 //! ripple edit that moves a segment along the timeline keeps its hash (and its preview); only the
 //! segments whose content changed get a new hash. Effects that print absolute sequence time (the
@@ -31,7 +31,6 @@
 //!   [`effect_cost_ms`]), scaled by sequence pixels / 1080p pixels;
 //! * **transitions**: dissolves/dips 1 ms (GPU), any other transition renders both sides on the
 //!   CPU: 12 ms plus the CPU path of both layers;
-//! * **adjustment layers**: whole-frame CPU render (10 ms) plus their effects.
 //!
 //! A segment is **red** when the estimate exceeds [`REALTIME_BUDGET`] × the frame duration,
 //! **yellow** when it plays in real time but is not "native", and has **no bar** when it is a single
@@ -342,7 +341,6 @@ fn hash_source(h: &mut Fnv128, project: &Project, id: ItemId, kind: TrackKind, d
             h.json(&("subclip", range));
             hash_source(h, project, *parent, kind, depth + 1);
         }
-        ItemKind::AdjustmentLayer { .. } => h.json(&("adjustment", &pi.kind)),
         ItemKind::Graphic { .. } => h.json(&("graphic", &pi.kind)),
         ItemKind::Drawing(_) => h.json(&("drawing", &pi.kind)),
         ItemKind::Sequence(s) => {
@@ -456,7 +454,6 @@ fn decode_cost_ms(project: &Project, id: ItemId, depth: u32) -> f64 {
             base * px
         }
         ItemKind::Subclip { parent, .. } => decode_cost_ms(project, *parent, depth + 1),
-        ItemKind::AdjustmentLayer { .. } => 0.0,
         // vector layers are drawn on the CPU (cached while static)
         ItemKind::Graphic { .. } => 1.5,
         ItemKind::Drawing(_) => 1.0,
@@ -489,9 +486,6 @@ fn cpu_layer(project: &Project, it: &TrackItem) -> bool {
 }
 
 fn layer_cost(project: &Project, it: &TrackItem, px: f64, force_cpu: bool) -> f64 {
-    if project.item(it.item).is_some_and(|p| matches!(p.kind, ItemKind::AdjustmentLayer { .. })) {
-        return 10.0 * px + item_fx_cost(it, px);
-    }
     let decode = decode_cost_ms(project, it.item, 0);
     let path = if force_cpu || cpu_layer(project, it) { 10.0 * px } else { 0.5 };
     decode + path + item_fx_cost(it, px)

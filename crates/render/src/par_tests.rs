@@ -188,7 +188,7 @@ fn rotation_happens_at_the_display_aspect() {
     let settings = SequenceSettings { width: 200, height: 100, par: (2, 1), ..Default::default() };
     let mut p = Project::new("rot");
     let sid = p.new_sequence("s", settings, 1, 0, None);
-    let adj = p.add_item("a", Label::Iris, ItemKind::AdjustmentLayer { width: 100, height: 100, rate: FPS, duration: Tick(TICKS_PER_SECOND) }, None);
+    let adj = p.add_item("a", Label::Iris, ItemKind::Graphic { width: 100, height: 100, rate: FPS }, None);
     let mut ti = p.make_track_item(adj, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, FPS.tick_of(1)), FPS).unwrap();
     for e in &mut ti.effects {
         resolve_auto_points(e, (200, 100), (100, 100));
@@ -205,7 +205,7 @@ fn rotation_happens_at_the_display_aspect() {
     let b = motion_matrix(seq, &ti, (100, 100), Some((1, 1)), Tick::ZERO).bounds(&r);
     let d = 100.0 * std::f64::consts::SQRT_2;
     assert!((b.w - d / 2.0).abs() < 1e-9 && (b.h - d).abs() < 1e-9, "{b:?}");
-    // graphics and adjustment layers (no ratio of their own) are in sequence pixels
+    // graphics (no ratio of their own) are in sequence pixels
     ti.effect_mut("motion").unwrap().params.get_mut("rotation").unwrap().value = ParamValue::Float(0.0);
     let b = motion_matrix(seq, &ti, (100, 100), None, Tick::ZERO).bounds(&r);
     assert!((b.w - 100.0).abs() < 1e-9, "{b:?}");

@@ -115,10 +115,6 @@ impl Canvas {
     fn set(&mut self, img: Image) {
         self.img = Some(img);
     }
-    /// A copy of the current image.
-    fn snapshot(&self) -> Image {
-        self.img.clone().unwrap_or_else(|| Image::new(self.w, self.h))
-    }
     fn into_image(self) -> Image {
         let (w, h) = (self.w, self.h);
         self.img.unwrap_or_else(|| Image::new(w, h))
@@ -182,19 +178,10 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
         if let Some(tr) = track.transitions.iter().find(|tr| tr.range().contains(t)) {
             let a = tr.from.and_then(|id| track.item(id)).filter(|i| i.enabled);
             let b = tr.to.and_then(|id| track.item(id)).filter(|i| i.enabled);
-            // An adjustment layer has no picture of its own: in a transition it is the frame below
-            // with its effects, so a dissolve fades the effects in or out.
-            let layer = |i: &TrackItem, below: &Image| -> Option<(Image, Blend)> {
-                if is_adjustment(project, i) {
-                    return opts.effects.then(|| adjustment_layer(project, seq, i, t, opts, &tc, below));
-                }
-                item_layer(project, seq, i, t, opts, sources, &tc).map(|(img, op, bl)| (with_opacity(img, op), bl))
-            };
-            let below = canvas.snapshot();
-            let la = a.and_then(|i| layer(i, &below));
-            let lb = b.and_then(|i| layer(i, &below));
-            // a fade from or to nothing keeps the one layer's blend mode (an adjustment layer in
-            // Multiply ends the fade as it carries on); between two layers they mix normally
+            let layer = |i: &TrackItem| item_layer(project, seq, i, t, opts, sources, &tc).map(|(img, op, bl)| (with_opacity(img, op), bl));
+            let la = a.and_then(layer);
+            let lb = b.and_then(layer);
+            // A fade from or to nothing keeps the visible layer's blend mode.
             let bl = match (&la, &lb) {
                 (Some((_, x)), None) | (None, Some((_, x))) => *x,
                 _ => Blend::Normal,
@@ -214,22 +201,6 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
         }
         let Some(item) = track.item_at(t) else { continue };
         if !item.enabled {
-            continue;
-        }
-        if is_adjustment(project, item) {
-            if !opts.effects {
-                continue;
-            }
-            let below = canvas.snapshot();
-            let (adj, bl) = adjustment_layer(project, seq, item, t, opts, &tc, &below);
-            if bl == Blend::Normal {
-                // The adjusted picture already replaces the original (see `adjustment_layer`).
-                canvas.set(adj);
-            } else {
-                let mut out = below;
-                blend::composite(&mut out, &adj, 1.0, bl);
-                canvas.set(out);
-            }
             continue;
         }
         match item_layer_ex(project, seq, item, t, opts, sources, &tc, true) {
@@ -254,71 +225,6 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
         colorman::to_display(&mut canvas, &seq.settings.color);
     }
     canvas
-}
-
-fn is_adjustment(project: &Project, item: &TrackItem) -> bool {
-    project.item(item.item).is_some_and(|pi| matches!(pi.kind, ItemKind::AdjustmentLayer { .. }))
-}
-
-/// An adjustment layer as a layer over `below` (the composite of the tracks under it): `below`
-/// with the layer's effects, faded by its opacity and opacity masks and limited to its
-/// (Motion-transformed) frame, and the blend mode it mixes with.
-fn adjustment_layer(project: &Project, seq: &Sequence, item: &TrackItem, t: Tick, opts: RenderOptions, tc: &str, below: &Image) -> (Image, Blend) {
-    let (w, h) = (below.w, below.h);
-    let mt = item.effect_time_at(t);
-    let mut adj = below.clone();
-    let cx = effects::FxCtx {
-        t: mt,
-        px_scale: opts.scale,
-        seconds: (t - item.start).seconds(),
-        timecode: tc,
-        clip_name: &item.name,
-        env: None,
-        frame_rate: seq.settings.frame_rate.as_f64(),
-    };
-    for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic)) {
-        mask::apply_effect(&mut adj, e, &cx);
-    }
-    let (op, bl) = opacity_blend(item, mt);
-    // Adjustment layer opacity (and opacity masks, in sequence pixels) weigh adjusted against original.
-    let mut weight = Image::filled(w, h, [op; 4]);
-    mask::apply_opacity_masks(&mut weight, item, mt, opts.scale);
-    // Motion moves / scales the adjustment layer's frame: it only applies inside it.
-    if let Some(region) = adjustment_region(seq, item, project, mt, opts.scale, w, h) {
-        let cov: Vec<f32> = region.px.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
-        mask::scale_by(&mut weight, &cov);
-    }
-    let cov: Vec<f32> = weight.px.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
-    if bl == Blend::Normal {
-        // The adjusted picture replaces the original instead of being drawn over it: what
-        // Transform or Basic 3D leave empty shows nothing of the untransformed picture (#1524).
-        mask::mix(&mut adj, below, &cov);
-    } else {
-        mask::scale_by(&mut adj, &cov);
-    }
-    (adj, bl)
-}
-
-/// Coverage of an adjustment layer's (Motion-transformed) frame in output pixels, or `None` when
-/// it covers the whole output.
-fn adjustment_region(seq: &Sequence, item: &TrackItem, project: &Project, mt: Tick, scale: f32, w: usize, h: usize) -> Option<Image> {
-    let size = source_size(project, item.item).unwrap_or((seq.settings.width, seq.settings.height));
-    let motion = motion_matrix(seq, item, size, source_par(project, item.item), mt);
-    let s = scale as f64;
-    let (fw, fh) = (((size.0 as f64 * s).round() as usize).max(1), ((size.1 as f64 * s).round() as usize).max(1));
-    let m = Affine::scale(s, s).then_apply(&motion).then_apply(&Affine::scale(1.0 / s, 1.0 / s));
-    let full = fw == w
-        && fh == h
-        && (m.a - 1.0).abs() < 1e-9
-        && (m.d - 1.0).abs() < 1e-9
-        && m.b.abs() < 1e-12
-        && m.c.abs() < 1e-12
-        && m.e.abs() < 1e-9
-        && m.f.abs() < 1e-9;
-    if full {
-        return None;
-    }
-    Some(Image::filled(fw, fh, [1.0; 4]).transformed(w, h, &m))
 }
 
 fn with_opacity(mut img: Image, op: f32) -> Image {
@@ -346,7 +252,7 @@ pub fn source_size(project: &Project, item: ItemId) -> Option<(u32, u32)> {
 }
 
 /// Pixel aspect ratio of an item's source, for [`motion_matrix`]: Interpret Footage's override,
-/// else the media's; `None` for items drawn in sequence pixels (graphics, adjustment layers).
+/// else the media's; `None` for items drawn in sequence pixels (graphics and drawings).
 pub fn source_par(project: &Project, item: ItemId) -> Option<(u32, u32)> {
     project.source_par(item)
 }
@@ -355,7 +261,7 @@ pub fn source_par(project: &Project, item: ItemId) -> Option<(u32, u32)> {
 /// full-res sequence pixels.
 ///
 /// `src` is the source's size in its own (storage) pixels and `src_par` their pixel aspect ratio
-/// (`None`: the sequence's, for graphics and adjustment layers). Motion works in square display
+/// (`None`: the sequence's, for graphics and drawings). Motion works in square display
 /// units, as Premiere's does: the Anchor Point is in source pixels and the Position in sequence
 /// pixels, but Scale and Rotation see the picture at its display aspect, so a 1440 x 1080 clip with
 /// 4:3 pixels covers a 1920 x 1080 square-pixel frame at 100 %, and a square-pixel clip in a 4:3
@@ -601,7 +507,6 @@ pub(crate) fn base_layer(
             let sub = RenderOptions { scale: want, effects: opts.effects, depth: opts.depth + 1, working_output: true };
             render_seq(project, nested, ft, sub, sources)
         }
-        ItemKind::AdjustmentLayer { .. } => return None,
         ItemKind::Graphic { .. } => {
             // standard effects work on the graphic at source resolution, then Motion places it
             let (gw, gh) = (((src_size.0 as f32 * want).ceil() as usize).max(1), ((src_size.1 as f32 * want).ceil() as usize).max(1));
@@ -703,11 +608,6 @@ pub fn arc_source(s: impl waltcut_media::MediaSource + 'static) -> SharedSource 
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-#[cfg(test)]
-#[path = "adjustment_tests.rs"]
-mod adjustment_tests;
 
 #[cfg(test)]
 #[path = "mixer_tests.rs"]

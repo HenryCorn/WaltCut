@@ -52,7 +52,7 @@ pub type Result<T> = std::result::Result<T, EditError>;
 /// Supplies fresh ids and media durations to edits.
 pub struct EditCtx<'a> {
     pub next_id: &'a mut u64,
-    /// Media duration of a project item (None = unlimited, e.g. stills / adjustment layers): the
+    /// Media duration of a project item (None = unlimited, e.g. stills / graphics): the
     /// latest media time its clips may show.
     pub media_duration: &'a dyn Fn(ItemId) -> Option<Tick>,
     /// The earliest media time clips of a project item may show (a subclip that restricts trims

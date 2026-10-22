@@ -9,7 +9,7 @@
 //! Effects that need more than the current frame — Posterize Time and Echo (other frames), Track
 //! Matte Key / Compound Blur / Gradient Wipe (another track), Auto Reframe and Warp Stabilizer
 //! (frames for analysis, sequence geometry) — read it through [`FxEnv`]; without an environment
-//! (isolated tests, adjustment layers) they leave the image unchanged.
+//! (isolated tests) they leave the image unchanged.
 
 mod blur;
 mod color;

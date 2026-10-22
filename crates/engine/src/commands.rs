@@ -980,7 +980,6 @@ pub(crate) fn place_item(
     let src_size = match &pi.kind {
         ItemKind::Media(m) => m.info.video.as_ref().map(|v| (v.width, v.height)),
         ItemKind::Sequence(q) => Some((q.settings.width, q.settings.height)),
-        ItemKind::AdjustmentLayer { width, height, .. } => Some((*width, *height)),
         _ => None,
     }
     .unwrap_or((1920, 1080));
@@ -1253,21 +1252,6 @@ fn build() -> Vec<CommandSpec> {
             let parent = u64_p(p, "parent").map(waltcut_project::BinId);
             let id = s.edit("New Bin", |pr, _| Ok(pr.add_bin(&n, parent)))?;
             Ok(json!({"bin": id.0}))
-        }),
-        cmd!("file.newAdjustmentLayer", "Adjustment Layer…", ["File", "New"], None, r#"{"seconds":f64=5}"#, always, |s, p| {
-            let st = s.active_sequence().map(|q| q.settings.clone()).unwrap_or_default();
-            let secs = f64_p(p, "seconds").unwrap_or(5.0);
-            let id = s.edit("New Adjustment Layer", |pr, st2| {
-                let id = pr.add_item(
-                    "Adjustment Layer",
-                    Label::Lavender,
-                    ItemKind::AdjustmentLayer { width: st.width, height: st.height, rate: st.frame_rate, duration: Tick::from_seconds_f64(secs) },
-                    None,
-                );
-                st2.project_selection = vec![id];
-                Ok(id)
-            })?;
-            Ok(json!({"item": id.0}))
         }),
         cmd!("file.newBarsAndTone", "Bars and Tone…", ["File", "New"], None, r#"{"seconds":f64=10}"#, always, |s, p| new_generator(
             s,

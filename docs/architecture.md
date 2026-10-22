@@ -118,7 +118,7 @@ the boundary.
 Project
 ├─ root: Bin                         tree of bins
 ├─ items: map ItemId → ProjectItem   flat
-│    kind: Media(MediaClip) | Sequence(Sequence) | Subclip{..} | AdjustmentLayer{..} | Graphic{..}
+│    kind: Media(MediaClip) | Sequence(Sequence) | Subclip{..} | Graphic{..}
 └─ next_id
 
 Sequence
@@ -224,7 +224,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   or more than 8:1 either way = square). `render::motion_matrix` works in square display units,
   so a 1440 x 1080 clip with 4:3 pixels fills a 1920 x 1080 square-pixel sequence at 100 %
   (Scale to Frame Size, Set to Frame Size and Fit / Fill use `Project::conformed_source_size`);
-  graphics and adjustment layers are in sequence pixels. New Sequence From Clip copies the clip's
+  graphics and drawings are in sequence pixels. New Sequence From Clip copies the clip's
   ratio, and the Source and Program monitors draw the picture at its display aspect. The
   renderer does not read decoded frames' own `VideoFrame::par`.
 - **Offline media.** The pool caches each item's source per reference (path, offline
@@ -302,7 +302,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   the effects' parameters evaluated at that time: the source is drawn into an `Rgba32Float`
   working image at the size the CPU decodes it, each effect runs as compute passes with the CPU
   reference's math (effects, then Motion, then Opacity / blend, as on the CPU), and the result is
-  placed like any layer. Other standard effects, effect and opacity masks, adjustment layers,
+  placed like any layer. Other standard effects, effect and opacity masks,
   nested sequences (except a plain one, whose own layers go into the plan: same frame size and
   colour settings as its parent, nothing on the clip that changes the picture, every layer inside
   blended normally) and non-dissolve transitions are rendered on the CPU for that layer or frame
@@ -512,7 +512,7 @@ with different vertex counts hold). Feather, Opacity and Expansion are ordinary 
   Intersect / Lighten / Darken / Difference; Inverted and Opacity apply per mask.
 - **Semantics.** A masked effect is `lerp(original, effected, coverage)` per premultiplied channel
   (the effect only applies inside); Opacity masks scale the clip's layer before Motion, so they
-  follow the clip's transform. Adjustment-layer masks are in sequence pixels.
+  follow the clip's transform.
 - **GPU.** `waltcut-gpu::GpuMask` evaluates the same coverage and mix in WGSL (compute), tested
   to agree with the CPU within 3·10⁻⁶. Layers with masks are CPU-rendered images in frame plans.
 - **Editing.** `masks.*` commands (add / remove / set / moveVertex / translate / addVertex /

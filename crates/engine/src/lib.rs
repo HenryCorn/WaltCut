@@ -1069,7 +1069,7 @@ pub fn media_start(p: &Project, id: ItemId) -> Tick {
     }
 }
 
-/// Media duration of an item (None for stills/adjustment layers = unlimited handles).
+/// Media duration of an item (None for stills/graphics = unlimited handles).
 pub fn media_duration(p: &Project, _pool: &MediaPool, id: ItemId) -> Option<Tick> {
     // a subclip's limit is its parent's: follow the chain, bounded (a damaged project file can make
     // it cyclic or arbitrarily deep)
@@ -1088,7 +1088,7 @@ pub fn media_duration(p: &Project, _pool: &MediaPool, id: ItemId) -> Option<Tick
                 id = *parent;
                 continue;
             }
-            waltcut_project::ItemKind::AdjustmentLayer { .. } | waltcut_project::ItemKind::Graphic { .. } | waltcut_project::ItemKind::Drawing(_) => None,
+            waltcut_project::ItemKind::Graphic { .. } | waltcut_project::ItemKind::Drawing(_) => None,
         };
     }
     None
