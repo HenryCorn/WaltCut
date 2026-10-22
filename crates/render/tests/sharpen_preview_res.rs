@@ -10,17 +10,7 @@ use waltcut_render::image::Image;
 use waltcut_time::Tick;
 
 fn cx(px_scale: f32) -> FxCtx<'static> {
-    FxCtx {
-        t: Tick::ZERO,
-        px_scale,
-        seconds: 0.0,
-        timecode: "00:00:01:00",
-        clip_name: "x",
-        project: None,
-        env: None,
-        frame_rate: 24.0,
-        working: waltcut_color::WorkingSpace::Rec709,
-    }
+    FxCtx { t: Tick::ZERO, px_scale, seconds: 0.0, timecode: "00:00:01:00", clip_name: "x", env: None, frame_rate: 24.0 }
 }
 
 /// Dark left half, light right half: the edge sits between x = 7 and x = 8.

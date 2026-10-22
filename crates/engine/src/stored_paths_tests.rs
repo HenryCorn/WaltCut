@@ -1,4 +1,4 @@
-//! Media paths stored in a project or an interchange file are opened only when they name a file
+//! Media paths stored in a project are opened only when they name a file
 //! on this computer or on the document's own share (`doc_path`): the open-time scan, rendering
 //! and the growing-files look never reach another computer, while a path beside the document and
 //! a file the user links in this session still open.
@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::json;
 use waltcut_media::DemoScene;
-use waltcut_project::{ItemId, MediaRef};
+use waltcut_project::MediaRef;
 use waltcut_render::offline::OfflineReason;
 
 use crate::media_test_util::{make_movie, session_with, tmp_dir};
@@ -67,9 +67,9 @@ fn foreign(paths: &[String]) -> Vec<&String> {
     paths.iter().filter(|p| p.contains("192.0.2.1") || p.starts_with("//") || p.starts_with(r"\\") || p.starts_with("file:")).collect()
 }
 
-/// `//<path>` for an absolute Unix path (None elsewhere).
+/// `//<path>` for an absolute path.
 fn slashed(path: &Path) -> Option<String> {
-    cfg!(unix).then(|| format!("/{}", path.display()))
+    Some(format!("/{}", path.display()))
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn stored_media_paths_open_only_on_this_computer_or_beside_the_project() {
     let r = t.execute("file.open", json!({"path": doc})).unwrap();
     assert_eq!(r["missingMedia"], json!(refused), "{r}");
     for &id in &items {
-        assert!(t.media.full_res_source(&t.project, id, &*t.services).is_some());
+        assert!(t.media.source_for(&t.project, id, &*t.services).is_some());
     }
     t.execute("media.refreshChanged", json!({})).unwrap();
 
@@ -122,74 +122,7 @@ fn stored_media_paths_open_only_on_this_computer_or_beside_the_project() {
         let id = items[refused - 1];
         t.execute("media.relink", json!({"item": id.0, "path": path, "force": true})).unwrap();
         t.media.remove(id);
-        assert!(t.media.full_res_source(&t.project, id, &*t.services).is_some());
+        assert!(t.media.source_for(&t.project, id, &*t.services).is_some());
         assert_eq!(t.media.offline_status(id), None, "a file linked in this session opens");
     }
-}
-
-/// A one-clip FCP7 XML sequence using the file at `pathurl`.
-fn xml(pathurl: &str) -> String {
-    let rate = "<rate><timebase>24</timebase><ntsc>FALSE</ntsc></rate>";
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE xmeml>
-<xmeml version="4">
-  <sequence id="sequence-1">
-    <name>Cut</name>
-    <duration>12</duration>
-    {rate}
-    <media>
-      <video>
-        <format><samplecharacteristics>{rate}<width>{W}</width><height>{H}</height></samplecharacteristics></format>
-        <track>
-          <clipitem id="clipitem-1">
-            <name>shot</name>
-            {rate}
-            <start>0</start><end>12</end><in>0</in><out>12</out>
-            <file id="file-1">
-              <name>shot.mov</name>
-              <pathurl>{pathurl}</pathurl>
-              {rate}
-              <duration>12</duration>
-            </file>
-          </clipitem>
-        </track>
-      </video>
-    </media>
-  </sequence>
-</xmeml>
-"#
-    )
-}
-
-#[test]
-fn interchange_media_paths_open_only_on_this_computer_or_beside_the_document() {
-    let root = tmp_dir("stored-paths-xml");
-    std::fs::create_dir_all(root.join("media")).unwrap();
-    let shot = root.join("media").join("shot.mov");
-    make_movie(&shot, DemoScene::Aurora, W, H, 12);
-
-    let mut urls = vec!["file://192.0.2.1/s/shot.mov".to_string()];
-    urls.extend(slashed(&shot).map(|p| format!("file://{p}")));
-    for (k, url) in urls.iter().enumerate() {
-        let doc = root.join(format!("refused-{k}.xml"));
-        std::fs::write(&doc, xml(url)).unwrap();
-        let (mut s, seen) = recording_session();
-        let r = s.execute("file.import", json!({"paths": [doc.to_string_lossy()]})).unwrap();
-        assert_eq!(r["documents"][0]["linkedMedia"], json!(0), "{r}");
-        let asked = seen.lock().unwrap().clone();
-        assert!(foreign(&asked).is_empty(), "{url} was opened: {:?}", foreign(&asked));
-        let ids: Vec<ItemId> = s.project.items.keys().copied().collect();
-        for id in ids {
-            s.media.full_res_source(&s.project, id, &*s.services);
-        }
-        let asked = seen.lock().unwrap().clone();
-        assert!(foreign(&asked).is_empty(), "{url} was rendered: {:?}", foreign(&asked));
-    }
-
-    let doc = root.join("beside.xml");
-    std::fs::write(&doc, xml("media/shot.mov")).unwrap();
-    let (mut s, _) = recording_session();
-    let r = s.execute("file.import", json!({"paths": [doc.to_string_lossy()]})).unwrap();
-    assert_eq!(r["documents"][0]["linkedMedia"], json!(1), "a path beside the document links: {r}");
 }

@@ -277,8 +277,7 @@ impl ThumbnailMode {
     }
 }
 
-/// Monitor display mode (View ▸ Display Mode / the monitor's wrench menu). Multi-Camera is the
-/// separate `MonitorView::multicam` switch.
+/// Monitor display mode (View ▸ Display Mode / the monitor's wrench menu).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DisplayMode {
     #[default]
@@ -289,8 +288,6 @@ pub enum DisplayMode {
     Blue,
     /// Source Monitor: the clip's audio waveform.
     AudioWaveform,
-    /// Program Monitor: a reference frame beside the current frame.
-    Comparison,
     /// Source Monitor: the picture above the audio waveform.
     VideoAndWaveform,
 }
@@ -325,11 +322,7 @@ pub struct MonitorView {
     pub show_transport: bool,
     /// Transport buttons hidden through the monitor's Button Editor. Stored per monitor.
     pub transport_hidden: Vec<String>,
-    /// Program monitor display mode Multi-Camera (angle grid + program).
-    pub multicam: bool,
     pub display: DisplayMode,
-    /// Comparison View: the reference frame's time (ticks); None = set on entry from the playhead.
-    pub compare_ref: Option<i64>,
     pub show_rulers: bool,
     pub show_guides: bool,
     pub lock_guides: bool,
@@ -351,9 +344,7 @@ impl Default for MonitorView {
             show_transport: true,
             // The optional Loop button is available from the editor without altering default layouts.
             transport_hidden: vec!["playback.loop".into()],
-            multicam: false,
             display: DisplayMode::Composite,
-            compare_ref: None,
             show_rulers: false,
             show_guides: true,
             lock_guides: false,
@@ -368,10 +359,6 @@ impl MonitorView {
     /// of it and Paused Resolution with High Quality Playback), Paused Resolution when stopped.
     pub fn effective_res(&self, playing: bool) -> PlaybackRes {
         if !playing || (self.high_quality && self.paused_res.scale() > self.res.scale()) { self.paused_res } else { self.res }
-    }
-    /// The display mode in effect (None = Multi-Camera).
-    pub fn display_mode(&self) -> Option<DisplayMode> {
-        (!self.multicam).then_some(self.display)
     }
 }
 
@@ -463,9 +450,6 @@ pub struct UiState {
     pub expanded_bins: Vec<u64>,
     /// Expanded folders in the Effects panel.
     pub expanded_fx: Vec<String>,
-    /// Effects panel: the Lumetri Presets folder shown as a thumbnail grid (wide panel).
-    #[serde(default)]
-    pub lumetri_grid_folder: Option<String>,
     /// Collapsed effect sections in Effect Controls ("clip:index").
     pub collapsed_fx: Vec<String>,
     /// Width of Effect Controls' effect list, left of the keyframe area (points; 0 = the default
@@ -480,8 +464,6 @@ pub struct UiState {
     #[serde(default = "shown")]
     pub show_status_bar: bool,
     pub dark: bool,
-    /// Lumetri scopes visible in the Program monitor area.
-    pub show_scopes: bool,
     /// Transient status line shown in the footer.
     pub status: String,
     /// A link the web browser couldn't open, shown with its address until closed
@@ -540,12 +522,6 @@ pub struct UiState {
     /// Link Media dialog (open when Some).
     #[serde(default)]
     pub link_media: Option<LinkMediaDraft>,
-    /// Create Proxies dialog (open when Some).
-    #[serde(default)]
-    pub create_proxies: Option<ProxyDraft>,
-    /// Project Manager dialog (open when Some).
-    #[serde(default)]
-    pub project_manager: Option<ProjectManagerDraft>,
     /// Make Offline dialog: Some(delete files?) while open.
     #[serde(default)]
     pub make_offline: Option<bool>,
@@ -561,15 +537,6 @@ pub struct UiState {
     /// Open Clip / Track Fx Editor windows (graphical audio-effect editors).
     #[serde(default)]
     pub audio_fx_editors: Vec<crate::panels::audio_fx_editor::FxTarget>,
-    /// Synchronize / Merge Clips / Create Multi-Camera Source Sequence dialog (open when Some).
-    #[serde(default)]
-    pub sync_dialog: Option<SyncDraft>,
-    /// Multi-Camera Record On/Off (key 0): playing in the Multi-Camera view records cuts.
-    #[serde(default = "yes")]
-    pub multicam_record: bool,
-    /// Edit Cameras dialog (open when Some).
-    #[serde(default)]
-    pub edit_cameras: Option<EditCamerasDraft>,
     /// Open guide dialog (Add Guide / Save Guides as Template / Manage Guides).
     #[serde(default)]
     pub guide_dialog: Option<GuideDialog>,
@@ -591,7 +558,7 @@ pub struct UiState {
     /// `panels::graphics_templates`.
     #[serde(default)]
     pub gfx_templates: crate::panels::graphics_templates::GfxTemplatesState,
-    /// Lumetri Scopes, Timecode, Events, Progress and Reference Monitor settings. See
+    /// Timecode, Events and Progress settings. See
     /// `panels::panel_state`.
     #[serde(default)]
     pub panels: crate::panels::panel_state::PanelsState,
@@ -603,9 +570,6 @@ pub struct UiState {
     /// (view settings and columns are engine preferences). See `panels::project`.
     #[serde(default)]
     pub project_panel: crate::panels::project::ProjectPanelUi,
-    /// Media Browser view state (tree, path field, Edit Columns…). See `panels::media_browser`.
-    #[serde(default)]
-    pub media_browser: crate::panels::media_browser::MediaBrowserUi,
 }
 
 /// An open Edit / Clip / File menu dialog: the engine command it runs on OK and the parameters
@@ -638,63 +602,6 @@ pub struct SavePresetDraft {
     pub description: String,
     /// "scale" | "anchorIn" | "anchorOut" | "none"
     pub keyframes: String,
-}
-
-/// Clip ▸ Synchronize…, Merge Clips… and Create Multi-Camera Source Sequence… share one draft;
-/// The Edit Cameras dialog: camera names and on/off per angle of a multi-camera source.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct EditCamerasDraft {
-    pub sequence: u64,
-    pub names: Vec<String>,
-    pub enabled: Vec<bool>,
-}
-
-/// `kind` says which dialog it is (`synchronize`, `merge`, `multicam`).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SyncDraft {
-    pub kind: String,
-    /// Project items (Merge Clips, Create Multi-Camera).
-    pub items: Vec<u64>,
-    pub name: String,
-    /// `in` | `out` | `timecode` | `marker` | `audio`
-    pub method: String,
-    pub ignore_hours: bool,
-    /// Clip marker name to sync on (empty = the first marker).
-    pub marker: String,
-    /// Frames added to every clip but the reference.
-    pub offset: i64,
-    /// Synchronize: reference track (`V1`, `A2`…; empty = the lowest track).
-    pub track: String,
-    /// Create Multi-Camera: `camera1` | `all` | `switch`.
-    pub audio: String,
-    /// Create Multi-Camera: `clip` | `track` | `metadata`.
-    pub camera_names: String,
-    pub processed_bin: bool,
-    /// Merge Clips: drop the video clip's own audio.
-    pub remove_video_audio: bool,
-    pub message: String,
-}
-
-impl Default for SyncDraft {
-    fn default() -> Self {
-        Self {
-            kind: "synchronize".into(),
-            items: vec![],
-            name: String::new(),
-            method: "audio".into(),
-            ignore_hours: false,
-            marker: String::new(),
-            offset: 0,
-            track: String::new(),
-            audio: "camera1".into(),
-            camera_names: "clip".into(),
-            processed_bin: true,
-            remove_video_audio: false,
-            message: String::new(),
-        }
-    }
 }
 
 /// File ▸ Link Media… (shown automatically when a project opens with missing media).
@@ -739,51 +646,6 @@ impl Default for LinkMediaDraft {
             candidates: vec![],
             candidate: None,
             skipped: vec![],
-            message: String::new(),
-        }
-    }
-}
-
-/// Clip ▸ Proxy ▸ Create Proxies….
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ProxyDraft {
-    pub items: Vec<u64>,
-    pub preset: String,
-    /// Empty = a Proxies folder next to the original media.
-    pub destination: String,
-}
-
-/// File ▸ Project Manager….
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ProjectManagerDraft {
-    pub sequences: Vec<u64>,
-    /// "collect" | "consolidate"
-    pub mode: String,
-    pub preset: String,
-    pub exclude_unused: bool,
-    pub handles: u32,
-    pub include_proxies: bool,
-    pub include_previews: bool,
-    pub destination: String,
-    /// Last dry-run estimate: (original bytes, resulting bytes, files).
-    pub estimate: Option<(u64, u64, usize)>,
-    pub message: String,
-}
-
-impl Default for ProjectManagerDraft {
-    fn default() -> Self {
-        Self {
-            sequences: vec![],
-            mode: "collect".into(),
-            preset: "prores_lt".into(),
-            exclude_unused: true,
-            handles: 30,
-            include_proxies: true,
-            include_previews: false,
-            destination: String::new(),
-            estimate: None,
             message: String::new(),
         }
     }
@@ -966,14 +828,12 @@ impl Default for UiState {
             effects_search: String::new(),
             expanded_bins: vec![],
             expanded_fx: vec!["Video Transitions".into(), "Video Transitions/Dissolve".into()],
-            lumetri_grid_folder: None,
             collapsed_fx: vec![],
             effect_controls_split: 0.0,
             show_menu_bar: true,
             show_header: true,
             show_status_bar: true,
             dark: true,
-            show_scopes: false,
             status: String::new(),
             failed_link: None,
             eyedropper: None,
@@ -993,16 +853,11 @@ impl Default for UiState {
             gfx_edit: None,
             pen_points: vec![],
             link_media: None,
-            create_proxies: None,
-            project_manager: None,
             make_offline: None,
             color_dialog: None,
             mask_pen: None,
             save_preset: None,
             audio_fx_editors: Vec::new(),
-            sync_dialog: None,
-            multicam_record: true,
-            edit_cameras: None,
             guide_dialog: None,
             text_props_dialog: None,
             workspace_dialog: None,
@@ -1012,7 +867,6 @@ impl Default for UiState {
             panels: Default::default(),
             keys: Default::default(),
             project_panel: Default::default(),
-            media_browser: Default::default(),
         }
     }
 }

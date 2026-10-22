@@ -99,14 +99,8 @@ impl Mode {
     }
 }
 
-/// The modes tried in order on this platform. macOS has only Metal, and no software adapter.
-pub const LADDER: &[Mode] = if cfg!(target_os = "windows") {
-    &[Mode::Default, Mode::Dx12, Mode::Software]
-} else if cfg!(target_os = "macos") {
-    &[Mode::Default]
-} else {
-    &[Mode::Default, Mode::Software]
-};
+/// The modes tried in order. macOS has only Metal, and no software adapter.
+pub const LADDER: &[Mode] = &[Mode::Default];
 
 /// The mode after `mode` in `ladder`, if any.
 fn next_in(ladder: &[Mode], mode: Mode) -> Option<Mode> {
@@ -427,7 +421,7 @@ fn expire_later(path: PathBuf) {
 /// Configure `options` for `mode`, before eframe creates the wgpu instance. `backend_override`
 /// is normally `Backends::from_env()`, i.e. `WGPU_BACKEND`.
 pub fn apply(options: &mut NativeOptions, mode: Mode, backend_override: Option<Backends>) {
-    apply_for(options, mode, backend_override, cfg!(target_os = "windows"));
+    apply_for(options, mode, backend_override, false);
 }
 
 fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<Backends>, windows: bool) {
@@ -874,7 +868,7 @@ mod tests {
             return;
         }
         // only the backends software mode uses: no driver this test loads is one the app avoids
-        let backends = software_backends(cfg!(target_os = "windows"));
+        let backends = software_backends(false);
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends, ..wgpu::InstanceDescriptor::new_without_display_handle() });
         let adapters = pollster::block_on(instance.enumerate_adapters(backends));
         match pick_software(&adapters, None) {

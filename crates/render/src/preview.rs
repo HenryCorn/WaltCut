@@ -53,7 +53,7 @@ pub const HASH_VERSION: &str = "filmcraft-preview-v1";
 /// Calibration (M4 Pro, shared with other jobs; 1080p 23.976 sequence, Full playback resolution,
 /// 8 s of playback ≈ 192 frames, counted by the Program monitor's dropped-frame stats):
 /// * 1080p H.264 High clip, no effects (no bar, est. 3.5 ms): 11 dropped;
-/// * same clip + Lumetri, Sharpen, Levels, Tint (red, est. 183 ms): 189–191 dropped, ≤ 17 on time;
+/// * same clip + Sharpen, Levels, Tint (red, est. 183 ms): 189–191 dropped, ≤ 17 on time;
 /// * after Render Effects In to Out (green; ProRes preview rendered at ~3 fps): 25–46 dropped on
 ///   the first play right after the render (frame workers still busy with live renders queued
 ///   before it), then 0–1 dropped on every later play.
@@ -349,7 +349,7 @@ fn hash_source(h: &mut Fnv128, project: &Project, id: ItemId, kind: TrackKind, d
             h.json(&("sequence", &s.settings));
             if kind == TrackKind::Audio {
                 // the nest's sound is the nested sequence's whole mix (see `audio_segments`)
-                h.json(&("mix", s.master_volume_db, &s.master_effects, &s.master_mixer, &s.submix_tracks, &s.multicam));
+                h.json(&("mix", s.master_volume_db, &s.master_effects, &s.master_mixer, &s.submix_tracks));
                 for (ti, tr) in s.audio_tracks.iter().enumerate() {
                     h.json(&("track", ti, tr.muted, tr.solo, tr.volume_db, tr.pan, tr.channels, &tr.effects, &tr.mixer, tr.items.len()));
                     for it in &tr.items {
@@ -384,7 +384,7 @@ fn hash_source(h: &mut Fnv128, project: &Project, id: ItemId, kind: TrackKind, d
 ///
 /// Three tiers from timing every effect at its defaults on a 1920×1080 frame on an M4 Pro
 /// (`cargo test -p waltcut-render --release -- --ignored effect_costs --nocapture` prints the
-/// table): heavy ≥ 30 ms (blurs/sharpen at real radii, Lumetri, Levels, keyers…), medium 10–30 ms,
+/// table): heavy ≥ 30 ms (blurs/sharpen at real radii, Levels, keyers…), medium 10–30 ms,
 /// light < 10 ms. Unknown ids count as medium.
 pub fn effect_cost_ms(id: &str) -> f64 {
     match id {
@@ -398,7 +398,6 @@ pub fn effect_cost_ms(id: &str) -> f64 {
         | "invert"
         | "ultra_key"
         | "four_color_gradient"
-        | "lumetri"
         | "color_balance"
         | "gamma_correction"
         | "wave_warp"

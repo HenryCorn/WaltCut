@@ -308,7 +308,7 @@ fn project_scratch_folders_outside_the_project_are_not_used() {
 }
 
 /// The Captured Audio and Video and Audio Previews folders a project names follow the same rule:
-/// voice-over takes, pasted images and proxies go next to the project unless the folder is
+/// voice-over takes and pasted images go next to the project unless the folder is
 /// inside the project's folder; folders on another computer are never used.
 #[test]
 fn project_captured_folder_outside_the_project_is_not_used() {
@@ -319,9 +319,7 @@ fn project_captured_folder_outside_the_project_is_not_used() {
     let mut s = demo();
     s.execute("file.saveAs", json!({"path": proj})).unwrap();
     let mut named = vec![d.join("elsewhere").to_string_lossy().to_string(), r"\\192.0.2.1\share\cap".to_string(), "file://192.0.2.1/s/cap".to_string()];
-    if cfg!(unix) {
-        named.push(format!("/{}", show.join("Captured").display()));
-    }
+    named.push(format!("/{}", show.join("Captured").display()));
     let beside = show.to_string_lossy().to_string();
     for dir in &named {
         s.edit("scratch", |p, _| {

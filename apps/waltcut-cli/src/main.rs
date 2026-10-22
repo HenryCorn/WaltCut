@@ -601,10 +601,7 @@ mod format_tests {
     #[test]
     fn startup_registers_the_hardware_decoders() {
         let hardware = super::register_hardware_decoders();
-        // always on macOS and Windows; on Linux when a VA-API driver or NVIDIA's driver (NVDEC) is there
-        let expected = cfg!(any(target_os = "macos", target_os = "windows"))
-            || (cfg!(target_os = "linux") && matches!(hardware, waltcut_platform::Availability::Available(_)));
-        assert_eq!(waltcut_platform::registered(), expected, "{hardware:?}");
+        assert!(waltcut_platform::registered(), "{hardware:?}");
     }
 
     #[test]
@@ -673,7 +670,6 @@ mod format_tests {
         assert_eq!(super::absolute("clip.mov"), cwd.join("clip.mov").to_string_lossy());
         assert!(!super::absolute("clip.mov").starts_with(r"\\?\"));
         assert_eq!(super::absolute(""), "");
-        #[cfg(unix)]
         {
             let dir = std::env::temp_dir().join(format!("filmcraft-cli-abs-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();

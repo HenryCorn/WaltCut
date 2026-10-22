@@ -142,7 +142,6 @@ mod tests {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             };
             let id = p.add_item("hdr", Label::Iris, ItemKind::Media(clip), None);

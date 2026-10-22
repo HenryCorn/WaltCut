@@ -897,18 +897,7 @@ fn draw_clip(
             let (pps, frozen) = (app.ui.timeline.pps, app.tl.thumb_pps);
             for (x, w, offset) in zoomed_thumbnail_tiles(mode, th.min.x, th.max.x, tw, visible, it.duration, rate.frame_duration(), pps, frozen) {
                 let mt = rate.snap(it.source_time_at(it.start + offset));
-                // a multi-camera clip shows its angle's clip
-                let (thumb_item, mt) = app
-                    .session
-                    .project
-                    .sequence(it.item)
-                    .and_then(|q| {
-                        let ti = q.angle_video_track_index(it.multicam_angle(q)?)?;
-                        let inner = q.video_tracks.get(ti)?.item_at(mt)?;
-                        Some((inner.item, inner.source_time_at(mt)))
-                    })
-                    .unwrap_or((it.item, mt));
-                if let Some((tex, _)) = app.thumbnail(ctx, thumb_item, mt, 160) {
+                if let Some((tex, _)) = app.thumbnail(ctx, it.item, mt, 160) {
                     let r = Rect::from_min_size(pos2(x, th.min.y), vec2(w, th.height()));
                     cp.image(tex, r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                 }
@@ -923,10 +912,6 @@ fn draw_clip(
     // name band
     if w > 24.0 {
         let mut label = it.name.clone();
-        if let Some(m) = it.multicam.filter(|m| m.enabled) {
-            let cam = app.session.project.sequence(it.item).and_then(|q| q.cameras().cameras.get(m.angle as usize).map(|c| c.name.clone()));
-            label = format!("[MC{}] {}", m.angle + 1, cam.unwrap_or(label));
-        }
         if (it.speed - 1.0).abs() > 1e-6 || it.reverse {
             label = format!("{label} [{}%]", ((if it.reverse { -1.0 } else { 1.0 }) * it.speed * 100.0).round());
         }
@@ -1110,10 +1095,7 @@ fn request_sequence_peaks(app: &mut FilmcraftApp, item: ItemId) -> Option<Arc<Ve
         }
         pending.lock().unwrap_or_else(|e| e.into_inner()).retain(|i| *i != pkey);
     };
-    #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(run);
-    #[cfg(target_arch = "wasm32")]
-    run();
     have
 }
 
@@ -1167,10 +1149,7 @@ pub(crate) fn request_peaks(app: &mut FilmcraftApp, item: ItemId, stream: usize)
         peaks.lock().unwrap_or_else(|e| e.into_inner()).insert(pkey, Arc::new(out));
         pending.lock().unwrap_or_else(|e| e.into_inner()).retain(|i| *i != pkey);
     };
-    #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(run);
-    #[cfg(target_arch = "wasm32")]
-    run();
     None
 }
 
@@ -2023,16 +2002,13 @@ pub(crate) const CLIP_MENU: &[&[(&str, &str)]] = &[
         ("Link", "clip.link"),
         ("Group", "clip.group"),
         ("Ungroup", "clip.ungroup"),
-        ("Synchronize…", "clip.synchronize"),
-        ("Merge Clips…", "clip.mergeClips"),
         ("Nest…", "clip.nest"),
         ("Make Subsequence", "sequence.makeSubsequence"),
         ("Reveal Nested Sequence", "sequence.revealNested"),
-        ("Multi-Camera", "clip.multicam"),
     ],
     &[("Label", "edit.label")],
     &[("Add Marker", "markers.add")],
-    &[("Speed/Duration…", "clip.speedDuration"), ("Scene Edit Detection…", "clip.sceneEditDetection")],
+    &[("Speed/Duration…", "clip.speedDuration")],
     &[
         ("Frame Hold Options…", "clip.frameHoldOptions"),
         ("Add Frame Hold", "clip.frameHold"),
@@ -2134,50 +2110,6 @@ fn gap_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui) {
     if r.clicked() {
         if let Err(e) = crate::menus::invoke(app, ctx, "edit.rippleDelete", json!({})) {
             app.ui.status = e;
-        }
-        ui.close();
-    }
-}
-
-/// The clip menu's Multi-Camera submenu: Enable, Flatten, and the cameras of the selected nested
-/// sequence clips (greyed out when none of the selected clips is a nested sequence).
-fn multicam_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, picked: &[&TrackItem]) {
-    let nests: Vec<&TrackItem> = picked.iter().copied().filter(|it| app.session.project.sequence(it.item).is_some()).collect();
-    let enabled = !nests.is_empty() && nests.iter().all(|it| it.multicam.is_some_and(|m| m.enabled));
-    // camera names of the first selected nest, and the angle it shows
-    let cameras: Vec<(usize, String)> = nests
-        .first()
-        .and_then(|it| app.session.project.sequence(it.item))
-        .map(|q| q.cameras().video_angles().map(|(i, c)| (i, c.name.clone())).collect())
-        .unwrap_or_default();
-    let shown = nests.first().and_then(|it| it.multicam).filter(|m| m.enabled).map(|m| m.angle as usize);
-    let mut run: Option<(&str, Value)> = None;
-    ui.add_enabled_ui(!nests.is_empty(), |ui| {
-        let r = ui.menu_button(tl!("Multi-Camera"), |ui| {
-            for (label, cmd) in [(if enabled { tl!("✓ Enable") } else { tl!("Enable") }, "clip.multicamEnable"), (tl!("Flatten"), "clip.multicamFlatten")] {
-                let r = ui.add_enabled(app.session.is_enabled(cmd), egui::Button::new(label));
-                app.auto.add(&format!("timeline.clipMenu.{cmd}"), r.rect, label);
-                if r.clicked() {
-                    run = Some((cmd, json!({})));
-                }
-            }
-            if enabled && !cameras.is_empty() {
-                ui.separator();
-                for (angle, name) in &cameras {
-                    let label = if shown == Some(*angle) { format!("✓ {name}") } else { name.clone() };
-                    let r = ui.button(&label);
-                    app.auto.add(&format!("timeline.clipMenu.multicam.camera.{angle}"), r.rect, &label);
-                    if r.clicked() {
-                        run = Some(("multicam.switchAngle", json!({"angle": angle, "clips": nests.iter().map(|it| it.id.0).collect::<Vec<_>>()})));
-                    }
-                }
-            }
-        });
-        app.auto.add("timeline.clipMenu.clip.multicam", r.response.rect, "Multi-Camera");
-    });
-    if let Some((cmd, params)) = run {
-        if let Err(e) = app.session.execute(cmd, params) {
-            app.ui.status = e.to_string();
         }
         ui.close();
     }
@@ -2884,10 +2816,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     });
                     continue;
                 }
-                if cmd == "clip.multicam" {
-                    multicam_menu(app, ui, &picked);
-                    continue;
-                }
                 let label = match cmd {
                     "clip.enable" if all_enabled => tl!("✓ Enable"),
                     "clip.link" if linked => tl!("Unlink"),
@@ -3047,8 +2975,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             if ctx.input(|i| i.pointer.any_released()) {
                 let r = if let Some(name) = effect.strip_prefix("preset:") {
                     app.session.execute("presets.apply", json!({"preset": name, "clips": [clip.0]}))
-                } else if let Some(name) = effect.strip_prefix(crate::panels::LUMETRI_PRESET_PREFIX) {
-                    app.session.execute("lumetri.applyPreset", json!({"name": name, "clips": [clip.0]}))
                 } else if transition_kind.is_some() {
                     app.session.execute("effects.apply", params)
                 } else {

@@ -2,26 +2,19 @@
 
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** major (new file: every file type Premiere Pro 26.5.2 reads or writes, against ours) · **Target:** Adobe Premiere Pro 2026 (26.5.2) and Media Encoder 2026
 
-Containers, stills, audio files, project and interchange files, captions and presets. Codecs inside
+Containers, stills, audio files, project files, captions and presets. Codecs inside
 the containers are in [codec-parity.md](codec-parity.md). Our import list is
 `waltcut_media::{VIDEO,AUDIO,STILL}_EXTENSIONS` plus the openers in `waltcut_codecs::openers()`;
 our export list is `waltcut_export::Format`. Premiere's list is from Adobe's supported-formats
 documentation and the exporter folders in the installed bundle's `MediaIO/systempresets` (names
 only). "Tested" names the evidence.
 
-## Project and interchange
+## Project files
 
 | Format | Premiere | Read | Write | Tested | % |
 |---|---|---|---|---|---|
 | **Premiere project `.prproj`** | native | **no** | **no** | — | **0%** ([G2](gaps.md#g2-premieres-prproj-cannot-be-opened)) |
 | Our project `.fcproj` | — | yes, one schema (older files refused, never modified) | yes, atomic, auto-save, recovery journal | round-trip and refusal tests | — |
-| FCP7 XML (`xmeml`) | read + write | yes | yes | round-trip tests; Premiere-exported XML slow (#461) | 75% |
-| FCPXML | read (via XtoCC) | yes | yes | round-trip tests | 80% |
-| AAF (Edit Protocol) | read + write | yes | yes (embedded / linked / consolidated) | own CFB; **never opened in Media Composer / Pro Tools** | 55% |
-| OMF 2.0 | write | no | yes | never opened in Pro Tools | 50% |
-| EDL (CMX 3600) | read + write | yes | yes | tests | 85% |
-| OpenTimelineIO | read + write (26.0) | yes | yes | tests | 80% |
-| Avid Log Exchange (ALE) | write | no | yes | — | 70% |
 | Marker CSV / text | write | — | yes (#454) | — | 80% |
 | Selection as project | Premiere project | — | `.fcproj` only | — | 50% |
 | Templates (`.prproj` templates) | yes | — | our templates | — | 70% |
@@ -85,8 +78,7 @@ only). "Tested" names the evidence.
 ## Summary
 
 **File formats dimension: ~60%, 140–240 h** (codecs counted separately). The beta blocker is
-`.prproj`. After it, by user impact: AVI and WMV import, EXR / PSD stills, AAF / OMF
-validation in Avid and Pro Tools, DVD / Blu-ray / DCP / broadcast MXF delivery.
+`.prproj`. After it, by user impact: AVI and WMV import, EXR / PSD stills, DVD / Blu-ray / DCP / broadcast MXF delivery.
 
 ## Revision history
 

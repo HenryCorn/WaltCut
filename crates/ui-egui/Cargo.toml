@@ -24,31 +24,24 @@ waltcut-audio-dsp = { workspace = true }
 waltcut-engine = { workspace = true }
 waltcut-export = { workspace = true }
 waltcut-gpu = { workspace = true }
-waltcut-scopes = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 rayon = { workspace = true }
-web-time = "1"
 # ArtCraft wordmark (PNG) for the About dialog and Home screen.
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 # Thread/process CPU clocks for frame-job profiling (safe wrappers; see frames.rs).
-[target.'cfg(unix)'.dependencies]
 rustix = { version = "1", default-features = false, features = ["std", "time"] }
-# the same clocks on Windows (GetThreadTimes / GetProcessTimes behind a safe API; MIT OR Apache-2.0)
-[target.'cfg(windows)'.dependencies]
-cpu-time = "1"
 
 [dev-dependencies]
 pollster = "0.4"
 waltcut-codecs = { workspace = true }
 # the bench registers OS hardware decoders as the desktop app does (dev-dependency only: ui-egui
-# itself stays OS-independent and web-portable)
+# itself stays OS-independent)
 waltcut-platform = { workspace = true }
-waltcut-interchange = { workspace = true }
 egui_kittest = { workspace = true, features = ["eframe", "wgpu"] }
 
 # build.rs bakes contributors/contributors.json into the binary (About ▸ Contributors).

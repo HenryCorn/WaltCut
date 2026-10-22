@@ -20,7 +20,6 @@ fn add_gen(p: &mut Project, g: GeneratorSource) -> ItemId {
             mark_out: None,
             markers: vec![],
             offline: false,
-            proxy: None,
             identity: None,
         }),
         None,
@@ -169,7 +168,7 @@ fn hashes_are_stable_across_save_and_load() {
     let (mut p, matte, ocean, seq) = setup();
     let a = place(&mut p, seq, 0, ocean, 0, 48);
     let b = place(&mut p, seq, 1, matte, 24, 48);
-    add_fx(&mut p, seq, a, "lumetri");
+    add_fx(&mut p, seq, a, "tint");
     add_fx(&mut p, seq, b, "gaussian_blur");
     let q = p.sequence_mut(seq).unwrap();
     let (_, it) = q.find_item_mut(b).unwrap();
@@ -191,7 +190,7 @@ fn need_classification_none_yellow_red() {
     let b = place(&mut p, seq, 0, matte, 24, 24);
     let c = place(&mut p, seq, 0, matte, 48, 24);
     add_fx(&mut p, seq, b, "tint");
-    for fx in ["gaussian_blur", "sharpen", "lumetri", "noise"] {
+    for fx in ["gaussian_blur", "sharpen", "levels", "noise"] {
         add_fx(&mut p, seq, c, fx);
     }
     let s = video_segments(&p, seq);
@@ -211,9 +210,9 @@ fn need_classification_none_yellow_red() {
 
 #[test]
 fn effect_tiers_are_ordered() {
-    assert!(effect_cost_ms("lumetri") > effect_cost_ms("tint"));
+    assert!(effect_cost_ms("levels") > effect_cost_ms("tint"));
     assert!(effect_cost_ms("tint") > effect_cost_ms("crop"));
-    assert_eq!(effect_cost_ms("gaussian_blur"), effect_cost_ms("lumetri"));
+    assert_eq!(effect_cost_ms("gaussian_blur"), effect_cost_ms("levels"));
 }
 
 /// Times every standard video effect on a 1080p frame (run with `--release --ignored --nocapture`)
@@ -226,17 +225,7 @@ fn effect_costs() {
     for d in waltcut_project::effect_defs().iter().filter(|d| d.kind == waltcut_project::EffectKind::Video && !d.intrinsic) {
         let mut img = crate::Image::filled(1920, 1080, [0.4, 0.5, 0.6, 1.0]);
         let e = d.instance();
-        let cx = FxCtx {
-            t: Tick::ZERO,
-            px_scale: 1.0,
-            seconds: 0.0,
-            timecode: "00:00:00:00",
-            clip_name: "x",
-            project: None,
-            env: None,
-            frame_rate: 24.0,
-            working: waltcut_color::WorkingSpace::Rec709,
-        };
+        let cx = FxCtx { t: Tick::ZERO, px_scale: 1.0, seconds: 0.0, timecode: "00:00:00:00", clip_name: "x", env: None, frame_rate: 24.0 };
         apply(&mut img, &e, &cx);
         let t0 = std::time::Instant::now();
         for _ in 0..3 {

@@ -250,7 +250,6 @@ mod tests {
 
     /// `std::env::args` panics on an argument that is not Unicode, so such a file name (Latin-1 on
     /// Linux) stopped the app before its window opened.
-    #[cfg(unix)]
     #[test]
     fn arguments_that_are_not_unicode_still_start_the_app() {
         use std::os::unix::ffi::OsStringExt;

@@ -26,10 +26,10 @@ Design principles:
  L5  ui-egui · automation · platform
  L4  engine
  L3  render · gpu · export · golden (test-only)
- L2  edit · codecs · interchange
+ L2  edit · codecs
  L1  frame · media · project · audio-dsp · text
  L0  foundation: time · geom · color · bitstream · testkit (dev-dependency only)
-     codecs/containers: isobmff · matroska · mxf · cfb · mpegts · ogg · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · dnx · apv · dng · aac · ac3 · mpa · opus
+     codecs/containers: isobmff · matroska · mxf · mpegts · ogg · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · dnx · apv · dng · aac · ac3 · mpa · opus
 ```
 
 Crates are named `filmcraft-<dir>` (`crates/time` is `waltcut-time`). The apps are `filmcraft`
@@ -44,7 +44,6 @@ and `filmcraft-cli`.
 | `isobmff` | L0 | MP4/MOV demux and mux |
 | `matroska` | L0 | MKV/WebM demux |
 | `mxf` | L0 | MXF demux and mux (SMPTE ST 377-1): OP1a / OP-Atom, index tables, AVC / VC-3 / ProRes / MPEG-2 identification, PCM / AES3 sound, timecode; writer for OP1a / OP-Atom with VC-3, ProRes, AVC and PCM ([README](../crates/mxf/README.md)) |
-| `cfb` | L0 | Compound File Binary ([MS-CFB] structured storage) reader and writer, the container of AAF ([README](../crates/cfb/README.md)) |
 | `mpegts` | L0 | MPEG-2 Systems demux (H.222.0): transport streams (188 / 192-byte BDAV / 204), program streams (MPEG-2 / MPEG-1, VOB, MOD), PSI, PES, PTS / PCR, access-unit index built on open ([README](../crates/mpegts/README.md)) |
 | `ogg` | L0 | Ogg demux (RFC 3533), Ogg Opus timing (RFC 7845 granules, pre-skip, end trimming), Vorbis headers |
 | `h264`, `h264enc` | L0 | H.264 decoder; H.264 encoder |
@@ -66,19 +65,16 @@ and `filmcraft-cli`.
 | `text` | L1 | text engine: font database (bundled OFL fonts + system fonts), shaping (harfrust), bidi, line breaking, paragraph layout, glyph/path rasteriser, strokes ([crates/text/README.md](../crates/text/README.md)) |
 | `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…) |
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
-| `interchange` | L2 | EDL, FCP7 XML, FCPXML, OTIO, AAF (on `cfb`) and OMF 2.0 import/export (no file I/O; the engine supplies rendered audio essence) ([README](../crates/interchange/README.md)) |
 | `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
 | `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU parity; empty library, dev-dependencies only |
-| `scopes` | L3 | video scope maths: waveform, parade, histogram, YUV / HLS vectorscopes, numeric summaries ([crates/scopes/README.md](../crates/scopes/README.md)) |
 | `export` | L3 | render → encode → mux pipeline, progress/cancel |
-| `engine` | L4 | `Session`, command registry, undo history, media pool, jobs, interchange glue |
+| `engine` | L4 | `Session`, command registry, undo history, media pool, jobs |
 | `ui-egui` | L5 | the egui frontend: docking, panels, timeline, monitors, playback, control-channel handlers |
 | `automation` | L5 | MCP server (`rmcp`, stdio), headless or bridged to the running app |
 | `platform` | L5 | OS media FFI only: hardware video decoding (VideoToolbox H.264 / HEVC on macOS; Media Foundation / Direct3D 11 H.264 / HEVC / VP9 / AV1 on Windows; VA-API H.264 / HEVC on Linux, with our own parsers and DPBs driving the stateless hardware; a no-op elsewhere) behind `codecs::VideoDecoder`, with transparent fallback to our decoders, and hardware H.264 encoding (VideoToolbox, opt-in) and H.265 encoding (VideoToolbox, the only H.265 encoder; the format exists only where a hardware encoder does) and NVIDIA NVENC H.264 (Windows and 64-bit Linux, opt-in) and H.265 (Windows, FilmCraft's only H.265 encoder there) encoding behind `export::VideoEncoder`; H.264 declines to the built-in encoder for what the hardware does not take. The one crate allowed `unsafe` ([ADR 0001](adr/0001-platform-ffi.md), [README](../crates/platform/README.md)) |
 | `filmcraft` | L6 | desktop binary: eframe/wgpu window, cpal audio output, file dialogs, native macOS menu, TCP control server |
 | `filmcraft-cli` | L6 | headless CLI: `exec`, `run`, `inspect`, `describe`, `commands`, `import`, `export`, `render`, `probe`, `mcp`; `--bridge` targets the running app |
-| `waltcut-web` | L6 | the browser app (wasm32): eframe web runner on WebGPU/WebGL2, Blob-backed services, OPFS recovery, WebAudio, WebCodecs, `window.filmcraft` API ([web.md](web.md)) |
 
 ### What `cargo xtask layers` enforces
 
@@ -94,9 +90,7 @@ are exempt):
 | L0 codecs stay standalone | L0 crates other than `time`, `geom`, `color`, `bitstream`, `testkit` may depend on no workspace crate except `waltcut-bitstream`. External crates such as `thiserror` and `rayon` are allowed. |
 | No UI/OS crates below L5 | `egui`, `eframe`, `egui-wgpu`, `winit`, `rfd`, `cpal`, `muda` are allowed only in L5 and L6. |
 
-`cargo xtask wasm` runs `cargo check --target wasm32-unknown-unknown` on every L0–L4 crate, the
-egui UI and the web app, so everything up to the engine stays web-portable and the web app builds
-([web.md](web.md)). `unsafe_code = "forbid"` applies workspace-wide, except in `platform`
+`unsafe_code = "forbid"` applies workspace-wide, except in `platform`
 (`deny`, allowed only on its FFI modules; [ADR 0001](adr/0001-platform-ffi.md)).
 
 ## 2. Time base
@@ -233,11 +227,9 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   graphics and adjustment layers are in sequence pixels. New Sequence From Clip copies the clip's
   ratio, and the Source and Program monitors draw the picture at its display aspect. The
   renderer does not read decoded frames' own `VideoFrame::par`.
-- **Offline media and proxies.** The pool caches each item's source per reference (path, offline
+- **Offline media.** The pool caches each item's source per reference (path, offline
   flag), so relinking and undo take effect at once. Media that can't be opened renders the offline
-  slate (`render::offline`) instead of failing. With proxies enabled, an item with a proxy reads
-  it through `ProxySource`, which reports the original's size. Export always uses
-  `MediaPool::full_res_provider`. See [project-files.md](project-files.md#media-offline-relinking-proxies-ingest).
+  slate (`render::offline`) instead of failing. See [project-files.md](project-files.md#media-offline-and-relinking).
 - **Seeking.** `codecs::Mp4Source` seeks to the preceding sync sample and decodes forward, caching
   every frame of the GOP. Sequential playback reuses the decoder. Decoders implement
   `codecs::VideoDecoder`. `register_video_decoder` puts a factory in front of the built-in ones, so a
@@ -556,20 +548,10 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
   sRGB decodes exactly as before, and its layers stay on the GPU. Log, HDR or wide-gamut media,
   and every layer of an HDR/wide-gamut sequence, are converted on the CPU (the GPU path draws them
   as pre-rendered images, like layers with effects).
-- **Outputs.** `RenderOptions::working_output` returns working-space pixels (HDR exports,
-  scopes); otherwise the top-level render is converted for an SDR monitor. The other colour
+- **Outputs.** `RenderOptions::working_output` returns working-space pixels (HDR exports);
+  otherwise the top-level render is converted for an SDR monitor. The other colour
   effects work on display-encoded values clamped to 0..1 (they clip HDR highlights above
   reference white).
-- **HDR grading (Lumetri).** `FxCtx::working` carries the sequence's working space. In a PQ or HLG
-  sequence Lumetri grades the working space's own signal normalised to **HDR White** (cd/m²,
-  Basic Correction; the curves, wheels, looks and HSL Secondary use the Curves section's **HDR
-  Range**): `waltcut_color::GradeSpace` (PQ: `PQ⁻¹(nits/10000) / PQ⁻¹(white/10000)`; HLG: the
-  BT.2100 inverse OOTF of a display with that peak, then the OETF). So the sliders and curves span
-  0 … HDR White like black … white in SDR, exposure is stops of light, and highlights above HDR
-  White pass through (contrast leaves them alone; **HDR Specular** scales them). Rec. 709
-  sequences grade exactly as before. HSL Secondary ▸ Refine: **Denoise** (median of the key,
-  radius 1–3 px) and **Blur** (Gaussian of the key, σ ≤ 20 px), both scaled with the playback
-  resolution.
 - **HDR metadata.** `VideoStreamInfo::hdr` (`HdrMetadata`: ST 2086 mastering luminance, MaxCLL,
   MaxFALL) is read from `mdcv` / `clli` (MP4 / MOV) and Matroska `MasteringMetadata` / `MaxCLL` /
   `MaxFALL`. PQ media tone mapped into an SDR working space uses it as the BT.2390 source peak
@@ -584,63 +566,7 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
 - **Monitors / display colour management.** The monitors are SDR (sRGB-encoded RGBA8 textures):
   HDR sequences are shown tone mapped. macOS EDR (extended-range `CAMetalLayer` output) is not
   wired up: there is no `platform` crate yet and eframe/wgpu do not expose an EDR surface, so HDR
-  values above SDR white are never sent to the display. The scopes of an HDR sequence show the
-  working-space values (waveform in cd/m² on a PQ scale, BT.2020 vectorscope).
-- **LUTs.** Lumetri Input LUT and Creative Look reference `lib:<id>` (the project's LUT library,
-  `Project::luts`, embedded `.cube`/`.3dl` text) or `builtin:<id>` (code-generated camera
-  conversions and looks). `waltcut-gpu::GpuLut` is the WGSL tetrahedral counterpart, tested for
-  parity.
-
-### 5.4 Multi-camera and synchronisation
-
-```text
-clips ──sync (in | out | timecode[±hours] | marker | audio)──► anchors (media time ↔ common instant)
-  ├─ clip.synchronize        moves selected timeline clips (link groups together) onto the reference
-  ├─ clip.mergeClips         video + ≤16 audio clips → a merged-clip sequence
-  └─ clip.createMulticam     cameras → a multi-camera source sequence (one video track per angle)
-multi-camera clip = nested source + TrackItem::multicam {enabled, angle}
-  render: only the angle's video track · audio: camera 1 | all | the angle (Switch Audio)
-```
-
-- **Model** (`project::multicam`). `Sequence::multicam` (`MulticamSource`: cameras with their video
-  track, audio tracks, name, shown flag and source item; audio mode) marks a multi-camera source;
-  `Sequence::merged` a merged clip. `TrackItem::multicam` (`MulticamSel`) makes a nested clip a
-  multi-camera clip; any nest can be one (its video tracks are then the angles,
-  `Sequence::cameras()`). Editing a multi-camera source into a sequence gives an enabled clip on the
-  first angle (`Project::make_track_item`). Project schema v7.
-- **Sync** (`engine::sync`). Each method reduces a clip to an *anchor* (the media time that lines up
-  with the common instant). Audio uses `audio_dsp::sync::find_offset`: DC removal, windowed-sinc
-  decimation to ≤ 8 kHz, GCC-PHAT-β (β = 0.75) via one packed complex FFT for the coarse lag, then
-  the same at the full rate on the loudest common window (≤ 2.7 s) and parabolic interpolation.
-  Recordings with different gains, microphones (filtered), 0 dB SNR noise or a strong echo are
-  aligned to the sample; two 10-minute recordings take ~2.4 s (release). Clips are placed on frame
-  boundaries with the sub-frame remainder taken from their source In, so video stays on frames
-  while audio keeps sample accuracy.
-- **Render.** `render::item_layer` renders a multi-camera clip's angle track only
-  (`render_seq_tracks`); `render::audio` mixes the nested source with only the audible tracks
-  (`Sequence::with_angle_audio`). Nested audio now plays at all (it was skipped when the nest had
-  no media source) and is limited to the clip's range. `render::multicam::render_grid_page` renders
-  one page of the shown angles at the cell scale in parallel (rayon) and tiles them: the
-  Multi-Camera view is one frame job (`frames::Target::MulticamGrid(source, layout, page)`),
-  prefetched while playing like the program. Only the page's angles are decoded.
-- **Multi-Camera view settings** (`EditorState::multicam_view`, Program ▸ wrench menu): grid
-  layout (automatic = smallest square up to 4×4, or fixed 2×2 / 3×3 / 4×4) with pages when the
-  angles don't fit (`render::multicam::page_layout`; `multicam.gridLayout`, `multicam.page`,
-  page arrows; keys 1–9 pick cameras on the shown page, `multicam.cut {camera}` stays absolute);
-  Multi-Camera Selection Top Down (stacked multi-camera clips: topmost instead of lowest);
-  Show Multi-Camera Preview Monitor (off: the grid fills the monitor); Auto-Adjust Multi-Camera
-  Playback Quality (`grid_cell_scale`: ½ / ¼ of the cell scale while playing); Transmit
-  Multi-Camera View (stored; there is no transmit device yet). `multicam.grid` returns the page.
-  Edit Cameras… shows a thumbnail per angle (`frames::Target::MulticamAngle`).
-- **Editing** (`edit::multicam`, `engine::multicam`). `multicam.switchAngle` (click an angle,
-  Ctrl/⌘-click for video only), `multicam.selectCamera1…9` (keys 1–9) and `cutToCamera1…9`
-  (Ctrl+1–9), Enable/Flatten, Edit Cameras, Audio Follows Video (`EditorState`). Live switching:
-  playback in the Multi-Camera view runs `multicam.recordStart`; each key/click is a
-  `multicam.cut` that is applied at once (the program shows it) by re-applying the whole pass to
-  the project from before the pass (`edit_merged`), so a pass is one undo step; Stop runs
-  `multicam.recordStop`, which ends the last angle at the stop point. Through edits inside the
-  recorded range are healed, so pressing the angle already showing adds no edit. Flatten replaces
-  a clip by the clip(s) its angle shows (outer effects carried over; linked pairs stay linked).
+  values above SDR white are never sent to the display.
 
 ## 6. Export jobs (`waltcut-export`)
 
@@ -694,22 +620,6 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 Video encoders implement `export::VideoEncoder`. Codec crates plug in with `register_encoder` and
 `register_audio_encoder`.
 
-Timelines can be exchanged as EDL, FCP7 XML, FCPXML, OTIO, AAF or OMF. `file.import` detects these
-formats and merges the result into the project as one undoable step (AAF / OMF embedded audio is
-written next to the document first). `file.import {replace: true}` starts from an empty project
-with the same name (`file.newProject`) so a headless import→export round-trip contains only the
-imported timeline. `file.exportInterchange`, `file.exportEdl`,
-`file.exportFcpxml`, `file.exportOtio`, `file.exportAaf` and `file.exportOmf` write them.
-`file.exportInterchange {format}` takes `edl`, `xml` (the default), `fcpxml`, `otio`, `aaf` or `omf`;
-any other value is a parameter error and nothing is written. For AAF and
-OMF the engine (`engine::aaf_omf`) first prepares the audio the document references: it lists the
-used ranges (`interchange::essence::audio_needs`), decodes or renders them (clip effects through the
-export audio pipeline), embeds them or writes WAV / AIFF files, and optionally renders a video
-mixdown. A nested sequence is exported the way Premiere Pro does it: a composition of its own in
-AAF (the media of the clips inside it is prepared with the rest), its sound mixed into the document
-in OMF, a nested sequence in FCP7 XML, FCPXML and OTIO, and one `AX` event in an EDL (table in the
-[interchange README](../crates/interchange/README.md)).
-
 ## 7. Automation surfaces
 
 All of these dispatch the same command ids.
@@ -728,25 +638,20 @@ All of these dispatch the same command ids.
   settings) is in `crates/ui-egui/src/state.rs` as serde structs, so `ui.inspect` and `ui.set` can
   read and write it.
 
-- **Panels with engine data** (M8.9 / M12.6): Lumetri Scopes (`scopes.read` returns the same
-  scopes as numbers), Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
+- **Panels with engine data** (M8.9 / M12.6): Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
   `ProjectItem::metadata`), Events (`events.list` / `events.clear`), Progress (`jobs.list` /
   `jobs.cancel`), Project Notes (`project.notes` / `project.setNotes`, plain text in
-  `Project::notes`, schema v15; one typing session is one undo step). Timecode and Reference Monitor are frontend-only views. Their settings are
+  `Project::notes`, schema v15; one typing session is one undo step). The Timecode panel is a frontend-only view. Their settings are
   `UiState::panels` (`ui.set {"panels": {...}}`).
-- **Project panel and Media Browser** (M12.7). View settings (List / Icon / Freeform, thumbnail
+- **Project panel** (M12.7). View settings (List / Icon / Freeform, thumbnail
   and font size, Preview Area, Hover Scrub), the List view's columns, widths and sort, and ten view
   presets are preferences (`Preferences::project_panel`; `project.view.*`, `project.columns.*`,
   `project.sort`, `project.viewPreset.*`). Freeform positions, Clip Size, stacks and saved
   arrangements are item metadata (`Freeform Position`, `Freeform Stack`,
   `Freeform Arrangement: <name>`; `project.freeform.*`), so they are undoable and saved with the
-  project without a schema change. The Media Browser lists directories through
-  `Services::list_entries` / `volumes` / `home_dir` (native: `std::fs`; web: the virtual file
-  table; tests: a fake filesystem): `engine::media_browser` keeps navigation history and the
-  selection in `Session::browser`, Favorites / recent directories / file types / columns in
-  `Preferences::media_browser` (`mediaBrowser.*`). Bins opened in a tab or a window, the inline
-  rename, dialogs and the hover-scrubbed card are `UiState::project_panel`; the browser's tree
-  state is `UiState::media_browser` (`ui.set {"projectPanel": …, "mediaBrowser": …}`).
+  project without a schema change. Bins opened in a tab or a window, the inline
+  rename, dialogs and the hover-scrubbed card are `UiState::project_panel`
+  (`ui.set {"projectPanel": …}`).
 
 Protocol reference: [control-protocol.md](control-protocol.md). Agent guide: [agents.md](agents.md).
 

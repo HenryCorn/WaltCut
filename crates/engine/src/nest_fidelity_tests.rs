@@ -61,7 +61,7 @@ fn scale_to_frame_size_on_a_nest_fills_the_frame_and_leaves_scale_alone() {
     let it = clip(&s, nest);
     assert!(it.scale_to_frame && (motion(&it, "scale") - 100.0).abs() < 1e-9);
     // the picture: the nest's corner is now the frame's corner
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let opts = waltcut_render::RenderOptions { scale: 0.25, ..Default::default() };
     let t = it.start + Tick(it.duration.0 / 2);
     let filled = waltcut_render::render_sequence(&s.project, s.state.active_sequence.unwrap(), t, opts, &provider);

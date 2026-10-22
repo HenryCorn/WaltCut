@@ -12,7 +12,6 @@
 
 /// Begin the activity (macOS); returns whether it is held. Call once at startup.
 pub fn disable() -> bool {
-    #[cfg(target_os = "macos")]
     {
         use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
         let options = NSActivityOptions::UserInitiatedAllowingIdleSystemSleep | NSActivityOptions::LatencyCritical;
@@ -21,10 +20,6 @@ pub fn disable() -> bool {
         // The activity lasts while the token is alive: keep it for the life of the process.
         std::mem::forget(token);
         true
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        false
     }
 }
 

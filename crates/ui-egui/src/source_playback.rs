@@ -174,16 +174,7 @@ impl FilmcraftApp {
         };
         audio.stop();
         let cursor = self.session.state.source_playhead.to_units_floor(i64::from(sr));
-        #[cfg(not(target_arch = "wasm32"))]
         let fill = crate::play_ahead::spawn(mix, cursor, sr, audio.channels(), self.source_playback.clock.audio_stats.clone());
-        #[cfg(target_arch = "wasm32")]
-        let fill = {
-            let (mix, mut cursor) = (mix, cursor);
-            Box::new(move |buf: &mut [f32], ch: usize| {
-                mix(cursor, buf, ch);
-                cursor = cursor.saturating_add(i64::try_from(buf.len() / ch.max(1)).unwrap_or(0));
-            })
-        };
         match audio.start(fill) {
             Ok(_) => self.source_playback.clock.audio_clock = true,
             Err(e) => self.ui.status = format!("Source audio output failed: {e}"),

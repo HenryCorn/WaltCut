@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 default = []
-# AI re-style through cloud providers (fal.ai) over HTTPS. Off in wasm builds.
+# AI re-style through cloud providers (fal.ai) over HTTPS.
 ai-cloud = ["waltcut-genai/cloud"]
 
 [dependencies]
@@ -24,20 +24,17 @@ waltcut-codecs = { workspace = true }
 waltcut-project = { workspace = true }
 waltcut-edit = { workspace = true }
 waltcut-render = { workspace = true }
-waltcut-scopes = { workspace = true }
 waltcut-text = { workspace = true }
 waltcut-audio-dsp = { workspace = true }
 waltcut-export = { workspace = true }
 waltcut-mxf = { workspace = true }
 waltcut-format = { workspace = true }
-waltcut-interchange = { workspace = true }
 waltcut-genai = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 craft-docpath = { workspace = true }
-web-time = "1"
 
 [dev-dependencies]
 waltcut-testkit = { workspace = true }

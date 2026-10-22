@@ -246,18 +246,12 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
                     Err(e) => return err(format!("`panels`: {e}")),
                 }
             }
-            // Project panel / Media Browser view state (`panels::project`, `panels::media_browser`), merged
-            for (k, which) in [("projectPanel", 0), ("mediaBrowser", 1)] {
+            // Project panel view state (`panels::project`), merged
+            for k in ["projectPanel"] {
                 let Some(patch) = p.get(k) else { continue };
-                let mut cur =
-                    if which == 0 { serde_json::to_value(&app.ui.project_panel) } else { serde_json::to_value(&app.ui.media_browser) }.unwrap_or_default();
+                let mut cur = serde_json::to_value(&app.ui.project_panel).unwrap_or_default();
                 merge(&mut cur, patch);
-                let r = if which == 0 {
-                    serde_json::from_value(cur).map(|v| app.ui.project_panel = v)
-                } else {
-                    serde_json::from_value(cur).map(|v| app.ui.media_browser = v)
-                };
-                if let Err(e) = r {
+                if let Err(e) = serde_json::from_value(cur).map(|v| app.ui.project_panel = v) {
                     return err(format!("`{k}`: {e}"));
                 }
             }
@@ -530,13 +524,6 @@ pub fn save_screenshot(ctx: &egui::Context, image: &egui::ColorImage, path: Opti
             let c = image.pixels[y * w + x];
             rgba.extend_from_slice(&[c.r(), c.g(), c.b(), 255]);
         }
-    }
-    if cfg!(target_arch = "wasm32") {
-        // No filesystem on the web: the PNG comes back in the reply.
-        return match encode_png(&rgba, cw as u32, ch as u32) {
-            Ok(png) => json!({"ok": true, "result": {"pngBase64": base64(&png), "width": cw, "height": ch}}),
-            Err(e) => json!({"ok": false, "error": e}),
-        };
     }
     let path = path.map(str::to_string).unwrap_or_else(|| waltcut_engine::temp_dir().join("filmcraft-screenshot.png").to_string_lossy().to_string());
     match encode_png(&rgba, cw as u32, ch as u32) {

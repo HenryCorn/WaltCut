@@ -109,11 +109,11 @@ impl Default for Decoder {
 /// The worker threads [`Decoder::new`] uses: the available cores (at most 16) with the `threads`
 /// feature on native targets, 1 otherwise.
 pub fn default_threads() -> usize {
-    #[cfg(all(feature = "threads", not(target_arch = "wasm32")))]
+    #[cfg(feature = "threads")]
     {
         std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).min(16)
     }
-    #[cfg(not(all(feature = "threads", not(target_arch = "wasm32"))))]
+    #[cfg(not(feature = "threads"))]
     {
         1
     }
@@ -129,11 +129,7 @@ impl Decoder {
     pub fn with_threads(threads: usize) -> Self {
         crate::cavlc::init_tables();
         #[cfg(feature = "threads")]
-        let pool = if threads > 1 && cfg!(not(target_arch = "wasm32")) {
-            rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("h264-{i}")).build().ok()
-        } else {
-            None
-        };
+        let pool = if threads > 1 { rayon::ThreadPoolBuilder::new().num_threads(threads).thread_name(|i| format!("h264-{i}")).build().ok() } else { None };
         #[cfg(feature = "threads")]
         let workers = if pool.is_some() { threads } else { 1 };
         #[cfg(not(feature = "threads"))]

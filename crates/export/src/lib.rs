@@ -677,11 +677,11 @@ impl Progress {
     /// reading of that speed, so ask regularly (the UI does on every frame it draws the job).
     /// `None` until a second of readings shows progress, and once the job is done or finished.
     pub fn eta(&self) -> Option<std::time::Duration> {
-        self.eta_at(web_time::Instant::now())
+        self.eta_at(std::time::Instant::now())
     }
 
     /// [`Progress::eta`] at a given time (tests, and hosts with a clock of their own).
-    pub fn eta_at(&self, now: web_time::Instant) -> Option<std::time::Duration> {
+    pub fn eta_at(&self, now: std::time::Instant) -> Option<std::time::Duration> {
         let (done, total) = (self.done.load(Ordering::Relaxed), self.total.load(Ordering::Relaxed));
         let mut pace = self.pace.lock().unwrap_or_else(|e| e.into_inner());
         pace.observe(now, done);
@@ -879,7 +879,7 @@ pub fn note_stage(stage: Stage, d: std::time::Duration) {
 
 /// Run `f`, adding its wall time to `stage`.
 pub fn timed<T>(stage: Stage, f: impl FnOnce() -> T) -> T {
-    let t = web_time::Instant::now();
+    let t = std::time::Instant::now();
     let r = f();
     note_stage(stage, t.elapsed());
     r
@@ -1843,7 +1843,7 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
             }
         }
     }
-    let t0 = web_time::Instant::now();
+    let t0 = std::time::Instant::now();
     let range = export_range(project, seq, settings)?;
     let cancelled = || progress.cancel.load(Ordering::Relaxed);
     let batch = rayon::current_num_threads().clamp(2, 16) as i64;

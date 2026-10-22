@@ -70,8 +70,6 @@
 	A title on a rounded card with a soft shadow.	부드러운 그림자가 있는 둥근 카드 위 제목.
 	AAC Audio	AAC 오디오
 	AAC Audio 48 kHz 320 kbps	AAC 오디오 48 kHz 320 kbps
-	AAF Export Settings	AAF 내보내기 설정
-	AAF…	AAF…
 	About	정보
 	About FilmCraft	FilmCraft 정보
 	Accent Color	강조 색상
@@ -99,7 +97,6 @@
 	Add Guide	안내선 추가
 	Add Guide…	안내선 추가…
 	Add keyframe	키프레임 추가
-	Add Lumetri Color to clip	클립에 Lumetri Color 추가
 	Add Marker	마커 추가
 	Add Marker (M)	마커 추가(M)
 	Add media to your project. Drop files anywhere in the window, or choose a source below.	프로젝트에 미디어를 추가합니다. 창 아무 곳에나 파일을 놓거나 아래에서 소스를 선택하세요.
@@ -145,7 +142,6 @@
 	Align Top	위쪽 정렬
 	Alignment	정렬
 	All	모두
-	All Cameras	모든 카메라
 	All Caps	모두 대문자
 	All Categories	모든 범주
 	All Empty Tracks	모든 빈 트랙
@@ -238,7 +234,6 @@
 	At Startup	시작 시
 	At Unnumbered Markers	번호 없는 마커에
 	Att	어택
-	Attach Proxies…	프록시 연결…
 	Attack	어택
 	Attempt to force hardware to document sample rate	하드웨어를 문서 샘플 속도로 강제 시도
 	Audio	오디오
@@ -296,7 +291,6 @@
 	Auto Save…	자동 저장…
 	Auto Tone Map Media (HDR and log into SDR)	미디어 자동 톤 매핑 (HDR 및 로그를 SDR로)
 	Auto tone map media (HDR and log into SDR)	미디어 자동 톤 매핑(HDR·log를 SDR로)
-	Auto-Adjust Multi-Camera Playback Quality	멀티 카메라 재생 품질 자동 조정
 	Auto-Match	자동 일치
 	Auto-Match Loudness	라우드니스 자동 일치
 	Auto-saves go to: {dir}	자동 저장 위치: {dir}
@@ -321,8 +315,6 @@
 	Avid DNxHR HQ	Avid DNxHR HQ
 	Avid DNxHR LB	Avid DNxHR LB
 	Avid DNxHR SQ	Avid DNxHR SQ
-	Avid Log Exchange	Avid Log Exchange
-	Avid Log Exchange…	Avid Log Exchange…
 	Avid-style OP-Atom: DNxHR HQ picture file plus one 24-bit 48 kHz PCM file per channel (_A1, _A2…)	Avid 방식 OP-Atom: DNxHR HQ 영상 파일 + 채널별 24비트 48 kHz PCM 파일(_A1, _A2…)
 	Background	배경
 	Background Color	배경 색상
@@ -465,14 +457,9 @@
 	Callout – Pointer	콜아웃 – 포인터
 	Callout – Tag	콜아웃 – 태그
 	Callouts	콜아웃
-	Camera 1	카메라 1
 	Camera Angle	카메라 앵글
-	Camera Angle Metadata	카메라 앵글 메타데이터
 	Camera Blur	카메라 흐림
-	Camera Names	카메라 이름
 	Camera Shake	카메라 흔들림
-	Camera {n} — {name}	카메라 {n} — {name}
-	Cameras shown in the Multi-Camera view (uncheck to hide).	멀티 카메라 보기에 표시할 카메라(숨기려면 선택 해제).
 	Cancel	취소
 	Cancel Dynamic Trim	동적 트림 취소
 	Cancel Queued Export	대기 중인 내보내기 취소
@@ -636,7 +623,6 @@
 	Color Theme	색상 테마
 	Color To Leave	유지할 색상
 	Color Tolerance	색상 허용치
-	Color Wheels & Match	색상 휠 및 일치
 	Color/Black	색상/검정
 	Color/Gray	색상/회색
 	Color:	색상:
@@ -653,8 +639,6 @@
 	Commits	커밋
 	Community	커뮤니티
 	Company	회사
-	Comparison	비교
-	Comparison View	비교 보기
 	Complexity	복잡도
 	Composite	합성
 	Composite In Back	뒤에 합성
@@ -671,7 +655,6 @@
 	Compressor	컴프레서
 	Configure…	구성…
 	Conflict: {key} is assigned to {commands} ({ctx})	충돌: {key}이(가) {commands}에 할당됨({ctx})
-	Consolidate and Transcode	통합 및 트랜스코딩
 	Consolidate Duplicates	중복 항목 통합
 	Constant Gain	일정 게인
 	Constant Power	일정 파워
@@ -689,7 +672,6 @@
 	Cool Blue	차가운 파랑
 	Cool, desaturated and punchy	차갑고 저채도이며 강렬함
 	Copy	복사
-	Copy and Create Proxies	복사 후 프록시 만들기
 	Copy Paste Includes Sequence Markers	복사/붙여넣기 시 시퀀스 마커 포함
 	Copyright	저작권
 	Core Width	코어 너비
@@ -709,14 +691,9 @@
 	Create ellipse mask	타원 마스크 만들기
 	Create Folder For Imported Projects	가져온 프로젝트용 폴더 만들기
 	Create folder for imported projects	가져온 프로젝트용 폴더 만들기
-	Create Multi-Camera Source Sequence	멀티 카메라 소스 시퀀스 만들기
-	Create Multi-Camera Source Sequence…	멀티 카메라 소스 시퀀스 만들기…
 	Create new graphic	새 그래픽 만들기
-	Create Proxies	프록시 만들기
-	Create Proxies…	프록시 만들기…
 	Create Search Bin	검색 빈 만들기
 	Create Sidecar File	사이드카 파일 만들기
-	Creating {n} proxy file(s)…	프록시 파일 {n}개 만드는 중…
 	Creative	크리에이티브
 	Creator	작성자
 	Credits	크레딧
@@ -748,15 +725,6 @@
 	Custom Color	사용자 정의 색상
 	Custom Setup	사용자 정의 설정
 	Cut	잘라내기
-	Cut to Camera 1	카메라 1로 전환
-	Cut to Camera 2	카메라 2로 전환
-	Cut to Camera 3	카메라 3으로 전환
-	Cut to Camera 4	카메라 4로 전환
-	Cut to Camera 5	카메라 5로 전환
-	Cut to Camera 6	카메라 6으로 전환
-	Cut to Camera 7	카메라 7로 전환
-	Cut to Camera 8	카메라 8로 전환
-	Cut to Camera 9	카메라 9로 전환
 	Cutoff	차단
 	Cyan-teal shadows and warm highlights with a little more contrast	청록 그림자와 따뜻한 하이라이트, 대비 약간 증가
 	Cycle (in Revolutions)	주기(회전 수)
@@ -848,7 +816,6 @@
 	Destination Path	대상 경로
 	Destination:	대상 위치:
 	Destinations	대상
-	Detach Proxies	프록시 분리
 	Detail Amplitude	세부 진폭
 	Detail Level	세부 수준
 	Detailed Analysis	상세 분석
@@ -964,8 +931,6 @@
 	Edge Type	가장자리 유형
 	Edge Width	가장자리 너비
 	Edit	편집
-	Edit Cameras	카메라 편집
-	Edit Cameras…	카메라 편집…
 	Edit Columns	열 편집
 	Edit Columns…	열 편집…
 	Edit Offline File	오프라인 파일 편집
@@ -980,7 +945,6 @@
 	Editing	편집
 	Editing Mode:	편집 모드:
 	Edit…	편집…
-	EDL…	EDL…
 	Effect	효과
 	Effect Controls	효과 컨트롤
 	Effect presets	효과 사전 설정
@@ -995,11 +959,9 @@
 	Enable clip and XMP metadata linking	클립 및 XMP 메타데이터 연결 사용
 	Enable developer mode	개발자 모드 사용
 	Enable hardware accelerated decoding (requires restart)	하드웨어 가속 디코딩 사용(재시작 필요)
-	Enable HSL Secondary	HSL 보조 사용
 	Enable language auto-detection	언어 자동 감지 사용
 	Enable Mercury Transmit	Mercury Transmit 사용
 	Enable ProRes hardware accelerated encoding, if available	가능한 경우 ProRes 하드웨어 가속 인코딩 사용
-	Enable proxies	프록시 사용
 	Enable Remix	리믹스 사용
 	Enable track for recording	트랙 녹음 활성화
 	Encapsulate	캡슐화
@@ -1015,7 +977,6 @@
 	Ends With	다음으로 끝남
 	Enhance Speech	음성 향상
 	Entire Source	전체 소스
-	Enumerate Cameras	카메라 번호 매기기
 	EQ	EQ
 	Error	오류
 	Errors Only	오류만
@@ -1089,7 +1050,6 @@
 	Faux Italic	가짜 기울임꼴
 	Favorites	즐겨찾기
 	Favorites only	즐겨찾기만
-	FCPXML…	FCPXML…
 	Feather	페더
 	Feedback	피드백
 	Feedback 1	피드백 1
@@ -1143,7 +1103,6 @@
 	Filter and EQ	필터 및 EQ
 	Filter Frequency	필터 주파수
 	Filter Resonance	필터 공진
-	Final Cut Pro XML…	Final Cut Pro XML…
 	Final Delay	최종 지연
 	Find	찾기
 	Find Edges	가장자리 찾기
@@ -1166,7 +1125,6 @@
 	Flare Color	플레어 색상
 	Flash	플래시
 	Flash Cue Marker	Flash 큐 마커
-	Flatten	병합
 	Flicker	깜박임
 	Flicker Removal	깜박임 제거
 	Flickers	깜박임
@@ -1186,12 +1144,9 @@
 	Font Size	글꼴 크기
 	Font Style	글꼴 스타일
 	Fonts used in the project:	프로젝트에 사용된 글꼴:
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	색상 관리 매개변수는 Lumetri 색상 패널의 설정 탭에서 지정합니다.
 	Forest	포레스트
 	Format	형식
 	Format and size	형식 및 크기
-	Four Scopes (RGB, 8 bit)	4개 스코프(RGB, 8비트)
-	Four Scopes (YUV, float, no clamp)	4개 스코프(YUV, 부동, 클램프 없음)
 	Fractal Influence	프랙탈 영향
 	Fractal Type	프랙탈 유형
 	Frame	프레임
@@ -1411,9 +1366,7 @@
 	Highpass	하이패스
 	Hindi	힌디어
 	Hindi digits	힌디어 숫자
-	Histogram	히스토그램
 	History	작업 내역
-	HLS Vectorscope + Histogram	HLS 벡터스코프 + 히스토그램
 	Hold	홀드
 	Hold Filters	필터 고정
 	Hold On	고정 위치
@@ -1429,7 +1382,6 @@
 	Horizontal Flip	가로 뒤집기
 	Horizontal Margin	가로 여백
 	Hover Scrub	마우스오버 스크럽
-	HSL Secondary	HSL 보조
 	Hue	색조
 	Hue Center	색조 중심
 	Hue Range	색조 범위
@@ -1456,7 +1408,6 @@
 	Import a preset file…	사전 설정 파일 가져오기…
 	Import as Image Sequence	이미지 시퀀스로 가져오기
 	Import From	가져오기 위치
-	Import from Media Browser	미디어 브라우저에서 가져오기
 	Import Image Sequence…	이미지 시퀀스 가져오기…
 	Import numbered stills as image sequences	번호가 매겨진 스틸을 이미지 시퀀스로 가져오기
 	Import Presets…	사전 설정 가져오기…
@@ -1477,7 +1428,6 @@
 	Include Alpha Channel	알파 채널 포함
 	Include Handles:	핸들 포함:
 	Include Preview Files	미리보기 파일 포함
-	Include Proxies	프록시 포함
 	Incoming	들어오는
 	Increase Audio Tracks Height	오디오 트랙 높이 늘리기
 	Increase Clip Volume	클립 볼륨 높이기
@@ -1489,14 +1439,10 @@
 	Increase Video Tracks Height	비디오 트랙 높이 늘리기
 	Indeterminate Media Timebase	불확정 미디어 타임베이스
 	Info	정보
-	Ingest	수집
-	Ingest Settings	수집 설정
-	Ingest Settings…	수집 설정…
 	Initial Delay	초기 지연
 	Inner	안쪽
 	Inner Radius	안쪽 반경
 	Input Boost	입력 부스트
-	Input LUT	입력 LUT
 	Input:	입력:
 	Insert	삽입
 	Insert (,)	삽입(,)
@@ -1678,7 +1624,6 @@
 	Logo Cutout	로고 잘라내기
 	Long Shadow	긴 그림자
 	Look	룩
-	Look LUT	룩 LUT
 	Look-Ahead Time	예측 시간
 	Loop	반복
 	Loop marked range	표시 범위 반복
@@ -1712,14 +1657,9 @@
 	Luma Min / Max	루마 최소/최대
 	Luma Source	루마 소스
 	Luma vs Sat	휘도 대 채도
-	Lumetri	Lumetri
-	Lumetri Color	Lumetri 색상
-	Lumetri Presets	Lumetri 사전 설정
-	Lumetri Scopes	Lumetri 스코프
 	Luminance	휘도
 	Luminance Threshold	휘도 임계값
 	Luminosity	광도
-	LUT	LUT
 	Magenta	마젠타
 	Magnification	확대/축소 비율
 	Magnify	돋보기
@@ -1797,8 +1737,6 @@
 	MB	MB
 	Media	미디어
 	Media Analysis	미디어 분석
-	Media Browser	미디어 브라우저
-	Media Browser Settings	미디어 브라우저 설정
 	Media Cache	미디어 캐시
 	Media Cache Database	미디어 캐시 데이터베이스
 	Media Cache Files	미디어 캐시 파일
@@ -1826,9 +1764,6 @@
 	Medium Room	중형 룸
 	Memory	메모리
 	Memory…	메모리…
-	Merge Clips	클립 병합
-	Merge Clips…	클립 병합…
-	Merged clip created	병합 클립 생성됨
 	Merged PRs	병합된 PR
 	Metadata	메타데이터
 	Metadata & Timecode Burn-in	메타데이터 및 타임코드 번인
@@ -1915,19 +1850,7 @@
 	Movie (audio and video)	동영상(오디오 및 비디오)
 	Movies, audio and stills from disk	디스크의 동영상, 오디오, 스틸 이미지
 	MPEG-4 audio (.m4a), stereo 48 kHz AAC-LC at 320 kbps	MPEG-4 오디오(.m4a), 스테레오 48 kHz AAC-LC 320 kbps
-	Multi-Camera	멀티 카메라
-	Multi-Camera Audio Follows Video	멀티 카메라 오디오가 비디오 따라가기
-	Multi-Camera Layout	멀티 카메라 레이아웃
-	Multi-Camera Record	멀티 카메라 녹화
-	Multi-Camera Record off	멀티 카메라 녹화 끔
-	Multi-Camera Record on	멀티 카메라 녹화 켬
-	Multi-Camera Record On/Off (0)	멀티 카메라 녹화 켬/끔(0)
-	Multi-Camera Record On/Off Toggle	멀티 카메라 녹화 켜기/끄기
-	Multi-Camera Selection Top Down	멀티 카메라 위에서 아래로 선택
-	Multi-camera source sequence with {n} camera(s)	카메라 {n}대 멀티 카메라 소스 시퀀스
-	Multi-Camera View	멀티 카메라 보기
 	Multiband Compressor	멀티밴드 컴프레서
-	Multicam	멀티캠
 	Multichannel Mono Media	멀티채널 모노 미디어
 	Multiple Clips Selected	여러 클립 선택됨
 	Multiplexer	멀티플렉서
@@ -1977,7 +1900,6 @@
 	New Ellipse	새 타원
 	New Item	새 항목
 	New Layer	새 레이어
-	New Media Browser Panel	새 미디어 브라우저 패널
 	New Offline File	새 오프라인 파일
 	New Project Panel	새 프로젝트 패널
 	New Project Shortcut	새 프로젝트 바로 가기
@@ -1993,11 +1915,9 @@
 	Next Appearance Mode	다음 모양 모드
 	Next in Sequence	시퀀스의 다음 항목
 	Next in Track	트랙의 다음 항목
-	Next Multi-Camera Page	다음 멀티 카메라 페이지
 	Next page	다음 페이지
 	Next to original media files	원본 미디어 파일 옆
 	Next to the media	미디어 옆
-	Next to the original media, in a Proxies folder	원본 미디어 옆 Proxies 폴더
 	Night	야간
 	Night Exterior	야간 실외
 	No	아니요
@@ -2016,7 +1936,6 @@
 	No matching commands	일치하는 명령 없음
 	No model credits were built into this copy.	이 사본에 모델 크레딧이 포함되지 않았습니다.
 	No Motion	모션 없음
-	No multi-camera clip at the playhead	재생 헤드에 멀티 카메라 클립 없음
 	No plugins are installed. Changes will take effect the next time you start FilmCraft.	설치된 플러그인이 없습니다. 변경 사항은 FilmCraft를 다음에 시작할 때 적용됩니다.
 	No saved guide templates.	저장된 안내선 템플릿 없음.
 	No Scroll	스크롤 없음
@@ -2093,9 +2012,6 @@
 	Offset To	오프셋 끝
 	Offset:	오프셋:
 	OK	확인
-	OMF Export Settings	OMF 내보내기 설정
-	OMF Title:	OMF 제목:
-	OMF…	OMF…
 	Omni	무지향
 	On	켬
 	On Original Image	원본 이미지에
@@ -2116,7 +2032,6 @@
 	Open In Source Monitor	소스 모니터에서 열기
 	Open in Source Monitor	소스 모니터에서 열기
 	Open in Timeline	타임라인에서 열기
-	Open Ingest Settings	수집 설정 열기
 	Open Most Recent	최근 항목 열기
 	Open new tab	새 탭 열기
 	Open Project…	프로젝트 열기…
@@ -2125,7 +2040,6 @@
 	OpenEXR	OpenEXR
 	OpenEXR Sequence	OpenEXR 시퀀스
 	Opens up the shadows	그림자를 밝힙니다
-	OpenTimelineIO…	OpenTimelineIO…
 	OpenType	OpenType
 	Optical Flow	광학 흐름
 	Options	옵션
@@ -2174,10 +2088,6 @@
 	Panels	패널
 	Panner	패너
 	Panner - Ambisonics	패너 - Ambisonics
-	Parade	퍼레이드
-	Parade (RGB)	퍼레이드(RGB)
-	Parade ({kind})	퍼레이드({kind})
-	Parade Type	퍼레이드 유형
 	Paragraph Text	단락 텍스트
 	Parametric Equalizer	파라메트릭 이퀄라이저
 	Passband Ripple	통과 대역 리플
@@ -2308,7 +2218,6 @@
 	Preview File Format:	미리 보기 파일 형식:
 	Previous in Sequence	시퀀스의 이전 항목
 	Previous in Track	트랙의 이전 항목
-	Previous Multi-Camera Page	이전 멀티 카메라 페이지
 	Previous page	이전 페이지
 	ProcAmp	ProcAmp
 	Processing Options	처리 옵션
@@ -2319,9 +2228,6 @@
 	Progressive	프로그레시브
 	Project	프로젝트
 	Project Auto Save:	프로젝트 자동 저장:
-	Project Manager	프로젝트 관리자
-	Project Manager: writing {path}	프로젝트 관리자: {path} 쓰는 중
-	Project Manager…	프로젝트 관리자…
 	Project Metadata	프로젝트 메타데이터
 	Project Notes	프로젝트 메모
 	Project Settings	프로젝트 설정
@@ -2334,8 +2240,6 @@
 	Project…	프로젝트…
 	Properties	속성
 	Protect Highlights	하이라이트 보호
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	프록시는 백그라운드에서 생성되어 완료 시 연결됩니다. 내보내기는 항상 원본 해상도 미디어를 사용합니다.
-	Proxy	프록시
 	Pull Motion	당기기 모션
 	Pulls highlights and whites down	밝은 영역과 흰색을 낮춥니다
 	Purple	보라
@@ -2391,10 +2295,8 @@
 	Rec. 601	Rec. 601
 	Rec. 709	Rec. 709
 	Recent Directories	최근 디렉터리
-	Reconnect Full Resolution Media…	전체 해상도 미디어 다시 연결…
 	Record	녹화
 	Record (voice-over on the record-enabled track)	녹음(녹음 활성 트랙에 내레이션)
-	Recorded {n} multi-camera cut(s)	멀티 카메라 컷 {n}개 녹화됨
 	Recording voice-over…	보이스오버 녹음 중…
 	Recover	복구
 	Recover Unsaved Changes	저장 안 된 변경 사항 복구
@@ -2422,7 +2324,6 @@
 	Reduce Rumble	럼블 감소
 	Reference	참조
 	Reference  {tc}	참조  {tc}
-	Reference Monitor	참조 모니터
 	Reference track:	기준 트랙:
 	Reference: next frame	참조: 다음 프레임
 	Reference: previous frame	참조: 이전 프레임
@@ -2625,9 +2526,6 @@
 	Scaling	비율 조정
 	Scan Lines	주사선
 	Scene	장면
-	Scene Edit Detection	장면 편집 감지
-	Scene Edit Detection: analysing in the background (see Progress)	장면 편집 감지: 백그라운드에서 분석 중(진행률 참조)
-	Scene Edit Detection…	장면 편집 감지…
 	Scene:	장면:
 	Scientific Filter	과학 필터
 	Scratch disk location for Captured Audio	캡처한 오디오의 스크래치 디스크 위치
@@ -2660,15 +2558,6 @@
 	Select an item to preview it	항목을 선택하면 미리 봅니다
 	Select audio clips to edit them here	여기서 편집할 오디오 클립을 선택하세요
 	Select audio clips, then click a preset to apply it.	오디오 클립을 선택한 뒤 사전 설정을 클릭해 적용합니다.
-	Select Camera 1	카메라 1 선택
-	Select Camera 2	카메라 2 선택
-	Select Camera 3	카메라 3 선택
-	Select Camera 4	카메라 4 선택
-	Select Camera 5	카메라 5 선택
-	Select Camera 6	카메라 6 선택
-	Select Camera 7	카메라 7 선택
-	Select Camera 8	카메라 8 선택
-	Select Camera 9	카메라 9 선택
 	Select Clip at Playhead	재생 헤드 위치 클립 선택
 	Select Find Box	찾기 상자 선택
 	Select items to clear	지울 항목 선택
@@ -2719,11 +2608,8 @@
 	Sequence…	시퀀스…
 	Sequentially	순차적으로
 	Set	설정
-	Set Comparison Reference	비교 기준 설정
-	Set Creative Look	크리에이티브 룩 설정
 	Set focus on the Timeline when performing Insert/Overwrite edits	삽입/덮어쓰기 편집 시 타임라인에 포커스
 	Set Gain to:	게인 설정:
-	Set Input LUT	입력 LUT 설정
 	Set Poster Frame	포스터 프레임 설정
 	Set Project Panel View	프로젝트 패널 보기 설정
 	Set the reference to the playhead	재생 헤드를 참조로 설정
@@ -2782,7 +2668,6 @@
 	Show Keyframes	키프레임 표시
 	Show Mask	마스크 표시
 	Show Mask Tracker Preview	마스크 추적기 미리 보기 표시
-	Show Multi-Camera Preview Monitor	멀티 카메라 미리보기 모니터 표시
 	Show Next Screen	다음 화면 표시
 	Show Only Noise	노이즈만 표시
 	Show Open Dialog	열기 대화 상자 표시
@@ -2970,7 +2855,6 @@
 	Stone Church	석조 교회
 	Stop	중지
 	Stop Export Queue	내보내기 대기열 중지
-	Stop Multi-Camera Recording	멀티 카메라 녹화 중지
 	Stop Source	소스 정지
 	Stop tracking	추적 중지
 	Stop Voice-over Recording	보이스오버 녹음 중지
@@ -3027,10 +2911,6 @@
 	Swivel	회전축
 	Sync Voice-over Capture	보이스오버 캡처 동기화
 	Sync with system	시스템과 동기화
-	Synchronize Clips	클립 동기화
-	Synchronize Point	동기화 지점
-	Synchronized {n} clip group(s)	클립 그룹 {n}개 동기화됨
-	Synchronize…	동기화…
 	Synthetic	합성
 	System Compatibility Report	시스템 호환성 보고서
 	System Compatibility Report…	시스템 호환성 보고서…
@@ -3126,7 +3006,6 @@
 	Toggle Audio During Scrubbing	스크러빙 중 오디오 전환
 	Toggle Full Screen	전체 화면 전환
 	Toggle Mute for All Targeted Audio Tracks	대상 오디오 트랙 모두 음소거 전환
-	Toggle Proxies	프록시 전환
 	Toggle Solo for All Targeted Audio Tracks	대상 오디오 트랙 모두 솔로 전환
 	Toggle Source/Program Monitor Focus	소스/프로그램 모니터 포커스 전환
 	Toggle Target Audio 1	대상 오디오 1 전환
@@ -3172,14 +3051,12 @@
 	Tracking method: {method}	추적 방식: {method}
 	Tracks	트랙
 	tracks	트랙
-	Transcode	트랜스코딩
 	Transform	변형
 	Transformers	트랜스포머
 	Transience	트랜지언스
 	Transition Completion	전환 완료
 	Transition Softness	전환 부드러움
 	Transitions	전환
-	Transmit Multi-Camera View	멀티 카메라 보기 전송
 	Transparency	투명도
 	Transparent Video…	투명 비디오…
 	Trash	휴지통
@@ -3274,11 +3151,6 @@
 	Variations:	변형:
 	VBR, 1 pass	VBR, 1패스
 	VBR, 2 pass	VBR, 2패스
-	Vectorscope (YUV)	벡터스코프(YUV)
-	Vectorscope + Waveform YC	벡터스코프 + 파형 YC
-	Vectorscope HLS	벡터스코프 HLS
-	Vectorscope Targets	벡터스코프 대상
-	Vectorscope YUV	벡터스코프 YUV
 	Velocity	속력
 	Venetian Blinds	베니션 블라인드
 	Version	버전
@@ -3469,7 +3341,6 @@
 	{category} · My Template	{category} · 내 템플릿
 	{codec} · {rate} Hz · {n} channel(s)	{codec} · {rate} Hz · {n}채널
 	{first} - Merged	{first} - 병합됨
-	{first} Multicam	{first} 멀티캠
 	{fps} fps · {n} frames queued	{fps} fps · 대기 프레임 {n}개
 	{f} (missing)	{f}(누락)
 	{key} can't be used as a shortcut	{key}은(는) 단축키로 사용할 수 없음

@@ -88,23 +88,9 @@ impl DirectorySource {
     pub fn system() -> Self {
         let mut dirs: Vec<PathBuf> = Vec::new();
         let home = std::env::var_os("HOME").map(PathBuf::from);
-        if cfg!(target_os = "macos") {
-            dirs.extend(["/System/Library/Fonts", "/Library/Fonts"].map(PathBuf::from));
-            if let Some(h) = &home {
-                dirs.push(h.join("Library/Fonts"));
-            }
-        } else if cfg!(windows) {
-            let win = std::env::var_os("WINDIR").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("C:\\Windows"));
-            dirs.push(win.join("Fonts"));
-            if let Some(l) = std::env::var_os("LOCALAPPDATA") {
-                dirs.push(PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
-            }
-        } else if cfg!(unix) && !cfg!(target_arch = "wasm32") {
-            dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(PathBuf::from));
-            if let Some(h) = &home {
-                dirs.push(h.join(".local/share/fonts"));
-                dirs.push(h.join(".fonts"));
-            }
+        dirs.extend(["/System/Library/Fonts", "/Library/Fonts"].map(PathBuf::from));
+        if let Some(h) = &home {
+            dirs.push(h.join("Library/Fonts"));
         }
         Self { dirs }
     }
@@ -342,7 +328,7 @@ pub fn scan_system() -> usize {
     if system_scanned() {
         return 0;
     }
-    let n = if cfg!(target_arch = "wasm32") { 0 } else { add_source(&DirectorySource::system()) };
+    let n = add_source(&DirectorySource::system());
     db().write().unwrap_or_else(|e| e.into_inner()).scanned = true;
     n
 }

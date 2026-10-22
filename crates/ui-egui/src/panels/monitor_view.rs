@@ -1,6 +1,6 @@
 //! Monitor view options (the View menu and the monitors' wrench menus): Playback / Paused
 //! Resolution, High Quality Playback, Display Mode (Composite Video, Alpha, Red, Green, Blue,
-//! Multi-Camera, Audio Waveform, Comparison View, Video and Audio Waveform Split), Magnification
+//! Audio Waveform, Video and Audio Waveform Split), Magnification
 //! (Fit, 10%…1600%, the wheel zooming about the pointer, middle-button or Hand-tool panning),
 //! rulers, guides (dragged out of the rulers, Add
 //! Guide…, Clear Guides, Lock Guides, templates saved in the user preferences) and Snap in Program
@@ -19,7 +19,7 @@
 use egui::{Align2, Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
 use serde_json::{Value, json};
 use waltcut_project::ItemId;
-use waltcut_time::{Tick, TimeDisplay, format_time};
+use waltcut_time::Tick;
 
 use crate::FilmcraftApp;
 use crate::dock::PanelKind;
@@ -46,14 +46,13 @@ const RES_NAMES: [(&str, PlaybackRes); 5] = [
     ("sixteenth", PlaybackRes::Sixteenth),
 ];
 
-const DISPLAY_NAMES: [(&str, DisplayMode); 8] = [
+const DISPLAY_NAMES: [(&str, DisplayMode); 7] = [
     ("composite", DisplayMode::Composite),
     ("alpha", DisplayMode::Alpha),
     ("red", DisplayMode::Red),
     ("green", DisplayMode::Green),
     ("blue", DisplayMode::Blue),
     ("audioWaveform", DisplayMode::AudioWaveform),
-    ("comparison", DisplayMode::Comparison),
     ("videoAndWaveform", DisplayMode::VideoAndWaveform),
 ];
 
@@ -223,42 +222,20 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
                 app.session.set_prefs(next).map(|_| json!({"deleted": name})).map_err(|e| format!("saving preferences: {e}"))
             }
         }
-        "compare.setReference" => {
-            let t = params
-                .get("time")
-                .and_then(Value::as_i64)
-                .map(Tick)
-                .or_else(|| params.get("seconds").and_then(Value::as_f64).map(Tick::from_seconds_f64))
-                .unwrap_or_else(|| app.session.playhead());
-            app.ui.program.compare_ref = Some(t.0);
-            Ok(json!({"reference": t.0}))
-        }
         _ => return None,
     };
     Some(r)
 }
 
 fn set_display(app: &mut FilmcraftApp, w: Which, d: &str) -> Result<Value, String> {
-    if d == "multicam" {
-        app.ui.program.multicam = true;
-        return Ok(json!({"monitor": "program", "display": "multicam"}));
-    }
     let (_, mode) = DISPLAY_NAMES.iter().find(|(n, _)| *n == d).ok_or_else(|| format!("unknown display mode `{d}`"))?;
-    // Audio Waveform and the split view are Source Monitor modes, Comparison is a Program mode.
+    // Audio Waveform and the split view are Source Monitor modes.
     let w = match mode {
         DisplayMode::AudioWaveform | DisplayMode::VideoAndWaveform => Which::Source,
-        DisplayMode::Comparison => Which::Program,
         _ => w,
     };
-    let ph = app.session.playhead();
     let v = view_mut(app, w);
     v.display = *mode;
-    if w == Which::Program {
-        v.multicam = false;
-    }
-    if *mode == DisplayMode::Comparison && v.compare_ref.is_none() {
-        v.compare_ref = Some(ph.0);
-    }
     Ok(json!({"monitor": prefix(w), "display": d}))
 }
 
@@ -287,16 +264,12 @@ pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
         return RES_NAMES.iter().find(|(n, _)| *n == r).map(|(_, x)| *x == v.paused_res);
     }
     if let Some(d) = rest.strip_prefix("display.") {
-        if d == "multicam" {
-            return Some(app.ui.program.multicam);
-        }
         let (_, mode) = DISPLAY_NAMES.iter().find(|(n, _)| *n == d)?;
         let v = match mode {
             DisplayMode::AudioWaveform | DisplayMode::VideoAndWaveform => &app.ui.source,
-            DisplayMode::Comparison => &app.ui.program,
             _ => v,
         };
-        return Some(v.display_mode() == Some(*mode));
+        return Some(v.display == *mode);
     }
     if let Some(z) = rest.strip_prefix("magnification.") {
         return Some(if z == "fit" { v.zoom.is_none() } else { ZOOMS.iter().find(|(n, _)| *n == z).is_some_and(|(_, f)| v.zoom == Some(*f)) });
@@ -680,35 +653,6 @@ fn column_peak(peaks: &[(f32, f32)], shown: (Tick, Tick), f0: f64, f1: f64) -> (
 /// Ticks per 48 kHz sample (the waveform peaks are 256-sample min/max pairs at 48 kHz).
 const TICKS_PER_SAMPLE_48K: f64 = waltcut_time::TICKS_PER_SECOND as f64 / 48_000.0;
 
-/// Comparison View: the reference side's label, timecode and step / set buttons.
-pub fn compare_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, rate: waltcut_time::FrameRate, drop_frame: bool) {
-    let t = app.tokens;
-    let rf = Tick(app.ui.program.compare_ref.unwrap_or(app.session.playhead().0));
-    let tc = format_time(rf, rate, drop_frame, TimeDisplay::Timecode, 48000);
-    ui.painter().text(pos2(bar.min.x + 4.0, bar.center().y), Align2::LEFT_CENTER, tlf!("Reference  {tc}", tc), Tokens::ui(11.0), t.text_dim);
-    let mut x = bar.max.x;
-    for (key, label, tip) in [
-        ("set", tl!("Set"), tl!("Set the reference to the playhead")),
-        ("next", "▶", tl!("Reference: next frame")),
-        ("prev", "◀", tl!("Reference: previous frame")),
-    ] {
-        let r = Rect::from_min_max(pos2(x - 34.0, bar.min.y + 1.0), pos2(x - 2.0, bar.max.y - 1.0));
-        x -= 34.0;
-        let resp = ui.interact(r, egui::Id::new(("compare", key)), Sense::click()).on_hover_text(tip);
-        ui.painter().rect_filled(r, 3.0, if resp.hovered() { t.hover } else { t.field_bg });
-        ui.painter().text(r.center(), Align2::CENTER_CENTER, label, Tokens::ui(10.0), t.text);
-        app.auto.add(&format!("program.compare.{key}"), r, tip);
-        if resp.clicked() {
-            let nt = match key {
-                "set" => app.session.playhead(),
-                "next" => rf + rate.frame_duration(),
-                _ => (rf - rate.frame_duration()).max(Tick::ZERO),
-            };
-            app.ui.program.compare_ref = Some(nt.0);
-        }
-    }
-}
-
 type Picks = Vec<(String, Rect, String, bool)>;
 
 fn pick(ui: &mut egui::Ui, out: &mut Picks, key: &str, label: &str, on: bool) {
@@ -719,7 +663,7 @@ fn pick(ui: &mut egui::Ui, out: &mut Picks, key: &str, label: &str, on: bool) {
 /// The view items of a monitor's wrench menu (display modes, resolutions, rulers, guides, snap).
 pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
     let v = view(app, w).clone();
-    let mode = v.display_mode();
+    let mode = Some(v.display);
     let mut out: Picks = Vec::new();
     pick(ui, &mut out, "display.composite", tl!("Composite Video"), mode == Some(DisplayMode::Composite));
     ui.menu_button(tl!("RGBA Channels"), |ui| {
@@ -733,8 +677,6 @@ pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
         }
     });
     if w == Which::Program {
-        pick(ui, &mut out, "display.multicam", tl!("Multi-Camera"), v.multicam);
-        pick(ui, &mut out, "display.comparison", tl!("Comparison View"), mode == Some(DisplayMode::Comparison));
     } else {
         pick(ui, &mut out, "display.audioWaveform", tl!("Audio Waveform"), mode == Some(DisplayMode::AudioWaveform));
         pick(ui, &mut out, "display.videoAndWaveform", tl!("Video and Audio Waveform Split"), mode == Some(DisplayMode::VideoAndWaveform));

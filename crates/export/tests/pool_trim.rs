@@ -27,7 +27,6 @@ fn project() -> (Arc<Project>, ItemId, SourceMap) {
         mark_out: None,
         markers: vec![],
         offline: false,
-        proxy: None,
         identity: None,
     };
     let red = p.add_item(&info.name, Label::Iris, ItemKind::Media(clip), None);

@@ -19,7 +19,6 @@ pub mod gtemplate;
 pub mod keyframe;
 pub mod mask;
 pub mod mixer;
-pub mod multicam;
 pub mod vtransition;
 
 use std::collections::BTreeMap;
@@ -36,7 +35,6 @@ pub use graphic_design::{CharStyle, GraphicMeta, LayerExtra, Pin, PinTarget, Rol
 pub use keyframe::{Interpolation, Keyframe, Param, ParamValue};
 pub use mask::{Mask, MaskMode, MaskPath, MaskVertex, TrackMethod};
 pub use mixer::{AutomationMode, InputMap, MixerStrip, TrackSend};
-pub use multicam::{Camera, MergedClip, MulticamAudio, MulticamSel, MulticamSource};
 
 macro_rules! id_type {
     ($name:ident) => {
@@ -210,8 +208,6 @@ pub struct MediaClip {
     /// the file exists. Files that are merely missing are detected at run time instead (the
     /// engine's media pool), so a project whose media comes back needs no change.
     pub offline: bool,
-    /// Proxy media, if attached.
-    pub proxy: Option<MediaRef>,
     /// Size and content fingerprint of the file when it was imported (or last linked); relinking
     /// checks a candidate against it. None for generators and projects from older builds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -387,8 +383,6 @@ impl ProjectItem {
                 waltcut_media::MediaKind::ImageSequence => "Image Sequence",
                 waltcut_media::MediaKind::Synthetic => "Synthetic",
             },
-            ItemKind::Sequence(s) if s.multicam.is_some() => "Multi-Camera Source Sequence",
-            ItemKind::Sequence(s) if s.merged.is_some() => "Merged Clip",
             ItemKind::Sequence(_) => "Sequence",
             ItemKind::Subclip { .. } => "Subclip",
             ItemKind::AdjustmentLayer { .. } => "Adjustment Layer",
@@ -556,9 +550,6 @@ pub struct TrackItem {
     /// Essential Sound audio type and settings (audio clips).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub essential: Option<EssentialSound>,
-    /// Multi-camera clip (a nested multi-camera source sequence): enabled flag and angle.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub multicam: Option<MulticamSel>,
     /// Video Options ▸ Time Interpolation: how frames are made when the clip's speed is changed.
     #[serde(default, skip_serializing_if = "TimeInterpolation::is_default")]
     pub time_interpolation: TimeInterpolation,
@@ -1002,12 +993,6 @@ pub struct Sequence {
     /// or to a submix after them.
     #[serde(default)]
     pub submix_tracks: Vec<Track>,
-    /// Set on multi-camera source sequences (cameras, audio mode).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub multicam: Option<MulticamSource>,
-    /// Set on merged clips (the merged video and audio items).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merged: Option<MergedClip>,
     /// Split In/Out points (Markers ▸ Mark Split): per-channel overrides of `mark_in`/`mark_out`.
     #[serde(default, skip_serializing_if = "SplitMarks::is_empty")]
     pub split: SplitMarks,
@@ -1135,9 +1120,6 @@ pub struct ProjectSettings {
     pub default_still_duration: Tick,
     pub default_transition_duration_frames: i64,
     pub default_audio_transition_duration: Tick,
-    /// Project Settings ▸ Ingest Settings: what happens to media on import.
-    #[serde(default)]
-    pub ingest: IngestSettings,
     /// Project Settings ▸ General ▸ Action and Title Safe Areas: (horizontal, vertical) percent.
     #[serde(default = "title_safe_default")]
     pub title_safe: (f64, f64),
@@ -1167,40 +1149,13 @@ fn capture_format_default() -> String {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ScratchDisks {
-    /// Captured and Generated media: proxies (when no ingest destination is set), Extract Audio.
+    /// Captured and Generated media: voice-over takes, Extract Audio.
     pub captured: Option<String>,
     /// Video and audio render previews (`<dir>/<project name>`).
     pub video_previews: Option<String>,
     pub audio_previews: Option<String>,
     /// Project Auto Save versions.
     pub auto_save: Option<String>,
-}
-
-/// Ingest on import (Project Settings ▸ Ingest Settings).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct IngestSettings {
-    pub enabled: bool,
-    pub action: IngestAction,
-    /// Destination folder for copies, transcodes and proxies (None = next to the media:
-    /// `<media dir>/Proxies` for proxies, `<media dir>/Ingest` for copies and transcodes).
-    pub destination: Option<String>,
-    /// Proxy / transcode preset id (the engine's `proxies::PRESETS`); empty = the default.
-    pub preset: String,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum IngestAction {
-    /// Copy the files to the destination (verified), then use the copies.
-    Copy,
-    /// Transcode to the preset's format, then use the transcodes.
-    Transcode,
-    /// Create proxies (in the background) and attach them.
-    #[default]
-    CreateProxies,
-    /// Copy, then create proxies of the copies.
-    CopyAndCreateProxies,
 }
 
 impl Default for ProjectSettings {
@@ -1212,7 +1167,6 @@ impl Default for ProjectSettings {
             default_still_duration: Tick(5 * TICKS_PER_SECOND),
             default_transition_duration_frames: 24,
             default_audio_transition_duration: Tick(TICKS_PER_SECOND),
-            ingest: IngestSettings::default(),
             title_safe: title_safe_default(),
             action_safe: action_safe_default(),
             capture_format: capture_format_default(),
@@ -1229,10 +1183,6 @@ pub struct Project {
     pub items: BTreeMap<ItemId, ProjectItem>,
     /// Monotonic id source for all id types.
     pub next_id: u64,
-    /// The project's LUT library (Lumetri Input LUT / Creative Look "Browse…"). LUT files are
-    /// embedded, so projects render without the original files.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub luts: Vec<ProjectLut>,
     /// Search bins (File ▸ New ▸ Search Bin): saved Find queries listed in the Project panel.
     /// Schema v11.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1307,20 +1257,6 @@ impl ProjectView {
     pub const MAX_PLAYHEAD: Tick = Tick(10_000_000 * TICKS_PER_SECOND);
 }
 
-/// A LUT imported into the project (`lut.import`). Lumetri refers to it as `lib:<id>`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ProjectLut {
-    pub id: String,
-    pub name: String,
-    /// Where it was imported from (informational).
-    #[serde(default)]
-    pub source_path: Option<String>,
-    /// `cube` or `3dl`.
-    pub format: String,
-    /// The file's text.
-    pub text: std::sync::Arc<str>,
-}
-
 impl Default for Project {
     fn default() -> Self {
         Self::new("Untitled")
@@ -1335,7 +1271,6 @@ impl Project {
             root: Bin { id: BinId(0), name: name.into(), children: Vec::new() },
             items: BTreeMap::new(),
             next_id: 1,
-            luts: Vec::new(),
             search_bins: Vec::new(),
             source_graphics: BTreeMap::new(),
             notes: String::new(),
@@ -1504,8 +1439,6 @@ impl Project {
             master_effects: Vec::new(),
             master_mixer: MixerStrip::default(),
             submix_tracks: Vec::new(),
-            multicam: None,
-            merged: None,
             split: SplitMarks::default(),
         };
         for i in 0..v {
@@ -1577,9 +1510,6 @@ impl Project {
         if let Some(sg) = &source_graphic {
             effects.extend(sg.layers.iter().cloned());
         }
-        // a multi-camera source sequence edits in as a multi-camera clip showing its first angle
-        let multicam =
-            it.as_sequence().and_then(|q| q.multicam.as_ref()).map(|m| MulticamSel { enabled: true, angle: m.first_video_angle().unwrap_or(0) as u32 });
         let source_channels = if kind == TrackKind::Audio {
             self.resolve_media(item).and_then(|(_, m, _)| m.interpret.audio_channels.as_ref()).and_then(|a| a.clips.first().cloned()).unwrap_or_default()
         } else {
@@ -1606,7 +1536,6 @@ impl Project {
             frame_hold: None,
             scale_to_frame: false,
             essential: None,
-            multicam,
             time_interpolation: TimeInterpolation::default(),
             hold_filters: false,
             field_options: None,
@@ -1807,7 +1736,6 @@ mod tests {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             }),
             None,

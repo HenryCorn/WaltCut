@@ -10,17 +10,7 @@ fn render_noise(effect_id: &str, rate: FrameRate, frame: i64, amount: f64) -> Ve
     let mut effect = find_effect(effect_id).unwrap().instance();
     effect.param_mut("amount").unwrap().value = ParamValue::Float(amount);
     let tick = rate.tick_of(frame);
-    let context = FxCtx {
-        t: tick,
-        px_scale: 1.0,
-        seconds: tick.seconds(),
-        timecode: "00:00:00:00",
-        clip_name: "generated matte",
-        project: None,
-        env: None,
-        frame_rate: 24.0,
-        working: waltcut_color::WorkingSpace::Rec709,
-    };
+    let context = FxCtx { t: tick, px_scale: 1.0, seconds: tick.seconds(), timecode: "00:00:00:00", clip_name: "generated matte", env: None, frame_rate: 24.0 };
     apply(&mut image, &effect, &context);
     image.px
 }

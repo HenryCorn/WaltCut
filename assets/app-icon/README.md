@@ -37,24 +37,14 @@ palette and traces the ink with potrace. Licence: [LICENSE.txt](LICENSE.txt) (MI
 | `filmcraft-1024.png` | 1024 px render |
 | `filmcraft-macos-512.png` | runtime Dock icon on macOS (embedded by `apps/waltcut/src/main.rs`) |
 | `filmcraft.icns` | macOS bundle icon (`CFBundleIconFile`) |
-| `filmcraft.ico` | Windows icon, 16–256 px (embedded in `filmcraft.exe` by `apps/waltcut/build.rs`) |
-| `hicolor/<size>/apps/ai.storyteller.filmcraft.png`, `hicolor/scalable/…svg` | Linux icon theme, used by `packaging/linux/ai.storyteller.filmcraft.desktop` |
-
-The web app's `apps/waltcut-web/web/favicon.png` (128 px) comes from the same artwork.
 
 ## How the icon reaches each OS
 
 - **macOS:** the window icon set at startup (`ViewportBuilder::with_icon`) is the Dock and app-switcher
   icon when the app runs unbundled. A future `.app` bundle points `CFBundleIconFile` at `filmcraft.icns`.
-- **Windows:** `build.rs` embeds `filmcraft.ico` as the exe's resource icon (Explorer, Start menu,
-  pinned taskbar), and the runtime icon covers the window, taskbar and Alt-Tab.
-- **Linux:** the runtime icon plus `with_app_id("ai.storyteller.filmcraft")`, which Wayland matches to
-  the `.desktop` file. Install the `hicolor/` tree under `/usr/share/icons/hicolor/` and the desktop
-  file under `/usr/share/applications/`.
 
 ## Regenerate
 
-`packaging/icons.sh` (needs `resvg`; `iconutil` on macOS for the `.icns`; the `.ico` is packed by
-`cargo xtask ico`). To change the artwork, replace `filmcraft.svg` and `filmcraft-small.svg` with new
+`packaging/icons.sh` (needs `resvg`; `iconutil` on macOS for the `.icns`). To change the artwork, replace `filmcraft.svg` and `filmcraft-small.svg` with new
 exports from craftrules, then run the script. Every derived file needs its `.attribution` sidecar
 and a row in `ATTRIBUTION.md`.

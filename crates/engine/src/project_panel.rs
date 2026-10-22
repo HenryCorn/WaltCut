@@ -218,7 +218,7 @@ pub const DEFAULT_COLUMNS: [&str; 12] = [
 ];
 
 /// Every built-in column (Metadata Display ▸ Project Metadata), in display order.
-pub const BUILTIN_COLUMNS: [&str; 36] = [
+pub const BUILTIN_COLUMNS: [&str; 35] = [
     "Name",
     "Label",
     "Media Type",
@@ -242,7 +242,6 @@ pub const BUILTIN_COLUMNS: [&str; 36] = [
     "Video Usage",
     "Audio Usage",
     "Status",
-    "Proxy",
     "File Path",
     "File Size",
     "Date Created",
@@ -272,7 +271,7 @@ pub fn is_internal_key(k: &str) -> bool {
 pub fn default_width(c: &str) -> f32 {
     match c {
         "Name" => 220.0,
-        "Label" | "Frame Rate" | "Status" | "Good" | "Proxy" => 80.0,
+        "Label" | "Frame Rate" | "Status" | "Good" => 80.0,
         "Video Info" | "Audio Info" | "File Path" | "Description" | "Log Note" | "Comment" => 170.0,
         _ => 110.0,
     }
@@ -414,11 +413,6 @@ pub fn cell(p: &Project, it: &ProjectItem, column: &str) -> (String, SortKey) {
         "Status" => text(match media {
             Some(m) if m.offline => "Offline".into(),
             Some(_) => "Online".into(),
-            None => String::new(),
-        }),
-        "Proxy" => text(match media {
-            Some(m) if m.proxy.is_some() => "Attached".into(),
-            Some(_) => "None".into(),
             None => String::new(),
         }),
         "File Path" => text(match media.map(|m| &m.media) {

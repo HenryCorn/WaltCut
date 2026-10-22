@@ -121,7 +121,6 @@ fn scene(specs: &[Spec]) -> (Project, ItemId, SourceMap) {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             }),
             None,

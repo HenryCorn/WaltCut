@@ -1,6 +1,6 @@
-//! Headless UI tests of the M8.9 / M12.6 panels: Lumetri Scopes (layouts, the settings menu,
-//! footer), Metadata (edit a field by typing, undo), Timecode, Events, Progress and the Reference
-//! Monitor, each opened from Window ▸ and driven by automation id through the control channel.
+//! Headless UI tests of the M8.9 / M12.6 panels: Metadata (edit a field by typing, undo),
+//! Timecode, Events and Progress, each opened from Window ▸ and driven by automation id through
+//! the control channel.
 //!
 //! Set `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` to also render offscreen with wgpu and write `panels-*.png`.
 
@@ -159,16 +159,14 @@ fn every_panel_opens_from_the_window_menu() {
     let menu = d.ok("ui.menu.list", json!({}));
     let window: Vec<String> =
         menu.as_array().unwrap().iter().filter(|m| m["path"] == json!(["Window"])).filter_map(|m| m["label"].as_str().map(str::to_string)).collect();
-    for p in ["Events", "Lumetri Scopes", "Metadata", "Progress", "Project Notes", "Reference Monitor", "Timecode"] {
+    for p in ["Events", "Metadata", "Progress", "Project Notes", "Timecode"] {
         assert!(window.iter().any(|w| w == p), "{p} not in Window: {window:?}");
     }
     for (panel, key) in [
-        ("LumetriScopes", "scopes.wrench"),
         ("Metadata", "metadata."),
         ("Timecode", "timecode.row.0"),
         ("Events", "events.clearAll"),
         ("Progress", "progress.showFinished"),
-        ("ReferenceMonitor", "reference.gang"),
         ("ProjectNotes", "notes.text"),
     ] {
         d.ok("ui.menu.invoke", json!({"id": format!("window.panel.{panel}")}));
@@ -234,7 +232,7 @@ fn wheel_over_a_tab_strip_switches_tabs() {
     let mut d = Driver::demo();
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, -40.0);
-    assert_eq!(shown(&mut d), PanelKind::MediaBrowser);
+    assert_eq!(shown(&mut d), PanelKind::Libraries);
     wheel(&mut d, 40.0);
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, 120.0);
@@ -253,65 +251,18 @@ fn wheel_over_a_tab_strip_switches_tabs() {
             phase: egui::TouchPhase::Move,
         });
         d.frames(1);
-        let expect = if step < 3 { PanelKind::Project } else { PanelKind::MediaBrowser };
+        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Libraries };
         assert_eq!(shown(&mut d), expect, "after {} pt", (step + 1) * 10);
     }
 
-    d.ok("ui.scroll", json!({"id": "panel.MediaBrowser", "dy": -40.0}));
+    d.ok("ui.scroll", json!({"id": "panel.Libraries", "dy": -40.0}));
     d.frames(2);
-    assert_eq!(shown(&mut d), PanelKind::MediaBrowser, "the wheel over the content keeps the tab");
+    assert_eq!(shown(&mut d), PanelKind::Libraries, "the wheel over the content keeps the tab");
 
     for _ in 0..10 {
         wheel(&mut d, -40.0);
     }
     assert_eq!(shown(&mut d), PanelKind::History, "no wrap past the last tab");
-}
-
-#[test]
-fn lumetri_scopes_layouts_menu_and_footer() {
-    let mut d = Driver::demo();
-    d.ok("ui.set", json!({"workspace": "Color"}));
-    d.ok("ui.panel.show", json!({"panel": "LumetriScopes"}));
-    // the default: RGB parade, Rec. 709, 8 Bit, Clamp Signal
-    d.wait_for("scopes.view.parade");
-    assert_eq!(d.label("scopes.space"), "Rec. 709");
-    let p = d.ui_panels();
-    assert_eq!((p["scopes"]["shown"].clone(), p["scopes"]["scale"].clone(), p["scopes"]["clamp"].clone()), (json!(["parade"]), json!("bits8"), json!(true)));
-    d.snapshot("panels-scopes-parade", Some("scopes."));
-    // the wrench menu: add the YUV vectorscope, switch the waveform type through its submenu
-    d.click("scopes.wrench");
-    assert!(d.has("scopes.menu.vectorscopeYuv"), "{:?}", d.ids("scopes.menu"));
-    d.click("scopes.menu.vectorscopeYuv");
-    d.wait_for("scopes.view.vectorscopeYuv");
-    assert!(d.has("scopes.view.parade"));
-    // Clamp Signal in the footer
-    d.click("scopes.clamp");
-    assert_eq!(d.ui_panels()["scopes"]["clamp"], json!(false));
-    // all five scopes in a grid, through ui.set; then a preset
-    d.ok("ui.set", json!({"panels": {"scopes": {"shown": ["vectorscopeYuv", "vectorscopeHls", "histogram", "parade", "waveform"], "waveformType": "yc", "paradeType": "rgbWhite", "brightness": "bright", "targets": "100"}}}));
-    for k in ["vectorscopeYuv", "vectorscopeHls", "histogram", "parade", "waveform"] {
-        d.wait_for(&format!("scopes.view.{k}"));
-    }
-    let rects: Vec<Value> = d.ok("ui.elements", json!({"prefix": "scopes.view."})).as_array().unwrap().iter().map(|e| e["rect"].clone()).collect();
-    assert_eq!(rects.len(), 5);
-    d.snapshot("panels-scopes-five", Some("scopes."));
-    d.click("scopes.wrench");
-    d.ok("ui.click", json!({"id": "scopes.menu.presets"}));
-    d.frames(3);
-    d.wait_for("scopes.menu.preset.5");
-    d.click("scopes.menu.preset.5");
-    let s = d.ui_panels()["scopes"].clone();
-    assert_eq!(s["preset"], json!("Four Scopes (YUV, float, no clamp)"), "{s}");
-    assert_eq!((s["scale"].clone(), s["clamp"].clone(), s["paradeType"].clone()), (json!("float"), json!(false), json!("yuv")));
-    assert_eq!(s["shown"].as_array().unwrap().len(), 4);
-    // colour space: Rec. 601 shows in the footer
-    d.ok("ui.set", json!({"panels": {"scopes": {"colorSpace": "rec601"}}}));
-    d.frames(3);
-    assert_eq!(d.label("scopes.space"), "Rec. 601");
-    // the numbers behind it, for agents
-    let r = d.exec("scopes.read", json!({"scopes": ["histogram"], "colorSpace": "601", "bins": false}));
-    assert_eq!(r["matrix"], "Bt601");
-    assert!(r["histogram"]["samples"].as_u64().unwrap() > 1000, "{r}");
 }
 
 #[test]
@@ -468,60 +419,6 @@ fn events_and_progress_panels() {
     assert!(!d.has("progress.job.4242"));
 }
 
-#[test]
-fn reference_monitor_parks_gangs_and_shows_scopes() {
-    let mut d = Driver::demo();
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.ReferenceMonitor"}));
-    d.frames(3);
-    assert_eq!(d.label("reference.timecode"), "00:00:00:00");
-    d.exec("playhead.set", json!({"timecode": "00:00:03:00"}));
-    d.frames(2);
-    // parked: the playhead moved, the reference did not
-    assert_eq!(d.label("reference.timecode"), "00:00:00:00");
-    d.click("reference.matchPlayhead");
-    assert_eq!(d.label("reference.timecode"), "00:00:03:00");
-    d.click("reference.stepForward");
-    assert_eq!(d.label("reference.timecode"), "00:00:03:01");
-    // ganged: follows the playhead
-    d.click("reference.gang");
-    assert_eq!(d.ui_panels()["reference"]["ganged"], json!(true));
-    d.exec("playhead.set", json!({"timecode": "00:00:01:00"}));
-    d.frames(2);
-    assert_eq!(d.label("reference.timecode"), "00:00:01:00");
-    d.wait_for("reference.picture");
-    d.snapshot("panels-reference-composite", Some("reference."));
-    // scopes of the reference frame
-    d.ok("ui.set", json!({"panels": {"reference": {"display": "scopes"}}}));
-    d.wait_for("reference.scopes.view.vectorscopeYuv");
-    d.wait_for("reference.scopes.view.waveform");
-    d.snapshot("panels-reference-scopes", Some("reference."));
-}
-
-#[test]
-fn scopes_of_colour_bars() {
-    let mut s = Session::default();
-    let id = s.execute("file.newBarsAndTone", json!({"seconds": 2})).unwrap()["item"].as_u64().unwrap();
-    s.execute("file.newSequenceFromClip", json!({"items": [id]})).unwrap();
-    let mut d = Driver::with(s);
-    d.ok(
-        "ui.set",
-        json!({"workspace": "Color", "panels": {"scopes": {"shown": ["vectorscopeYuv", "histogram", "parade", "waveform"], "waveformType": "luma"}}}),
-    );
-    d.ok("ui.panel.show", json!({"panel": "LumetriScopes"}));
-    for k in ["vectorscopeYuv", "histogram", "parade", "waveform"] {
-        d.wait_for(&format!("scopes.view.{k}"));
-    }
-    d.snapshot("panels-scopes-bars", Some("scopes."));
-    // the numbers: the six 75 % bars sit on their targets
-    let r = d.exec("scopes.read", json!({"scopes": ["vectorscopeYuv", "parade"], "columns": 8}));
-    let peaks = r["vectorscopeYuv"]["peaks"].as_array().unwrap();
-    let angles: Vec<f64> = peaks.iter().take(7).map(|p| p["angleDeg"].as_f64().unwrap()).collect();
-    for t in waltcut_scopes::targets(waltcut_scopes::Matrix::Bt709, 191.0 / 255.0) {
-        let a = waltcut_scopes::angle_deg(t.cb, t.cr) as f64;
-        assert!(angles.iter().any(|x| (x - a).abs() < 1.5), "{} at {a:.1}° not in {angles:?}", t.name);
-    }
-}
-
 /// #1075: child backgrounds must not cover the focus outline shared with Program. Check the
 /// rendered primitives, including Media Browser's parent group, in both requested themes.
 #[test]
@@ -536,7 +433,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     let mut d = Driver::demo();
     for theme in ["dark", "light"] {
         d.ok("ui.set", json!({"theme": theme}));
-        for panel in ["Program", "LumetriScopes", "EssentialSound", "Timeline", "MediaBrowser"] {
+        for panel in ["Program", "EssentialSound", "Timeline", "Libraries"] {
             d.ok("ui.panel.show", json!({"panel": panel}));
             d.ok("ui.set", json!({"focused": panel}));
             d.frames(3);
@@ -718,7 +615,7 @@ fn inspector_source_defaults_when_loading_an_older_ui_state() {
     saved["panels"].as_object_mut().unwrap().remove("inspectorSource");
     let restored: waltcut_ui_egui::state::UiState = serde_json::from_value(saved).unwrap();
     assert_eq!(restored.panels.inspector_source, waltcut_ui_egui::panels::panel_state::InspectorSource::Project);
-    assert_eq!(restored.panels.scopes, ui.panels.scopes);
+    assert_eq!(restored.panels.timecode, ui.panels.timecode);
 }
 
 #[test]
@@ -746,8 +643,7 @@ fn middle_closing_an_inactive_project_tab_keeps_the_inspector_target() {
 }
 
 /// #2329: in the Effects panel what a folder holds is indented under it: an effect's label starts
-/// right of its sub-folder's, a sub-folder's right of its top folder's, and the same for presets
-/// and Lumetri presets.
+/// right of its sub-folder's, a sub-folder's right of its top folder's, and the same for presets.
 #[test]
 fn effects_are_indented_under_their_folders() {
     fn text_x(d: &mut Driver, text: &str) -> f32 {
@@ -764,19 +660,12 @@ fn effects_are_indented_under_their_folders() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Effects"}));
     d.frames(3);
-    for folder in ["Video Effects", "Video Effects/Blur & Sharpen", "Presets", "Lumetri Presets", "Lumetri Presets/Monochrome"] {
+    for folder in ["Video Effects", "Video Effects/Blur & Sharpen", "Presets"] {
         d.click(&format!("effects.folder.{folder}"));
     }
     d.frames(2);
     let preset = d.app().session.presets.all()[0].name.clone();
-    let lumetri = waltcut_render::lumetri_presets::presets().into_iter().find(|p| p.folder == "Monochrome").unwrap().name;
-    for (outer, inner) in [
-        ("Video Effects", "Blur & Sharpen"),
-        ("Blur & Sharpen", "Gaussian Blur"),
-        ("Presets", preset.as_str()),
-        ("Lumetri Presets", "Monochrome"),
-        ("Monochrome", lumetri),
-    ] {
+    for (outer, inner) in [("Video Effects", "Blur & Sharpen"), ("Blur & Sharpen", "Gaussian Blur"), ("Presets", preset.as_str())] {
         let (a, b) = (text_x(&mut d, outer), text_x(&mut d, inner));
         assert!(b >= a + 12.0, "`{inner}` ({b}) is not indented under `{outer}` ({a})");
     }

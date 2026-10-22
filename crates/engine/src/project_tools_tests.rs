@@ -49,14 +49,12 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "file.saveAll",
             "file.revert",
             "media.makeOffline",
-            "file.importFromMediaBrowser",
             "file.import",
-            "file.projectManager",
         ],
     );
-    assert_order(&menu_ids(&["File", "Export"]), &["file.exportEdl", "file.exportSelectionProject", "file.exportAle", "file.exportOtio", "file.exportFcp7Xml"]);
+    assert_order(&menu_ids(&["File", "Export"]), &["file.exportMedia", "file.exportSelectionProject"]);
     assert_eq!(menu_ids(&["File", "Get Media File Properties for"]), vec!["file.mediaPropertiesFile", "file.mediaProperties"]);
-    assert_eq!(menu_ids(&["File", "Project Settings"]), vec!["file.projectSettings.general", "file.projectSettings.scratchDisks", "project.ingestSettings"]);
+    assert_eq!(menu_ids(&["File", "Project Settings"]), vec!["file.projectSettings.general", "file.projectSettings.scratchDisks"]);
     assert_order(&menu_ids(&["Edit"]), &["edit.deselectAll", "edit.find", "edit.findNext", "edit.consolidateDuplicates", "edit.editOriginal"]);
     let clip: Vec<&str> = crate::commands::command_specs().iter().filter(|c| c.menu.first() == Some(&"Clip")).map(|c| c.id).collect();
     assert_order(
@@ -66,7 +64,6 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
             "clip.editOffline",
             "clip.sourceSettings",
             "clip.speedDuration",
-            "clip.sceneEditDetection",
             "clip.replaceFromBin",
             "clip.updateMetadata",
             "clip.generateAudioWaveform",
@@ -75,13 +72,10 @@ fn file_edit_clip_menu_order_and_shortcuts_match_premiere() {
     );
     for (id, label, sc) in [
         ("file.close", "Close", Some("Cmd+W")),
-        ("file.importFromMediaBrowser", "Import from Media Browser", Some("Cmd+Alt+I")),
         ("file.mediaProperties", "Selection…", Some("Cmd+Shift+H")),
         ("file.exportSelectionProject", "Selection as FilmCraft Project…", None),
-        ("file.exportAle", "Avid Log Exchange…", None),
         ("edit.find", "Find…", Some("Cmd+F")),
         ("edit.editOriginal", "Edit Original", Some("Cmd+E")),
-        ("clip.sceneEditDetection", "Scene Edit Detection…", None),
         ("clip.automateToSequence", "Automate to Sequence…", None),
     ] {
         let c = crate::commands::find(id).unwrap();
@@ -208,15 +202,6 @@ fn export_selection_project_and_ale() {
     let mut listed = Vec::new();
     p.root.all_items(&mut listed);
     assert!(p.items.keys().all(|k| listed.contains(k) || matches!(p.item(*k).unwrap().kind, ItemKind::Graphic { .. })));
-    // ALE of the selection, or of the whole project
-    let ale = dir.join("log.ale").to_string_lossy().to_string();
-    s.execute("project.select", json!({"items": []})).unwrap();
-    let r = s.execute("file.exportAle", json!({"path": ale})).unwrap();
-    let doc = waltcut_interchange::ale::parse(&std::fs::read_to_string(&ale).unwrap()).unwrap();
-    assert_eq!(r["clips"].as_u64().unwrap() as usize, doc.rows.len());
-    assert!(doc.rows.len() >= 9, "{}", doc.rows.len());
-    assert_eq!(doc.heading("FPS"), Some("23.976"));
-    assert!(doc.rows.iter().any(|r| r[0] == "Ambient_Score.wav" && r[1] == "A1A2"));
 }
 
 #[test]
@@ -336,7 +321,6 @@ fn edit_original_opens_media_files_only() {
     for f in ["run.bat", "app.desktop", "clip.mov.lnk", "Tool.app", "folder.mov", "missing.mov", ""] {
         assert!(!ok(f), "{f}");
     }
-    #[cfg(unix)]
     {
         std::os::unix::fs::symlink(d.join("app.desktop"), d.join("link.mov")).unwrap();
         assert!(!ok("link.mov"), "a media name linking to another kind of file");

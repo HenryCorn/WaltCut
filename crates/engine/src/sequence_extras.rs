@@ -184,7 +184,7 @@ pub fn mix_peak_db(s: &Session) -> Result<f64> {
     let q = s.project.sequence(seq_id).ok_or(EngineError::NoSequence)?;
     let sr = q.settings.sample_rate.max(1);
     let total = q.duration().to_units_floor(sr as i64);
-    let provider = s.media.full_res_provider(s.project.clone(), s.services.clone());
+    let provider = s.media.provider(s.project.clone(), s.services.clone());
     let mut peak = 0f32;
     let mut pos = 0i64;
     while pos < total {

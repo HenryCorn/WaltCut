@@ -6,8 +6,7 @@
 //! untouched) and keeps the latest sample here for the UI to read while it builds a stroke.
 //!
 //! Like [`crate::cursor`], this is a read-only, non-media OS call that lives here because this
-//! is the only crate allowed `unsafe` (AGENTS.md §0.3, ADR 0001). Other platforms (and a monitor
-//! that could not be installed) report `None`, and the UI draws at full pressure.
+//! is the only crate allowed `unsafe` (AGENTS.md §0.3, ADR 0001). A monitor that could not be installed reports `None`, and the UI draws at full pressure.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -17,7 +16,6 @@ static PRESSURE: AtomicU32 = AtomicU32::new(0);
 static TABLET: AtomicBool = AtomicBool::new(false);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 
-#[cfg(any(test, target_os = "macos"))]
 fn record(tablet: bool, pressure: f32) {
     TABLET.store(tablet, Ordering::Relaxed);
     let p = if pressure.is_finite() { pressure.clamp(0.0, 1.0) } else { 1.0 };
@@ -43,7 +41,6 @@ pub fn install_pen_monitor() -> bool {
     ok
 }
 
-#[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 mod imp {
     use std::ptr::NonNull;
@@ -81,13 +78,6 @@ mod imp {
         let ok = monitor.is_some();
         std::mem::forget(monitor);
         ok
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-mod imp {
-    pub fn install() -> bool {
-        false
     }
 }
 

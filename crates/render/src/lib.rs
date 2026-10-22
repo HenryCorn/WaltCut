@@ -12,7 +12,6 @@
 pub mod audio;
 pub mod audio_fx;
 pub mod blend;
-pub mod color_match;
 pub mod colorman;
 pub mod drawing;
 pub mod effects;
@@ -21,16 +20,12 @@ pub mod gpufx;
 pub mod graphic_clip;
 pub mod graphics;
 pub mod image;
-pub mod lumetri_presets;
-pub mod luts;
 pub mod mask;
 pub mod mixer;
-pub mod multicam;
 pub mod offline;
 pub mod plan;
 pub mod preview;
 pub mod remix;
-pub mod scene;
 pub mod track;
 pub mod transitions;
 pub mod vfx;
@@ -166,7 +161,7 @@ impl Layer {
     }
 }
 
-/// Render a sequence, or only its video track `only` (a multi-camera angle; drawn even when the
+/// Render a sequence, or only its video track `only` (what a track-reading effect sees; drawn even when the
 /// track's output is off).
 pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, sources: &dyn SourceProvider, only: Option<usize>) -> Image {
     let (w, h) = output_size(seq, opts.scale);
@@ -278,10 +273,8 @@ fn adjustment_layer(project: &Project, seq: &Sequence, item: &TrackItem, t: Tick
         seconds: (t - item.start).seconds(),
         timecode: tc,
         clip_name: &item.name,
-        project: Some(project),
         env: None,
         frame_rate: seq.settings.frame_rate.as_f64(),
-        working: seq.settings.color.working,
     };
     for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic)) {
         mask::apply_effect(&mut adj, e, &cx);
@@ -512,10 +505,8 @@ pub(crate) fn item_layer_ex(
             seconds: (t - item.start).seconds(),
             timecode: tc,
             clip_name: &item.name,
-            project: Some(project),
             env: Some(&env),
             frame_rate: seq.settings.frame_rate.as_f64(),
-            working: seq.settings.color.working,
         };
         for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)) {
             if waltcut_media::cancel::cancelled() {
@@ -608,17 +599,7 @@ pub(crate) fn base_layer(
         }
         ItemKind::Sequence(nested) => {
             let sub = RenderOptions { scale: want, effects: opts.effects, depth: opts.depth + 1, working_output: true };
-            match item.multicam_angle(nested) {
-                // a multi-camera clip shows its angle's track only (nothing for an audio-only angle)
-                Some(angle) => match nested.angle_video_track_index(angle) {
-                    Some(ti) => render_seq_tracks(project, nested, ft, sub, sources, Some(ti)),
-                    None => {
-                        let (nw, nh) = output_size(nested, want);
-                        Image::new(nw, nh)
-                    }
-                },
-                None => render_seq(project, nested, ft, sub, sources),
-            }
+            render_seq(project, nested, ft, sub, sources)
         }
         ItemKind::AdjustmentLayer { .. } => return None,
         ItemKind::Graphic { .. } => {
@@ -724,8 +705,6 @@ pub fn arc_source(s: impl waltcut_media::MediaSource + 'static) -> SharedSource 
 mod tests;
 
 #[cfg(test)]
-mod lumetri_hdr_tests;
-
 #[cfg(test)]
 #[path = "adjustment_tests.rs"]
 mod adjustment_tests;

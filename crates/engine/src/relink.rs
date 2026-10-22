@@ -83,7 +83,7 @@ pub struct Missing {
     pub name: String,
     pub file_name: String,
     pub path: String,
-    /// `missing` (file not found), `offline` (made offline) or `proxyMissing` (only the proxy).
+    /// `missing` (file not found) or `offline` (made offline).
     pub status: &'static str,
     pub duration: i64,
     pub start_timecode: Option<i64>,
@@ -112,10 +112,6 @@ pub fn scan(p: &Project, pool: &MediaPool, services: &dyn Services) -> Vec<Missi
             "offline"
         } else if !exists(path) {
             "missing"
-        } else if let Some(MediaRef::File { path: pp }) = &m.proxy
-            && !exists(pp)
-        {
-            "proxyMissing"
         } else {
             continue;
         };
@@ -135,7 +131,7 @@ pub fn scan(p: &Project, pool: &MediaPool, services: &dyn Services) -> Vec<Missi
 /// Rescan and remember the result. Returns the list.
 pub fn refresh(s: &mut Session) -> Vec<Missing> {
     let list = scan(&s.project, &s.media, &*s.services);
-    s.offline.missing = list.iter().filter(|m| m.status != "proxyMissing").map(|m| ItemId(m.item)).collect();
+    s.offline.missing = list.iter().map(|m| ItemId(m.item)).collect();
     list
 }
 
@@ -589,17 +585,12 @@ fn status_json(s: &Session, id: ItemId) -> Option<Value> {
             _ => "online",
         },
     };
-    let proxy = match &m.proxy {
-        Some(MediaRef::File { path }) => json!({"path": path, "online": s.services.file_size(path).is_ok()}),
-        _ => Value::Null,
-    };
     Some(json!({
         "item": id.0,
         "name": it.name,
         "path": path,
         "status": status,
         "identity": m.identity,
-        "proxy": proxy,
     }))
 }
 

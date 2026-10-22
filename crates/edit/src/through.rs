@@ -19,7 +19,7 @@ const MEDIA_SLACK: i64 = 2;
 /// Whether the cut between adjacent items `a` (left) and `b` (right) is a through edit: same
 /// source, same speed and direction, and `b` continues `a` in media time.
 pub fn is_through_edit(a: &TrackItem, b: &TrackItem) -> bool {
-    if a.end() != b.start || a.item != b.item || a.speed != b.speed || a.reverse != b.reverse || a.multicam != b.multicam {
+    if a.end() != b.start || a.item != b.item || a.speed != b.speed || a.reverse != b.reverse {
         return false;
     }
     match (a.frame_hold, b.frame_hold) {
@@ -179,7 +179,6 @@ mod tests {
             frame_hold: None,
             scale_to_frame: false,
             essential: None,
-            multicam: None,
             time_interpolation: Default::default(),
             hold_filters: false,
             field_options: None,

@@ -29,7 +29,6 @@ pub fn add_generator(p: &mut Project, pool: &MediaPool, src: GeneratorSource, na
         mark_out: None,
         markers: vec![],
         offline: false,
-        proxy: None,
         identity: None,
     };
     let key = crate::media_pool::media_key(&clip);
@@ -151,16 +150,6 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
         o.set_at(r.tick_of(12), ParamValue::Float(100.0));
         o.set_at(r.tick_of(84), ParamValue::Float(100.0));
         o.set_at(r.tick_of(95), ParamValue::Float(0.0));
-    }
-    // Grade on the dunes shot.
-    if let Some(mut lum) = find_effect("lumetri").map(|d| d.instance()) {
-        lum.params.get_mut("temperature").map(|v| v.value = ParamValue::Float(18.0));
-        lum.params.get_mut("contrast").map(|v| v.value = ParamValue::Float(22.0));
-        lum.params.get_mut("vignette_amount").map(|v| v.value = ParamValue::Float(-1.4));
-        let s = p.sequence_mut(seq)?;
-        if let Some(it) = s.video_tracks[0].items.get_mut(3) {
-            it.effects.insert(0, lum);
-        }
     }
     let s = p.sequence_mut(seq)?;
     s.video_tracks[1].items.push(ov);

@@ -33,17 +33,14 @@ pub fn item_icon(k: &ItemKind) -> Icon {
     }
 }
 
-/// Offline / proxy state of a project item for the badges.
+/// Offline state of a project item for the badges.
 pub struct Badge {
     pub offline: bool,
     pub offline_text: &'static str,
-    pub proxy: bool,
-    /// Proxies are enabled (the badge is lit).
-    pub proxy_on: bool,
 }
 
 pub fn media_badge(app: &FilmcraftApp, it: &waltcut_project::ProjectItem) -> Badge {
-    let mut b = Badge { offline: false, offline_text: "", proxy: false, proxy_on: false };
+    let mut b = Badge { offline: false, offline_text: "" };
     let target = match &it.kind {
         ItemKind::Subclip { parent, .. } => app.session.project.item(*parent),
         _ => Some(it),
@@ -58,21 +55,12 @@ pub fn media_badge(app: &FilmcraftApp, it: &waltcut_project::ProjectItem) -> Bad
         b.offline = true;
         b.offline_text = if st.reason == waltcut_render::offline::OfflineReason::Unreadable { tl!("Unreadable") } else { tl!("Media missing") };
     }
-    b.proxy = m.proxy.is_some();
-    b.proxy_on = app.session.media.use_proxies();
     b
 }
 
-fn paint_badges(ui: &egui::Ui, b: &Badge, at: egui::Pos2, t: &Tokens) {
-    let mut x = at.x;
+fn paint_badges(ui: &egui::Ui, b: &Badge, at: egui::Pos2) {
     if b.offline {
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(x + 7.0, at.y), vec2(13.0, 13.0)), Icon::Offline, OFFLINE);
-        x += 18.0;
-    }
-    if b.proxy {
-        let pr = Rect::from_min_size(pos2(x, at.y - 7.0), vec2(16.0, 14.0));
-        ui.painter().rect_filled(pr, 2.0, if b.proxy_on { t.accent } else { Color32::from_gray(70) });
-        ui.painter().text(pr.center(), Align2::CENTER_CENTER, "P", Tokens::ui(10.0), Color32::WHITE);
+        icons::paint(ui.painter(), Rect::from_center_size(pos2(at.x + 7.0, at.y), vec2(13.0, 13.0)), Icon::Offline, OFFLINE);
     }
 }
 
@@ -309,20 +297,6 @@ fn item_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, id: ItemId, kind: &ItemK
                 ui.close();
             }
         }
-        ui.menu_button(tl!("Proxy"), |ui| {
-            for (label, cmd) in [
-                (tl!("Create Proxies…"), "media.createProxies"),
-                (tl!("Attach Proxies…"), "media.attachProxies"),
-                (tl!("Reconnect Full Resolution Media…"), "media.reconnectFullRes"),
-                (tl!("Detach Proxies"), "media.detachProxies"),
-            ] {
-                if ui.button(label).clicked() {
-                    actions.push(("project.select".into(), json!({"items": [id.0]})));
-                    actions.push((cmd.into(), json!({})));
-                    ui.close();
-                }
-            }
-        });
     }
     ui.separator();
     if ui.button(tl!("Clear")).clicked() {
@@ -765,7 +739,7 @@ fn list_bin(app: &mut FilmcraftApp, ui: &mut egui::Ui, bin: &Bin, depth: usize, 
                 if badge.offline { OFFLINE } else { t.text },
             );
             if nr.max.x + 40.0 < name_r.max.x {
-                paint_badges(ui, &badge, pos2(nr.max.x + 6.0, r.center().y), &t);
+                paint_badges(ui, &badge, pos2(nr.max.x + 6.0, r.center().y));
             }
         }
         x += name_w;
@@ -879,12 +853,6 @@ fn card(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, id: ItemId, pre: &st
         icons::paint(ui.painter(), Rect::from_center_size(pos2(band.min.x + 12.0, band.center().y), vec2(13.0, 13.0)), Icon::Offline, Color32::WHITE);
         ui.painter().text(pos2(band.min.x + 24.0, band.center().y), Align2::LEFT_CENTER, badge.offline_text, Tokens::ui(10.5), Color32::WHITE);
         app.auto.add(&format!("{pre}.item.{}.offline", id.0), band, badge.offline_text);
-    }
-    if badge.proxy {
-        let pr = Rect::from_min_size(pos2(th.max.x - 22.0, th.min.y + 4.0), vec2(18.0, 14.0));
-        ui.painter().rect_filled(pr, 2.0, if badge.proxy_on { t.accent } else { Color32::from_gray(70) });
-        ui.painter().text(pr.center(), Align2::CENTER_CENTER, "P", Tokens::ui(10.0), Color32::WHITE);
-        app.auto.add(&format!("{pre}.item.{}.proxy", id.0), pr, "Proxy attached");
     }
     let f = font(app);
     let ty = th.max.y + 11.0;

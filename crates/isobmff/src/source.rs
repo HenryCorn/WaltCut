@@ -70,34 +70,12 @@ impl<T: ByteSource + ?Sized> ByteSource for Box<T> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl ByteSource for std::fs::File {
     fn len(&self) -> u64 {
         self.metadata().map(|m| m.len()).unwrap_or(0)
     }
-    #[cfg(unix)]
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> io::Result<()> {
         std::os::unix::fs::FileExt::read_exact_at(self, buf, offset)
-    }
-    #[cfg(windows)]
-    fn read_at(&self, mut offset: u64, mut buf: &mut [u8]) -> io::Result<()> {
-        use std::os::windows::fs::FileExt;
-        while !buf.is_empty() {
-            let n = self.seek_read(buf, offset)?;
-            if n == 0 {
-                return Err(eof());
-            }
-            offset += n as u64;
-            buf = &mut buf[n..];
-        }
-        Ok(())
-    }
-    #[cfg(not(any(unix, windows)))]
-    fn read_at(&self, offset: u64, buf: &mut [u8]) -> io::Result<()> {
-        use std::io::{Read, Seek, SeekFrom};
-        let mut f = self;
-        f.seek(SeekFrom::Start(offset))?;
-        f.read_exact(buf)
     }
 }
 

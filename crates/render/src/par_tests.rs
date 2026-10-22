@@ -70,7 +70,6 @@ fn project(src: (u32, u32), src_par: (u32, u32), seq: (u32, u32), seq_par: (u32,
         mark_out: None,
         markers: vec![],
         offline: false,
-        proxy: None,
         identity: None,
     };
     let item = p.add_item("halves", Label::Iris, ItemKind::Media(clip), None);

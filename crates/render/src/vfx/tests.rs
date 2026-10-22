@@ -9,17 +9,7 @@ use waltcut_project::{EffectKind, Interpolation, Keyframe, Param, ParamKind, fin
 use super::*;
 
 fn cx() -> FxCtx<'static> {
-    FxCtx {
-        t: Tick::ZERO,
-        px_scale: 1.0,
-        seconds: 0.0,
-        timecode: "01:00:00:00",
-        clip_name: "clip",
-        project: None,
-        env: None,
-        frame_rate: 24.0,
-        working: waltcut_color::WorkingSpace::Rec709,
-    }
+    FxCtx { t: Tick::ZERO, px_scale: 1.0, seconds: 0.0, timecode: "01:00:00:00", clip_name: "clip", env: None, frame_rate: 24.0 }
 }
 
 fn inst(id: &str) -> EffectInstance {
@@ -1094,7 +1084,6 @@ mod pipeline {
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: None,
             }),
             None,

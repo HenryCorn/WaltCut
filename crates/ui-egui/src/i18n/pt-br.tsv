@@ -44,7 +44,6 @@
 	Arrange	Organizar
 	ArtCraft Website	Site do ArtCraft
 	Assembly	Montagem
-	Attach Proxies…	Anexar proxies…
 	Audio Channels…	Canais de áudio…
 	Audio Clip Mixer	Misturador de clipes de áudio
 	Audio Gain…	Ganho de áudio…
@@ -86,13 +85,10 @@
 	Close Project	Fechar projeto
 	Color Management…	Gerenciamento de cores…
 	Color Matte…	Matte de cor…
-	Comparison View	Visualização de comparação
 	Composite Video	Vídeo composto
 	Consolidate Duplicates	Consolidar duplicatas
 	Copy	Copiar
 	Copy Paste Includes Sequence Markers	Copiar e colar inclui marcadores da sequência
-	Create Multi-Camera Source Sequence…	Criar sequência de origem multicâmera…
-	Create Proxies…	Criar proxies…
 	Cut	Recortar
 	Darkest	Mais escuro
 	Delete Render Files	Excluir arquivos de renderização
@@ -101,7 +97,6 @@
 	Demo Footage	Clipes de demonstração
 	Demo Project	Projeto de demonstração
 	Deselect All	Desmarcar tudo
-	Detach Proxies	Desanexar proxies
 	Display Mode	Modo de exibição
 	Distribute	Distribuir
 	Distribute Horizontally	Distribuir horizontalmente
@@ -138,7 +133,6 @@
 	Find…	Localizar…
 	Fit	Ajustar
 	Fit to frame	Ajustar ao quadro
-	Flatten	Achatar
 	Forest	Floresta
 	Frame Blending	Emenda de quadros
 	Frame Hold Options…	Opções de quadro congelado…
@@ -166,10 +160,8 @@
 	History	Histórico
 	Import From	Importar de
 	Import Image Sequence…	Importar sequência de imagens…
-	Import from Media Browser	Importar do navegador de mídia
 	Import…	Importar…
 	Info	Informações
-	Ingest Settings…	Configurações de ingestão…
 	Insert	Inserir
 	Insert Frame Hold Segment	Inserir segmento de quadro congelado
 	Install Motion Graphics Template…	Instalar modelo de gráficos de movimento…
@@ -190,8 +182,6 @@
 	Refresh Changed Media	Atualizar mídia alterada
 	Linked Selection	Seleção vinculada
 	Lock Guides	Bloquear guias
-	Lumetri Color	Cor Lumetri
-	Lumetri Scopes	Escopos Lumetri
 	Magnification	Ampliação
 	Make Offline…	Tornar offline…
 	Make Subclip…	Criar subclipe…
@@ -204,17 +194,13 @@
 	Mark Split	Marcar divisão
 	Markers	Marcadores
 	Match Frame	Quadro correspondente
-	Media Browser	Navegador de mídia
 	Media Cache…	Cache de mídia…
 	Media…	Mídia…
 	Medium	Médio
 	Memory…	Memória…
-	Merge Clips…	Mesclar clipes…
 	Metadata	Metadados
 	Modify	Modificar
 	Motion Graphics Template…	Modelo de gráficos de movimento…
-	Multi-Camera	Multicâmera
-	Multi-Camera View	Visualização multicâmera
 	Nest…	Aninhar…
 	New	Novo
 	New Layer	Nova camada
@@ -243,17 +229,14 @@
 	Program	Programa
 	Progress	Progresso
 	Project	Projeto
-	Project Manager…	Gerenciador de projetos…
 	Project Settings	Configurações do projeto
 	Project…	Projeto…
 	Properties	Propriedades
 	Purple	Roxo
-	Reconnect Full Resolution Media…	Reconectar mídia em resolução total…
 	Recover Unsaved Changes…	Recuperar alterações não salvas…
 	Rectangle	Retângulo
 	Red	Vermelho
 	Redo	Refazer
-	Reference Monitor	Monitor de referência
 	Remix	Remixagem
 	Remix Properties…	Propriedades da remixagem…
 	Remove Attributes…	Remover atributos…
@@ -287,7 +270,6 @@
 	Save a Copy…	Salvar uma cópia…
 	Save as Template…	Salvar como modelo…
 	Scale to Frame Size	Escalar para o tamanho do quadro
-	Scene Edit Detection…	Detecção de edição de cena…
 	Scratch Disks…	Discos de trabalho…
 	Search Bin	Pasta de pesquisa
 	Select	Selecionar
@@ -317,7 +299,6 @@
 	Source	Origem
 	Source Settings…	Configurações de origem…
 	Speed/Duration…	Velocidade/duração…
-	Synchronize…	Sincronizar…
 	System Compatibility Report…	Relatório de compatibilidade do sistema…
 	Tan	Canela
 	Teal	Verde-azulado
@@ -327,7 +308,6 @@
 	Timecode…	Timecode…
 	Timeline	Linha do tempo
 	Timeline…	Linha do tempo…
-	Toggle Proxies	Alternar proxies
 	Tools	Ferramentas
 	Top	Superior
 	Transparent Video…	Vídeo transparente…
@@ -441,9 +421,6 @@
 	SMPTE HD bars with 1 kHz reference tone	Barras SMPTE HD com tom de referência de 1 kHz
 	Community	Comunidade
 	Join us on Discord	Junte-se a nós no Discord
-	OMF Export Settings	Configurações de exportação OMF
-	AAF Export Settings	Configurações de exportação AAF
-	OMF Title:	Título OMF:
 	Mixdown video	Mixar vídeo
 	Audio:	Áudio:
 	Encapsulate	Encapsular
@@ -620,15 +597,7 @@
 	(no clips)	(nenhum clipe)
 	Show Transport Controls	Mostrar controles de transporte
 	Loop	Loop
-	Multi-Camera Audio Follows Video	Áudio multicâmera segue o vídeo
-	Multi-Camera Record	Gravação multicâmera
-	Multi-Camera Selection Top Down	Seleção multicâmera de cima para baixo
-	Show Multi-Camera Preview Monitor	Mostrar monitor de pré-visualização multicâmera
-	Auto-Adjust Multi-Camera Playback Quality	Ajustar automaticamente a qualidade de reprodução multicâmera
-	Transmit Multi-Camera View	Transmitir visualização multicâmera
-	Multi-Camera Layout	Layout multicâmera
 	Automatic	Automático
-	Edit Cameras…	Editar câmeras…
 	Add Marker (M)	Adicionar marcador (M)
 	Mark In (I)	Marcar entrada (I)
 	Mark Out (O)	Marcar saída (O)
@@ -644,22 +613,15 @@
 	Extract (')	Extrair (')
 	Export Frame: use Export mode (M6)	Exportar quadro: use o modo Exportar (M6)
 	Button Editor	Editor de botões
-	Multi-Camera Record on	Gravação multicâmera ativada
-	Multi-Camera Record off	Gravação multicâmera desativada
 	{first} - Merged	{first} - Mesclado
-	{first} Multicam	{first} Multicâmera
 	In Points	Pontos de entrada
 	Out Points	Pontos de saída
 	Clip Marker	Marcador de clipe
 	Audio	Áudio
-	Merge Clips	Mesclar clipes
-	Create Multi-Camera Source Sequence	Criar sequência de origem multicâmera
-	Synchronize Clips	Sincronizar clipes
 	Clip Name:	Nome do clipe:
 	Sequence Name:	Nome da sequência:
 	{n} clip(s): {names}	{n} clipe(s): {names}
 	{n} clip(s) selected; the clip on the reference track stays put.	{n} clipe(s) selecionado(s); o clipe da faixa de referência não se move.
-	Synchronize Point	Ponto de sincronização
 	Ignore Hours	Ignorar horas
 	first marker	primeiro marcador
 	Offset Audio by:	Deslocar o áudio em:
@@ -668,38 +630,20 @@
 	Reference track:	Faixa de referência:
 	lowest (V1…)	a mais baixa (V1…)
 	Remove Audio from AV Clip	Remover o áudio do clipe AV
-	Camera 1	Câmera 1
-	All Cameras	Todas as câmeras
 	Switch Audio	Alternar áudio
-	Camera Names	Nomes das câmeras
 	Clip Names	Nomes dos clipes
-	Enumerate Cameras	Numerar câmeras
-	Camera Angle Metadata	Metadados de ângulo de câmera
 	Move source clips to Processed Clips bin	Mover os clipes de origem para a pasta Clipes processados
-	Synchronized {n} clip group(s)	{n} grupo(s) de clipes sincronizado(s)
-	Merged clip created	Clipe mesclado criado
-	Multi-camera source sequence with {n} camera(s)	Sequência de origem multicâmera com {n} câmera(s)
-	No multi-camera clip at the playhead	Nenhum clipe multicâmera no cursor de reprodução
-	Camera {n} — {name}	Câmera {n} — {name}
 	Page {page} of {pages}	Página {page} de {pages}
 	Previous page	Página anterior
 	Next page	Próxima página
-	Multi-Camera Record On/Off (0)	Gravação multicâmera ativada/desativada (0)
 	Record	Gravar
-	Edit Cameras	Editar câmeras
-	Cameras shown in the Multi-Camera view (uncheck to hide).	Câmeras mostradas na visualização multicâmera (desmarque para ocultar).
-	Recorded {n} multi-camera cut(s)	{n} corte(s) multicâmera gravado(s)
 	Clamp Signal	Limitar sinal
 	Presets	Predefinições
-	Parade ({kind})	Parade ({kind})
 	Waveform ({kind})	Forma de onda ({kind})
-	Parade Type	Tipo de parade
 	Waveform Type	Tipo de forma de onda
-	Vectorscope Targets	Alvos do vetorscópio
 	Colour Space	Espaço de cores
 	Brightness	Brilho
 	Signal Scale	Escala do sinal
-	Histogram	Histograma
 	Paste Attributes	Colar atributos
 	Remove Attributes	Remover atributos
 	New Offline File	Novo arquivo offline
@@ -789,28 +733,20 @@
 	Make {n} selected clip(s) offline. Their clips show the offline slate until you link them again.	Tornar {n} clipe(s) selecionado(s) offline. Os clipes mostrarão a claquete offline até que sejam vinculados novamente.
 	Media files remain on disk	Os arquivos de mídia permanecem no disco
 	Media files are deleted	Os arquivos de mídia são excluídos
-	Create Proxies	Criar proxies
 	{n} clip(s) selected.	{n} clipe(s) selecionado(s).
 	Format and size	Formato e tamanho
 	Destination	Destino
-	Next to the original media, in a Proxies folder	Ao lado da mídia original, em uma pasta Proxies
-	Proxies are made in the background and attached when done. Export always uses full-resolution media.	Os proxies são criados em segundo plano e anexados ao terminar. A exportação sempre usa a mídia em resolução total.
-	Creating {n} proxy file(s)…	Criando {n} arquivo(s) proxy…
-	Project Manager	Gerenciador de projetos
 	Sequences	Sequências
 	Resulting Project	Projeto resultante
 	Collect Files and Copy to New Location	Coletar arquivos e copiar para um novo local
-	Consolidate and Transcode	Consolidar e transcodificar
 	Options	Opções
 	Exclude Unused Clips	Omitir clipes não usados
 	Include Handles:	Incluir margens:
-	Include Proxies	Incluir proxies
 	Include Preview Files	Incluir arquivos de pré-visualização
 	Destination Path	Caminho de destino
 	Disk space: original {original} · resulting {result} ({n} files)	Espaço em disco: original {original} · resultante {result} ({n} arquivos)
 	Disk space: —	Espaço em disco: —
 	Calculate	Calcular
-	Project Manager: writing {path}	Gerenciador de projetos: gravando {path}
 	Timeline: (no sequences)	Linha do tempo: (nenhuma sequência)
 	Browse	Procurar
 	Select audio clips, then click a preset to apply it.	Selecione clipes de áudio e clique em uma predefinição para aplicá-la.
@@ -850,8 +786,6 @@
 	Clip Volume	Volume do clipe
 	(no clip selected)	(nenhum clipe selecionado)
 	Master · {name}	Mestre · {name}
-	Add Lumetri Color to clip	Adicionar Cor Lumetri ao clipe
-	Input LUT	LUT de entrada
 	Color	Cor
 	Temperature	Temperatura
 	Tint	Tonalidade
@@ -866,7 +800,6 @@
 	HDR White	Branco HDR
 	HDR Specular	Especular HDR
 	Look	Visual
-	Look LUT	LUT de visual
 	Intensity	Intensidade
 	Adjustments	Ajustes
 	Faded Film	Filme desbotado
@@ -901,7 +834,6 @@
 	Midpoint	Ponto médio
 	Roundness	Arredondamento
 	Feather	Difusão
-	LUT	LUT
 	Color Match	Correspondência de cores
 	Reference	Referência
 	Face Detection (protect skin tones)	Detecção de rostos (protege os tons de pele)
@@ -920,7 +852,6 @@
 	Stop tracking	Parar rastreamento
 	Tracking method: {method}	Método de rastreamento: {method}
 	Composite	Composto
-	Comparison	Comparação
 	Video and Waveform	Vídeo e forma de onda
 	System Default	Padrão do sistema
 	Default location	Local padrão
@@ -1088,8 +1019,6 @@
 	File Types Displayed	Tipos de arquivo exibidos
 	List View	Visualização em lista
 	Thumbnail View	Visualização em miniaturas
-	Ingest	Ingestão
-	Open Ingest Settings	Abrir configurações de ingestão
 	Import as Image Sequence	Importar como sequência de imagens
 	{sel} of {total} items selected	{sel} de {total} itens selecionados
 	{total} items	{total} itens
@@ -1106,7 +1035,6 @@
 	Reveal in Finder	Mostrar no gerenciador de arquivos
 	Edit Columns…	Editar colunas…
 	Hover Scrub	Reprodução ao passar o mouse
-	New Media Browser Panel	Novo painel de navegador de mídia
 	Create Folder For Imported Projects	Criar pasta para os projetos importados
 	Allow Duplicate Media During Project Import	Permitir mídia duplicada ao importar projetos
 	Refresh	Atualizar
@@ -1167,7 +1095,6 @@
 	Open in Timeline	Abrir na linha do tempo
 	New Sequence From Clip	Nova sequência a partir do clipe
 	Set Poster Frame	Definir quadro de pôster
-	Proxy	Proxy
 	Open in Place	Abrir no mesmo lugar
 	Open in New Tab	Abrir em uma nova guia
 	Open in New Window	Abrir em uma nova janela
@@ -1465,7 +1392,6 @@
 	Color Theme	Tema de cores
 	Color To Leave	Cor a manter
 	Color Tolerance	Tolerância de cor
-	Color Wheels & Match	Rodas de cores e correspondência
 	Colorize	Colorir
 	Columns	Colunas
 	Comment	Comentário
@@ -1620,14 +1546,12 @@
 	Edge Width	Largura da borda
 	Elliptical	Elíptico
 	Emboss	Relevo
-	Enable HSL Secondary	Ativar HSL secundário
 	Enable Mercury Transmit	Ativar Mercury Transmit
 	Enable ProRes hardware accelerated encoding, if available	Ativar a codificação ProRes acelerada por hardware, se disponível
 	Enable clip and XMP metadata linking	Ativar a vinculação de metadados de clipe e XMP
 	Enable developer mode	Ativar o modo de desenvolvedor
 	Enable hardware accelerated decoding (requires restart)	Ativar a decodificação acelerada por hardware (requer reinicialização)
 	Enable language auto-detection	Ativar a detecção automática de idioma
-	Enable proxies	Ativar proxies
 	End Color	Cor final
 	End Point	Ponto final
 	End of Ramp	Fim da rampa
@@ -1689,10 +1613,7 @@
 	Focus Size	Tamanho do foco
 	Fold Motion	Movimento de dobra
 	Foldback	Retorno
-	For color management parameters, go to the Settings tab in the Lumetri Color panel.	Para os parâmetros de gerenciamento de cores, vá até a guia Configurações do painel Cor Lumetri.
 	Format	Formato
-	Four Scopes (RGB, 8 bit)	Quatro escopos (RGB, 8 bits)
-	Four Scopes (YUV, float, no clamp)	Quatro escopos (YUV, ponto flutuante, sem limitar)
 	Fractal Influence	Influência fractal
 	Fractal Type	Tipo de fractal
 	Frame	Quadro
@@ -1776,8 +1697,6 @@
 	Grunge & Distort	Grunge e distorção
 	GuitarSuite	GuitarSuite
 	HDR Graphics White (Nits)	Branco de gráficos HDR (nits)
-	HLS Vectorscope + Histogram	Vetorscópio HLS + histograma
-	HSL Secondary	HSL secundário
 	Hard	Duro
 	Hard Clip	Clipping duro
 	Hard Light	Luz direta
@@ -1956,7 +1875,6 @@
 	Luma Key	Chave de luma
 	Luma Source	Origem de luma
 	Luma and Chroma	Luma e croma
-	Lumetri Presets	Predefinições Lumetri
 	Luminance	Luminância
 	Luminance Threshold	Limiar de luminância
 	Luminosity	Luminosidade
@@ -2115,8 +2033,6 @@
 	Panel Wipe	Cortina de painéis
 	Panels	Painéis
 	Panner - Ambisonics	Panorâmico - Ambisonics
-	Parade	Parade
-	Parade (RGB)	Parade (RGB)
 	Parametric Equalizer	Equalizador paramétrico
 	Passband Ripple	Ondulação da banda passante
 	Path	Caminho
@@ -2567,10 +2483,6 @@
 	VR Sharpen	Nitidez VR
 	VR Spherical Blur	Desfoque esférico VR
 	Validate Content Credentials on import	Validar as credenciais de conteúdo ao importar
-	Vectorscope (YUV)	Vetorscópio (YUV)
-	Vectorscope + Waveform YC	Vetorscópio + forma de onda YC
-	Vectorscope HLS	Vetorscópio HLS
-	Vectorscope YUV	Vetorscópio YUV
 	Venetian Blinds	Persianas venezianas
 	Vertical 4:5	Vertical 4:5
 	Vertical 9:16	Vertical 9:16
@@ -2660,17 +2572,10 @@
 	minute(s)	minuto(s)
 	second(s)	segundo(s)
 	seconds	segundos
-	AAF…	AAF…
 	Audio…	Áudio…
-	Avid Log Exchange…	Avid Log Exchange…
 	Color…	Cor…
-	EDL…	EDL…
 	Edit Workspaces…	Editar áreas de trabalho…
-	FCPXML…	FCPXML…
-	Final Cut Pro XML…	Final Cut Pro XML…
 	General…	Geral…
-	OMF…	OMF…
-	OpenTimelineIO…	OpenTimelineIO…
 	Save Changes to this Workspace	Salvar as alterações nesta área de trabalho
 	Save as New Workspace…	Salvar como nova área de trabalho…
 	Create Search Bin	Criar pasta de pesquisa
@@ -2678,7 +2583,6 @@
 	Source Settings	Configurações de origem
 	Update Metadata	Atualizar metadados
 	Automate To Sequence	Automatizar para a sequência
-	Scene Edit Detection	Detecção de edição de cena
 	Analyze	Analisar
 	Normalize Mix Track	Normalizar faixa de mixagem
 	Simplify Sequence	Simplificar sequência
@@ -2687,7 +2591,6 @@
 	Flash Cue Marker	Marcador de referência Flash
 	System Compatibility Report	Relatório de compatibilidade do sistema
 	no GPU adapter: the CPU compositor is used	nenhum adaptador de GPU: o compositor da CPU é usado
-	Avid Log Exchange	Avid Log Exchange
 	FilmCraft Project	Projeto do FilmCraft
 	{name} Selection.fcproj	{name} Seleção.fcproj
 	{name} (Simplified)	{name} (simplificada)
@@ -2700,15 +2603,12 @@
 	Any	Qualquer
 	Case Sensitive	Diferenciar maiúsculas e minúsculas
 	Scratch Disks	Discos de trabalho
-	Ingest Settings	Configurações de ingestão
 	Captured and Generated:	Capturado e gerado:
 	Video Previews:	Pré-visualizações de vídeo:
 	Audio Previews:	Pré-visualizações de áudio:
 	Project Auto Save:	Salvamento automático do projeto:
 	Same as Project	Igual ao projeto
 	Path: {path}	Caminho: {path}
-	Transcode	Transcodificar
-	Copy and Create Proxies	Copiar e criar proxies
 	Action:	Ação:
 	Destination:	Destino:
 	Next to the media	Ao lado da mídia
@@ -2778,7 +2678,6 @@
 	Export formats	Formatos de exportação
 	Match {n} of {total}	Correspondência {n} de {total}
 	Saved template {path}	Modelo salvo em {path}
-	Scene Edit Detection: analysing in the background (see Progress)	Detecção de edição de cena: analisando em segundo plano (consulte Progresso)
 	Delete Search Bin	Excluir pasta de pesquisa
 	 (removed from {list})	 (removido de {list})
 	{key} can't be used as a shortcut	{key} não pode ser usado como atalho
@@ -2974,15 +2873,6 @@
 	Close Bin	Fechar pasta
 	Close Sequence	Fechar sequência
 	Contains	Contém
-	Cut to Camera 1	Cortar para a câmera 1
-	Cut to Camera 2	Cortar para a câmera 2
-	Cut to Camera 3	Cortar para a câmera 3
-	Cut to Camera 4	Cortar para a câmera 4
-	Cut to Camera 5	Cortar para a câmera 5
-	Cut to Camera 6	Cortar para a câmera 6
-	Cut to Camera 7	Cortar para a câmera 7
-	Cut to Camera 8	Cortar para a câmera 8
-	Cut to Camera 9	Cortar para a câmera 9
 	D1/DV NTSC (0.9091)	D1/DV NTSC (0.9091)
 	D1/DV PAL (1.0940)	D1/DV PAL (1.0940)
 	DVCPRO HD (1.5)	DVCPRO HD (1.5)
@@ -3054,7 +2944,6 @@
 	Left align text	Alinhar texto à esquerda
 	Looping GIF, 640×360 at 15 fps	GIF em loop, 640×360 a 15 fps
 	Lower First	Inferior primeiro
-	Lumetri	Lumetri
 	MXF OP-Atom	MXF OP-Atom
 	MXF OP-Atom DNxHR (Avid)	MXF OP-Atom DNxHR (Avid)
 	MXF OP1a	MXF OP1a
@@ -3074,7 +2963,6 @@
 	Matches	Corresponde a
 	Maximize or Restore Active Frame	Maximizar ou restaurar o quadro ativo do painel
 	Maximize or Restore Frame Under Cursor	Maximizar ou restaurar o quadro do painel sob o cursor
-	Media Browser Settings	Configurações do navegador de mídia
 	MediaBrowser	Navegador de mídia
 	MediaCache	Cache de mídia
 	Mixer	Misturador
@@ -3091,8 +2979,6 @@
 	Move Selection Page Up	Mover a seleção uma página para cima
 	Move Selection Right	Mover a seleção para a direita
 	Move Selection Up	Mover a seleção para cima
-	Multi-Camera Record On/Off Toggle	Ativar/desativar gravação multicâmera
-	Multicam	Multicâmera
 	Navigate to End of Segment	Ir para o fim do segmento
 	Navigate to Next Line	Ir para a próxima linha
 	Navigate to Next Word	Ir para a próxima palavra
@@ -3100,7 +2986,6 @@
 	Navigate to Previous Word	Ir para a palavra anterior
 	Navigate to Start of Segment	Ir para o início do segmento
 	Navigation	Navegação
-	Next Multi-Camera Page	Próxima página multicâmera
 	Nudge Clip Selection Down	Empurrar a seleção de clipes para baixo
 	Nudge Clip Selection Left Five Frames	Empurrar a seleção de clipes cinco quadros para a esquerda
 	Nudge Clip Selection Left One Frame	Empurrar a seleção de clipes um quadro para a esquerda
@@ -3148,7 +3033,6 @@
 	Play In to Out with Preroll/Postroll	Reproduzir da entrada à saída com pré-roll/pós-roll
 	Play from Playhead to Out Point	Reproduzir do cursor de reprodução ao ponto de saída
 	Play/Stop	Reproduzir/parar
-	Previous Multi-Camera Page	Página multicâmera anterior
 	Progressive	Progressivo
 	ProjectPanel	Painel Projeto
 	QuickTime (Motion JPEG)	QuickTime (Motion JPEG)
@@ -3174,15 +3058,6 @@
 	Ripple Trim Next Edit to Playhead	Aparagem em cascata da próxima edição até o cursor de reprodução
 	Ripple Trim Previous Edit to Playhead	Aparagem em cascata da edição anterior até o cursor de reprodução
 	Rolling Edit Tool	Ferramenta Edição rolante
-	Select Camera 1	Selecionar câmera 1
-	Select Camera 2	Selecionar câmera 2
-	Select Camera 3	Selecionar câmera 3
-	Select Camera 4	Selecionar câmera 4
-	Select Camera 5	Selecionar câmera 5
-	Select Camera 6	Selecionar câmera 6
-	Select Camera 7	Selecionar câmera 7
-	Select Camera 8	Selecionar câmera 8
-	Select Camera 9	Selecionar câmera 9
 	Select Clip at Playhead	Selecionar o clipe no cursor de reprodução
 	Select Find Box	Selecionar a caixa de pesquisa
 	Select Next Clip	Selecionar o próximo clipe
@@ -3196,9 +3071,6 @@
 	Select to Segment End	Selecionar até o fim do segmento
 	Select to Segment Start	Selecionar até o início do segmento
 	Selection Tool	Ferramenta Seleção
-	Set Comparison Reference	Definir a referência de comparação
-	Set Creative Look	Definir o visual criativo
-	Set Input LUT	Definir a LUT de entrada
 	Set Project Panel View	Definir a visualização do painel Projeto
 	Show Next Screen	Mostrar a próxima tela
 	Show Previous Screen	Mostrar a tela anterior
@@ -3229,7 +3101,6 @@
 	Step Forward Five Frames	Avançar cinco quadros
 	Step Forward One Frame	Avançar um quadro
 	Stop Export Queue	Parar a fila de exportação
-	Stop Multi-Camera Recording	Parar a gravação multicâmera
 	Stop Voice-over Recording	Parar a gravação de narração
 	Sync Voice-over Capture	Sincronizar a captura de narração
 	TIFF	TIFF

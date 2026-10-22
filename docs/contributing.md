@@ -12,15 +12,12 @@ of the crate you will change.
 | | All platforms |
 |---|---|
 | Rust | stable ≥ 1.95 (edition 2024; egui 0.36 requires it), via [rustup](https://rustup.rs) |
-| wasm target | `rustup target add wasm32-unknown-unknown` (for `cargo xtask wasm`) |
 | Components | `rustup component add rustfmt clippy` |
 | ffmpeg + ffprobe (optional) | test oracle and fixture generator only; tests skip without it |
 
 | OS | Extra |
 |---|---|
 | macOS | Xcode Command Line Tools. ffmpeg: `brew install ffmpeg` (includes libx264/libx265). |
-| Linux | C toolchain and the system headers cpal and rfd need: ALSA (`libasound2-dev`) and GTK 3 (`libgtk-3-dev`), plus the usual X11/Wayland development packages for winit. ffmpeg from your distribution, built with libx264 and libx265. |
-| Windows | MSVC build tools. The oracle tests look for ffmpeg only in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin`, so most of them skip on Windows. |
 
 The oracle tests find ffmpeg at `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`. H.264 and
 HEVC fixtures need an ffmpeg built with libx264 and libx265. The VideoToolbox fixtures run only on
@@ -43,7 +40,6 @@ cargo xtask web --serve 8765                          # the web app on http://12
 |---|---|
 | `FILMCRAFT_CONTROL_PORT` | Same as `--control <port>` |
 | `FILMCRAFT_CPU_COMPOSITE=1` | Disables the GPU compositor |
-| `FILMCRAFT_DEV_DESKTOP_ENTRY=1` | Linux, opt-in: a run from a source tree installs a user-level desktop entry (and the icons from `assets/app-icon`) so the taskbar shows the FilmCraft icon. Nothing is written without it; packaged runs never write one |
 | `FILMCRAFT_DATA_DIR` | Same as `--data-dir <dir>`: auto-save, crash recovery, settings and logs |
 | `RUST_LOG` | Log levels for standard error and the log file (see [Logs](#logs)) |
 
@@ -57,9 +53,7 @@ playback and codec speed, use `--release`.
 ### Logs
 
 The desktop app writes its `log` records to standard error and to `Logs/filmcraft.log` in the data
-directory (`~/.local/share/filmcraft/Logs/` or `$XDG_DATA_HOME/filmcraft/Logs/` on Linux,
-`~/Library/Application Support/FilmCraft/Logs/` on macOS, `%APPDATA%\FilmCraft\Logs\` on Windows,
-or under `--data-dir` / `FILMCRAFT_DATA_DIR`), next to the crash logs; Help ▸ Reveal Log Files opens
+directory (`~/Library/Application Support/FilmCraft/Logs/`, or under `--data-dir` / `FILMCRAFT_DATA_DIR`), next to the crash logs; Help ▸ Reveal Log Files opens
 the folder. A start from a desktop menu or the Dock has no terminal, so this file is what to attach
 to a bug report: GPU compositor fallbacks, audio output problems, panicked frame jobs and container
 warnings all land there. Each launch moves the previous log to `filmcraft.1.log` (and that one to
@@ -86,8 +80,7 @@ CRAFT_FONTS_DIR="$PWD/../craft-fonts" cargo run --release -p waltcut
 
 Use an absolute path: `build.rs` runs in `crates/text`, so a relative `CRAFT_FONTS_DIR` would
 resolve from there. `crates/text/build.rs` reads its `fonts/manifest.txt` and embeds the fonts as
-`waltcut_text::fonts::CRAFT_FONTS` (native: all of them; the web build: only BIZ UDPGothic
-Regular, to keep the wasm small). The Japanese ones become the last fallback of every UI font family
+`waltcut_text::fonts::CRAFT_FONTS` (all of them). The Japanese ones become the last fallback of every UI font family
 (`crates/ui-egui/src/theme.rs`, BIZ UDPGothic first) and fallback faces in the text engine (Gothic
 for sans text, Mincho for serif text). Without `CRAFT_FONTS_DIR`, `CRAFT_FONTS` is empty and
 FilmCraft uses its bundled and system fonts. A `CRAFT_FONTS_DIR` that is not a checkout is a build
@@ -114,7 +107,6 @@ Every commit must pass all of these:
 | Tests | `cargo test --workspace` |
 | Layering | `cargo xtask layers` |
 | Assets | `cargo xtask assets` |
-| wasm | `cargo xtask wasm` (checks every L0–L4 crate, `waltcut-ui-egui` and `waltcut-web` for `wasm32-unknown-unknown`) |
 | All of the above | `cargo xtask ci` (runs clippy and tests with `--release`) |
 
 Run them with `CRAFT_FONTS_DIR` set too when you change font code ([craft-fonts](#building-with-craft-fonts)).
@@ -146,9 +138,9 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
 
 Open pull requests against `main` from a short-lived branch named for the work. Link the issue,
 explain the user-visible change, and report relevant local checks in the pull request description.
-Pull-request CI checks formatting on Linux, macOS, and Windows, with a three-minute timeout per
-platform. The full Clippy, test, layer, asset, and wasm gates remain available by manually
-dispatching the CI workflow with `full_quality` enabled. The full Linux run disables release LTO
+Pull-request CI checks formatting on macOS, with a three-minute timeout. The full Clippy, test,
+layer, and asset gates remain available by manually dispatching the CI workflow with
+`full_quality` enabled. The full run disables release LTO
 and uses 16 codegen units to keep the test build practical; this does not change the release profile
 used for shipped builds.
 
@@ -243,8 +235,7 @@ stream is cut into blocks (there are tests for this).
    implementations. Name the spec edition in the crate README.
 2. Create `crates/<name>` as an L0 crate that depends only on `waltcut-bitstream` (plus
    `thiserror` and optional `rayon` behind a `threads` feature). Add `[lints] workspace = true`, add
-   it to `[workspace.dependencies]`, and add it to `LAYERS` in `xtask/src/main.rs`. It must build
-   for wasm32.
+   it to `[workspace.dependencies]`, and add it to `LAYERS` in `xtask/src/main.rs`.
 3. Test it against ffmpeg as an oracle (see [testing.md](testing.md)):
    - generate fixtures with ffmpeg on first use into `target/fixtures/<crate>/`;
    - skip with a message when ffmpeg is missing;

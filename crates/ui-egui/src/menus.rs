@@ -71,9 +71,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.display.red", "Red", ["View", "Display Mode"], None),
     uic!("view.display.green", "Green", ["View", "Display Mode"], None),
     uic!("view.display.blue", "Blue", ["View", "Display Mode"], None),
-    uic!("view.display.multicam", "Multi-Camera", ["View", "Display Mode"], None),
     uic!("view.display.audioWaveform", "Audio Waveform", ["View", "Display Mode"], None),
-    uic!("view.display.comparison", "Comparison View", ["View", "Display Mode"], None),
     uic!("view.display.videoAndWaveform", "Video and Audio Waveform Split", ["View", "Display Mode"], None),
     uic!("view.magnification.fit", "Fit", ["View", "Magnification"], None),
     uic!("view.magnification.10", "10%", ["View", "Magnification"], None),
@@ -97,11 +95,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.guideTemplates.manage", "Manage Guides…", ["View", "Guide Templates"], None),
     uic!("view.guideTemplates.apply", "Apply Guide Template", [], None),
     uic!("view.guideTemplates.delete", "Delete Guide Template", [], None),
-    uic!("view.compare.setReference", "Set Comparison Reference", [], None),
     uic!("view.dynamicAudioWaveforms", "Dynamic Audio Waveforms", ["View"], None),
-    uic!("multicam.toggleView", "Multi-Camera View", ["View"], Some("Shift+0")),
-    uic!("multicam.recordToggle", "Multi-Camera Record On/Off Toggle", [], Some("0")),
-    uic!("multicam.editCamerasDialog", "Edit Cameras…", [], None),
     uic!("voiceover.recordToggle", "Voice-over Record", [], None),
     uic!("voiceover.settingsDialog", "Voice-Over Record Settings…", [], None),
     // ids follow `ThemeKind`, labels follow Settings ▸ Appearance ▸ Color Theme (`darkest`, `dark`, `light`)
@@ -273,12 +267,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if !targets_source(app, &params)
         && let Some(r) = crate::panels::trim_monitor::route_transport(app, ctx, id)
     {
-        return r;
-    }
-    if let Some(r) = crate::panels::multicam::route(app, id, &params) {
-        if let Err(e) = &r {
-            app.ui.status = e.clone();
-        }
         return r;
     }
     if let Some(r) = crate::panels::voiceover::route(app, ctx, id, &params) {
@@ -453,11 +441,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         "help.shortcuts" | "app.keyboardShortcuts" => {
             crate::panels::shortcuts_dialog::open(app);
             return Ok(Value::Null);
-        }
-        // File ▸ Export ▸ AAF… / OMF… open their settings dialogs; with a path they export directly.
-        "file.exportAaf" | "file.exportOmf" if params.get("path").is_none() => {
-            waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
-            return crate::panels::interchange_export::open(app, ctx, id);
         }
         // File ▸ Export ▸ Media… opens the Export mode, like ⌘M (#382); with a path it exports directly.
         "file.exportMedia" if params.get("path").is_none() => {

@@ -11,7 +11,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIR="$ROOT/assets/app-icon"
 SVG="$DIR/filmcraft.svg"
-APP_ID="ai.storyteller.filmcraft"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -28,25 +27,6 @@ render() { resvg -w "$2" -h "$2" "$1" "$3" </dev/null; }
 render "$SVG" 1024 "$DIR/filmcraft-1024.png"
 # Runtime window/Dock icon on macOS (apps/waltcut/src/main.rs embeds it).
 render "$MAC" 512 "$DIR/filmcraft-macos-512.png"
-
-# Linux hicolor theme. Windows and Linux use the full-bleed tile.
-for s in 16 24 32 48 64 128 256 512; do
-  mkdir -p "$DIR/hicolor/${s}x${s}/apps"
-  render "$SVG" "$s" "$DIR/hicolor/${s}x${s}/apps/$APP_ID.png"
-done
-mkdir -p "$DIR/hicolor/scalable/apps"
-cp "$DIR/filmcraft-small.svg" "$DIR/hicolor/scalable/apps/$APP_ID.svg"
-
-# Web app favicon and loading image.
-render "$SVG" 128 "$ROOT/apps/waltcut-web/web/favicon.png"
-
-# Windows .ico.
-ICO_PNGS=()
-for s in 16 20 24 32 40 48 64 128 256; do
-  render "$SVG" "$s" "$TMP/ico-$s.png"
-  ICO_PNGS+=("$TMP/ico-$s.png")
-done
-(cd "$ROOT" && cargo run -q -p xtask -- ico "$DIR/filmcraft.ico" "${ICO_PNGS[@]}")
 
 # macOS .icns.
 if command -v iconutil >/dev/null; then

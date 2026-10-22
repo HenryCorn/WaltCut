@@ -52,7 +52,6 @@ pub mod menus;
 pub mod native_dialogs;
 pub mod panels;
 pub mod perf;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod play_ahead;
 pub mod scrub;
 mod shuttle;
@@ -125,8 +124,6 @@ pub struct AudioDevices {
 #[derive(Default)]
 pub struct HostHooks {
     pub pick_files: Option<Box<dyn FnMut(&[&str]) -> Vec<String>>>,
-    /// The cursor in physical screen pixels. Where the windowing layer reports no pointer while files are dragged in from the OS (Windows), a drop is placed where this says it landed.
-    pub cursor_screen_position: Option<Box<dyn Fn() -> Option<(i32, i32)>>>,
     /// Drawing-tablet pen pressure (0..1) while the pointer is a pen, for the Brush tool. `None`
     /// from the hook (a mouse) or no hook: strokes are drawn at full pressure.
     pub pen_pressure: Option<Box<dyn Fn() -> Option<f32>>>,
@@ -143,11 +140,11 @@ pub struct HostHooks {
     pub system_languages: Option<Box<dyn Fn() -> Vec<String>>>,
     /// Open dialog for a JSON file (shortcut preset import): filter name, extensions → path.
     pub pick_open_file: Option<Box<dyn FnMut(&str, &[&str]) -> Option<String>>>,
-    /// Folder picker (Link Media search, proxy and Project Manager destinations).
+    /// Folder picker (Link Media search).
     pub pick_folder: Option<Box<dyn FnMut() -> Option<String>>>,
     /// Folder picker starting at the current destination (Export Frame).
     pub pick_folder_at: Option<Box<dyn FnMut(&str) -> Option<String>>>,
-    /// Pick one file for a command that relinks to it (Link Media ▸ Locate…, Attach Proxies,
+    /// Pick one file for a command that relinks to it (Link Media ▸ Locate…)
     /// Reconnect Full Resolution) instead of importing it, as [`Self::pick_files`] does. Native
     /// hosts return the path. A host whose picker is asynchronous (the web) returns `None` and
     /// runs `hint.command` with `hint.params` plus `"path"` itself once the user has chosen.
@@ -235,7 +232,6 @@ pub struct Playback {
     /// consuming samples hands the clock back to the wall clock (see [`AUDIO_STALL_S`]).
     audio_seen: (u64, f64),
     /// Audio underruns for the current (or last) play (desktop: sound is mixed ahead).
-    #[cfg(not(target_arch = "wasm32"))]
     pub audio_stats: std::sync::Arc<play_ahead::AudioStats>,
     /// Shown / dropped frame accounting for the current (or last) play.
     pub meter: frames::PlaybackMeter,
@@ -266,15 +262,8 @@ const SCREENSHOT_SETTLE_MAX_S: f64 = 5.0;
 
 /// Export entries that run from the menus through the save panel: command, filter label,
 /// extension.
-pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 7] = [
-    ("markers.exportCsv", "Marker report (CSV)", "csv"),
-    ("file.exportEdl", "EDL", "edl"),
-    ("file.exportFcp7Xml", "Final Cut Pro XML", "xml"),
-    ("file.exportFcpxml", "FCPXML", "fcpxml"),
-    ("file.exportOtio", "OpenTimelineIO", "otio"),
-    ("file.exportAle", "Avid Log Exchange", "ale"),
-    ("file.exportSelectionProject", "FilmCraft Project", "fcproj"),
-];
+pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 2] =
+    [("markers.exportCsv", "Marker report (CSV)", "csv"), ("file.exportSelectionProject", "FilmCraft Project", "fcproj")];
 
 pub struct FilmcraftApp {
     pub session: Session,
@@ -510,7 +499,7 @@ impl FilmcraftApp {
             self.disable_gpu("frame larger than the GPU's maximum texture size");
             return None;
         }
-        let t0 = web_time::Instant::now();
+        let t0 = std::time::Instant::now();
         let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let (view, size) = g.compositor.composite_prepared(&plan.plan, Some(&plan.prepared));
             (view.clone(), size)
@@ -866,9 +855,6 @@ impl FilmcraftApp {
                 self.ui.status = e;
             }
         }
-        if name == "Color" {
-            self.ui.show_scopes = false;
-        }
     }
 
     pub fn show_panel(&mut self, p: PanelKind) {
@@ -884,14 +870,12 @@ impl FilmcraftApp {
         }
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
-                PanelKind::LumetriColor | PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
+                PanelKind::EssentialGraphics | PanelKind::EssentialSound | PanelKind::Properties => PanelKind::Program,
                 PanelKind::Source
                 | PanelKind::EffectControls
                 | PanelKind::AudioClipMixer
                 | PanelKind::Metadata
-                | PanelKind::LumetriScopes
                 | PanelKind::AudioTrackMixer
-                | PanelKind::ReferenceMonitor
                 | PanelKind::Timecode => PanelKind::Source,
                 _ => PanelKind::Project,
             };
@@ -1010,8 +994,6 @@ impl FilmcraftApp {
             let t = self.session.playhead();
             let _ = self.session.execute("mixer.recordStart", json!({"time": t.0}));
         }
-        // Multi-Camera view: playing records live cuts (keys 1–9 / clicking angles)
-        panels::multicam::on_play(self);
         // voice-over: the capture starts with the audio clock
         panels::voiceover::on_play(self);
     }
@@ -1034,7 +1016,6 @@ impl FilmcraftApp {
                 self.ui.status = e.to_string();
             }
         }
-        panels::multicam::on_stop(self);
         panels::voiceover::on_stop(self);
     }
 
@@ -1053,16 +1034,7 @@ impl FilmcraftApp {
         // the old stream stops before the new mixer resets the underrun counters
         a.stop();
         // Desktop: mix ahead on a thread so the device callback never waits on decoding.
-        #[cfg(not(target_arch = "wasm32"))]
         let fill = play_ahead::spawn(mix, cursor, sr, a.channels(), self.playback.audio_stats.clone());
-        #[cfg(target_arch = "wasm32")]
-        let fill = {
-            let (mut mix, mut cursor) = (mix, cursor);
-            Box::new(move |buf: &mut [f32], ch: usize| {
-                mix(cursor, buf, ch);
-                cursor += (buf.len() / ch.max(1)) as i64;
-            })
-        };
         match a.start(fill) {
             Ok(_) => {
                 self.playback.audio_clock = true;
@@ -1222,7 +1194,7 @@ impl FilmcraftApp {
 
     /// Get a thumbnail texture for an item at a media time (requested at low priority).
     /// Cache revision of a project item's own frames: media changes only when its file does
-    /// (relink, Make Offline, proxies on/off), so its frames survive unrelated edits; other items
+    /// (relink, Make Offline), so its frames survive unrelated edits; other items
     /// (sequences) follow the project revision.
     pub fn item_revision(&self, item: waltcut_project::ItemId) -> u64 {
         let p = &self.session.project;
@@ -1235,7 +1207,6 @@ impl FilmcraftApp {
                 use std::hash::{Hash, Hasher};
                 let mut h = std::collections::hash_map::DefaultHasher::new();
                 waltcut_engine::media_pool::media_key(m).hash(&mut h);
-                (m.proxy.is_some() && self.session.media.use_proxies()).hash(&mut h);
                 h.finish()
             }
             _ => self.session.revision,
@@ -1302,13 +1273,8 @@ impl FilmcraftApp {
     pub fn file_dialog(&mut self, id: &str, params: &Value) -> Result<Value, String> {
         match id {
             "file.import" => {
-                let exts: Vec<&str> = waltcut_media::VIDEO_EXTENSIONS
-                    .iter()
-                    .chain(waltcut_media::AUDIO_EXTENSIONS)
-                    .chain(waltcut_media::STILL_EXTENSIONS)
-                    .chain(&["srt", "vtt", "scc", "edl", "xml", "fcpxml", "otio", "aaf", "omf"])
-                    .copied()
-                    .collect();
+                let exts: Vec<&str> =
+                    waltcut_media::VIDEO_EXTENSIONS.iter().chain(waltcut_media::AUDIO_EXTENSIONS).chain(waltcut_media::STILL_EXTENSIONS).copied().collect();
                 let bin = params.get("bin").cloned();
                 self.pick(FileDialog::open_files(&exts), move |app, paths| {
                     if paths.is_empty() {
@@ -1361,7 +1327,7 @@ impl FilmcraftApp {
         }
     }
 
-    /// File ▸ Export ▸ EDL…, Final Cut Pro XML… etc. from the menus (#382): ask where to save, then
+    /// File ▸ Export entries that save a file, from the menus (#382): ask where to save, then
     /// run the command with that `path` and the rest of `params`.
     fn export_save_dialog(&mut self, id: &str, filter: &str, ext: &str, params: &Value) -> Result<Value, String> {
         waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&self.session))?;
@@ -1371,7 +1337,6 @@ impl FilmcraftApp {
         // Timelines are named after the sequence; a selection must not suggest the open project's file.
         let sequence = self.session.state.active_sequence.and_then(|s| self.session.project.item(s)).map(|i| i.name.clone());
         let stem = match id {
-            "file.exportAle" => self.session.project.name.clone(),
             "file.exportSelectionProject" => format!("{} selection", self.session.project.name),
             _ => sequence.unwrap_or_else(|| self.session.project.name.clone()),
         };
@@ -1426,16 +1391,9 @@ impl FilmcraftApp {
         }
     }
 
-    /// Where files dragged in from the OS are over the window. The OS reports no cursor motion during such a drag
-    /// (winit, Windows), so ask it through the host hook, else use the last pointer position egui saw.
+    /// Where files dragged in from the OS are over the window: the last pointer position egui saw.
     fn drop_pointer(&self, ctx: &egui::Context) -> Option<egui::Pos2> {
-        let os_pointer = self
-            .hooks
-            .cursor_screen_position
-            .as_ref()
-            .and_then(|f| f())
-            .and_then(|px| ctx.input(|i| i.viewport().inner_rect.map(|r| screen_px_to_ui(px, i.pixels_per_point, r.min))));
-        os_pointer.or_else(|| ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos())))
+        ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos()))
     }
 
     // ---------------------------------------------------------------- input
@@ -1696,7 +1654,6 @@ impl FilmcraftApp {
     /// seconds, and as soon as the window comes back to the front (after a render in another app),
     /// stamp the project's media files on a worker thread and read the changed ones again
     /// ([`waltcut_engine::media_watch`]).
-    #[cfg(not(target_arch = "wasm32"))]
     fn tick_media_refresh(&mut self, ctx: &egui::Context) {
         if let Some(r) = self.session.poll_media_scan() {
             match r {
@@ -1744,7 +1701,6 @@ impl FilmcraftApp {
         }
         self.sync_pool();
         self.apply_prefs(&ctx);
-        #[cfg(not(target_arch = "wasm32"))]
         self.tick_media_refresh(&ctx);
         for ev in self.session.drain_events() {
             match ev {
@@ -2009,7 +1965,6 @@ fn synthesize_mac_ctrl_click(armed: &mut bool, raw_input: &mut egui::RawInput) {
 impl eframe::App for FilmcraftApp {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         self.native_window_focused = Some(raw_input.focused);
-        #[cfg(target_os = "macos")]
         if !self.control_input_only {
             synthesize_mac_ctrl_click(&mut self.mac_ctrl_click_armed, raw_input);
         }
@@ -2113,9 +2068,6 @@ impl eframe::App for FilmcraftApp {
             ui.ctx().request_repaint();
             return;
         }
-        // No frame worker threads on the web: render queued frames here, within a time budget
-        // that leaves room for the UI pass (a no-op where workers run).
-        self.frames.pump(std::time::Duration::from_millis(if self.playback.playing { 24 } else { 40 }));
         // A panic in one panel must not close the app (losing unsaved work) or leave a blank
         // window: catch it, keep the session, and say what happened.
         if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.frame(ui))).is_err() {
@@ -2752,34 +2704,6 @@ mod voiceover_playback_tests {
         assert!(app.session.playhead() > from, "{:?} <= {from:?}", app.session.playhead());
         app.session.execute("audio.voiceover.stop", json!({"discard": true})).unwrap();
         app.stop();
-    }
-}
-
-/// A physical-pixel screen position as a point in the window's UI space, given the window's content origin in points.
-///
-/// Assumes the whole virtual screen uses the window's `pixels_per_point`: with monitors of mixed
-/// DPI the point can be off when the cursor and the window's origin are on different monitors.
-fn screen_px_to_ui(px: (i32, i32), pixels_per_point: f32, content_min: egui::Pos2) -> egui::Pos2 {
-    let ppp = if pixels_per_point.is_finite() && pixels_per_point > 0.0 { pixels_per_point } else { 1.0 };
-    egui::pos2(px.0 as f32 / ppp - content_min.x, px.1 as f32 / ppp - content_min.y)
-}
-
-#[cfg(test)]
-mod screen_px_tests {
-    use super::screen_px_to_ui;
-
-    #[test]
-    fn maps_screen_pixels_into_the_window() {
-        let p = screen_px_to_ui((1300, 900), 2.0, egui::pos2(100.0, 50.0));
-        assert_eq!((p.x, p.y), (550.0, 400.0));
-    }
-
-    #[test]
-    fn a_hostile_scale_does_not_divide_by_zero() {
-        for ppp in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            let p = screen_px_to_ui((10, 20), ppp, egui::pos2(0.0, 0.0));
-            assert!(p.x.is_finite() && p.y.is_finite());
-        }
     }
 }
 

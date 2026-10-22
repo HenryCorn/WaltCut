@@ -187,7 +187,6 @@ fn v1_preferences_migrate_and_bad_values_are_repaired() {
     assert_eq!((p.playback.preroll_seconds, p.playback.postroll_seconds), (4.0, 1.0));
     assert_eq!(p.playback.step_many_frames, 5, "new key gets its default");
     assert_eq!((p.trim.large_trim_offset, p.trim.playhead_determines_loop), (12, true));
-    assert!(p.media.enable_proxies);
     assert_eq!(p.media.default_media_scaling, "none");
     assert_eq!(p.guides.templates[0].name, "T");
     assert_eq!(p.timeline, settings::TimelinePrefs::default());

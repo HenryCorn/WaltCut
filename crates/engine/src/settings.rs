@@ -23,7 +23,7 @@ use crate::commands::{CommandSpec, always, bad, bool_p, str_p};
 use crate::{EngineError, Result, Session};
 
 /// Version of the preferences file layout ([`crate::autosave::Preferences::version`]).
-/// v1: Auto Save, Audio (mixer automation), Playback (pre/postroll), Trim, Media (proxies), guides,
+/// v1: Auto Save, Audio (mixer automation), Playback (pre/postroll), Trim, Media, guides,
 /// Essential Sound presets. v2: every Settings category.
 pub const PREFS_VERSION: u32 = 2;
 
@@ -1073,17 +1073,14 @@ static CATEGORIES: &[Category] = &[
     Category {
         id: "color",
         title: "Color",
-        rows: &[
-            Row::Group(
-                "Display Color Settings",
-                &[
-                    b("color.displayColorManagement", "Display Color Management", false),
-                    b("color.extendedDynamicRange", "Extended Dynamic Range Monitoring", false),
-                    f("color.hdrGraphicsWhite", "HDR Graphics White (Nits)", Kind::Choice(HDR_WHITE), false),
-                ],
-            ),
-            Row::Note("For color management parameters, go to the Settings tab in the Lumetri Color panel."),
-        ],
+        rows: &[Row::Group(
+            "Display Color Settings",
+            &[
+                b("color.displayColorManagement", "Display Color Management", false),
+                b("color.extendedDynamicRange", "Extended Dynamic Range Monitoring", false),
+                f("color.hdrGraphicsWhite", "HDR Graphics White (Nits)", Kind::Choice(HDR_WHITE), false),
+            ],
+        )],
     },
     Category {
         id: "graphics",
@@ -1147,7 +1144,6 @@ static CATEGORIES: &[Category] = &[
             b("media.validateContentCredentials", "Validate Content Credentials on import", false),
             b("media.writeClipMarkersToXmp", "Write clip markers to XMP", false),
             b("media.enableXmpLinking", "Enable clip and XMP metadata linking", false),
-            b("media.enableProxies", "Enable proxies", true),
             b("media.allowDuplicateMedia", "Allow duplicate media during project import", false),
             b("media.createFolderForImportedProjects", "Create folder for imported projects", false),
             b("media.autoHideDependentClips", "Automatically Hide Dependent Clips", false),
@@ -1619,9 +1615,6 @@ pub fn clean(dir: &Path, keep: Option<&Path>) -> (usize, u64) {
 impl Session {
     /// The media cache folder (None without a data directory, e.g. tests and the web).
     pub fn media_cache_dir(&self) -> Option<PathBuf> {
-        if cfg!(target_arch = "wasm32") {
-            return None;
-        }
         media_cache_dir(&self.prefs.media_cache, self.prefs_path.as_deref().and_then(Path::parent))
     }
 

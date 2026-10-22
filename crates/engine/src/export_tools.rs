@@ -368,11 +368,7 @@ pub fn default_export_dir(s: &Session) -> PathBuf {
     if let Some(d) = s.path.as_deref().and_then(|p| Path::new(p).parent()).filter(|d| !d.as_os_str().is_empty()) {
         return d.to_path_buf();
     }
-    if cfg!(target_arch = "wasm32") {
-        // the web build's virtual file table: written files are offered as downloads
-        return PathBuf::from("/exports");
-    }
-    if let Some(h) = crate::media_browser::std_home_dir() {
+    if let Some(h) = crate::std_home_dir() {
         let movies = Path::new(&h).join("Movies");
         return if movies.is_dir() { movies } else { PathBuf::from(h) };
     }
@@ -402,14 +398,12 @@ fn with_extension(path: &str, settings: &ExportSettings) -> String {
     }
 }
 
-/// `~/` expanded to the home directory (`USERPROFILE` on Windows). On Windows `/` becomes `\`:
-/// after a `\\?\` prefix (what `canonicalize` returns) `/` is not a separator.
+/// `~/` expanded to the home directory.
 pub fn expand_home(p: &str) -> String {
-    let p = match (p.strip_prefix("~/"), crate::media_browser::std_home_dir()) {
+    match (p.strip_prefix("~/"), crate::std_home_dir()) {
         (Some(rest), Some(h)) => format!("{h}/{rest}"),
         _ => p.to_string(),
-    };
-    if cfg!(windows) { p.replace('/', "\\") } else { p }
+    }
 }
 
 /// `x` names a folder: it ends in a separator or already exists as one.
@@ -451,18 +445,9 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     }
     let id = s.jobs.iter().map(|j| j.id).max().unwrap_or(0) + 1;
     let job = crate::Job { id, label, progress: Default::default(), result: Default::default() };
-    // Export always renders full-resolution media, whatever the proxy toggle says.
-    let provider = s.media.full_res_provider(project.clone(), s.services.clone()).recording();
+    let provider = s.media.provider(project.clone(), s.services.clone()).recording();
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let offline = s.export_offline.entry(id).or_default().clone();
-    if cfg!(target_arch = "wasm32") && !wait && waltcut_export::stepped(format) {
-        // No threads: the host advances the export between UI frames (`Session::pump_jobs`).
-        let mut exporter = waltcut_export::Exporter::new(project, seq, &settings, &prog).map_err(|e| EngineError::Other(e.to_string()))?;
-        exporter.set_batch(1);
-        s.jobs.push(job);
-        s.stepped.push(crate::SteppedJob { job: id, exporter, provider, progress: prog, result: res });
-        return Ok(id);
-    }
     let run = move || {
         let r = waltcut_export::export(&project, seq, &settings, &provider, &prog).map_err(|e| e.to_string());
         *offline.lock().unwrap_or_else(|x| x.into_inner()) = provider.offline_used();
@@ -474,7 +459,7 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     };
     let run = crate::export_tools::guard_job(job.progress.clone(), job.result.clone(), run);
     s.jobs.push(job);
-    if wait || cfg!(target_arch = "wasm32") {
+    if wait {
         run();
     } else {
         std::thread::Builder::new().name("waltcut-export".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
@@ -482,7 +467,7 @@ pub fn spawn_export(s: &mut Session, project: Arc<Project>, seq: ItemId, mut set
     Ok(id)
 }
 
-/// Last-resort guard for a background job body (export, previews, proxies, …): a panic marks the
+/// Last-resort guard for a background job body (export, previews, …): a panic marks the
 /// job failed with an error instead of killing its thread and leaving the job "running" forever.
 /// The panic hook has already logged where it happened.
 pub(crate) fn guard_job(
@@ -804,8 +789,8 @@ fn queue_cancel(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     // wait for a cancelled encode to stop (there is no encode thread, clock or sleep on wasm32)
-    if bool_p(p, "wait").unwrap_or(false) && !cfg!(target_arch = "wasm32") {
-        let t0 = web_time::Instant::now();
+    if bool_p(p, "wait").unwrap_or(false) {
+        let t0 = std::time::Instant::now();
         while s.export_queue.items.iter().any(|i| i.status == QueueStatus::Encoding) && t0.elapsed() < std::time::Duration::from_secs(60) {
             let running = s.export_queue.running;
             s.export_queue.running = false;

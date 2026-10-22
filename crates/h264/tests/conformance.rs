@@ -162,12 +162,6 @@ fn concurrent_fixture_publication_is_safe() {
     let open_published = |path: &std::path::Path| {
         let mut options = std::fs::OpenOptions::new();
         options.read(true);
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            // Like the external decoder, allow reads but deny replacement while open.
-            options.share_mode(1);
-        }
         options.open(path).unwrap()
     };
     let start = std::sync::Barrier::new(4);

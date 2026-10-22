@@ -38,13 +38,8 @@ fn perf_24_tracks_3_effects_realtime_factor() {
 /// CPU seconds used by the calling thread (None where there is no thread clock; callers fall back
 /// to wall time).
 fn thread_cpu_secs() -> Option<f64> {
-    #[cfg(unix)]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
         Some(t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9)
-    }
-    #[cfg(not(unix))]
-    {
-        None
     }
 }

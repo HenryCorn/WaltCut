@@ -217,7 +217,7 @@ fn image_sequence_survives_save_and_reopen() {
     let dir = tmp_dir("imgseq-reopen");
     let mut s = demo();
     let paths = write_frames(&dir, "f", &[0, 1, 2, 3], "png");
-    let id = item_of(&s.execute("file.importFromMediaBrowser", json!({"paths": [paths[0]], "imageSequence": true})).unwrap());
+    let id = item_of(&s.execute("file.import", json!({"paths": [paths[0]], "imageSequence": true})).unwrap());
     let proj = dir.join("seq.fcproj");
     s.execute("file.saveAs", json!({"path": proj.to_string_lossy()})).unwrap();
     let mut t = Session::default();

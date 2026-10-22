@@ -948,16 +948,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu-time"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9e393a7668fe1fad3075085b86c781883000b4ede868f43627b34a87c8b7ded"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4095,15 +4085,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxmltree"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5391,8 +5372,6 @@ dependencies = [
  "waltcut-time",
  "waltcut-ui-egui",
  "winit",
- "winresource",
- "zbus",
 ]
 
 [[package]]
@@ -5472,10 +5451,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-cfb"
-version = "0.10.0"
-
-[[package]]
 name = "waltcut-cli"
 version = "0.10.0"
 dependencies = [
@@ -5532,7 +5507,6 @@ dependencies = [
  "waltcut-time",
  "waltcut-vp8",
  "waltcut-vp9",
- "web-time",
 ]
 
 [[package]]
@@ -5593,17 +5567,14 @@ dependencies = [
  "waltcut-frame",
  "waltcut-genai",
  "waltcut-geom",
- "waltcut-interchange",
  "waltcut-isobmff",
  "waltcut-media",
  "waltcut-mxf",
  "waltcut-project",
  "waltcut-render",
- "waltcut-scopes",
  "waltcut-testkit",
  "waltcut-text",
  "waltcut-time",
- "web-time",
 ]
 
 [[package]]
@@ -5634,7 +5605,6 @@ dependencies = [
  "waltcut-testkit",
  "waltcut-text",
  "waltcut-time",
- "web-time",
 ]
 
 [[package]]
@@ -5757,23 +5727,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-interchange"
-version = "0.10.0"
-dependencies = [
- "proptest",
- "roxmltree",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "waltcut-cfb",
- "waltcut-color",
- "waltcut-geom",
- "waltcut-media",
- "waltcut-project",
- "waltcut-time",
-]
-
-[[package]]
 name = "waltcut-isobmff"
 version = "0.10.0"
 dependencies = [
@@ -5860,7 +5813,6 @@ name = "waltcut-platform"
 version = "0.10.0"
 dependencies = [
  "block2 0.6.2",
- "libloading",
  "log",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
@@ -5880,7 +5832,6 @@ dependencies = [
  "waltcut-render",
  "waltcut-testkit",
  "waltcut-time",
- "windows 0.62.2",
 ]
 
 [[package]]
@@ -5927,15 +5878,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-scopes"
-version = "0.10.0"
-dependencies = [
- "serde",
- "serde_json",
- "waltcut-color",
-]
-
-[[package]]
 name = "waltcut-testkit"
 version = "0.10.0"
 dependencies = [
@@ -5966,7 +5908,6 @@ dependencies = [
 name = "waltcut-ui-egui"
 version = "0.10.0"
 dependencies = [
- "cpu-time",
  "craft-ui",
  "eframe",
  "egui",
@@ -5988,15 +5929,12 @@ dependencies = [
  "waltcut-frame",
  "waltcut-geom",
  "waltcut-gpu",
- "waltcut-interchange",
  "waltcut-media",
  "waltcut-platform",
  "waltcut-project",
  "waltcut-render",
- "waltcut-scopes",
  "waltcut-text",
  "waltcut-time",
- "web-time",
 ]
 
 [[package]]
@@ -6013,30 +5951,6 @@ dependencies = [
  "rayon",
  "thiserror 2.0.21",
  "waltcut-bitstream",
-]
-
-[[package]]
-name = "waltcut-web"
-version = "0.10.0"
-dependencies = [
- "eframe",
- "egui",
- "js-sys",
- "log",
- "serde_json",
- "waltcut-codecs",
- "waltcut-color",
- "waltcut-engine",
- "waltcut-format",
- "waltcut-frame",
- "waltcut-isobmff",
- "waltcut-media",
- "waltcut-time",
- "waltcut-ui-egui",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "web-time",
 ]
 
 [[package]]
@@ -6931,16 +6845,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winresource"
-version = "0.1.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0986a8b1d586b7d3e4fe3d9ea39fb451ae22869dcea4aa109d287a374d866087"
-dependencies = [
- "toml 1.1.6+spec-1.1.0",
- "version_check",
 ]
 
 [[package]]

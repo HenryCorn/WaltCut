@@ -1,4 +1,4 @@
-//! Engine side of the M12.6 panels (the scopes are in [`crate::scopes`]).
+//! Engine side of the M12.6 panels.
 //!
 //! | Id | What |
 //! |---|---|
@@ -6,8 +6,7 @@
 //! | `metadata.get` / `metadata.set` | the Metadata panel: an item's clip and file properties; editable log fields (undoable) |
 //! | `project.notes` / `project.setNotes` | the Project Notes panel: free plain text saved in the project (undoable) |
 //!
-//! The Progress panel uses `jobs.list` / `jobs.cancel`; the Timecode panel and the Reference
-//! Monitor are frontend state only.
+//! The Progress panel uses `jobs.list` / `jobs.cancel`; the Timecode panel is frontend state only.
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -73,7 +72,7 @@ pub struct EventLog {
 }
 
 fn now_ms() -> u64 {
-    web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
 impl EventLog {

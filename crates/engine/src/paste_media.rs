@@ -26,9 +26,7 @@ pub fn save_pasted_image(s: &mut Session, png: &[u8]) -> Result<String> {
         .find(|(path, file)| !names.contains(file) && s.services.file_size(path).is_err())
         .map(|(path, _)| path)
         .ok_or_else(|| EngineError::Other(format!("{dir}: no free file name for \"Pasted Image <n>.png\"")))?;
-    if !cfg!(target_arch = "wasm32") {
-        std::fs::create_dir_all(&dir).map_err(|e| EngineError::Other(format!("{dir}: {e}")))?;
-    }
+    std::fs::create_dir_all(&dir).map_err(|e| EngineError::Other(format!("{dir}: {e}")))?;
     s.services.write_file(&path, png).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     Ok(path)
 }

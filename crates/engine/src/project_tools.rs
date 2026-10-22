@@ -1,5 +1,5 @@
 //! File / Edit / Clip menu long tail (M3.11), and [`apply_layout`], which puts these commands (and
-//! those of `sequence_extras` and `scene_detect`) in Premiere's menu order.
+//! those of `sequence_extras`) in Premiere's menu order.
 //!
 //! | Id | Menu |
 //! |---|---|
@@ -7,9 +7,7 @@
 //! | `file.close` | File ▸ Close (⌘W): closes the active sequence |
 //! | `file.closeAllProjects` / `file.closeAllOtherProjects` | File ▸ Close All Projects / Close All Other Projects |
 //! | `file.saveAsTemplate` | File ▸ Save as Template… (`file.templates`, `file.newProjectFromTemplate`) |
-//! | `file.importFromMediaBrowser` | File ▸ Import from Media Browser (⌥⌘I) |
 //! | `file.exportSelectionProject` | File ▸ Export ▸ Selection as FilmCraft Project… |
-//! | `file.exportAle` | File ▸ Export ▸ Avid Log Exchange… |
 //! | `file.mediaPropertiesFile` / `file.mediaProperties` | File ▸ Get Media File Properties for ▸ File… / Selection… (⇧⌘H) |
 //! | `file.projectSettings.general` / `.scratchDisks` | File ▸ Project Settings ▸ General… / Scratch Disks… |
 //! | `edit.find` / `edit.findNext` | Edit ▸ Find… (⌘F) / Find Next |
@@ -92,26 +90,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
         spec("file.saveAsTemplate", "Save as Template…", &["File"], None, r#"{"name":str?,"path":str?}"#, always, save_as_template),
         query("file.templates", "List Project Templates", &[], None, "{}", always, list_templates),
         spec("file.newProjectFromTemplate", "New Project from Template", &[], None, r#"{"template":name|path,"name":str?}"#, always, new_from_template),
-        spec(
-            "file.importFromMediaBrowser",
-            "Import from Media Browser",
-            &["File"],
-            Some("Cmd+Alt+I"),
-            r#"{"paths":[str]?,"imageSequence":bool?}"#,
-            always,
-            |s, p| {
-                // the Media Browser's selection unless `paths` are given
-                let paths = match p.get("paths").and_then(Value::as_array) {
-                    Some(a) => a.clone(),
-                    None => s.browser.selection.iter().map(|x| json!(x)).collect(),
-                };
-                if paths.is_empty() {
-                    return Err(bad("file.importFromMediaBrowser", "select files in the Media Browser"));
-                }
-                let seq = p.get("imageSequence").and_then(Value::as_bool).unwrap_or(false);
-                s.execute("file.import", json!({"paths": paths, "imageSequence": seq}))
-            },
-        ),
         // File ▸ Import with "Image Sequence" checked (the UI asks for the first frame).
         spec("file.importImageSequence", "Import Image Sequence…", &["File"], None, r#"{"path":str,"bin":binId?}"#, always, |s, p| {
             let path = p.get("path").and_then(Value::as_str).ok_or_else(|| bad("file.importImageSequence", "need `path` (the first numbered still)"))?;
@@ -130,7 +108,6 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             has_project_selection,
             export_selection,
         ),
-        spec("file.exportAle", "Avid Log Exchange…", &["File", "Export"], None, r#"{"path":str,"items":[id]?}"#, has_loggable, export_ale),
         query("file.mediaPropertiesFile", "File…", &["File", "Get Media File Properties for"], None, r#"{"path":str}"#, always, media_properties_file),
         query(
             "file.mediaProperties",
@@ -201,12 +178,11 @@ enum At {
     Before(&'static str),
 }
 
-/// Add this module's, `sequence_extras`' and `scene_detect`'s commands and arrange them (and a few
+/// Add this module's and `sequence_extras`' commands and arrange them (and a few
 /// existing ones) in Premiere's menu order.
 pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
     let mut pool = commands();
     pool.extend(crate::sequence_extras::commands());
-    pool.extend(crate::scene_detect::commands());
     // Apply Default Transitions to Selection works on selected clips too (⇧D), not only on
     // selected edit points; the Trim Monitor button keeps using the same id.
     if let Some(c) = v.iter_mut().find(|c| c.id == "trim.applyDefaultTransition")
@@ -217,37 +193,26 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         c.run = new.run;
         c.params = new.params;
     }
-    // Project Settings ▸ Ingest Settings…
-    if let Some(c) = v.iter_mut().find(|c| c.id == "project.ingestSettings") {
-        c.menu = &["File", "Project Settings"];
-    }
     let layout: Vec<(At, Vec<&'static str>)> = vec![
         (At::After("file.newBinFromSelection"), vec!["file.newSearchBin"]),
         (At::Before("file.closeProject"), vec!["file.close"]),
         (At::After("file.closeProject"), vec!["file.closeAllProjects", "file.closeAllOtherProjects"]),
         (At::After("file.saveCopy"), vec!["file.saveAsTemplate"]),
-        (At::After("file.exportEdl"), vec!["file.exportSelectionProject", "file.exportAle", "file.exportOtio", "file.exportFcp7Xml", "file.exportFcpxml"]),
+        (At::After("file.exportMedia"), vec!["file.exportSelectionProject"]),
         (
             At::Before("file.projectManager"),
-            vec![
-                "file.mediaPropertiesFile",
-                "file.mediaProperties",
-                "file.projectSettings.general",
-                "file.projectSettings.scratchDisks",
-                "project.ingestSettings",
-            ],
+            vec!["file.mediaPropertiesFile", "file.mediaProperties", "file.projectSettings.general", "file.projectSettings.scratchDisks"],
         ),
         (At::After("edit.deselectAll"), vec!["edit.find", "edit.findNext"]),
         (At::After("edit.consolidateDuplicates"), vec!["edit.editOriginal"]),
         (At::After("clip.editSubclip"), vec!["clip.editOffline", "clip.sourceSettings"]),
-        (At::After("clip.speedDuration"), vec!["clip.sceneEditDetection"]),
         (At::After("clip.replaceFromBin"), vec!["clip.updateMetadata", "clip.generateAudioWaveform", "clip.automateToSequence"]),
         (At::After("sequence.applyAudioTransition"), vec!["trim.applyDefaultTransition"]),
         (At::After("sequence.showThroughEdits"), vec!["sequence.normalizeMixTrack"]),
         (At::After("sequence.makeSubsequence"), vec!["sequence.simplify"]),
         (At::After("markers.addChapter"), vec!["markers.addFlashCue"]),
         (At::Before("file.close"), vec!["file.open"]),
-        (At::After("media.makeOffline"), vec!["file.importFromMediaBrowser", "file.import", "file.importImageSequence"]),
+        (At::After("media.makeOffline"), vec!["file.import", "file.importImageSequence"]),
     ];
     for (at, ids) in layout {
         let mut run = Vec::new();
@@ -393,9 +358,6 @@ fn is_offline(s: &Session, id: ItemId) -> bool {
 }
 fn has_offline_selection(s: &Session) -> std::result::Result<(), String> {
     if targets(s, &Value::Null).iter().any(|i| is_offline(s, *i)) { Ok(()) } else { Err("select an offline clip".into()) }
-}
-fn has_loggable(s: &Session) -> std::result::Result<(), String> {
-    if s.project.items.keys().any(|i| media_of(&s.project, *i).is_some()) { Ok(()) } else { Err("the project has no clips to log".into()) }
 }
 fn can_automate(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
@@ -688,7 +650,7 @@ fn new_from_template(s: &mut Session, p: &Value) -> Result<Value> {
 // ---------------------------------------------------------------------------------------------
 
 /// The selected items plus everything they need: sequence contents (recursively), subclip
-/// parents, multi-camera / merged-clip sources and graphic canvases.
+/// parents and graphic canvases.
 ///
 /// Bins and items share one id space, so a named bin contributes every item it holds (and
 /// everything those items need), as `project.delete` does. The project's own top bin does not,
@@ -743,11 +705,6 @@ pub fn closure(p: &Project, roots: &[ItemId]) -> BTreeSet<ItemId> {
                 for t in q.all_tracks() {
                     todo.extend(t.items.iter().map(|i| i.item));
                 }
-                let mut ids = BTreeSet::new();
-                for v in [serde_json::to_value(&q.multicam).unwrap_or_default(), serde_json::to_value(&q.merged).unwrap_or_default()] {
-                    crate::clip_ops::collect_ids(&v, &mut ids, p);
-                }
-                todo.extend(ids);
             }
             _ => {}
         }
@@ -792,24 +749,6 @@ fn export_selection(s: &mut Session, p: &Value) -> Result<Value> {
     sub.root.name = name;
     s.services.write_file(&path, &waltcut_format::encode(&sub, false)).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     Ok(json!({"path": path, "items": keep.iter().map(|i| i.0).collect::<Vec<_>>()}))
-}
-
-fn export_ale(s: &mut Session, p: &Value) -> Result<Value> {
-    let path = str_p(p, "path").ok_or_else(|| bad("file.exportAle", "need `path`"))?.to_string();
-    let mut items: Vec<ItemId> = match p.get("items").and_then(Value::as_array) {
-        Some(a) => a.iter().filter_map(|v| v.as_u64().map(ItemId)).collect(),
-        None => s.state.project_selection.clone(),
-    };
-    if items.is_empty() {
-        // the whole project, in Project panel order
-        s.project.root.all_items(&mut items);
-    }
-    let doc = waltcut_interchange::ale::export_items(&s.project, &items);
-    if doc.rows.is_empty() {
-        return Err(EngineError::Other("none of the items is a clip that can be logged".into()));
-    }
-    s.services.write_file(&path, waltcut_interchange::ale::write(&doc).as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
-    Ok(json!({"path": path, "clips": doc.rows.len()}))
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -213,16 +213,9 @@ fn mix_item(
         if live.depth >= crate::MAX_NEST_DEPTH {
             return;
         }
-        // A multi-camera clip plays the audio of its source's audio setting: camera 1, all
-        // cameras, or (when switching audio) the angle the clip selects.
-        let q = if nested.multicam.is_some() {
-            std::borrow::Cow::Owned(nested.with_angle_audio(item.multicam_angle(nested)))
-        } else {
-            std::borrow::Cow::Borrowed(nested)
-        };
         // The nested sequence is the clip's source: speed, reverse and clip effects apply to its
         // mix exactly as they do to a media clip's sound.
-        let read = |m0: i64, len: usize| Some(nested_mix(project, &q, m0, len, sr, sources, w, live.depth));
+        let read = |m0: i64, len: usize| Some(nested_mix(project, nested, m0, len, sr, sources, w, live.depth));
         effected(item, &read, a0, n, sr, w)
     } else {
         let Some(src) = sources.source(item.item) else { return };

@@ -709,7 +709,6 @@ fn import_source(
                 mark_out: None,
                 markers: vec![],
                 offline: false,
-                proxy: None,
                 identity: Some(identity),
             }),
             bin,
@@ -968,8 +967,8 @@ pub(crate) fn place_item(
     audio_split: Option<(TimeRange, Tick)>,
 ) -> Result<Vec<ClipId>> {
     let pi = s.project.item(item).ok_or_else(|| bad(label, "no such item"))?.clone();
-    // the nest toggle off: a sequence edits in as its clips (a multi-camera source stays one clip)
-    if s.state.sequences_as_clips && pi.as_sequence().is_some_and(|q| q.multicam.is_none()) {
+    // the nest toggle off: a sequence edits in as its clips
+    if s.state.sequences_as_clips && pi.as_sequence().is_some() {
         return crate::sequence_tools::place_sequence_clips(s, item, range, at, vdest, adest, insert, label);
     }
     let (video, audio) = s.project.source_streams(item);
@@ -1340,8 +1339,6 @@ fn build() -> Vec<CommandSpec> {
             }
             let mut ids = Vec::new();
             let mut errors = Vec::new();
-            let mut sequences = Vec::new();
-            let mut reports = Vec::new();
             let mut image_sequences = Vec::new();
             // Image Sequence: each path is the first frame of a numbered still sequence. With
             // Settings ▸ Media ▸ Import image sequences on, a single numbered still is detected.
@@ -1366,45 +1363,17 @@ fn build() -> Vec<CommandSpec> {
                         Ok(id) => ids.push(id.0),
                         Err(e) => errors.push(format!("{path}: {e}")),
                     },
-                    Ok(b) => {
-                        if let Some(fmt) = crate::interchange::detect(&path, &b) {
-                            match crate::interchange::import(s, &path, &b, fmt) {
-                                Ok(r) => {
-                                    sequences.extend(r["sequences"].as_array().cloned().unwrap_or_default());
-                                    reports.push(r);
-                                }
-                                Err(e) => errors.push(format!("{path}: {e}")),
-                            }
-                        } else {
-                            match import_bytes(s, &path, b.into(), bin) {
-                                Ok(id) => ids.push(id.0),
-                                Err(e) => errors.push(format!("{path}: {e}")),
-                            }
-                        }
-                    }
+                    Ok(b) => match import_bytes(s, &path, b.into(), bin) {
+                        Ok(id) => ids.push(id.0),
+                        Err(e) => errors.push(format!("{path}: {e}")),
+                    },
                     Err(e) => errors.push(format!("{path}: {e}")),
                 }
             }
-            if ids.is_empty() && sequences.is_empty() && reports.is_empty() && !errors.is_empty() {
+            if ids.is_empty() && !errors.is_empty() {
                 return Err(EngineError::Other(errors.join("; ")));
             }
-            // Project Settings ▸ Ingest: copy / transcode / create proxies
-            // (image sequences are many files: ingest copies and transcodes single files only)
-            let item_ids: Vec<ItemId> = ids.iter().filter(|i| !image_sequences.iter().any(|q| q["item"].as_u64() == Some(**i))).map(|i| ItemId(*i)).collect();
-            let ingest = match crate::proxies::ingest(s, &item_ids) {
-                Ok(v) => v,
-                Err(e) => {
-                    errors.push(format!("ingest: {e}"));
-                    Value::Null
-                }
-            };
-            let mut out = if !ingest.is_null() {
-                json!({"items": ids, "sequences": sequences, "documents": reports, "errors": errors, "ingest": ingest})
-            } else if reports.is_empty() {
-                json!({"items": ids, "errors": errors})
-            } else {
-                json!({"items": ids, "sequences": sequences, "documents": reports, "errors": errors})
-            };
+            let mut out = json!({"items": ids, "errors": errors});
             if !image_sequences.is_empty() {
                 out["imageSequences"] = json!(image_sequences);
             }
@@ -1418,54 +1387,6 @@ fn build() -> Vec<CommandSpec> {
             }
             Ok(out)
         }),
-        cmd!(
-            "file.exportInterchange",
-            "Export Interchange",
-            [],
-            None,
-            r#"{"format":"edl|xml|fcpxml|otio|aaf|omf"=xml,"path":str,"sequence":id?}"#,
-            has_seq,
-            crate::interchange::export
-        ),
-        cmd!("file.exportEdl", "EDL…", ["File", "Export"], None, r#"{"path":str}"#, has_seq, |s, p| {
-            let mut q = p.clone();
-            q["format"] = json!("edl");
-            crate::interchange::export(s, &q)
-        }),
-        cmd!("file.exportFcp7Xml", "Final Cut Pro XML…", ["File", "Export"], None, r#"{"path":str}"#, has_seq, |s, p| {
-            let mut q = p.clone();
-            q["format"] = json!("xml");
-            crate::interchange::export(s, &q)
-        }),
-        cmd!("file.exportFcpxml", "FCPXML…", ["File", "Export"], None, r#"{"path":str}"#, has_seq, |s, p| {
-            let mut q = p.clone();
-            q["format"] = json!("fcpxml");
-            crate::interchange::export(s, &q)
-        }),
-        cmd!("file.exportOtio", "OpenTimelineIO…", ["File", "Export"], None, r#"{"path":str}"#, has_seq, |s, p| {
-            let mut q = p.clone();
-            q["format"] = json!("otio");
-            crate::interchange::export(s, &q)
-        }),
-        cmd!(
-            "file.exportAaf",
-            "AAF…",
-            ["File", "Export"],
-            None,
-            r#"{"path":str,"sequence":id?,"mixdownVideo":bool?,"mixdownFormat":"mov|mxf"?,"breakoutToMono":bool?,"audio":"embedded|separate|linked"?,"audioFormat":"wav|aiff|mxf"?,"sampleRate":int?,"bitDepth":"16|24"?,"trimAudio":bool?,"handles":frames?,"renderAudioEffects":bool?,"smallSectors":bool?}"#,
-            has_seq,
-            |s, p| crate::aaf_omf::export_aaf(s, p)
-        ),
-        cmd!(
-            "file.exportOmf",
-            "OMF…",
-            ["File", "Export"],
-            None,
-            r#"{"path":str,"sequence":id?,"title":str?,"audio":"embedded|separate"?,"audioFormat":"wav|aiff"?,"sampleRate":int?,"bitDepth":"16|24"?,"trimAudio":bool?,"handles":frames?,"renderAudioEffects":bool?,"breakoutToMono":bool?}"#,
-            has_seq,
-            |s, p| crate::aaf_omf::export_omf(s, p)
-        ),
-        cmd!("file.importAaf", "Import AAF…", [], None, r#"{"path":str}"#, always, |s, p| crate::aaf_omf::import_document(s, p, "file.importAaf")),
         cmd!("file.save", "Save", ["File"], Some("Cmd+S"), r#"{"path":str?}"#, always, |s, p| {
             let path = str_p(p, "path").map(str::to_string).or_else(|| s.path.clone()).ok_or_else(|| bad("file.save", "no path (use Save As)"))?;
             write_project(s, &path, true)
@@ -3384,7 +3305,6 @@ fn build() -> Vec<CommandSpec> {
     crate::sequence_tools::splice(&mut v);
     v.extend(crate::settings::commands());
     v.extend(crate::mixer::commands());
-    v.extend(crate::multicam::commands());
     v.extend(crate::essential_sound::commands());
     v.extend(crate::color::commands());
     v.extend(crate::graphics::commands());
@@ -3393,18 +3313,14 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::graphic_templates::commands());
     v.extend(crate::shortcuts::commands());
     v.extend(crate::relink::commands());
-    v.extend(crate::proxies::commands());
-    v.extend(crate::project_manager::commands());
     v.extend(crate::masks::commands());
     v.extend(crate::presets::commands());
     v.extend(crate::export_tools::commands());
     v.extend(crate::panels::commands());
-    v.extend(crate::scopes::commands());
     v.extend(crate::remix::commands());
     v.extend(crate::voiceover::commands());
     v.extend(crate::keyboard::commands());
     v.extend(crate::project_panel::commands());
-    v.extend(crate::media_browser::commands());
     v.extend(crate::paste_media::commands());
     // Edit ▸ Label ▸ <colour>, Paste Attributes, subclips, Video / Audio Options, Replace With Clip…
     // and their menu order
@@ -3873,7 +3789,6 @@ fn param_info(p: &waltcut_project::ParamDef) -> Value {
         K::Angle => "angle",
         K::Text => "text",
         K::Curve { .. } => "curve",
-        K::Wheel => "wheel",
         K::Path => "path",
     };
     j["type"] = json!(ty);
@@ -4293,7 +4208,7 @@ fn name_project(p: &mut waltcut_project::Project, name: String) {
 }
 
 fn write_project(s: &mut Session, path: &str, adopt: bool) -> Result<Value> {
-    let t0 = web_time::Instant::now();
+    let t0 = std::time::Instant::now();
     // Save As renames the project after its new file (not an edit: no undo step, not dirty).
     if adopt
         && let Some(name) = project_name_for(path)
@@ -4316,9 +4231,7 @@ fn write_project(s: &mut Session, path: &str, adopt: bool) -> Result<Value> {
 
 /// Make `proj` the session's project (fresh history, media pool and editor state).
 fn install_project(s: &mut Session, proj: waltcut_project::Project, path: Option<String>, clean: bool) {
-    let proxies = s.media.use_proxies();
     s.media = std::sync::Arc::new(crate::MediaPool::default());
-    s.media.set_use_proxies(proxies);
     s.offline = Default::default();
     let first = proj.sequences().next().map(|i| i.id);
     s.media.add_stored(&proj, path.as_deref());
@@ -4328,9 +4241,7 @@ fn install_project(s: &mut Session, proj: waltcut_project::Project, path: Option
     s.state = crate::Session::default().state;
     s.state.active_sequence = first;
     s.state.open_sequences = first.into_iter().collect();
-    if let Some(p) = &path
-        && !cfg!(target_arch = "wasm32")
-    {
+    if let Some(p) = &path {
         s.previews.set_dir(Some(crate::project_tools::previews_dir_for(&s.project, p, &s.prefs.auto_save.scratch_folders)));
     }
     s.path = path;

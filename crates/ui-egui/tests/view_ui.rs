@@ -1,5 +1,5 @@
 //! View menu and monitor view options, driven headless through the control channel: playback /
-//! paused resolution, High Quality Playback, display modes (channels, comparison, multi-camera,
+//! paused resolution, High Quality Playback, display modes (channels, multi-camera,
 //! source waveform), magnification and panning, rulers and guides (drag out of the ruler, move,
 //! lock, clear, Add Guide…, templates), Snap in Program Monitor, and the Graphics menu commands.
 //!
@@ -146,26 +146,8 @@ fn view_menu_resolutions_and_display_modes() {
     d.menu("view.display.alpha");
     assert_eq!(d.program()["display"], "Alpha");
 
-    // comparison view: reference frame at the playhead, stepped by the reference buttons
-    d.exec("playhead.set", json!({"seconds": 2}));
-    d.menu("view.display.comparison");
-    let p = d.program();
-    assert_eq!(p["display"], "Comparison");
-    let r0 = p["compare_ref"].as_i64().unwrap();
-    d.frames(3);
-    assert!(d.try_rect("program.compare.reference").is_some());
-    d.click("program.compare.next");
-    let r1 = d.program()["compare_ref"].as_i64().unwrap();
-    assert!(r1 > r0, "reference stepped forward: {r0} → {r1}");
-    d.exec("playhead.set", json!({"seconds": 4}));
-    d.shot("comparison");
-
-    // Multi-Camera links to the existing multi-camera view; Composite turns it off
-    d.menu("view.display.multicam");
-    assert_eq!(d.program()["multicam"], true);
     d.menu("view.display.composite");
-    let p = d.program();
-    assert_eq!((p["multicam"].as_bool(), p["display"].as_str()), (Some(false), Some("Composite")));
+    assert_eq!(d.program()["display"], "Composite");
 
     // wrench menu items carry automation ids
     d.click("program.settings");
