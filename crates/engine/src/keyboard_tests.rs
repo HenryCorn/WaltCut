@@ -350,7 +350,7 @@ fn poster_frame_and_export_frame() {
     assert!(keyboard::poster_frame(s.project.item(item).unwrap()).is_some());
 
     // Shift+E writes the Program frame
-    let dir = std::env::temp_dir().join(format!("fc-export-frame-{}", std::process::id()));
+    let dir = waltcut_testkit::workspace_root().join("target").join(format!("fc-export-frame-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("frame.png");
     let r = s.execute("file.exportFrame", json!({"path": path.to_string_lossy()})).unwrap();
@@ -360,7 +360,7 @@ fn poster_frame_and_export_frame() {
     assert_eq!((r["width"].as_u64().unwrap(), r["height"].as_u64().unwrap()), (seq.settings.width as u64, seq.settings.height as u64));
     // with Import, the still lands in the project
     let n = s.project.items.len();
-    s.execute("file.exportFrame", json!({"path": dir.join("frame2.tiff").to_string_lossy(), "format": "tiff", "import": true})).unwrap();
+    s.execute("file.exportFrame", json!({"path": dir.join("frame2.png").to_string_lossy(), "format": "png", "import": true})).unwrap();
     assert_eq!(s.project.items.len(), n + 1);
     let _ = std::fs::remove_dir_all(&dir);
 }

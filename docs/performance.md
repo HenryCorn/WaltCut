@@ -106,7 +106,7 @@ compositor's savings are a larger part of the export.
 What is left in a frame without overlays is the Y'CbCr → linear float conversion of the camera
 picture (4.5 ms in the synthetic case) and the conversion to 8 bits (2 ms).
 
-## Results (GPU3: GPU export rendering, Off → Auto, #30)
+## Retained GPU export composition
 
 Export ▸ GPU Rendering composites the exported frames on the GPU (`waltcut-gpu`'s off-screen
 compositor, a pool of up to four renderers) instead of the CPU reference renderer, which stays the
@@ -183,12 +183,18 @@ the draft plan's box decimation of the planes, cheap next to software decoding, 
 CPU cost. Zero-copy upload of the decoded `CVPixelBuffer` into wgpu (no copy-out at all) is the
 next step (issue #30).
 
-## Results (HW2: VideoToolbox hardware H.264 encoding, built-in → hardware)
+## Export: overlapped rendering and encoding
 
-Apple M1 (8 cores, 16 GB), 2026-10-06, single runs on an otherwise idle machine, release build.
-Hardware encoding is opt-in per export (`hardware_encoding: auto`); the built-in encoder is unchanged.
+The retained H.264/ProRes stepped exporter renders batch k+1 while encoding/muxing/mixing batch k,
+using `rayon::in_place_scope`. Encoders stay on the calling thread. Fixed 16-frame audio/video
+interleave and H.264 slice layout preserve CPU output bytes across core counts, step sizes and
+overlap settings; `determinism_tests.rs` checks those retained paths.
 
-### The encoder alone (100 frames of 1920×1080 25 fps camera footage, High, one-pass VBR, keyframe every 50)
+Prefetched incomplete media is discarded and retried; cancellation drops prefetched frames and a
+render-ahead panic becomes an export error. Two in-flight payload batches are capped by
+`IN_FLIGHT_BUDGET` (512 MiB), reducing the batch size as needed. HDR payload accounting includes
+both RGB floats and RGBA/alpha (16 bytes/pixel). This is a payload budget, not a whole-process RSS
+promise; decoding, compositor working images and encoders also use memory.
 
 Frames go in as planar Y'CbCr and out as compressed frames (NV12 fill, `VTCompressionSessionEncodeFrame`,
 flush); quality is the luma PSNR of our software decoder's output against the input.
@@ -689,17 +695,6 @@ within the noise. The cold-seek table above is the load-independent comparison.
 The timeline is not a bottleneck: the whole app frame (all panels) costs ~3 ms with 1000 clips
 visible; it already culls clips outside the view. The waveform display gain no longer rescans the
 whole source's peaks for every clip every frame (cached per peak list).
-
-### Export (8 s of 1080p23.976 H.264 + AAC source)
-
-| format | fps before → after | CPU ms/frame before → after |
-|---|---|---|
-| H.264 + AAC | 10.6, 5.8 → 10.2, 11.9 | 256 → 250 |
-| ProRes 422 | 4.7, 3.0 → 6.3, 9.6 | 249 → 232 |
-
-Profile (`sample`): H.264 export is ~45 % encoder, ~30 % decoding the noisy 45 Mbit/s source,
-~25 % CPU compositing; ProRes export spends most in `prores::encode::slice_bits` /
-`choose_quantisers` (rate search), then source decode and compositing. Not changed in M4.8.
 
 ### Project save / open (5 sequences × 1000 clips, 3.7 MB)
 

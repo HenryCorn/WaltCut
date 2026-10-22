@@ -454,7 +454,11 @@ pub fn export(o: &Opts) -> Vec<Value> {
         return Vec::new();
     };
     let secs = if o.quick { 3.0 } else { 8.0 };
-    let dir = std::env::temp_dir().join(format!("filmcraft-bench-export-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("target")
+        .join(format!("filmcraft-bench-export-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("tmp dir");
     let mut rows = Vec::new();
     // Scenes: (id, format, label, extension, layered). `--only` matches the id exactly here,
@@ -462,18 +466,16 @@ pub fn export(o: &Opts) -> Vec<Value> {
     let scenes = [
         ("h264", "h264", "H.264 + AAC (MP4)", "mp4", false),
         ("h264_layers", "h264", "H.264 + AAC, 3 composited layers", "mp4", true),
-        ("prores", "prores", "ProRes 422 (MOV)", "mov", false),
+        ("prores", "prores", "ProRes 4444 with alpha (MOV)", "mov", false),
     ];
     for (id, format, label, ext, fx) in scenes.into_iter().filter(|f| o.only.as_deref().is_none_or(|x| x == f.0)) {
         let mut runs = Vec::new();
         let mut cpu = Vec::new();
         let mut bytes = 0u64;
         let mut frames = 0i64;
-        let hw0 = waltcut_engine::export::hw_encode_stats();
         let gpu0 = waltcut_engine::export::gpu_render_stats();
         // The engine's headless session does not register the app's GPU export renderer; the bench
-        // does it here so `--gpu-rendering auto` measures the GPU path (and the row reports the
-        // frames it actually rendered on the GPU).
+        // does it here for the automatically selected compositor (the row reports actual GPU frames).
         waltcut_engine::export::register_frame_renderer(gpu_export_frame_renderer_factory);
         for _ in 0..o.repeat {
             let mut s = Session::default();
@@ -500,9 +502,7 @@ pub fn export(o: &Opts) -> Vec<Value> {
             waltcut_export::reset_export_lock_wait();
             waltcut_gpu::export_renderer::timing::reset();
             let (t0, c0) = (Instant::now(), cpu_now());
-            // `--hw auto`: the hardware encoder too (NVENC H.264 on Windows); `--hw off`: ours
-            let hardware = if o.hw == "off" { "off" } else { "auto" };
-            let r = s.execute("file.exportMedia", json!({"path": out.to_string_lossy(), "format": format, "hardwareEncoding": hardware, "gpuRendering": if o.hw == "off" { "off" } else { "auto" }, "wait": true}));
+            let r = s.execute("file.exportMedia", json!({"path": out.to_string_lossy(), "format": format, "overwrite":true, "wait": true}));
             let dt = t0.elapsed().as_secs_f64();
             if let Err(e) = r {
                 eprintln!("export {format}: {e}");
@@ -541,9 +541,7 @@ pub fn export(o: &Opts) -> Vec<Value> {
             "scene": id, "format": label, "frames": frames, "seconds": best, "fps": frames as f64 / best,
             "realtime": frames as f64 / best / FrameRate::FPS_23_976.as_f64(), "cpu_ms_per_frame": median(&cpu),
             "mbytes": bytes as f64 / 1e6, "runs_s": runs, "load": load_avg(),
-            // pictures encoded by a hardware encoder during this row (zero with --hw off or where there is none)
-            "hw_frames": waltcut_engine::export::hw_encode_stats().frames.saturating_sub(hw0.frames),
-            // frames composited by the GPU export renderer (zero with --gpu-rendering off or where there is no adapter)
+            // Actual GPU composition, independent of the fixed built-in video encoder.
             "gpu_frames": waltcut_engine::export::gpu_render_stats().frames.saturating_sub(gpu0.frames),
             "gpu_fallbacks": waltcut_engine::export::gpu_render_stats().fallbacks.saturating_sub(gpu0.fallbacks),
         }));

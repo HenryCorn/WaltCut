@@ -6,24 +6,7 @@ use serde_json::{Map, Value};
 const MAX_PARAM_NESTING: usize = 64;
 
 /// Options that take a value (`--project p`); every other `--x` is a flag.
-const VALUED: &[&str] = &[
-    "--project",
-    "--save-as",
-    "--bridge",
-    "--format",
-    "--scale",
-    "--quality",
-    "--seconds",
-    "--out",
-    "--frames",
-    "--preset",
-    "--range",
-    "--start",
-    "--end",
-    "--data-dir",
-    "--settings",
-    "--gpu-rendering",
-];
+const VALUED: &[&str] = &["--project", "--save-as", "--bridge", "--format", "--seconds", "--out", "--frames", "--range", "--start", "--end"];
 
 #[derive(Debug, Default)]
 pub struct Args {
@@ -73,6 +56,27 @@ impl Args {
     /// The first option that is not in `allowed`, if any.
     pub fn unknown_opt(&self, allowed: &[&str]) -> Option<&str> {
         self.opts.iter().map(|(n, _)| n.as_str()).find(|n| !allowed.contains(n))
+    }
+
+    pub fn check_options(&self, valued: &[&str], flags: &[&str]) -> Result<(), String> {
+        let mut seen = std::collections::HashSet::new();
+        for (name, value) in &self.opts {
+            if !seen.insert(name) {
+                return Err(format!("option `{name}` was provided more than once"));
+            }
+            if valued.contains(&name.as_str()) {
+                if value.as_deref().is_none_or(str::is_empty) {
+                    return Err(format!("option `{name}` needs a value"));
+                }
+            } else if flags.contains(&name.as_str()) {
+                if value.is_some() {
+                    return Err(format!("flag `{name}` takes no value"));
+                }
+            } else {
+                return Err(format!("unsupported option `{name}`"));
+            }
+        }
+        Ok(())
     }
 
     /// Command params from positionals `from..`: one JSON object, or `key=value` pairs
@@ -166,10 +170,10 @@ mod tests {
 
     #[test]
     fn version_after_global_options() {
-        for s in ["--version", "-V", "--demo --version", "--compact -V", "--data-dir d --version", "export --version"] {
+        for s in ["--version", "-V", "--demo --version", "--compact -V", "--project d --version", "export --version"] {
             assert!(args(s).wants_version(), "{s}");
         }
-        for s in ["version", "--data-dir -V", "exec x -V", "-- --version"] {
+        for s in ["version", "--project -V", "exec x -V", "-- --version"] {
             assert!(!args(s).wants_version(), "{s}");
         }
     }
@@ -189,12 +193,26 @@ mod tests {
     }
 
     #[test]
-    fn gpu_rendering_takes_a_space_separated_value() {
-        let a = args("export --gpu-rendering off out.wav --start 0 --end 0.1");
-        assert_eq!(a.positionals, ["export", "out.wav"]);
-        assert_eq!(a.opt("--gpu-rendering"), Some("off"));
-        let b = args("export out.wav --gpu-rendering auto");
-        assert_eq!(b.positionals, ["export", "out.wav"]);
-        assert_eq!(b.opt("--gpu-rendering"), Some("auto"));
+    fn operational_options_cannot_ignore_values_duplicates_or_removed_flags() {
+        let valued = ["--format", "--project"];
+        let flags = ["--overwrite", "--demo"];
+        assert!(args("export out.mov --format prores --overwrite").check_options(&valued, &flags).is_ok());
+        for request in [
+            "export out.mov --overwrite=false",
+            "export out.mov --demo=yes",
+            "export out.mov --format",
+            "export out.mov --format=prores --format=h264",
+            "export out.mov --preset old",
+            "export out.mov --settings={}",
+            "export out.mov --queue",
+            "export out.mov --quality 95",
+            "export out.mov --scale 0.5",
+            "export out.mov --no-audio",
+            "export out.mov --gpu-rendering auto",
+            "export --list-presets",
+            "export out.mov --data-dir x",
+        ] {
+            assert!(args(request).check_options(&valued, &flags).is_err(), "{request}");
+        }
     }
 }

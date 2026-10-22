@@ -221,19 +221,21 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
                     Err(e) => return err(format!("`{k}`: {e}")),
                 }
             }
-            // Export mode state (`panels::export_mode::ExportUi`), deep-merged; `"preset": name`
-            // applies that preset's settings first
-            if let Some(patch) = p.get("export").filter(|v| v.is_object()) {
-                if let Some(name) = patch.get("preset").and_then(Value::as_str)
-                    && name != crate::panels::export_mode::CUSTOM
-                    && !crate::panels::export_mode::apply_preset(app, name)
-                {
-                    return err(format!("no export preset named `{name}`"));
+            // The simple export draft rejects removed settings and unknown keys.
+            if let Some(patch) = p.get("export") {
+                if !patch.is_object() {
+                    return err("`export` must be an object");
                 }
                 let mut cur = serde_json::to_value(&app.ui.export).unwrap_or_default();
                 merge(&mut cur, patch);
                 match serde_json::from_value(cur) {
-                    Ok(e) => app.ui.export = e,
+                    Ok(e) => {
+                        let e: crate::panels::export_mode::ExportUi = e;
+                        if let Err(error) = e.validate() {
+                            return err(error);
+                        }
+                        app.ui.export = e;
+                    }
                     Err(e) => return err(format!("`export`: {e}")),
                 }
             }

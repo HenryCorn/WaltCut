@@ -139,122 +139,127 @@ fn run_keep_going_reports_failures() {
     assert_eq!(lines[1]["ok"], true);
 }
 
-#[test]
-fn export_wav_waits_for_job() {
-    let dir = std::env::temp_dir().join(format!("fc-cli-x-{}", std::process::id()));
+fn export_project(name: &str) -> (std::path::PathBuf, String) {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("target")
+        .join("export-tests")
+        .join(format!("cli-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let out = dir.join("still.wav");
-    let o = cli(&["--demo", "export", out.to_str().unwrap()]);
-    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
-    assert!(std::fs::metadata(&out).map(|m| m.len() > 44).unwrap_or(false));
+    let project = dir.join("p.fcproj").to_str().unwrap().to_string();
+    json_out(&cli(&["exec", "file.newSequence", "name=Small", "width=64", "height=36", "fps=24", "--save-as", &project]));
+    (dir, project)
+}
+
+#[test]
+fn retained_movie_exports_wait_for_real_files_and_report_the_written_path() {
+    let (dir, project) = export_project("movies");
+    let before = std::fs::read(&project).unwrap();
+    for (format, filename, video, audio) in [("h264", "movie.mp4", "H.264 (High)", "AAC"), ("prores", "movie.mov", "Apple ProRes 4444", "PCM 32-bit float")] {
+        let out = dir.join(filename).to_str().unwrap().to_string();
+        let args = ["--project", &project, "export", &out, "--format", format, "--start", "0", "--end", "0.25"];
+        let o = cli(&args);
+        let result = json_out(&o);
+        assert_eq!(result["result"]["frames"], 6, "{result}");
+        assert_eq!(result["path"], out);
+        assert!(std::fs::metadata(&out).unwrap().len() > 100);
+        let info = json_out(&cli(&["probe", &out]));
+        assert_eq!(info["video"]["codec"], video, "{info}");
+        assert_eq!(info["audio_streams"][0]["codec"], audio, "{info}");
+        assert_eq!(info["audio_streams"][0]["channels"], 2, "{info}");
+        assert!(String::from_utf8_lossy(&o.stderr).contains(&format!("exported {out} in ")));
+        assert!(!cli(&args).status.success(), "existing destination needs explicit overwrite");
+        let mut replace = args.to_vec();
+        replace.push("--overwrite");
+        json_out(&cli(&replace));
+    }
+    assert_eq!(std::fs::read(&project).unwrap(), before);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// `export --preset`: a built-in preset by name (dash or en dash), a custom range, a user preset
-/// from `--data-dir`, `--list-presets`, `--queue`, and a clean failure for an unknown preset.
 #[test]
-fn export_with_presets() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/export-tests").join(format!("cli-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    let data = dir.join("data");
-    let data_s = data.to_str().unwrap();
-    let out = dir.join("proxy.mov");
-    let o = cli(&["--demo", "--data-dir", data_s, "export", out.to_str().unwrap(), "--preset", "Apple ProRes 422 Proxy", "--start", "0", "--end", "0.25"]);
-    let v = json_out(&o);
-    assert_eq!(v["preset"], "Apple ProRes 422 Proxy");
-    assert!(std::fs::metadata(&out).map(|m| m.len() > 1000).unwrap_or(false));
-    if let Some(ffprobe) = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe", "/usr/bin/ffprobe"].into_iter().find(|p| std::path::Path::new(p).exists()) {
-        let p = Command::new(ffprobe)
-            .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,profile,width", "-of", "csv=p=0", out.to_str().unwrap()])
-            .output()
-            .unwrap();
-        assert_eq!(String::from_utf8_lossy(&p.stdout).trim(), "prores,Proxy,1920");
+fn png_sequence_and_still_commands_use_retained_outputs_and_no_implicit_replacement() {
+    let (dir, project) = export_project("images");
+    let base = dir.join("frames.png").to_str().unwrap().to_string();
+    let args = ["--project", &project, "export", &base, "--format", "png", "--start", "0", "--end", "0.25"];
+    assert_eq!(json_out(&cli(&args))["result"]["frames"], 6);
+    for i in 0..6 {
+        assert!(dir.join(format!("frames{i:03}.png")).exists());
     }
-    // the extension comes from the preset; a hyphen finds the en-dash name
-    let base = dir.join("adaptive");
-    json_out(&cli(&[
-        "--demo",
-        "--data-dir",
-        data_s,
-        "export",
-        base.to_str().unwrap(),
-        "--preset",
-        "Match Source - Adaptive Low Bitrate",
-        "--start",
-        "0",
-        "--end",
-        "0.2",
-    ]));
-    assert!(dir.join("adaptive.mp4").exists());
-    // a user preset saved into the data directory is found by later runs
-    json_out(&cli(&[
-        "--data-dir",
-        data_s,
-        "exec",
-        "export.presets.save",
-        "name=Tiny WAV",
-        "from=Waveform Audio 48 kHz 16-bit",
-        "settings={\"audio\":{\"bits\":24}}",
-    ]));
-    let list = json_out(&cli(&["--data-dir", data_s, "export", "--list-presets", "tiny"]));
-    assert_eq!(list.as_array().unwrap().len(), 1, "{list}");
-    let wav = dir.join("tiny.wav");
-    json_out(&cli(&["--demo", "--data-dir", data_s, "export", wav.to_str().unwrap(), "--preset", "Tiny WAV", "--start", "0", "--end", "0.5"]));
-    let b = std::fs::read(&wav).unwrap();
-    assert_eq!(u16::from_le_bytes([b[34], b[35]]), 24, "24-bit from the user preset");
-    // through the queue
-    let q = dir.join("queued.wav");
-    let v = json_out(&cli(&["--demo", "--data-dir", data_s, "export", q.to_str().unwrap(), "--preset", "Tiny WAV", "--queue", "--range", "entire"]));
-    assert_eq!(v["items"][0]["status"], "done", "{v}");
-    assert!(q.exists());
-    // a format that changes the extension: the completion message names the file written (#341)
-    let prores = dir.join("prores.mp4");
-    let o = cli(&[
-        "--demo",
-        "--data-dir",
-        data_s,
-        "export",
-        prores.to_str().unwrap(),
-        "--preset",
-        "Apple ProRes 422 HQ",
-        "--start",
-        "0",
-        "--end",
-        "0.1",
-        "--scale",
-        "0.125",
-    ]);
-    let v = json_out(&o);
-    let written = v["path"].as_str().unwrap().to_string();
-    assert!(written.ends_with("prores.mp4.mov") && std::path::Path::new(&written).exists(), "{v}");
-    let msg = String::from_utf8_lossy(&o.stderr);
-    assert!(msg.contains(&format!("exported {written} in ")), "{msg}");
-    let qa = dir.join("queued-prores.mp4");
-    let o = cli(&[
-        "--demo",
-        "--data-dir",
-        data_s,
-        "export",
-        qa.to_str().unwrap(),
-        "--preset",
-        "Apple ProRes 422 HQ",
-        "--queue",
-        "--start",
-        "0",
-        "--end",
-        "0.1",
-        "--scale",
-        "0.125",
-    ]);
-    let v = json_out(&o);
-    let written = v["items"][0]["path"].as_str().unwrap().to_string();
-    assert!(written.ends_with("queued-prores.mp4.mov"), "{v}");
-    assert!(String::from_utf8_lossy(&o.stderr).contains(&format!("exported {written} in ")), "{}", String::from_utf8_lossy(&o.stderr));
-    // unknown preset: exit status 1 and a message naming it
-    let bad = cli(&["--demo", "--data-dir", data_s, "export", dir.join("x.mp4").to_str().unwrap(), "--preset", "No Such Preset"]);
-    assert_eq!(bad.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&bad.stderr).contains("No Such Preset"));
+    assert!(!dir.join("frames006.png").exists());
+    let mut replace = args.to_vec();
+    replace.push("--overwrite");
+    assert!(!cli(&replace).status.success(), "PNG sequence replacement is refused");
+    for name in ["frame.png", "frame.jpg"] {
+        let out = dir.join(name).to_str().unwrap().to_string();
+        let args = ["--project", &project, "render", "--seconds", "0", "--out", &out];
+        let result = json_out(&cli(&args));
+        assert_eq!((result["width"].as_u64(), result["height"].as_u64()), (Some(64), Some(36)));
+        let bytes = std::fs::read(&out).unwrap();
+        assert!(bytes.starts_with(if name.ends_with(".png") { b"\x89PNG\r\n\x1a\n" } else { b"\xff\xd8" }));
+        assert!(!cli(&args).status.success());
+        let mut replace = args.to_vec();
+        replace.push("--overwrite");
+        json_out(&cli(&replace));
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn removed_delivery_options_formats_commands_and_hostile_ranges_fail_without_outputs() {
+    let (dir, project) = export_project("unsupported");
+    let out = dir.join("out.mov").to_str().unwrap().to_string();
+    let before = std::fs::read(&project).unwrap();
+    for extra in [
+        vec!["--preset", "old"],
+        vec!["--settings={}"],
+        vec!["--queue"],
+        vec!["--list-presets"],
+        vec!["--data-dir", "old"],
+        vec!["--quality", "95"],
+        vec!["--scale", "0.5"],
+        vec!["--gpu-rendering", "auto"],
+        vec!["--no-audio"],
+        vec!["--overwrite=false"],
+        vec!["--format=prores", "--format=h264"],
+        vec!["--format"],
+        vec!["--start", "0"],
+        vec!["--start", "NaN", "--end", "1"],
+        vec!["--start", "0", "--end", "inf"],
+        vec!["--start", "-1", "--end", "1"],
+        vec!["--range", "entire", "--start", "0", "--end", "1"],
+        vec!["--demo"],
+    ] {
+        let mut args = vec!["--project", &project, "export", &out];
+        args.extend_from_slice(&extra);
+        let response = cli(&args);
+        assert_eq!(response.status.code(), Some(2), "{args:?}: {}", String::from_utf8_lossy(&response.stderr));
+    }
+    for format in ["wav", "aiff", "aac", "m4a", "hevc", "mjpeg", "gif", "tiff", "bmp", "tga", "dpx", "exr"] {
+        assert!(!cli(&["--project", &project, "export", &out, "--format", format]).status.success(), "{format}");
+    }
+    for command in ["file.exportMedia", "file.exportFrame", "export.quick"] {
+        for option in ["--preset=old", "--settings={}", "--queue", "--scale=0.5", "--quality=95", "--overwrite=false"] {
+            assert_eq!(cli(&["--project", &project, "exec", command, option]).status.code(), Some(2), "{command} {option}");
+        }
+    }
+    let script = dir.join("export.jsonl");
+    std::fs::write(&script, serde_json::json!({"id":"file.exportMedia","params":{"path":out,"format":"prores","wait":true}}).to_string()).unwrap();
+    for option in ["--preset=old", "--settings={}", "--queue", "--quality=95", "--scale=0.5"] {
+        assert_eq!(cli(&["--project", &project, "run", script.to_str().unwrap(), option]).status.code(), Some(2), "run {option}");
+    }
+    std::fs::remove_file(script).unwrap();
+    for id in ["export.queue.add", "export.queue.start", "export.queue.list", "export.presets.list", "export.presets.save", "export.formats", "export.resolve"]
+    {
+        assert_eq!(cli(&["--project", &project, "exec", id]).status.code(), Some(1), "{id}");
+    }
+    let commands = json_out(&cli(&["commands", "export.", "--json"]));
+    let ids: Vec<_> = commands.as_array().unwrap().iter().map(|item| item["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["export.quick"]);
+    assert_eq!(std::fs::read(&project).unwrap(), before);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "only the unchanged project remains");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -308,19 +313,25 @@ fn closed_stdout_still_runs_the_script_and_saves() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// `render` with a non-numeric or non-finite `--seconds` / `--scale` is a usage error (exit 2) and
-/// writes nothing, instead of silently rendering frame 0 at full scale.
+/// Invalid time and removed scaling are usage errors, not silently ignored delivery arguments.
 #[test]
 fn render_rejects_bad_numbers() {
-    let dir = std::env::temp_dir().join(format!("fc-cli-render-nan-{}", std::process::id()));
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join(format!("fc-cli-render-nan-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let still = dir.join("s.png").to_str().unwrap().to_string();
-    for (opt, bad) in
-        [("--seconds", "1s"), ("--seconds", "1,5"), ("--seconds", "abc"), ("--seconds", "NaN"), ("--seconds", "inf"), ("--scale", "xyz"), ("--scale", "NaN")]
-    {
-        let (secs, scale) = if opt == "--seconds" { (bad, "0.1") } else { ("1", bad) };
-        let o = cli(&["--demo", "render", "--seconds", secs, "--scale", scale, "--out", &still]);
+    for (opt, bad) in [
+        ("--seconds", "1s"),
+        ("--seconds", "1,5"),
+        ("--seconds", "abc"),
+        ("--seconds", "NaN"),
+        ("--seconds", "inf"),
+        ("--seconds", "-1"),
+        ("--seconds", "1e300"),
+        ("--scale", "0.5"),
+        ("--scale", "NaN"),
+    ] {
+        let o = cli(&["--demo", "render", opt, bad, "--out", &still]);
         let err = String::from_utf8_lossy(&o.stderr);
         assert_eq!(o.status.code(), Some(2), "{opt} {bad}: {err}");
         assert!(err.contains("filmcraft-cli:") && err.contains(opt), "{opt} {bad}: {err}");
@@ -334,12 +345,12 @@ fn render_rejects_bad_numbers() {
 /// placeholder frames; then it still warns.
 #[test]
 fn export_with_missing_media_fails_unless_allowed() {
-    let dir = std::env::temp_dir().join(format!("fc-cli-1054-{}", std::process::id()));
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join(format!("fc-cli-1054-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = |n: &str| dir.join(n).to_str().unwrap().to_string();
     let (still, proj) = (f("still.png"), f("p.fcproj"));
-    let o = cli(&["--demo", "render", "--seconds", "1", "--scale", "0.1", "--out", &still]);
+    let o = cli(&["--demo", "render", "--seconds", "1", "--out", &still]);
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     json_out(&cli(&["exec", "file.newSequence", "name=s", "width=64", "height=36", "fps=24", "--save-as", &proj]));
     let paths = format!("paths=[\"{}\"]", still.replace('\\', "\\\\"));
@@ -375,7 +386,7 @@ fn export_with_missing_media_fails_unless_allowed() {
     let err = String::from_utf8_lossy(&render.stderr);
     assert_eq!(render.status.code(), Some(1), "{err}");
     assert!(err.contains("still.png") && err.contains("--allow-offline"), "{err}");
-    let render = cli(&["--project", &proj, "render", "--seconds", "0", "--out", &f("r.png"), "--allow-offline"]);
+    let render = cli(&["--project", &proj, "render", "--seconds", "0", "--out", &f("r.png"), "--overwrite", "--allow-offline"]);
     assert!(render.status.success(), "{}", String::from_utf8_lossy(&render.stderr));
     assert!(String::from_utf8_lossy(&render.stderr).contains("still.png"));
     let _ = std::fs::remove_dir_all(&dir);

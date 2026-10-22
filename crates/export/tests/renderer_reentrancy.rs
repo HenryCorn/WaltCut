@@ -80,14 +80,17 @@ fn project() -> (Arc<Project>, ItemId, SourceMap) {
 fn run_case(case: &str) {
     let (threads, format, overlap, audio) = match case {
         "png" => (1, Format::PngSequence, false, false),
-        "gif" => (1, Format::Gif, false, false),
         "stepped" => (1, Format::ProRes, false, false),
         "overlap-audio" => (8, Format::ProRes, true, true),
         _ => panic!("unknown regression case: {case}"),
     };
     register_frame_renderer(factory);
     let (project, seq, sources) = project();
-    let dir = std::env::temp_dir().join(format!("fc-renderer-reentrancy-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("target")
+        .join(format!("fc-renderer-reentrancy-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let settings = ExportSettings {
         format,
@@ -140,7 +143,7 @@ fn nested_rayon_renderers_finish_every_export_path() {
         watchdog.join().unwrap();
         return;
     }
-    for case in ["png", "gif", "stepped", "overlap-audio"] {
+    for case in ["png", "stepped", "overlap-audio"] {
         let mut child = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "nested_rayon_renderers_finish_every_export_path", "--nocapture"])
             .env(CHILD, case)

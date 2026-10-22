@@ -45,7 +45,7 @@ fn idle_mb() -> f64 {
 #[test]
 fn the_float_shelf_is_empty_when_a_standalone_export_ends_however_it_ended() {
     let (p, seq, sources) = project();
-    let dir = std::env::temp_dir().join(format!("fc-pool-trim-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join(format!("fc-pool-trim-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let settings =
         |format: Format, name: &str| ExportSettings { format, path: dir.join(name).to_string_lossy().to_string(), include_audio: false, ..Default::default() };
@@ -74,9 +74,10 @@ fn the_float_shelf_is_empty_when_a_standalone_export_ends_however_it_ended() {
     assert!(export(&p, seq, &settings(Format::ProRes, "b.mov"), &sources, &cancelled).is_err());
     check("a cancelled video");
 
-    // an encoder that is not there: the pipeline was built, the export never started
+    // Output creation fails after the pipeline is built and still releases idle images.
     leave_something();
-    assert!(export(&p, seq, &settings(Format::Hevc, "c.mp4"), &sources, &Progress::default()).is_err());
+    let invalid = settings(Format::ProRes, "missing-parent/c.mov");
+    assert!(export(&p, seq, &invalid, &sources, &Progress::default()).is_err());
     check("an export that could not start");
 
     // stepped by the host (the web build), dropped half way: 6 frames of 24

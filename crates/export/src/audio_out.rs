@@ -14,13 +14,14 @@ pub(crate) struct AudioOut {
     pub sr: u32,
     pub channels: usize,
     pub out: i64,
-    end: i64,
+    pub end: i64,
 }
 
 impl AudioOut {
     pub fn new(project: Arc<Project>, seq: ItemId, settings: &ExportSettings, range: TimeRange) -> Result<Self> {
         let q = project.sequence(seq).ok_or(ExportError::NoSequence)?;
-        let resolved = settings.resolve(q.settings.width, q.settings.height, q.settings.frame_rate, q.settings.sample_rate);
+        crate::validate_range(range)?;
+        let resolved = settings.resolve(q.settings.width, q.settings.height, q.settings.frame_rate, q.settings.sample_rate)?;
         let mut seq = q.clone();
         seq.settings.sample_rate = resolved.sample_rate;
         let sr = resolved.sample_rate;
@@ -29,9 +30,9 @@ impl AudioOut {
         Ok(Self { project, seq, sr, channels: 2, out, end })
     }
 
-    /// Mix `n` samples from the current cursor, padding with silence past the range end.
+    /// Mix up to one second from the current cursor; long ranges never size an allocation.
     pub fn pull(&mut self, until: i64, sources: &dyn SourceProvider) -> Option<Vec<Vec<f32>>> {
-        let until = until.min(self.end);
+        let until = until.min(self.end).min(self.out.saturating_add(i64::from(self.sr)));
         if until <= self.out {
             return None;
         }
@@ -45,14 +46,6 @@ impl AudioOut {
         }
         self.out = until;
         Some(stereo)
-    }
-
-    pub fn remaining(&self) -> u64 {
-        u64::try_from(self.end.saturating_sub(self.out)).unwrap_or(0)
-    }
-
-    pub fn rest(&mut self, sources: &dyn SourceProvider) -> Option<Vec<Vec<f32>>> {
-        self.pull(self.end, sources)
     }
 }
 

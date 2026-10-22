@@ -1,4 +1,4 @@
-//! Retained timing audio through the real program playback callback and a written PCM export.
+//! Retained timing audio through the real playback callback and written ProRes MOV/float PCM.
 //! Synthetic WAVs live under target/ and are deleted when the fixture drops. No audio hardware,
 //! GPU, ffmpeg or external media is required.
 
@@ -96,6 +96,9 @@ fn clip_volume_and_track_mute_affect_playback_and_exported_audio() {
             .unwrap();
         let clip = placed["clips"][0].as_u64().unwrap();
         let seq = session.state.active_sequence.unwrap();
+        session.execute("file.newSequence", json!({"name":"Unrelated", "width":16, "height":16, "fps":30, "sampleRate":44_100, "video":1, "audio":1})).unwrap();
+        let unrelated = session.state.active_sequence.unwrap();
+        session.state.active_sequence = Some(seq);
         // Keep this callback alive across edits: playback must hear updated project snapshots.
         let mut mix = playback_mix(&session, seq, SR);
         let half_db = 20.0 * 0.5f64.log10();
@@ -156,24 +159,34 @@ fn clip_volume_and_track_mute_affect_playback_and_exported_audio() {
             assert_eq!(expected.iter().any(|s| *s != 0.0), !muted && level > -96.0, "{name}: non-silent fixture");
             assert_samples(&capture(&mut mix), &expected, &format!("{name} playback"));
 
-            let path = fixture.path(&format!("{channels}-{name}.wav"));
+            let path = fixture.path(&format!("{channels}-{name}.mov"));
+            session.state.active_sequence = Some(unrelated);
             let result = session
                 .execute(
                     "file.exportMedia",
                     json!({
-                        "path": path, "format": "wav", "range": "custom", "startFrame": 1, "endFrame": 7, "wait": true,
-                        "settings": {"audio": {"sample_rate": SR, "bits": 32, "float": true}}
+                        "sequence": seq.0, "path": path, "format": "prores", "range": "custom", "startFrame": 1, "endFrame": 7, "wait": true
                     }),
                 )
                 .unwrap();
+            session.state.active_sequence = Some(seq);
             assert_eq!(result["offlineMedia"], json!([]), "{name}: no offline silence");
-            let exported = WavSource::parse("export.wav", std::fs::read(path).unwrap().into()).unwrap();
+            let bytes = std::fs::read(path).unwrap();
+            let container = waltcut_isobmff::open(bytes.clone()).unwrap();
+            let audio_track = &container.tracks[container.track_of_kind(waltcut_isobmff::TrackKind::Audio).unwrap()];
+            assert_eq!(audio_track.timescale, SR);
+            assert_eq!(audio_track.duration, RANGE_FRAMES as u64, "{name}: written PCM sample count");
+            assert_eq!(audio_track.samples.iter().map(|s| u64::from(s.duration)).sum::<u64>(), RANGE_FRAMES as u64);
+            let video_track = &container.tracks[container.track_of_kind(waltcut_isobmff::TrackKind::Video).unwrap()];
+            assert_eq!(video_track.samples.len(), 6, "{name}: exclusive-end frame range");
+            assert_eq!(video_track.entries[0].format.0, *b"ap4h", "{name}: retained ProRes 4444");
+            let exported = waltcut_codecs::open_bytes("export.mov", bytes.into()).unwrap();
             assert_eq!(exported.info().audio().unwrap().sample_rate, SR);
             assert_eq!(exported.info().audio().unwrap().channels, 2);
             assert_eq!(exported.info().duration.to_units_floor(i64::from(SR)), RANGE_FRAMES as i64, "{name}: exact export duration");
             let audio = exported.audio(0, RANGE_FRAMES, SR).unwrap();
             let samples: Vec<f32> = audio.channels[0].iter().zip(&audio.channels[1]).flat_map(|(&l, &r)| [l, r]).collect();
-            assert_samples(&samples, &expected, &format!("{name} exported WAV"));
+            assert_samples(&samples, &expected, &format!("{name} exported MOV PCM"));
         }
         assert_eq!(FrameRate::FPS_24.tick_of(1).to_units_floor(i64::from(SR)), RANGE_START);
     }

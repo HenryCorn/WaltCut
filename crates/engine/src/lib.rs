@@ -19,6 +19,7 @@ pub mod commands;
 pub mod demo;
 pub mod doc_path;
 pub mod drawing;
+mod export_output;
 pub mod export_tools;
 pub mod graphic_design;
 pub mod graphics;
@@ -112,12 +113,6 @@ pub trait Services: Send + Sync {
     /// `None`: the frames are read when the sequence is opened.
     fn file_loader(&self) -> Option<waltcut_media::sequence::FrameLoader> {
         None
-    }
-    /// Exports are encoded in memory and handed to [`Services::write_file`] (hosts without a
-    /// filesystem, e.g. the web: the file is then offered as a download). Otherwise they stream
-    /// to the output path.
-    fn export_in_memory(&self) -> bool {
-        false
     }
 }
 
@@ -334,7 +329,7 @@ pub struct Session {
     /// Background jobs (exports, render previews…).
     pub jobs: Vec<Job>,
     /// Export job → the offline items it drew the slate for, filled when the export finishes
-    /// (#1054; `offlineMedia` in `file.exportMedia` and queue results).
+    /// (#1054; `offlineMedia` in `file.exportMedia` and job results).
     pub export_offline: std::collections::HashMap<u64, Arc<std::sync::Mutex<Vec<media_pool::OfflineMedia>>>>,
     /// User preferences (`prefs.*` commands) and where they persist (None = not persisted).
     pub prefs: autosave::Preferences,
@@ -355,10 +350,8 @@ pub struct Session {
     pub restyler_override: Option<Arc<dyn waltcut_genai::Restyler>>,
     /// Effect presets (built-in + the user's, persisted in the data directory).
     pub presets: presets::PresetLibrary,
-    /// Export presets (built-in + the user's, persisted in the data directory) and favourites.
-    pub export_presets: export_tools::ExportPresetLibrary,
-    /// The export queue (session state, not saved with the project).
-    pub export_queue: export_tools::ExportQueue,
+    /// The single active export worker (cancelled and joined on drop).
+    pub(crate) export_worker: Option<export_tools::ExportWorker>,
     /// The Events panel log: failed commands, job results, auto-save errors, messages.
     pub log: panels::EventLog,
     /// Nesting depth of [`Session::execute`] (commands that run other commands).
@@ -429,8 +422,7 @@ impl Session {
             ai_jobs: Vec::new(),
             restyler_override: None,
             presets: Default::default(),
-            export_presets: Default::default(),
-            export_queue: Default::default(),
+            export_worker: None,
             log: Default::default(),
             exec_depth: 0,
             media_stamps: Default::default(),
@@ -447,7 +439,6 @@ impl Session {
         self.prefs.apply_hardware_decoding();
         self.shortcuts.set_dir(&cfg.data_dir);
         self.presets.set_dir(&cfg.data_dir);
-        self.export_presets.set_dir(&cfg.data_dir);
         self.prefs_path = Some(prefs_path);
         self.apply_media_cache();
         self.persistence = Some(autosave::Persistence::start(&cfg, self.prefs.auto_save.clone())?);
@@ -458,6 +449,7 @@ impl Session {
     /// Clean shutdown: flush and stop the worker. Unsaved changes stay in the journal (offered on
     /// the next launch); otherwise the session's journal directory is removed.
     pub fn shutdown(&mut self) {
+        self.export_worker.take();
         self.sync_persistence();
         if let Some(p) = self.persistence.take() {
             p.close();
@@ -488,7 +480,7 @@ impl Session {
     /// Apply worker notifications (call regularly, e.g. once per UI frame).
     pub fn poll_persistence(&mut self) {
         ai::poll(self);
-        export_tools::pump_queue(self, false);
+        export_tools::poll(self);
         panels::log_jobs(self);
         let Some(p) = self.persistence.as_mut() else { return };
         for ev in p.drain_events() {

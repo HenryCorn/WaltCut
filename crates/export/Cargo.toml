@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-export"
-description = "Export pipeline: parallel render → encode → mux, presets, progress/cancel"
+description = "Export pipeline: H.264 MP4, ProRes 4444 MOV, PNG sequences and stills"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -16,18 +16,16 @@ waltcut-color = { workspace = true }
 waltcut-media = { workspace = true }
 waltcut-project = { workspace = true }
 waltcut-render = { workspace = true }
-waltcut-geom = { workspace = true }
-waltcut-text = { workspace = true }
 waltcut-isobmff = { workspace = true }
 waltcut-prores = { workspace = true }
 waltcut-aac = { workspace = true }
 waltcut-h264enc = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 rayon = { workspace = true }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "tiff", "bmp"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 [dev-dependencies]
+serde_json = { workspace = true }
 waltcut-testkit = { workspace = true }
 waltcut-codecs = { workspace = true }

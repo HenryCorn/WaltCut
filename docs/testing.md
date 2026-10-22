@@ -39,7 +39,7 @@ macOS before merge. Native `cargo test -p xtask --quiet` (6 tests) and
 | Audio Clip Mixer automation, Track Mixer view | `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | Touch: a 201-point fader ramp thins to ≤ 6 clip keyframes, values within 0.1 dB, live override while held, values outside the gesture unchanged, one undo step; Latch holds until stop; Write records volume and pan from the start; a gesture across two clips writes both; Read commits once without a pass; UI: Clip Mixer mode dropdown, a recorded fader drag writes clip keyframes; Show/Hide Tracks, Meter Input(s) Only, transport record button |
 | Removed capture (#23 draft) | `crates/engine/src/audio_reduction_tests.rs`, existing `paste_media_tests.rs` and scratch-folder tests | recording commands reject hostile parameters without project/preference mutation; pasted images retain trusted scratch-folder selection. Cross-typechecked; execution pending macOS. |
 | Removed audio processing (#23 draft) | `engine/src/audio_reduction_tests.rs`, `project/src/effect.rs`, `format/tests/fixtures.rs` (under `crates/`) | Removed effect/transition commands and IDs, insert flags, project transition data, unused sequence Mix parameters and multichannel source maps reject malformed/hostile requests without project/history/state mutation. Current golden project contains only retained fields; pre-reduction fixtures still prove explicit refusal. Native execution pending. |
-| Retained timing audio (#23 draft) | `crates/ui-egui/tests/audio_timing.rs` | generated mono/stereo WAV import, source In and timeline offset; actual live callback plus decoded written float WAV samples checked for Audio Gain, mute/unmute, additive intrinsic Volume, bypass/disable, selected mono channel, silence floor and sample-accurate keyframes across irregular blocks; exact export duration and silence outside the clip. Cross-target typechecked; **native macOS execution pending**, not claimed passing. |
+| Retained timing audio (#23/#25 drafts) | `crates/ui-egui/tests/audio_timing.rs` | generated mono/stereo WAV import, source In and timeline offset; actual live callback plus actual decoded written ProRes MOV/float-PCM samples checked for Audio Gain, mute/unmute, additive intrinsic Volume, bypass/disable, selected mono channel, silence floor and sample-accurate keyframes across irregular blocks. Each of 24 mono/stereo × state cases checks every stereo sample, exactly 12,000 audio frames at 48 kHz, six video frames and `ap4h`; no WAV delivery API or model-only replacement. Cross-target typechecked; **native macOS execution pending**, not claimed passing. |
 | Oracle | `crates/*/tests/*oracle*.rs`, `conformance.rs` | compare with ffmpeg/ffprobe (§2) |
 | Robustness / fuzz | `*/tests/robustness.rs`, `*/tests/fuzz.rs` | seeded mutation and truncation of real and synthetic files; nothing may panic |
 | Program monitor while dragging | `crates/ui-egui/tests/perf_ui.rs` | headless: a parameter changed on every UI pass (a value dragged in Effect Controls or Properties) and a backward scrub leave the Program monitor's picture at most one step behind (it shows the frame asked for the pass before while the frame due renders; it used to freeze until the mouse rested); a frame still rendering is kept when the same frame is asked for at a newer revision, so frames slower than a refresh (CPU effects) are shown too; `perf.stats` reports the picture's frame and revision against the playhead and the project |
@@ -119,7 +119,8 @@ anything is "fixed" to match) and add asserts for anything new.
 | MP4 audio at another rate (`codecs/tests/mp4_oracle.rs`) | ffmpeg-written AAC in MP4 (48 kHz, edit list skipping the priming) | reads resampled to 44.1 kHz in frame-sized requests equal the native decode interpolated at the same times (difference < 10⁻⁴, peak ≤ the source level) |
 | image sequences / BWF (`codecs/tests/media_oracle.rs`) | ffmpeg-written PNG/TIFF/BMP/JPEG stills read by ffmpeg's image2 demuxer; ffmpeg BWF (`-write_bext`) | PNG/TIFF/BMP **exact**, JPEG ±12 (measured 3); missing frames hold the previous one; BWF TimeReference = ffprobe's, start timecode, samples exact |
 | `export` | our own demuxer/decoder reads the file back; ffprobe counts frames when present | expected size, duration, colour, audio level; exact frame count |
-| `export` settings and presets (M6.5) | `export/src/settings_tests.rs`, engine `export_tests.rs`: every built-in preset exports a slice of the demo sequence; ffprobe reads codec, profile, size, rate, audio format and data rate; our decoders read pixels back | codec / profile / container / size / `r_frame_rate` / sample format exact; H.264 bitrate ≤ VBR max × 1.1 and ≥ ½ target over 3 s; ProRes including 4444 alpha; image sequences numbered `<name>000…`; overlays, metadata (`title`/`copyright` tags), MOV multiplexer, two-pass/CBR progress; native macOS sample export validation pending |
+| Retained delivery (#25 draft) | `export/src/{tests,settings_tests,hdr_tests,determinism_tests}.rs`, engine `export_tests.rs`, CLI integration tests | actual H.264 + AAC MP4, ProRes 4444 MOV and RGBA PNG sequence read back with retained decoders; frame counts exact, alpha checked on every ProRes/PNG frame, range/selected-sequence audio timing preserved; PNG/JPEG stills, HDR colour signalling, bounded memory, deterministic CPU batches/overlap and panic/cancel/error paths. Unknown/removed formats/settings/commands and hostile dimensions/rates/ranges/buffers rejected. Native macOS execution of every retained output round trip remains pending. |
+| Transactional output (#25 draft) | `engine/src/export_output.rs` standalone-compatible tests, engine/UI/CLI export tests | no-clobber install, explicit movie/still replacement, unused PNG bases, uppercase PNG names, cancellable preflight, owned rollback, another writer's replacement preserved, cleanup errors surfaced, panic/shutdown/cancel cleanup and no orphan worker. The Unix atomic-replacement test requires macOS. |
 
 Each codec README has the full fixture matrix and the measured results.
 
@@ -195,7 +196,8 @@ and automation ids without project or layout edits.
 
 The narrower orphan-processing slice removes audio-effect/transition tests and fixture generation
 with their implementations, not the shared Motion/Opacity/graphic keyframe tests.
-`crates/ui-egui/tests/audio_timing.rs` compares production callback samples and float WAV exports
+`crates/ui-egui/tests/audio_timing.rs` compares production callback samples and actual written
+ProRes MOV stereo float-PCM samples decoded through the retained media stack
 with generated mono/stereo input, including timing, source In, gain, live mute/unmute,
 additive keyframed Volume, bypass/disable and channel selection. Platform-independent DSP tests run
 on Windows; engine/media/UI tests require macOS and are only cross-typechecked here with
@@ -204,10 +206,37 @@ Native `cargo xtask ci`, actual sample-test execution and the animation-flow con
 screenshot are still pending. Status: **DRAFT IMPLEMENTATION — native macOS acceptance pending**.
 This stacked #23 draft is not complete, accepted or merged.
 
-`crates/ui-egui/tests/export_ui.rs` drives Export mode: the settings column and Summary, editing a
-setting turning the preset into Custom, the Preset Manager (search, favourite star, save, apply,
-delete), the queue panel (Send to Queue, Up/Down, Cancel, Start, Retry, Clear) with real encodes,
-the Export button and the header's Quick Export popup (`export-*.png` snapshots).
+`crates/ui-egui/tests/export_ui.rs` drives the simple Export and shared Quick Export controls:
+destination, three retained media formats, exact ranges, Start, live progress/status and the actual
+Cancel widget. It checks absent queue/advanced UI, strict draft refusal without mutation, actual
+written frame counts, Replace/Keep behavior and PNG conflicts. `export_menu_ui`, `frame_export_ui`
+and `native_dialogs_ui` retain menu routing, PNG/JPEG stills, full-resolution/captured-monitor frames,
+alpha/depth, explicit replacement and asynchronous destination picking/late-answer refusal.
+Optional snapshots use `FILMCRAFT_UI_SNAPSHOT_DIR`; these native tests and screenshots have **not**
+been executed on this Windows cross-check host.
+
+### #25 native acceptance still required
+
+Status: **IMPLEMENTATION DRAFTED**, not complete, accepted or merged. On macOS, with the existing
+external ffmpeg/ffprobe fixture/oracle setup, run:
+
+```sh
+cargo test -p waltcut-export
+cargo test -p waltcut-engine export
+cargo test -p waltcut-ui-egui --test audio_timing --test export_ui --test export_menu_ui --test frame_export_ui --test native_dialogs_ui
+cargo test -p waltcut-cli
+cargo test -p waltcut-automation export_progress_and_cancel
+cargo test -p waltcut-codecs -p waltcut-platform
+cargo xtask ci
+```
+
+These are acceptance commands, **not passing results**. Native retained-import fixture decoding and
+every retained output round trip (H.264/AAC MP4, alpha ProRes 4444 MOV, alpha PNG sequence, PNG/JPEG
+stills), PQ/HLG straight-colour/partial/zero-alpha ProRes regressions, real callback/MOV sample
+comparisons while a different-rate sequence is active, full CI and the real app's control-channel
+animation-flow screenshot remain pending. Manually check a real iPhone HEVC Main10 HLG MOV + AAC
+import, preview/scrub/timing and each retained output; no real iPhone file has been checked.
+Synthetic fixtures do not substitute for that check. No reduction freeze or issue close-out occurs.
 
 `crates/ui-egui/tests/color_ui.rs` drives colour features the same way (`color-*.png` snapshots):
 the Interpret Footage ▸ Color Management and Sequence Color Management dialogs.

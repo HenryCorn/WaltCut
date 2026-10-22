@@ -1,11 +1,8 @@
-//! OS media integration (layer L5): hardware video decoding and encoding through macOS's codecs.
+//! OS media integration (layer L5): hardware video decoding through macOS's codecs.
 //!
 //! [`register`] puts the VideoToolbox decoder factory in front of WaltCut's own decoders
 //! (`waltcut_codecs::register_video_decoder`) for H.264 (`avcC`) and HEVC (`hvcC`) streams, 8- and
-//! 10-bit, 4:2:0 and 4:2:2. It also registers a hardware H.264 encoder factory
-//! (`waltcut_export::register_encoder`) that only acts when an export asks for it
-//! (`ExportSettings::hardware_encoding` = `Auto`), see [`hardware_encode`], and makes the H.265
-//! export format available where VideoToolbox has an HEVC encoder.
+//! 10-bit, 4:2:0 and 4:2:2. Export uses the built-in Rust H.264 and ProRes 4444 encoders.
 //!
 //! Hardware decoding never makes a file undecodable:
 //!
@@ -24,13 +21,10 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-pub mod hardware_encode;
 pub mod hybrid;
 pub mod pen;
 #[allow(unsafe_code)]
 pub mod videotoolbox;
-#[allow(unsafe_code)]
-pub mod videotoolbox_encode;
 
 pub use hybrid::HybridDecoder;
 
@@ -48,11 +42,6 @@ pub enum Availability {
 /// WaltCut's own decoders.
 pub fn register() -> Availability {
     waltcut_codecs::register_video_decoder(videotoolbox_factory);
-    waltcut_export::register_encoder(hardware_encode::videotoolbox_encoder_factory);
-    waltcut_export::register_format_probe(waltcut_export::Format::Hevc, hardware_encode::hevc_available);
-    // the probe creates a hardware session (about 0.1 s): answer it now, off the UI thread,
-    // before the first draw of the format list asks
-    hardware_encode::warm_hevc_probe();
     waltcut_codecs::hw::set_hw_backend("VideoToolbox");
     Availability::Available("VideoToolbox")
 }

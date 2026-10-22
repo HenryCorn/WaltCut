@@ -199,23 +199,46 @@ fn a_panel_folder_arrives_in_its_open_dialog_and_nowhere_once_it_is_closed() {
 }
 
 #[test]
-fn export_location_browse_works_with_the_runner_and_with_synchronous_pickers() {
-    // runner: the folder arrives later
+fn export_destination_browse_works_with_the_runner_and_with_synchronous_pickers() {
+    let a = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join("exports-a.mp4").to_string_lossy().into_owned();
+    let b = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join("exports-b.mp4").to_string_lossy().into_owned();
+    // Runner: the full destination arrives later, without starting an export.
     let mut d = Driver::new(true);
     d.ok("ui.set", json!({"mode": "export"}));
     d.frames(3);
-    d.click("export.location.browse");
-    let (_, answer) = d.asked();
-    answer.send(vec!["/tmp/exports-a".into()]).unwrap();
+    d.click("export.browse");
+    let (dialog, answer) = d.asked();
+    assert!(matches!(dialog, FileDialog::SaveAs { ref exts, .. } if exts == &["mp4"]));
+    answer.send(vec![a.clone()]).unwrap();
     d.frames(2);
-    assert_eq!(d.app().ui.export.location, "/tmp/exports-a");
+    assert_eq!(d.app().ui.export.path, a);
+    assert!(d.app().session.jobs.is_empty());
 
     // synchronous picker (no runner, as on macOS / Windows / other hosts): still filled in
     let mut d = Driver::new(false);
-    d.app().hooks.pick_folder = Some(Box::new(|| Some("/tmp/exports-b".into())));
+    let chosen = b.clone();
+    d.app().hooks.pick_save_as = Some(Box::new(move |_, exts, _| {
+        assert_eq!(exts, &["mp4"]);
+        Some(chosen.clone())
+    }));
     d.ok("ui.set", json!({"mode": "export"}));
     d.frames(3);
-    d.click("export.location.browse");
-    assert_eq!(d.app().ui.export.location, "/tmp/exports-b");
+    d.click("export.browse");
+    assert_eq!(d.app().ui.export.path, b);
     assert!(!d.app().native_dialog_open());
+}
+
+#[test]
+fn a_destination_from_a_closed_quick_export_dialog_is_ignored() {
+    let mut d = Driver::new(true);
+    d.click("header.quickExport");
+    let before = d.app().ui.export.path.clone();
+    d.click("quickExport.browse");
+    let (_, answer) = d.asked();
+    d.click("quickExport.close");
+    answer.send(vec!["target\\late-export.mp4".into()]).unwrap();
+    d.frames(3);
+    assert_eq!(d.app().ui.export.path, before);
+    assert!(!d.app().native_dialog_open());
+    assert!(d.app().session.jobs.is_empty());
 }

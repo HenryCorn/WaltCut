@@ -88,7 +88,6 @@ pub struct PlaybackPrefs {
     pub postroll_seconds: f64,
     /// "Step forward/back many: N frames" (Shift+Right / Shift+Left).
     pub step_many_frames: u32,
-    pub pause_encoder_queue: bool,
     pub enable_transmit: bool,
     pub disable_video_in_background: bool,
     /// Draft decoding while playing at 1/2 resolution or lower: H.264 non-reference pictures
@@ -108,7 +107,6 @@ impl Default for PlaybackPrefs {
             preroll_seconds: 3.0,
             postroll_seconds: 2.0,
             step_many_frames: 5,
-            pause_encoder_queue: true,
             enable_transmit: false,
             disable_video_in_background: true,
             draft_decode: false,
@@ -252,7 +250,6 @@ pub struct MediaPrefs {
     pub resume_growing_playback: bool,
     pub growing_refresh_seconds: u32,
     pub hardware_decoding: bool,
-    pub prores_hardware_encoding: bool,
 }
 
 impl Default for MediaPrefs {
@@ -274,7 +271,6 @@ impl Default for MediaPrefs {
             resume_growing_playback: false,
             growing_refresh_seconds: 60,
             hardware_decoding: true,
-            prores_hardware_encoding: true,
         }
     }
 }

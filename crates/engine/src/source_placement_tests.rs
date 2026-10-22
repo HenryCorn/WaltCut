@@ -218,7 +218,10 @@ fn sub_frame_place_ends_at_requested_end_and_inspect_matches_export_frames() {
     assert!(c["end"].as_i64().unwrap() <= end, "clip runs past the requested end: {c}");
     assert_eq!(rate.snap(Tick(c["start"].as_i64().unwrap())).0, c["start"].as_i64().unwrap(), "clip starts between frames: {c}");
     assert_eq!(js["duration"], end);
-    let frames = s.execute("export.resolve", json!({})).unwrap()["frames"].clone();
+    let seq = s.state.active_sequence.unwrap();
+    let range = waltcut_export::export_range(&s.project, seq, &Default::default()).unwrap();
+    let (first, end) = waltcut_export::frame_span(s.sequence_rate(), range);
+    let frames = json!(end - first);
     assert_eq!(js["durationFrames"], frames);
     assert_eq!(frames, 120);
 }
@@ -235,7 +238,10 @@ fn inspect_duration_frames_counts_a_partial_last_frame_like_export() {
     let t = rate.frame_duration().0 / 3;
     s.execute("timeline.move", json!({"moves":[{"clip":clips[0],"track":tracks.0,"time":t},{"clip":clips[1],"track":tracks.1,"time":t}]})).unwrap();
     let js = s.execute("sequence.inspect", json!({})).unwrap();
-    let frames = s.execute("export.resolve", json!({})).unwrap()["frames"].clone();
+    let seq = s.state.active_sequence.unwrap();
+    let range = waltcut_export::export_range(&s.project, seq, &Default::default()).unwrap();
+    let (first, end) = waltcut_export::frame_span(s.sequence_rate(), range);
+    let frames = json!(end - first);
     assert_eq!(js["durationFrames"], frames);
     assert_eq!(frames, 49);
 }

@@ -1,11 +1,11 @@
 //! Long exports over MCP (docs/agents.md § Long exports): `file.exportMedia` with `wait: true`
 //! runs as a background engine job; the server reports its progress as MCP
 //! `notifications/progress` (when the request carried a `progressToken`) and stops it on
-//! `notifications/cancelled`, deleting the partial output. The session lock is only held for
-//! short polls, so other requests are answered while the export runs.
+//! `notifications/cancelled`, awaiting the engine's ownership-aware staging cleanup. A late
+//! cancellation reports a committed output rather than claiming it was removed. The session lock
+//! is only held for short polls, so other requests are answered while the export runs.
 
-use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use rmcp::RoleServer;
 use rmcp::model::{CallToolResult, ContentBlock as Content, ProgressNotificationParam, ProgressToken};
@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use crate::server::FilmcraftMcp;
 
 /// Engine commands that block until a render is written when called with `wait: true`.
-pub const LONG_COMMANDS: &[&str] = &["file.exportMedia"];
+pub const LONG_COMMANDS: &[&str] = &["file.exportMedia", "export.quick"];
 
 /// How often the job is polled (and at most how often progress is reported).
 const POLL: Duration = Duration::from_millis(100);
@@ -51,7 +51,6 @@ impl FilmcraftMcp {
     /// Run `id` (a [`LONG_COMMANDS`] entry, `wait: true`) as a job, reporting progress and
     /// honouring cancellation.
     pub(crate) async fn run_long(&self, id: &str, mut params: Value, context: &RequestContext<RoleServer>) -> CallToolResult {
-        let started = SystemTime::now();
         if let Some(p) = params.as_object_mut() {
             p.insert("wait".into(), json!(false));
         }
@@ -62,20 +61,29 @@ impl FilmcraftMcp {
         let Some(job) = start.get("job").and_then(Value::as_u64) else {
             return CallToolResult::error(vec![Content::text(format!("{id} started no job: {start}"))]);
         };
-        let path = start.get("path").and_then(Value::as_str).unwrap_or_default().to_string();
         let mut rep = Reporter { peer: context.peer.clone(), token: context.meta.get_progress_token(), last: 0.0 };
         loop {
-            let state = self.job_state(job).await;
-            let finished = state.as_ref().is_none_or(|j| j["finished"].as_bool() == Some(true));
-            if let Some(j) = &state {
-                let (done, total) = (j["done"].as_f64().unwrap_or(0.0), j["total"].as_f64().unwrap_or(0.0));
-                rep.report(done, total, j["status"].as_str().unwrap_or_default()).await;
-            }
-            if finished {
-                let offline = state.as_ref().and_then(|j| j.get("offlineMedia").cloned());
-                let result = state.map(|j| j["result"].clone()).unwrap_or(Value::Null);
+            let state = match self.job_state(job).await {
+                Ok(Some(state)) => state,
+                Ok(None) => return CallToolResult::error(vec![Content::text(format!("export job {job} is missing; no successful result was received"))]),
+                Err(error) => {
+                    let cleanup = self.cancel_and_wait(job).await;
+                    return CallToolResult::error(vec![Content::text(format!("cannot poll export job {job}: {error}; cancellation: {cleanup:?}"))]);
+                }
+            };
+            let (done, total) = (state["done"].as_f64().unwrap_or(0.0), state["total"].as_f64().unwrap_or(0.0));
+            rep.report(done, total, state["status"].as_str().unwrap_or_default()).await;
+            if state["finished"].as_bool() == Some(true) {
+                let offline = state.get("offlineMedia").cloned();
+                let result = state["result"].clone();
+                if !result.is_object() {
+                    return CallToolResult::error(vec![Content::text(format!("export job {job} finished without a valid result"))]);
+                }
                 if let Some(e) = result.get("error").and_then(Value::as_str) {
                     return CallToolResult::error(vec![Content::text(format!("export failed: {e}"))]);
+                }
+                if !successful_report(&result) {
+                    return CallToolResult::error(vec![Content::text(format!("export job {job} finished without a valid output report"))]);
                 }
                 let mut out = start;
                 if let Some(o) = out.as_object_mut() {
@@ -84,79 +92,57 @@ impl FilmcraftMcp {
                         o.insert("offlineMedia".into(), off);
                     }
                 }
-                return CallToolResult::success(vec![Content::text(serde_json::to_string_pretty(&out).unwrap_or_default())]);
+                return match serde_json::to_string_pretty(&out) {
+                    Ok(text) => CallToolResult::success(vec![Content::text(text)]),
+                    Err(error) => CallToolResult::error(vec![Content::text(format!("cannot serialize export job {job}: {error}"))]),
+                };
             }
             tokio::select! {
                 _ = context.ct.cancelled() => break,
                 _ = tokio::time::sleep(POLL) => {}
             }
         }
-        // Cancelled: stop the encode at the next batch, wait for the worker, delete the partial file.
-        let _ = self.run("jobs.cancel", json!({"job": job})).await;
+        // Cancelled: stop the encode at the next batch, wait for the worker, let the engine discard only this job's staging files.
+        let message = match self.cancel_and_wait(job).await {
+            Ok(message) | Err(message) => message,
+        };
+        CallToolResult::error(vec![Content::text(message)])
+    }
+
+    async fn cancel_and_wait(&self, job: u64) -> Result<String, String> {
+        self.run("jobs.cancel", json!({"job": job})).await.map_err(|e| format!("cannot cancel export job {job}: {e}"))?;
         for _ in 0..600 {
-            if self.job_state(job).await.is_none_or(|j| j["finished"].as_bool() == Some(true)) {
-                break;
+            let state = self.job_state(job).await?.ok_or_else(|| format!("export job {job} disappeared while awaiting cancellation"))?;
+            if state["finished"].as_bool() == Some(true) {
+                return cancellation_result(job, &state);
             }
             tokio::time::sleep(POLL).await;
         }
-        remove_partial(&path, started);
-        CallToolResult::error(vec![Content::text("cancelled")])
+        Err(format!("cancellation requested for export job {job}, but it has not stopped after 60 seconds; inspect jobs.list"))
     }
 
     /// The job's `jobs.list` entry.
-    async fn job_state(&self, job: u64) -> Option<Value> {
-        let jobs = self.run("jobs.list", json!({})).await.ok()?;
-        jobs.as_array()?.iter().find(|j| j["id"].as_u64() == Some(job)).cloned()
+    async fn job_state(&self, job: u64) -> Result<Option<Value>, String> {
+        let jobs = self.run("jobs.list", json!({})).await.map_err(|e| e.to_string())?;
+        let jobs = jobs.as_array().ok_or_else(|| "jobs.list returned no job array".to_string())?;
+        Ok(jobs.iter().find(|j| j["id"].as_u64() == Some(job)).cloned())
     }
 }
 
-/// Delete what an interrupted export wrote, and nothing else: the output file itself, the numbered
-/// stills of an image sequence (`<stem><3+ digits>.<same extension>`, only when the output is a
-/// PNG/TIFF/BMP/JPEG/Targa/DPX sequence) and the caption sidecar
-/// (`<stem>.srt` / `<stem>.vtt`), each only if it was written since `since`. Other files that
-/// merely share the name's stem (`<stem>.aep`, `<stem>2.psd`, `<stem>1.mp4` beside a movie, …) are
-/// never touched, even when they were saved during the export.
-pub fn remove_partial(path: &str, since: SystemTime) {
-    let p = Path::new(path);
-    let (Some(dir), Some(stem), Some(file)) = (p.parent(), p.file_stem().and_then(|s| s.to_str()), p.file_name().and_then(|s| s.to_str())) else {
-        return;
-    };
-    let ext = p.extension().and_then(|s| s.to_str()).unwrap_or_default();
-    let dir = if dir.as_os_str().is_empty() { Path::new(".") } else { dir };
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    // file times are coarser than the clock
-    let since = since.checked_sub(Duration::from_secs(1)).unwrap_or(since);
-    for e in entries.flatten() {
-        let name = e.file_name();
-        let Some(name) = name.to_str() else { continue };
-        if is_export_output(name, file, stem, ext) && e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|t| t >= since)) {
-            let _ = std::fs::remove_file(e.path());
-        }
-    }
+fn successful_report(result: &Value) -> bool {
+    result.get("error").is_none()
+        && result["path"].as_str().is_some_and(|path| !path.is_empty())
+        && result["frames"].as_u64().is_some_and(|frames| (1..=1_000_000).contains(&frames))
 }
 
-/// Whether `name` is a file an export to `file` (`stem` + `.ext`) writes.
-fn is_export_output(name: &str, file: &str, stem: &str, ext: &str) -> bool {
-    if name == file {
-        return true;
+fn cancellation_result(job: u64, state: &Value) -> Result<String, String> {
+    let result = &state["result"];
+    match result["error"].as_str() {
+        Some("cancelled") => Ok("cancelled; the export worker stopped and discarded its staging files".into()),
+        Some(error) => Err(format!("export job {job} stopped with an error: {error}")),
+        None if successful_report(result) => Ok(format!("export completed before cancellation; output retained at {}", result["path"])),
+        None => Err(format!("export job {job} finished without a valid result; inspect jobs.list")),
     }
-    let Some(rest) = name.strip_prefix(stem) else { return false };
-    if let Some(sidecar) = rest.strip_prefix('.') {
-        return sidecar.eq_ignore_ascii_case("srt") || sidecar.eq_ignore_ascii_case("vtt");
-    }
-    // image sequence: the frame number (at least three digits, like `image_sequence_path`), then the
-    // output's own extension; movies and audio are a single file, so numbered neighbours are not theirs
-    if !is_sequence_extension(ext) {
-        return false;
-    }
-    let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
-    digits >= 3 && rest.get(digits..).is_some_and(|r| r.strip_prefix('.').is_some_and(|x| x == ext))
-}
-
-/// Whether an export to a file with extension `ext` writes an image sequence (one still per frame).
-fn is_sequence_extension(ext: &str) -> bool {
-    use waltcut_engine::export::Format;
-    Format::from_name(ext).is_some_and(Format::is_image_sequence)
 }
 
 #[cfg(test)]
@@ -164,79 +150,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_the_exports_own_files_are_removed() {
-        let dir = std::env::temp_dir().join(format!("fc-remove-partial-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let started = SystemTime::now();
-        let ours = ["trailer.png", "trailer000.png", "trailer123.png", "trailer.srt", "trailer.vtt"];
-        // same stem, written during the export, but not the export's
-        let theirs = ["trailer.aep", "trailer2.psd", "trailer.docx", "trailer000.jpg", "trailers.png", "trailer.png.bak", "other.png"];
-        for f in ours.iter().chain(theirs.iter()) {
-            std::fs::write(dir.join(f), b"x").unwrap();
+    fn only_retained_waited_exports_use_the_long_job_adapter() {
+        for command in ["file.exportMedia", "export.quick"] {
+            assert!(is_long(command, &json!({"wait":true})));
+            for params in [json!({}), json!({"wait":false}), json!({"wait":"true"}), Value::Null] {
+                assert!(!is_long(command, &params));
+            }
         }
-        remove_partial(&dir.join("trailer.png").to_string_lossy(), started);
-        for f in ours {
-            assert!(!dir.join(f).exists(), "{f} should be removed");
+        for command in ["export.queue.start", "export.queue.add", "file.exportFrame", "export.resolve"] {
+            assert!(!is_long(command, &json!({"wait":true})));
         }
-        for f in theirs {
-            assert!(dir.join(f).exists(), "{f} must not be removed");
-        }
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn numbered_files_beside_a_movie_are_kept() {
-        let dir = std::env::temp_dir().join(format!("fc-remove-partial-movie-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let started = SystemTime::now();
-        // a movie export writes one file: `clip1.mp4` and `clip002.mp4` are other exports
-        let ours = ["clip.mp4", "clip.srt"];
-        let theirs = ["clip1.mp4", "clip002.mp4", "clip2.mov"];
-        for f in ours.iter().chain(theirs.iter()) {
-            std::fs::write(dir.join(f), b"x").unwrap();
+    fn cancellation_reports_cleanup_errors_and_late_completion_truthfully() {
+        let cancelled = cancellation_result(7, &json!({"result":{"error":"cancelled"}})).unwrap();
+        assert!(cancelled.contains("stopped and discarded"));
+        let failed = cancellation_result(7, &json!({"result":{"error":"cancelled; could not remove export staging directory"}})).unwrap_err();
+        assert!(failed.contains("could not remove"), "{failed}");
+        let completed = cancellation_result(7, &json!({"result":{"path":"kept.mov","frames":6}})).unwrap();
+        assert!(completed.contains("output retained at \"kept.mov\""), "{completed}");
+        assert!(!completed.contains("discarded"));
+        for result in
+            [Value::Null, json!({}), json!({"path":"kept.mov"}), json!({"path":"kept.mov","frames":0}), json!({"path":"kept.mov","frames":6,"error":false})]
+        {
+            assert!(!successful_report(&result));
+            assert!(cancellation_result(7, &json!({"result":result})).is_err());
         }
-        remove_partial(&dir.join("clip.mp4").to_string_lossy(), started);
-        for f in ours {
-            assert!(!dir.join(f).exists(), "{f} should be removed");
-        }
-        for f in theirs {
-            assert!(dir.join(f).exists(), "{f} must not be removed");
-        }
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn sequence_frames_have_at_least_three_digits() {
-        let dir = std::env::temp_dir().join(format!("fc-remove-partial-digits-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let started = SystemTime::now();
-        // frames are numbered with at least three digits (`shot000.tiff`); `shot2.tiff` is not one
-        let ours = ["shot.tiff", "shot000.tiff", "shot1234.tiff"];
-        let theirs = ["shot2.tiff", "shot12.tiff"];
-        for f in ours.iter().chain(theirs.iter()) {
-            std::fs::write(dir.join(f), b"x").unwrap();
-        }
-        remove_partial(&dir.join("shot.tiff").to_string_lossy(), started);
-        for f in ours {
-            assert!(!dir.join(f).exists(), "{f} should be removed");
-        }
-        for f in theirs {
-            assert!(dir.join(f).exists(), "{f} must not be removed");
-        }
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn files_older_than_the_export_are_kept() {
-        let dir = std::env::temp_dir().join(format!("fc-remove-partial-old-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("clip.mp4"), b"x").unwrap();
-        remove_partial(&dir.join("clip.mp4").to_string_lossy(), SystemTime::now() + Duration::from_secs(60));
-        assert!(dir.join("clip.mp4").exists());
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

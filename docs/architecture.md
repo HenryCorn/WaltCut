@@ -287,7 +287,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   images. Broad video effects, grading and video transitions are deleted in the #24 stacked draft;
   there are no effect compute stages or transition shaders. `FILMCRAFT_CPU_COMPOSITE=1` forces
   the CPU compositor in the desktop app. Native macOS CPU/GPU checks are pending, not claimed here.
-- **CPU compositor shortcuts.** The CPU compositor, which is what export runs, works on
+- **CPU compositor shortcuts.** The CPU compositor, also the export fallback, works on
   premultiplied linear `f32` images, 33 MB at 1080p, so what it does not allocate, convert or mix
   is time saved. Three shortcuts, each of which gives the general path's bits (compared bit for
   bit, with every blend mode, in `render/src/region_tests.rs`): the canvas stays unallocated
@@ -411,7 +411,8 @@ and crossfade modules, and unreachable DSP processors. Removed IDs and old field
 including in preset imports; there is no compatibility shell. Only intrinsic Volume remains as
 an audio effect, alongside shared Motion/Opacity/keyframe/graphic data.
 
-`crates/ui-egui/tests/audio_timing.rs` compares actual callback samples and decoded float WAV
+`crates/ui-egui/tests/audio_timing.rs` compares actual callback samples and decoded written
+ProRes MOV/float-PCM
 samples for mono/stereo timing, source In, live gain/mute, additive Volume, bypass/disable,
 channel selection and keyframes across irregular blocks. Engine/project/format/UI tests cover
 removed commands/IDs/fields and hostile source maps. This is **DRAFT IMPLEMENTATION — native macOS acceptance pending**:
@@ -474,49 +475,53 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
 ## 6. Export jobs (`waltcut-export`)
 
 ```text
-file.exportMedia {path, preset?, settings?, format?, range?, …}     export.quick {preset?, path?}
-  → engine::export_tools: preset ⊕ settings JSON ⊕ flat overrides → ExportSettings; range resolved
-  → a Job {id, label, progress, result} on a background thread (export.queue.* runs them in order)
-  → export: per output frame render (output rate) → fit into the output frame → overlays → limiter
-            → encode in order → mux; audio mixed and written as stereo, with no loudness pass
-  → jobs.list shows progress; jobs.cancel sets the shared cancel flag
+file.exportMedia {path, format?, sequence?, range?, start/end?, wait?, overwrite?}
+export.quick {same params; path optional}
+  → engine::export_tools: strict keys/types, sequence-derived size/rate, exact range, source protection
+  → one owned Job {id, label, progress, result} and cancellable worker; immutable project snapshot
+  → render → fixed encoder → mux, with the selected sequence's stereo soundtrack
+  → engine::ExportOutput: install successful staged files, otherwise roll back only owned output
+  → jobs.list shows progress/status/result; jobs.cancel sets the shared cancel flag
 ```
 
 | Format | Encoder | Container |
 |---|---|---|
-| `h264` | `waltcut-h264enc` (profile, level, CBR / VBR 1-pass / VBR 2-pass, keyframe distance) + `waltcut-aac` | MP4 or QuickTime (`isobmff`, the Multiplexer setting) |
-| `prores` | `waltcut-prores` (Proxy / LT / 422 / HQ / 4444 with alpha) | MOV |
-| `mjpeg` | built in | MOV |
-| `aac` | `waltcut-aac` (AAC-LC, the audio settings' bitrate) | audio only: MPEG-4 audio `.m4a` (`isobmff`, priming in an edit list), or raw ADTS when the path ends in `.aac` |
-| `png`, `tiff`, `bmp`, `jpg` | `image` | numbered stills `<name>000.<ext>`, `<name>001.<ext>` … |
-| `tga`, `dpx`, `exr` | built in (`raster.rs`: uncompressed Targa 24/32-bit; DPX 10-bit RGB, SMPTE ST 268; OpenEXR half-float linear RGB(A), uncompressed scan lines) | numbered stills, as above |
-| `gif`, `wav`, `aiff` | built in / `image` | GIF / stereo RIFF WAVE (`WAVE_FORMAT_IEEE_FLOAT` + `fact` for float) / stereo AIFF (16-, 24- or 32-bit PCM; 32-bit float as AIFF-C `fl32`) |
+| `h264` | fixed built-in H.264 High, one-pass VBR 20/30 Mb/s, approximately 2-second keyframes; stereo AAC-LC | MP4 only |
+| `prores` | fixed built-in ProRes 4444 (`ap4h`), always straight alpha; stereo float32 PCM at sequence sample rate | MOV only |
+| `png` | RGBA8 PNG, always straight alpha | numbered sequence `<name>000.png`, `<name>001.png` …; no audio file/sidecar |
+| `file.exportFrame` | full-resolution SDR PNG (8/16-bit RGBA) or JPEG (8-bit, flattened over black) | one `.png` / `.jpg` / `.jpeg` |
 
 - **Reproducible.** The same project and settings give the same file on every machine. Frames render
   in batches of one per core, but the muxer gets them in fixed groups of 16 output frames
   (`INTERLEAVE` in `crates/export/src/job.rs`), each followed by its audio, and H.264 uses one slice
   per four macroblock rows instead of one per core.
-- **Settings.** `ExportSettings` (serde, camelCase, every field optional) holds Video (frame size or
-  Match Source, frame rate, Scale to Fit / Fill / Stretch, pixel aspect, field order — progressive
-  only, profile / level, bitrate encoding, target / maximum / adaptive bitrate, keyframe distance,
-  maximum render quality), Audio (codec, sample rate, AAC bitrate, PCM sample size: `bits` 16, 24 or 32
-  and `float` for 32-bit float PCM in WAV, AIFF and QuickTime — `supports_sample_format` says
-  which a codec and container store, and Export mode greys out the rest),
-  Multiplexer (container choice), Effects (image / name / timecode overlays, video limiter),
-  Metadata (`udta` `©nam`, `©ART`, `©cpy`, `©des`,
-  `©cmt`). `settings.summary()` / `estimate_bytes()` feed Export mode's Summary.
-- **Presets.** `export::presets::builtin_presets()` are our own definitions (Match Source adaptive
-  H.264 at 0.2 / 0.1 / 0.05 bits per pixel, 1080p / 2160p delivery, vertical 1080×1920, ProRes,
-  image sequences, GIF, WAV / AIFF). User presets and favourites persist in
-  `<data dir>/export-presets.json` (`export.presets.*`).
-- **Queue.** `export.queue.add` snapshots the project and the resolved settings (several sequences
-  or ranges add several items); `export.queue.start` encodes ready items one after another as
-  ordinary jobs, advanced by `Session::poll_persistence` / `pump_jobs` (or synchronously with
-  `wait`). Cancel, retry, reorder, remove and clear work per item. The queue is session state, not
-  part of the project file.
+- **Contract.** Serialized `ExportSettings` contains only format/path/range and rejects unknown
+  fields. Commands reject settings/preset blobs and flat advanced options. Internal preview scale,
+  SDR proxy generation and compositor selection are not user delivery settings. Export and Quick
+  Export expose only destination, format, range, Start, progress/status and Cancel.
+- **Ownership and output.** Only one export can run; another start fails, never queues. The session
+  cancels and joins its worker on shutdown and reaps completed handles. Finished history is bounded.
+  A panic becomes a failed job. Movie/still replacement is explicit and atomic on macOS after
+  successful encoding. New destinations and PNG frames use no-clobber hard links from a sibling
+  staging directory; PNG overwrite is refused. Rollback checks file identity so another writer's
+  replacement is not removed. Normal cleanup failures are returned to the caller/status; panic-time
+  cleanup is best effort with non-panicking error logging. Source/project paths and imported image
+  sequences are protected, including offline media.
+- **Bounds.** Output sides ≤8192, total pixels ≤16,777,216, ≤1,000,000 frames and ≤24 hours;
+  sequence rates, sample rates, ranges and buffers are validated before conversions/allocations.
+  H.264 derives even output dimensions; ProRes/PNG retain the sequence's dimensions. Render batches
+  remain memory-bounded and cancellation-aware.
+- **Composition.** Engine exports automatically try the registered GPU compositor and retain CPU
+  fallback. There is no GPU/hardware-encoder delivery toggle. Core deterministic tests select the
+  CPU renderer; GPU comparison tests cover the retained Motion/Opacity/blend path.
+- **Offline media.** Completed jobs and still results carry `offlineMedia`; the UI warns about
+  placeholder output, and CLI exits 1 unless `--allow-offline` explicitly accepts it.
 
-Video encoders implement `export::VideoEncoder`. Codec crates plug in with `register_encoder` and
-`register_audio_encoder`.
+No queue, delivery presets, advanced encoder choices, overlays/watermarks/burn-ins, caption
+sidecars or loudness pass remain. The [export contract](../crates/export/README.md) lists commands,
+overwrite semantics and pending acceptance. **#25 IMPLEMENTATION DRAFTED**: native import fixtures,
+every retained output round trip, iPhone manual acceptance, full CI and animation screenshot are
+pending; this is not a completed/accepted/merged reduction.
 
 ## 7. Automation surfaces
 

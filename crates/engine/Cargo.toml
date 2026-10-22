@@ -33,6 +33,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 craft-docpath = { workspace = true }
+same-file = "1"
 
 [dev-dependencies]
 waltcut-testkit = { workspace = true }
