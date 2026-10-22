@@ -552,10 +552,9 @@ pub struct UiState {
     /// `panels::menu_dialogs`.
     #[serde(default)]
     pub extras: crate::panels::menu_dialogs::Extras,
-    /// Essential Graphics ▸ Browse and the graphics template / Replace Fonts dialogs. See
-    /// `panels::graphics_templates`.
+    /// Replace Fonts dialog for graphic clips.
     #[serde(default)]
-    pub gfx_templates: crate::panels::graphics_templates::GfxTemplatesState,
+    pub replace_fonts: Option<crate::panels::graphic_design::ReplaceDraft>,
     /// Timecode, Events and Progress settings. See
     /// `panels::panel_state`.
     #[serde(default)]
@@ -860,7 +859,7 @@ impl Default for UiState {
             workspace_dialog: None,
             clip_dialog: None,
             extras: Default::default(),
-            gfx_templates: Default::default(),
+            replace_fonts: None,
             panels: Default::default(),
             keys: Default::default(),
             project_panel: Default::default(),

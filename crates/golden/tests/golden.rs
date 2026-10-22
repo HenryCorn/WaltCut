@@ -290,33 +290,6 @@ fn graphic_scene(bg: DemoScene, layers: Vec<EffectInstance>) -> Scene {
     b.at(12)
 }
 
-/// A built-in graphics template (Lower Third – Slab) placed on a 320×180 sequence with its
-/// editable properties overridden (name, slab and accent colours, hidden role line): checks the
-/// template's scaling, pins (the slab widens with the longer name) and the overrides.
-fn graphic_template() -> Scene {
-    use waltcut_project::gtemplate::{builtin_templates, layer_uid};
-    let t = builtin_templates().into_iter().find(|t| t.id == "builtin:lower-third-slab").unwrap();
-    let (mut layers, meta) = t.instantiate((W, H));
-    let mut over = |control: &str, v: ParamValue| {
-        let c = t.controls.iter().find(|c| c.id == control).unwrap();
-        let l = layers.iter_mut().find(|l| layer_uid(l) == c.layer).unwrap();
-        if c.param == "enabled" {
-            l.enabled = v.as_bool().unwrap();
-        } else {
-            l.params.get_mut(&c.param).unwrap().value = v;
-        }
-    };
-    over("name", ParamValue::Text("Golden Overrides".into()));
-    over("slab_color", ParamValue::Color([0.75, 0.15, 0.18, 1.0]));
-    over("accent_color", ParamValue::Color([0.2, 0.85, 0.4, 1.0]));
-    over("show_role", ParamValue::Bool(false));
-    let mut s = graphic_scene(DemoScene::Forest, layers);
-    let seq = s.seq;
-    let q = s.project.sequence_mut(seq).unwrap();
-    q.video_tracks[1].items[0].graphic = Some(Box::new(meta));
-    s
-}
-
 /// Per-character styles (a bold, bigger, coloured word and an underlined one) and a rounded box
 /// pinned around the text on all four edges.
 fn graphic_rich_text() -> Scene {
@@ -584,7 +557,6 @@ fn scenes() -> Vec<(&'static str, &'static str, fn() -> Scene)> {
         ("text_burnin", "Timecode and Clip Name burn-in text", text_burnin),
         ("graphic_title", "Graphic clip: title text with stroke and shadow, lower-third bar", graphic_title),
         ("graphic_shapes", "Graphic clip: ellipse, polygon, path and rotated text with background", graphic_shapes),
-        ("graphic_template", "Graphics template (Lower Third – Slab) with overridden properties", graphic_template),
         ("graphic_rich_text", "Per-character text styles and a box pinned around the text", graphic_rich_text),
         ("log_to_rec709", "Colour management: S-Log3/S-Gamut3.Cine footage to Rec. 709 (tone mapped)", log_to_rec709),
         ("hdr_tone_map", "Colour management: Rec. 2100 PQ footage tone mapped into a Rec. 709 sequence", hdr_tone_map),
@@ -650,7 +622,6 @@ goldens!(
     text_burnin,
     graphic_title,
     graphic_shapes,
-    graphic_template,
     graphic_rich_text,
     log_to_rec709,
     hdr_tone_map,

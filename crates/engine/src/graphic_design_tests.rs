@@ -41,106 +41,29 @@ fn clip_of(v: &Value) -> ClipId {
 }
 
 #[test]
-fn template_export_install_apply_round_trip() {
-    let mut s = demo("gt-export");
-    let c = clip_of(&s.execute("graphics.newText", json!({"text": "Headline", "position": [200, 900]})).unwrap());
-    s.execute("graphics.newText", json!({"text": "Subhead", "clip": c.0, "position": [200, 960], "size": 40})).unwrap();
-    s.execute("graphics.newShape", json!({"shape": "rectangle", "clip": c.0, "position": [400, 920], "size": [500, 150]})).unwrap();
-    s.execute("graphics.arrangeLayer", json!({"clip": c.0, "layer": 2, "to": "back"})).unwrap();
-    s.execute("graphics.setRoll", json!({"clip": c.0, "mode": "crawlLeft", "startOffScreen": true})).unwrap();
-    let r = s
-        .execute(
-            "graphics.template.export",
-            json!({"clip": c.0, "name": "Show Lower Third", "category": "Lower Thirds", "controls": [
-                {"layer": 1, "param": "text", "name": "Headline"},
-                {"layer": "Subhead", "param": "text", "name": "Subhead"},
-                {"layer": 0, "param": "fill_color", "name": "Box Color"},
-                {"layer": 1, "param": "size", "name": "Headline Size", "min": 20, "max": 200},
-                {"layer": 2, "param": "enabled", "name": "Show Subhead"},
-            ]}),
-        )
-        .unwrap();
-    let path = r["path"].as_str().unwrap().to_string();
-    assert!(path.ends_with("show-lower-third.fcgt"), "{path}");
-    assert_eq!(r["controls"].as_array().unwrap().len(), 5);
-    assert_eq!(r["controls"][3]["kind"], "slider");
-    assert_eq!(r["controls"][4]["kind"], "checkbox");
-    // the file is our documented JSON format
-    let file: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(file["format"], "filmcraft.graphicsTemplate");
-    assert_eq!(file["version"], 1);
-    assert_eq!(file["graphic"]["roll"]["mode"], "crawlLeft");
-
-    // install into another user's library
-    let mut s2 = demo("gt-install");
-    let ins = s2.execute("graphics.template.install", json!({"path": path})).unwrap();
-    assert_eq!(ins["id"], "user:show-lower-third");
-    let list = s2.execute("graphics.template.list", json!({"query": "lower third", "source": "user"})).unwrap();
-    assert_eq!(list.as_array().unwrap().len(), 1, "{list}");
-    let all = s2.execute("graphics.template.list", json!({})).unwrap();
-    assert!(all.as_array().unwrap().len() >= 9, "built-ins and the user template");
-    let undo_before = s2.history.undo.len();
-    let a = s2
-        .execute(
-            "graphics.template.apply",
-            json!({"template": "Show Lower Third", "values": {"Headline": "Breaking News", "Box Color": "#ff0000", "headline_size": 500}}),
-        )
-        .unwrap();
-    assert_eq!(s2.history.undo.len(), undo_before + 1, "one undo step");
-    let c2 = clip_of(&a);
-    assert_eq!(texts(&s2, c2), vec!["Breaking News", "Subhead"]);
-    let it = item(&s2, c2);
-    assert_eq!(it.graphic.as_ref().unwrap().roll.mode, waltcut_project::RollMode::CrawlLeft);
-    let ctl = s2.execute("graphics.template.controls", json!({"clip": c2.0})).unwrap();
-    assert_eq!(ctl["controls"][0]["value"], "Breaking News");
-    assert_eq!(ctl["controls"][2]["value"], "#ff0000");
-    assert_eq!(ctl["controls"][3]["value"], 200.0, "slider clamped to its range");
-    s2.execute("graphics.template.set", json!({"clip": c2.0, "control": "Show Subhead", "value": false})).unwrap();
-    let ctl = s2.execute("graphics.template.controls", json!({"clip": c2.0})).unwrap();
-    assert_eq!(ctl["controls"][4]["value"], false);
-    s2.execute("edit.undo", json!({})).unwrap();
-    s2.execute("edit.undo", json!({})).unwrap();
-    assert!(s2.active_sequence().unwrap().find_item(c2).is_none(), "undo removes the applied template");
-    // unknown property
-    assert!(s2.execute("graphics.template.apply", json!({"template": "Show Lower Third", "values": {"Nope": 1}})).is_err());
-    assert!(s2.active_sequence().unwrap().video_tracks.iter().all(|t| t.items.iter().all(|i| i.name != "Show Lower Third")));
-    // remove
-    s2.execute("graphics.template.remove", json!({"template": "user:show-lower-third"})).unwrap();
-    assert!(s2.execute("graphics.template.list", json!({"source": "user"})).unwrap().as_array().unwrap().is_empty());
-}
-
-#[test]
-fn mogrt_files_are_never_read() {
-    let mut s = demo("gt-mogrt");
-    let d = tmp_dir("gt-mogrt-files");
-    let m = d.join("fancy.mogrt");
-    std::fs::write(&m, b"PK\x03\x04whatever").unwrap();
-    let e = s.execute("graphics.template.install", json!({"path": m.to_string_lossy()})).unwrap_err().to_string();
-    assert!(e.contains(".mogrt"), "{e}");
-    // a ZIP renamed to .fcgt is refused too
-    let z = d.join("renamed.fcgt");
-    std::fs::write(&z, b"PK\x03\x04whatever").unwrap();
-    let e = s.execute("graphics.template.install", json!({"path": z.to_string_lossy()})).unwrap_err().to_string();
-    assert!(e.contains("does not read"), "{e}");
-}
-
-#[test]
-fn builtin_templates_apply_and_thumbnail() {
-    let mut s = demo("gt-builtin");
-    let list = s.execute("graphics.template.list", json!({"category": "Callouts"})).unwrap();
-    assert_eq!(list.as_array().unwrap().len(), 2);
-    for e in s.execute("graphics.template.list", json!({"source": "builtin"})).unwrap().as_array().unwrap().clone() {
-        let id = e["id"].as_str().unwrap();
-        let r = s.execute("graphics.template.apply", json!({"template": id})).unwrap();
-        assert!(!texts(&s, clip_of(&r)).is_empty(), "{id}");
-        let th = s.execute("graphics.template.thumbnail", json!({"template": id, "width": 160})).unwrap();
-        assert_eq!((th["width"].as_u64(), th["height"].as_u64()), (Some(160), Some(90)));
-        let png = waltcut_project::gtemplate::base64_decode(th["pngBase64"].as_str().unwrap()).unwrap();
-        assert!(png.starts_with(b"\x89PNG"));
-        let (_, _, rgba) = super::thumbnail(&super::find_template(&s, id).unwrap().template, 160);
-        assert!(rgba.chunks(4).filter(|p| p[3] > 128).count() > 50, "{id}: the thumbnail shows something");
-        s.execute("playhead.set", json!({"seconds": 600 + 20 * s.history.undo.len()})).unwrap();
+fn removed_template_commands_are_unknown_and_never_exported() {
+    let mut s = Session::default();
+    let before = s.project.clone();
+    for id in [
+        "graphics.template.list",
+        "graphics.template.apply",
+        "graphics.template.export",
+        "graphics.template.install",
+        "graphics.template.remove",
+        "graphics.template.set",
+        "graphics.template.controls",
+        "graphics.template.thumbnail",
+        "file.exportGraphicsTemplate",
+    ] {
+        assert!(crate::commands::find(id).is_none(), "{id}");
+        assert!(matches!(s.execute(id, json!({})), Err(crate::EngineError::UnknownCommand(ref missing)) if missing == id));
     }
+    // command.list is also the catalogue consumed by CLI, MCP and the control channel.
+    let catalog = s.execute("command.list", json!({})).unwrap().to_string();
+    assert!(!catalog.contains("graphics.template."));
+    assert!(!catalog.contains("file.exportGraphicsTemplate"));
+    assert_eq!(*s.project, *before);
+    assert!(s.history.undo.is_empty());
 }
 
 #[test]

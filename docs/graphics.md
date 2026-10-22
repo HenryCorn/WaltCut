@@ -186,59 +186,24 @@ the postroll, with linear acceleration over Ease In and deceleration over Ease O
 
 These settings are `TrackItem::graphic` (`GraphicMeta`, schema v12).
 
-## Graphics templates (`.fcgt`)
+## Graphic editor
 
-FilmCraft's equivalent of motion graphics templates is its **own** format: a `.fcgt` file is
-documented, versioned JSON (`waltcut_project::gtemplate`):
+The Essential Graphics panel opens the graphic editor directly; the template browser and template
+properties are no longer present. Graphics-template reading, installation, export, embedded
+resources and built-in designs have been deleted in the draft graphics-template slice of #24.
+That issue remains open: the broad effects catalogue and other effects-related removals are still
+pending, as are native macOS CI and visual verification of this slice.
 
-| Field | Meaning |
-|---|---|
-| `format`, `version` | `"filmcraft.graphicsTemplate"`, `1` (newer versions are refused) |
-| `id`, `name`, `category`, `description`, `author`, `license`, `tags` | library information |
-| `canvas`, `duration` | frame size it was designed for, default clip length (ticks) |
-| `layers` | the graphic's layers, exactly as in a project file, each with a `uid` |
-| `graphic` | roll / crawl and responsive time |
-| `controls` | editable properties: `{id, name, kind: text\|color\|slider\|checkbox\|font\|position, layer: uid, param, min, max}`; `param: "enabled"` is the layer's visibility |
-| `resources.fonts` | optional embedded font files (base64) with their licence; registered on install |
+Text and shape graphic clips remain editable. With no layer selected the editor shows
+**Responsive Design – Time** (intro / outro, Roll with its options); with a layer selected,
+**Responsive Design – Position** (Pin To and the pinned edges). With characters selected by the Type
+tool, the Text section's controls style just those characters. Replace Fonts in Projects… lists
+the fonts in use (missing ones flagged) and replaces one.
 
-Placing a template on a sequence of another size scales and centres its layers (pin distances
-scale too).
-
-**FilmCraft never reads or imports Adobe `.mogrt` files** (or any other application's template
-packages): Install refuses `.mogrt` paths without opening them, and the reader rejects ZIP
-archives. Built-in templates are original designs made for FilmCraft in code (no image, font or
-template files): lower thirds (Slab, Rule, Ticker crawl), titles (Centered, Boxed), end credits
-(Roll) and callouts (Pointer, Tag), with the bundled Inter font. Thumbnails are rendered by the
-engine at runtime.
-
-| Command | Menu | Params |
-|---|---|---|
-| `graphics.template.list` | (query) | `query`, `category`, `source` (builtin / user) |
-| `graphics.template.apply` | Browse tab: drag or double-click | `template` (id, name or `.fcgt` path), `values` {control: value}, `time`, `track` |
-| `graphics.template.export` | Graphics and Titles ▸ Export As Motion Graphics Template… | `clip`, `name`, `category`, `description`, `controls` [{`layer`, `param`, `name`, `kind`, `min`, `max`}], `path` (default: the user folder), `embedFonts` |
-| `file.exportGraphicsTemplate` | File ▸ Export ▸ Motion Graphics Template… | as above |
-| `graphics.template.install` | Graphics and Titles ▸ Install Motion Graphics Template… | `path` (a `.fcgt`) |
-| `graphics.template.remove` | Browse tab | `template` (user templates) |
-| `graphics.template.set` / `graphics.template.controls` | Essential Graphics ▸ Edit | `clip`, `control`, `value` / `values` |
-| `graphics.template.thumbnail` | (query) | `template`, `width`, `path` (PNG) |
-
-User templates live in `<data dir>/Graphics Templates/`.
-
-**Essential Graphics panel.** *Browse* lists the built-in and user templates as cards with
-engine-rendered thumbnails, a search field and a category filter; click selects, double-click or
-Apply places the template at the playhead, dragging a card onto a video track places it there,
-Install… picks a `.fcgt`, Remove deletes a user template. *Edit* is the graphic editor; for a graphic
-made from a template it starts with **Template Properties** (one editor per control). With no layer
-selected it shows **Responsive Design – Time** (intro / outro, Roll with its options); with a layer
-selected, **Responsive Design – Position** (Pin To and the pinned edges). With characters selected
-by the Type tool, the Text section's controls style just those characters. Export As Motion
-Graphics Template… opens a dialog (name, category, description and a checklist of properties to
-expose); Replace Fonts in Projects… lists the fonts in use (missing ones flagged) and replaces one.
-Automation ids: `essentialGraphics.tab.browse|edit`, `gfxTemplates.search`, `gfxTemplates.category`,
-`gfxTemplates.item.<id>`, `gfxTemplates.apply|install|remove`, `gfxTemplates.control.<control id>`,
-`graphics.roll.*`, `graphics.time.intro|outro`, `graphics.pin.to|left|top|right|bottom`,
-`exportTemplate.*`, `replaceFonts.*`; `ui.set {"gfxTemplates": {...}, "gfxEdit": {...}}` sets the
-panel state and the Type-tool selection.
+Automation ids: `graphics.roll.*`, `graphics.time.intro|outro`,
+`graphics.pin.to|left|top|right|bottom`, and `replaceFonts.*`.
+`ui.set {"replaceFonts": {"from": "Inter", "to": "Noto Serif"}}` edits an open font-replacement
+dialog, and `gfxEdit` still controls the Type-tool selection.
 
 ## Source graphics and fonts
 
@@ -260,5 +225,6 @@ solid fill colour.
 
 ## Not yet
 
-Mask-with-text, per-layer blend modes, Bézier curves in the pen tool (paths are polygons), media
-layers inside graphics, and template controls grouped into folders.
+Mask-with-text, per-layer blend modes, Bézier curves in the pen tool (paths are polygons), and media
+layers inside graphics. This is a description of remaining limitations, not an expansion of the
+retained scope.

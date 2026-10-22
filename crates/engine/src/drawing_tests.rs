@@ -48,6 +48,61 @@ fn drawings_render_on_the_program_frame() {
 }
 
 #[test]
+fn reference_and_drawing_clips_keep_motion_opacity_blending_and_keyframes() {
+    use waltcut_time::Tick;
+
+    let mut s = session();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("target")
+        .join("fixtures")
+        .join(format!("retained-reference-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("reference.png");
+    image::RgbaImage::from_pixel(320, 180, image::Rgba([255, 0, 0, 255])).save(&path).unwrap();
+    let imported = s.execute("file.import", json!({"paths": [path.to_string_lossy()]})).unwrap();
+    let placed = s.execute("timeline.place", json!({"item": imported["items"][0], "track": "V1", "time": 0})).unwrap();
+    let reference = placed["clips"][0].as_u64().unwrap();
+    let drawing = new_drawing(&mut s);
+    s.execute("drawing.addStroke", json!({"clip": drawing.0, "frame": 0, "stroke": {"color": "#00ff00", "size": 20, "points": [[160, 90]]}})).unwrap();
+    let before = s.project.clone();
+    for clip in [reference, drawing.0] {
+        for (param, value) in [("anchor", json!([160, 90])), ("scale", json!(50)), ("rotation", json!(90))] {
+            s.execute("effects.setParam", json!({"clip": clip, "effect": "motion", "param": param, "value": value})).unwrap();
+        }
+        for (time, position, opacity) in [(Tick::ZERO, [100, 90], 100), (s.sequence_rate().tick_of(24), [140, 90], 0)] {
+            for (effect, param, value) in [("motion", "position", json!(position)), ("opacity", "opacity", json!(opacity))] {
+                s.execute("effects.setParam", json!({"clip": clip, "effect": effect, "param": param, "value": value, "keyframe": true, "time": time.0}))
+                    .unwrap();
+            }
+        }
+    }
+    let render = |s: &Session, t| {
+        let provider = s.media.provider(s.project.clone(), s.services.clone());
+        waltcut_render::render_sequence(&s.project, s.state.active_sequence.unwrap(), t, Default::default(), &provider)
+    };
+    let half = s.sequence_rate().tick_of(12);
+    // The reference has moved, rotated and scaled. Away from the stroke it is half opaque.
+    let img = render(&s, half);
+    let p = img.get(120, 120);
+    assert!((p[0] - 0.5).abs() < 0.02 && (p[3] - 0.5).abs() < 0.02, "{p:?}");
+    assert!(img.get(20, 20)[3] < 0.01, "the reference no longer covers the frame");
+    s.execute("effects.setParam", json!({"clip": drawing.0, "effect": "opacity", "param": "blend", "value": "Screen"})).unwrap();
+    let screen = render(&s, half).get(120, 90);
+    s.execute("effects.setParam", json!({"clip": drawing.0, "effect": "opacity", "param": "blend", "value": "Multiply"})).unwrap();
+    let multiply = render(&s, half).get(120, 90);
+    assert!(screen[0] > multiply[0] + 0.1 && screen[1] > multiply[1] + 0.1, "{screen:?} vs {multiply:?}");
+    assert!(render(&s, s.sequence_rate().tick_of(24)).get(140, 90)[3] < 0.01, "both clips fade to transparent");
+    let after = s.project.clone();
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(*s.project, *after);
+    assert_ne!(*s.project, *before);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
 fn in_betweens_fill_the_gap_between_cels() {
     let mut s = session();
     new_drawing(&mut s);

@@ -14,8 +14,8 @@ pub mod events;
 pub mod export_mode;
 pub mod file_dialogs;
 pub mod frame_export;
+pub mod graphic_design;
 pub mod graphics;
-pub mod graphics_templates;
 pub mod import_mode;
 pub mod keyboard;
 pub mod masks;
@@ -79,7 +79,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::AudioMeters => meters::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),
         PanelKind::Properties => effect_controls::properties_panel(app, ui, rect),
-        PanelKind::EssentialGraphics => graphics_templates::essential_graphics(app, ui, rect),
+        PanelKind::EssentialGraphics => graphics::properties(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
         PanelKind::Markers => misc::markers(app, ui, rect),
         PanelKind::Info => misc::info(app, ui, rect),
@@ -105,8 +105,6 @@ enum DragPayload {
     Bin(u64),
     Source(source_drag::SourceDrag),
     Effect(String),
-    /// A graphics template (id, name) from Essential Graphics ▸ Browse.
-    Template(String, String),
 }
 
 fn payload_id() -> egui::Id {
@@ -131,15 +129,6 @@ pub fn start_drag_bin(ui: &egui::Ui, bin: u64) {
 pub fn dragged_bin(ui: &egui::Ui) -> Option<u64> {
     match payload(ui) {
         Some(DragPayload::Bin(b)) => Some(b),
-        _ => None,
-    }
-}
-pub fn start_drag_template(ui: &egui::Ui, id: &str, name: &str) {
-    ui.ctx().data_mut(|d| d.insert_temp(payload_id(), Some(DragPayloadBox(DragPayload::Template(id.to_string(), name.to_string())))));
-}
-pub fn dragged_template(ui: &egui::Ui) -> Option<String> {
-    match payload(ui) {
-        Some(DragPayload::Template(id, _)) => Some(id),
         _ => None,
     }
 }
@@ -219,7 +208,6 @@ pub fn drag_ghost(app: &FilmcraftApp, ui: &egui::Ui) {
                 };
                 format!("{name} · {mode} · {:.2} s", s.range.duration.seconds())
             }
-            DragPayload::Template(_, name) => name.clone(),
             DragPayload::Effect(e) => match e.strip_prefix("preset:") {
                 Some(name) => name.to_string(),
                 None => waltcut_project::find_effect(e).map(|d| d.name.to_string()).unwrap_or_default(),
