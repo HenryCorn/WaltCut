@@ -39,6 +39,25 @@ fn golden_project_opens_and_round_trips_without_loss() {
     assert_eq!(encode(&decode(&again).unwrap().project, true), again, "stable on repeated saves");
 }
 
+#[test]
+fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v16-edit.fcproj")).unwrap();
+    for (path, value) in [
+        ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
+        ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
+        ("/project/items/21/kind/Sequence/settings/audio_master", serde_json::json!("Surround51")),
+        ("/project/items/21/kind/Sequence/audio_tracks/0/items/0/source_channels", serde_json::json!([0, 1, 2])),
+        ("/project/items/21/kind/Sequence/audio_tracks/0/items/0/effects/0/effect", serde_json::json!("parametric_eq")),
+        ("/project/items/21/kind/Sequence/audio_tracks/0/items/0/effects/0/post_fader", serde_json::json!(true)),
+    ] {
+        let mut doc = baseline.clone();
+        let (parent, key) = path.rsplit_once('/').unwrap();
+        doc.pointer_mut(parent).unwrap().as_object_mut().unwrap().insert(key.into(), value);
+        let bytes = serde_json::to_vec(&doc).unwrap();
+        assert!(decode(&bytes).is_err(), "accepted removed data at {path}");
+    }
+}
+
 /// A project written by the build before the reduction fails with the actionable error, and
 /// reading it changes nothing: the bytes are hashed before and after, on disk.
 #[test]

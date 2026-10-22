@@ -219,12 +219,6 @@ fn project_settings_dialog() {
 #[test]
 fn clip_and_sequence_dialogs() {
     let mut d = Driver::new();
-    // Normalize Mix Track
-    d.menu("sequence.normalizeMixTrack");
-    d.ok("ui.set", json!({"menuDialog": {"db": -6.0}}));
-    d.click("normalizeMix.ok");
-    assert!(!d.dialog_open());
-    assert!(d.app().session.active_sequence().unwrap().master_volume_db != 0.0);
     // Simplify Sequence
     let n = d.app().session.project.items.len();
     d.menu("sequence.simplify");

@@ -149,7 +149,7 @@ fn v1_preferences_migrate_and_bad_values_are_repaired() {
     // values a hand-edited (or future) file may carry are repaired, not fatal
     let bad = json!({
         "version": 2,
-        "timeline": {"autoScroll": "sideways", "stillImageDuration": -4, "stillImageUnit": "fortnights", "audioTransitionDuration": 1e9},
+        "timeline": {"autoScroll": "sideways", "stillImageDuration": -4, "stillImageUnit": "fortnights"},
         "appearance": {"highlightColor": "blue"},
         "memory": {"frameCacheMb": 1},
         "labels": {"colors": {"violet": {"name": "Purple-ish", "color": "#zzzzzz"}, "nope": {"name": "x", "color": "#000000"}}},
@@ -160,7 +160,6 @@ fn v1_preferences_migrate_and_bad_values_are_repaired() {
     assert_eq!(p.timeline.auto_scroll, "pageScroll");
     assert_eq!(p.timeline.still_image_unit, "seconds");
     assert_eq!(p.timeline.still_image_duration, 0.01);
-    assert_eq!(p.timeline.audio_transition_duration, 3600.0, "seconds: capped at an hour");
     assert_eq!(p.appearance.highlight_color, settings::DEFAULT_HIGHLIGHT);
     assert_eq!(p.memory.frame_cache_mb, 64);
     assert_eq!(p.labels.name(Label::Violet), "Purple-ish");
@@ -266,29 +265,6 @@ fn still_image_default_duration_and_indeterminate_timebase() {
     let (_, range) = crate::commands::source_range(&s).unwrap();
     assert_eq!(range.duration, rate.tick_of(10));
     let _ = std::fs::remove_dir_all(&dir);
-}
-
-fn transition_duration(s: &Session, r: &Value) -> Tick {
-    let id = r["transition"].as_u64().unwrap_or_else(|| panic!("{r}"));
-    let q = s.active_sequence().unwrap();
-    q.all_tracks().flat_map(|t| t.transitions.iter()).find(|t| t.id.0 == id).unwrap().duration
-}
-
-#[test]
-fn default_transition_durations() {
-    let mut s = demo();
-    let rate = s.sequence_rate();
-    let q = s.active_sequence().unwrap();
-    let aclip = q.audio_tracks[0].items[1].id.0;
-    // audio: 0.5 seconds, snapped to frames
-    s.execute("prefs.set", json!({"values": {"timeline.audioTransitionDuration": 0.5, "timeline.audioTransitionUnit": "seconds"}})).unwrap();
-    let r = s.execute("sequence.applyAudioTransition", json!({"clip": aclip})).unwrap();
-    assert_eq!(transition_duration(&s, &r), rate.snap_nearest(Tick::from_seconds_f64(0.5)));
-    // explicit frames still win
-    let cut2 = s.active_sequence().unwrap().audio_tracks[0].items[3].start;
-    s.execute("playhead.set", json!({"time": cut2.0})).unwrap();
-    let r = s.execute("sequence.applyAudioTransition", json!({"clip": aclip, "frames": 4})).unwrap();
-    assert_eq!(transition_duration(&s, &r), rate.tick_of(4));
 }
 
 #[test]

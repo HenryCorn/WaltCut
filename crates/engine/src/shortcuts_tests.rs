@@ -53,11 +53,9 @@ fn defaults_follow_the_registry_and_the_premiere_audit() {
     // the audit adopts Premiere defaults for commands that had none
     let audit = sc.audit();
     let has = |c: &str, k: &str, p: Option<&str>| audit.iter().any(|b| b.command == c && b.keys == k && b.panel.as_deref() == p);
-    assert!(has("trim.applyDefaultTransition", "Shift+D", None), "{audit:?}");
     assert!(has("playback.slowForward", "Shift+L", None));
     assert!(has("playback.playAround", "Shift+K", None));
     assert!(has("source.open", "Shift+O", Some("Project")));
-    assert_eq!(sc.primary("trim.applyDefaultTransition").as_deref(), Some("Shift+D"));
     // no conflicts in any built-in preset (macOS)
     for name in crate::shortcuts::BUILTIN_PRESETS {
         let mut t = Session::default();

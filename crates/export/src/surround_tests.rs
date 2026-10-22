@@ -1,13 +1,14 @@
-//! 5.1 export: WAV (WAVE_FORMAT_EXTENSIBLE, 6 channels), ProRes MOV with 6 PCM channels (`chan`
+//! Six-channel output conversion: WAV (WAVE_FORMAT_EXTENSIBLE), ProRes MOV with 6 PCM channels (`chan`
 //! atom) and H.264 MP4 with AAC 5.1 (channel configuration 6). ffprobe checks the channel layout;
 //! ffmpeg decodes the PCM files sample-exactly and the AAC file per channel (each channel carries
-//! its own tone). ffmpeg / ffprobe are external test oracles only.
+//! its own tone on L/R; the other output channels are silent). This is stereo output conversion,
+//! not a surround mixer. ffmpeg / ffprobe are external test oracles only.
 
 use std::sync::Arc;
 
 use waltcut_frame::{AudioBuffer, VideoFrame};
 use waltcut_media::{AudioStreamInfo, FrameRequest, MediaError, MediaInfo, MediaKind, MediaSource};
-use waltcut_project::{AudioChannels, ItemKind, Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
+use waltcut_project::{ItemKind, Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
 use waltcut_render::SourceMap;
 use waltcut_time::TICKS_PER_SECOND;
 
@@ -17,7 +18,7 @@ const SR: u32 = 48_000;
 /// Tone frequency of each 5.1 channel (L, R, C, LFE, Ls, Rs).
 const HZ: [f64; 6] = [500.0, 700.0, 900.0, 60.0, 1300.0, 1700.0];
 
-/// A 6-channel source: channel c is a 0.25-amplitude sine at `HZ[c]`.
+/// A stereo source: channel c is a 0.25-amplitude sine at `HZ[c]`.
 struct Tones6 {
     info: MediaInfo,
 }
@@ -34,11 +35,11 @@ impl MediaSource for Tones6 {
         Err(MediaError::Unsupported("audio only".into()))
     }
     fn audio(&self, start: i64, frames: usize, sample_rate: u32) -> waltcut_media::Result<AudioBuffer> {
-        Ok(AudioBuffer { sample_rate, channels: (0..6).map(|c| (0..frames).map(|i| tone(c, start + i as i64)).collect()).collect() })
+        Ok(AudioBuffer { sample_rate, channels: (0..2).map(|c| (0..frames).map(|i| tone(c, start + i as i64)).collect()).collect() })
     }
 }
 
-/// A 320×180 sequence with a 5.1 Mix and one 5.1 audio track holding 1 s of the six tones.
+/// A 320×180 sequence holding one second of distinct stereo tones.
 fn surround() -> (Arc<Project>, ItemId, SourceMap) {
     let mut p = Project::new("51");
     let info = MediaInfo {
@@ -46,7 +47,7 @@ fn surround() -> (Arc<Project>, ItemId, SourceMap) {
         kind: MediaKind::AudioOnly,
         duration: Tick(2 * TICKS_PER_SECOND),
         video: None,
-        audio_streams: vec![AudioStreamInfo { sample_rate: SR, channels: 6, codec: "test".into(), bits_per_sample: Some(32) }],
+        audio_streams: vec![AudioStreamInfo { sample_rate: SR, channels: 2, codec: "test".into(), bits_per_sample: Some(32) }],
         container: "test".into(),
         start_timecode: None,
         file_size: None,
@@ -67,12 +68,10 @@ fn surround() -> (Arc<Project>, ItemId, SourceMap) {
         None,
     );
     let r = FrameRate::FPS_24;
-    let mut st = SequenceSettings { width: 320, height: 180, frame_rate: r, ..Default::default() };
-    st.audio_master = AudioChannels::Surround51;
+    let st = SequenceSettings { width: 320, height: 180, frame_rate: r, ..Default::default() };
     let seq = p.new_sequence("s", st, 1, 1, None);
     let ai = p.make_track_item(id, TrackKind::Audio, Tick::ZERO, TimeRange::new(Tick::ZERO, r.tick_of(24)), r).unwrap();
     let q = p.sequence_mut(seq).unwrap();
-    q.audio_tracks[0].channels = AudioChannels::Surround51;
     q.audio_tracks[0].items.push(ai);
     let mut m = SourceMap::default();
     m.0.insert(id, Arc::new(Tones6 { info }) as Arc<dyn MediaSource>);
@@ -120,7 +119,7 @@ fn assert_sample_exact(ch: &[Vec<f64>], frames: usize) {
     assert_eq!(ch[0].len(), frames, "frame count");
     for (c, v) in ch.iter().enumerate() {
         for (i, x) in v.iter().enumerate() {
-            let want = ((tone(c, i as i64).clamp(-1.0, 1.0) * 8_388_607.0).round() as i64) << 8;
+            let want = if c < 2 { ((tone(c, i as i64).clamp(-1.0, 1.0) * 8_388_607.0).round() as i64) << 8 } else { 0 };
             assert_eq!(*x as i64, want, "channel {c} sample {i}");
         }
     }
@@ -189,11 +188,14 @@ fn aac_51_in_mp4_keeps_every_channel_in_place() {
         assert_eq!(n, 6);
         assert!(is_51(&layout), "{layout}");
     }
-    // ffmpeg decodes to L R C LFE Ls Rs: each channel's own tone dominates (≥ 30 dB above the
-    // others' tones), so no channel was swapped by the AAC reordering
+    // ffmpeg decodes to L R C LFE Ls Rs: L/R retain their tones and all other channels are silent.
     if let Some(ch) = decode(&path) {
         for (c, v) in ch.iter().enumerate() {
             let mid = &v[v.len() / 4..v.len() * 3 / 4];
+            if c >= 2 {
+                assert!(mid.iter().all(|v| v.abs() <= 4096.0), "silent output channel {c}");
+                continue;
+            }
             let own = tone_power(mid, HZ[c]);
             for (k, hz) in HZ.iter().enumerate().filter(|(k, _)| *k != c) {
                 let other = tone_power(mid, *hz);
@@ -204,7 +206,7 @@ fn aac_51_in_mp4_keeps_every_channel_in_place() {
 }
 
 #[test]
-fn stereo_export_of_a_51_mix_is_the_bs775_downmix() {
+fn stereo_export_keeps_the_stereo_soundtrack() {
     let (p, seq, m) = surround();
     let path = out_path("fold.wav");
     let mut st = settings(Format::Wav, &path);
@@ -212,14 +214,13 @@ fn stereo_export_of_a_51_mix_is_the_bs775_downmix() {
     export(&p, seq, &st, &m, &Progress::default()).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     assert_eq!(u16::from_le_bytes([bytes[20], bytes[21]]), 1, "plain PCM for stereo");
-    let k = std::f32::consts::FRAC_1_SQRT_2;
     let at = |frame: usize, c: usize| {
         let o = 44 + (frame * 2 + c) * 3;
         (i32::from_le_bytes([0, bytes[o], bytes[o + 1], bytes[o + 2]]) >> 8) as f32 / 8_388_607.0
     };
     for i in [10usize, 1234, 30_000] {
-        let l = tone(0, i as i64) + k * tone(2, i as i64) + k * tone(4, i as i64);
-        let r = tone(1, i as i64) + k * tone(2, i as i64) + k * tone(5, i as i64);
+        let l = tone(0, i as i64);
+        let r = tone(1, i as i64);
         assert!((at(i, 0) - l).abs() < 2e-6 && (at(i, 1) - r).abs() < 2e-6, "frame {i}");
     }
 }

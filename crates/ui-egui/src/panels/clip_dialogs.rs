@@ -10,15 +10,14 @@
 //!
 //! Automation ids (`<p>` = the dialog prefix below, `<key>` = a parameter):
 //! - every dialog: `<p>.ok`, `<p>.cancel`, and `<p>.<key>` for each control;
-//! - Paste Attributes `pasteAttributes.*`: `motion`, `opacity`, `volume`,
-//!   `channelVolume`, `panner`, `effects`, `effect.<id>`, `scaleTimes`;
+//! - Paste Attributes `pasteAttributes.*`: `motion`, `opacity`, `volume`, `scaleTimes`;
 //! - Remove Attributes `removeAttributes.*`: the same without `scaleTimes`;
 //! - Offline File `offlineFile.*`: `fileName`, `name`, `tapeName`, `video`, `audio`, `width`,
 //!   `height`, `fps`, `timecode`, `seconds`, `description`;
 //! - Nested Sequence Name `nest.*`: `name`;
 //! - Make Subclip `makeSubclip.*`: `name`, `startFrame`, `endFrame`, `restrictTrims`;
 //! - Edit Subclip `editSubclip.*`: `startFrame`, `endFrame`, `restrictTrims`, `convertToMaster`;
-//! - Audio Channels `audioChannels.*`: `format.<mono|stereo|5.1|adaptive>`, `count`,
+//! - Audio Channels `audioChannels.*`: `format.<mono|stereo>`, `count`,
 //!   `clip.<n>.ch.<c>` (n, c 0-based);
 //! - Timecode `timecode.*`: `timecode`, `tapeName`, `reset`;
 //! - Frame Hold Options `frameHold.*`: `enabled`, `holdOn.<in|out|playhead|sourceTimecode|sequenceTime>`,
@@ -67,11 +66,11 @@ fn meta(command: &str) -> Option<(&'static str, &'static str)> {
 fn intrinsic_video() -> [(&'static str, &'static str); 2] {
     [("motion", "Motion"), ("opacity", "Opacity")]
 }
-fn intrinsic_audio() -> [(&'static str, &'static str); 3] {
-    [("volume", tl!("Volume")), ("channelVolume", tl!("Channel Volume")), ("panner", tl!("Panner"))]
+fn intrinsic_audio() -> [(&'static str, &'static str); 1] {
+    [("volume", "Volume")]
 }
-fn formats() -> [(&'static str, &'static str); 4] {
-    [("mono", tl!("Mono")), ("stereo", tl!("Stereo")), ("5.1", "5.1"), ("adaptive", tl!("Adaptive"))]
+fn formats() -> [(&'static str, &'static str); 2] {
+    [("mono", "Mono"), ("stereo", "Stereo")]
 }
 fn hold_on() -> [(&'static str, &'static str); 5] {
     [
@@ -124,39 +123,27 @@ fn defaults(app: &FilmcraftApp, id: &str) -> (Value, Value) {
     let s = &app.session;
     match id {
         "edit.pasteAttributes" | "edit.removeAttributes" => {
-            // effects offered: the copied clips' (Paste) or the selected clips' (Remove) standard effects
-            let mut names: Vec<(String, String)> = Vec::new();
-            let mut add = |e: &waltcut_project::EffectInstance| {
-                if let Some(d) = e.def().filter(|d| !d.intrinsic && !waltcut_project::graphic::is_layer_id(d.id))
-                    && !names.iter().any(|n| n.0 == d.id)
-                {
-                    names.push((d.id.to_string(), d.name.to_string()));
-                }
-            };
             let mut has_v = false;
             let mut has_a = false;
             if id == "edit.pasteAttributes" {
-                for (k, _, it) in &s.state.clipboard {
+                for (k, _, _) in &s.state.clipboard {
                     has_v |= *k == TrackKind::Video;
                     has_a |= *k == TrackKind::Audio;
-                    it.effects.iter().for_each(&mut add);
                 }
             } else if let Some(q) = s.active_sequence() {
                 for c in &s.state.selection {
-                    if let Some((tid, it)) = q.find_item(*c) {
+                    if let Some((tid, _)) = q.find_item(*c) {
                         let v = q.video_tracks.iter().any(|t| t.id == tid);
                         has_v |= v;
                         has_a |= !v;
-                        it.effects.iter().for_each(&mut add);
                     }
                 }
             }
-            let mut p = json!({"motion": has_v, "opacity": has_v, "volume": has_a, "channelVolume": has_a, "panner": has_a,
-                "effects": names.iter().map(|n| n.0.clone()).collect::<Vec<_>>()});
+            let mut p = json!({"motion": has_v, "opacity": has_v, "volume": has_a});
             if id == "edit.pasteAttributes" {
                 p["scaleTimes"] = json!(true);
             }
-            (p, json!({"video": has_v, "audio": has_a, "effects": names}))
+            (p, json!({"video": has_v, "audio": has_a}))
         }
         "file.newOfflineFile" => {
             let st = s.active_sequence().map(|q| q.settings.clone()).unwrap_or_default();
@@ -324,27 +311,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 ui.label(RichText::new(tl!("Audio Attributes")).strong());
                 for (k, l) in intrinsic_audio() {
                     check(ui, &mut elems, pre, p, k, l, a);
-                }
-                let effects: Vec<(String, String)> = d.info["effects"]
-                    .as_array()
-                    .map(|x| x.iter().filter_map(|e| Some((e[0].as_str()?.to_string(), e[1].as_str()?.to_string()))).collect())
-                    .unwrap_or_default();
-                ui.label(RichText::new(tl!("Effects")).strong());
-                if effects.is_empty() {
-                    ui.label(RichText::new(tl!("No effects")).weak());
-                }
-                for (id, name) in &effects {
-                    let mut on = p["effects"].as_array().is_some_and(|x| x.iter().any(|e| e.as_str() == Some(id)));
-                    let r = ui.checkbox(&mut on, crate::i18n::t(name));
-                    push(&mut elems, format!("{pre}.effect.{id}"), &r, name.as_str());
-                    if r.changed() {
-                        let mut list: Vec<Value> = p["effects"].as_array().cloned().unwrap_or_default();
-                        list.retain(|e| e.as_str() != Some(id));
-                        if on {
-                            list.push(json!(id));
-                        }
-                        p["effects"] = Value::Array(list);
-                    }
                 }
                 if d.command == "edit.pasteAttributes" {
                     ui.separator();

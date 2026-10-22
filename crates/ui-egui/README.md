@@ -22,27 +22,28 @@ Effect-mask creation, rows, tracking controls and Program overlays are removed i
 blend on media, drawing, text and shape clips. Native macOS UI execution and animation-flow
 screenshots remain pending.
 
-## Audio reduction (#23, partial draft)
+## Audio reduction (#23, DRAFT IMPLEMENTATION)
 
 Essential Sound's panel, sub-tab state and automation ids are deleted with its engine commands,
 audio-type settings/presets and automatic processing. `scripted::essential_sound_panel_and_commands_are_absent`
 checks clean rejection without project or layout mutation. The focus-outline regression now uses
-the retained Essential Graphics panel. General audio effects, mixers and loudness remain for the
-next slice; playback, scrubbing, waveforms, mono/stereo, track mute and clip volume are unchanged.
-The production playback/export sample tests in `tests/audio_timing.rs` remain. Native macOS
-test execution and visual acceptance are pending; these stacked drafts are not complete or merged.
+the retained Essential Graphics panel. Mixers and orphan audio-effects/transitions have also been
+deleted vertically, including catalogue folders, drag/drop, transition editors, graphical audio
+editors and channel-volume/panner controls. The Effects panel now offers retained Motion/Opacity
+presets only; generic Effect Controls/keyframe and graphic editing remain.
 
-## Transition drop previews
+The timeline line edits static Audio Gain (`gain_db`), independent of intrinsic Volume in Effect
+Controls/Properties. The minimal renderer adds enabled/non-bypassed Volume to Audio Gain in dB
+per sample, evaluating keyframes in source time. Mute silences the track. Mono/stereo source
+mapping, waveform and scrub remain; unsupported multichannel source maps and removed sequence
+mix-format parameters reject requests. Export loudness and actual output/source-monitor channel
+conversion remain for another slice, not a surround mixer.
 
-Dragging a video or audio transition over a compatible clip shows its actual time span, the
-selected cut and an In/Out label. Shared cuts center the span; isolated edges use a one-sided
-span. The preview uses the engine's read-only transition planner, including Timeline duration
-preferences, and release dispatches `effects.apply` with the same edge. Locked tracks and
-incompatible clip types show no valid transition preview. Ordinary effects retain their clip
-outline. `timeline.transitionDropPreview` exposes the span and edge to automation.
-
-`transition_drop_ui` covers both edges of short video/audio clips, hover without project edits,
-the committed span and undo. Set `FILMCRAFT_UI_SNAPSHOT_DIR` to render screenshots with wgpu.
+`tests/audio_timing.rs` checks actual callback samples and written float WAV samples for mono and
+stereo sources, offsets/source In, gain/mute, additive Volume, bypass/disable, channel selection
+and keyframes. `clip_audio_ui` checks the independent gain line and retained Volume controls.
+**Native macOS test execution, full CI and animation-flow screenshots are pending.** These stacked
+drafts are not complete, accepted or merged.
 
 ## Language
 

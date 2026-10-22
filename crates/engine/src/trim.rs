@@ -343,30 +343,6 @@ pub fn monitor_info(s: &Session) -> Value {
     })
 }
 
-/// `trim.applyDefaultTransition` (Apply Default Transitions to Selection, Trim Monitor button): the
-/// default audio transition at every selected edit point.
-pub fn apply_default_transitions(s: &mut Session) -> Result<Value> {
-    let pts = s.state.edit_points.clone();
-    let n0 = s.history.undo.len();
-    let mut ids = Vec::new();
-    for ep in &pts {
-        let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
-        let Some((tid, _)) = seq.find_item(ep.clip) else { continue };
-        if !seq.track(tid).is_some_and(|t| t.kind == TrackKind::Audio) {
-            continue;
-        }
-        let cmd = "sequence.applyAudioTransition";
-        if let Ok(r) = s.execute(cmd, json!({"clip": ep.clip.0, "edge": if ep.out { "out" } else { "in" }})) {
-            ids.push(r["transition"].clone());
-        }
-    }
-    if ids.is_empty() {
-        return Err(EngineError::Other("no transition could be applied at the selected edit points".into()));
-    }
-    crate::clip_ops::collapse_history(s, n0, "Apply Default Transitions");
-    Ok(json!({"transitions": ids}))
-}
-
 // ------------------------------------------------------------------ dynamic trimming
 
 /// Trim-mode playback state (not project data; never saved).

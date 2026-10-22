@@ -1,6 +1,5 @@
-//! Audio of video clips (#223): a selected video clip shows the Volume, Channel Volume and Panner
-//! of the audio linked to it as well, as in Premiere, and the Volume line on audio clips in the
-//! timeline can be dragged and keyframed.
+//! Linked clip Volume stays in Effect Controls/Properties; the timeline line edits independent
+//! static Audio Gain, never Volume automation.
 //!
 //! With `FILMCRAFT_UI_SHOTS=<dir>` the tests also render the UI with wgpu and write PNGs there.
 
@@ -95,12 +94,6 @@ impl Driver {
     fn item(&self, clip: u64) -> TrackItem {
         self.harness.state().session.active_sequence().unwrap().find_item(ClipId(clip)).unwrap().1.clone()
     }
-    /// The clip's Volume level: its value and its keyframes (media time, dB).
-    fn level(&self, clip: u64) -> (f64, Vec<(i64, f64)>) {
-        let it = self.item(clip);
-        let p = it.effect("volume").unwrap().param("level").unwrap().clone();
-        (p.value.as_f64().unwrap(), p.keyframes.iter().map(|k| (k.time.0, k.value.as_f64().unwrap())).collect())
-    }
     fn drag(&mut self, from: (f64, f64), by: (f64, f64)) {
         self.ok("ui.drag", json!({"from": {"x": from.0, "y": from.1}, "to": {"x": from.0 + by.0, "y": from.1 + by.1}, "steps": 6}));
         self.frames(3);
@@ -125,8 +118,8 @@ fn effect_controls_show_the_audio_of_a_video_clip() {
     let motion = d.rect("effectControls.effect.motion");
     let volume = d.rect("effectControls.effect.volume");
     assert!(volume[1] > motion[1], "Audio comes after Video: {volume:?} {motion:?}");
-    d.rect("effectControls.effect.channel_volume");
-    d.rect("effectControls.effect.panner");
+    assert!(d.find("effectControls.effect.channel_volume").is_none());
+    assert!(d.find("effectControls.effect.panner").is_none());
 
     // the audio rows edit the audio clip
     for fx in ["motion", "opacity"] {
@@ -141,21 +134,6 @@ fn effect_controls_show_the_audio_of_a_video_clip() {
     d.exec("timeline.select", json!({"clips": [pair.video]}));
     assert!(d.find("effectControls.effect.volume").is_none());
     d.rect("effectControls.effect.motion");
-}
-
-/// #696: Parametric EQ on a linked A/V pair shows in Effect Controls (and Custom Setup) while the
-/// video clip is selected — Effect Controls used to keep only the picture clip.
-#[test]
-fn effect_controls_show_audio_fx_on_a_linked_pair() {
-    let (mut d, pair) = Driver::demo(&["EffectControls"]);
-    d.exec("timeline.select", json!({"clips": [pair.video]}));
-    d.exec("effects.apply", json!({"clips": [pair.video], "effect": "parametric_eq"}));
-    assert_eq!(d.item(pair.audio).effects.last().map(|e| e.effect.as_str()), Some("parametric_eq"));
-    for fx in ["motion", "opacity", "volume", "channel_volume", "panner"] {
-        d.click(&format!("effectControls.effect.{fx}"));
-    }
-    d.rect("effectControls.effect.parametric_eq");
-    d.rect("effectControls.effect.parametric_eq.edit");
 }
 
 #[test]
@@ -175,26 +153,28 @@ fn properties_show_the_audio_of_a_video_clip() {
 }
 
 #[test]
-fn dragging_the_volume_line_changes_the_level() {
+fn dragging_the_gain_line_preserves_intrinsic_volume() {
     let (mut d, pair) = Driver::demo(&[]);
     let start = d.item(pair.audio).start;
-    let (before, _) = d.level(pair.audio);
+    d.exec("effects.setParam", json!({"clip": pair.audio, "effect": "volume", "param": "level", "value": -3.0, "time": start.0, "keyframe": true}));
+    let volume = d.item(pair.audio).effect("volume").unwrap().clone();
+    let before = d.item(pair.audio).gain_db;
     d.shot("volume-line");
     let line = d.rect(&format!("timeline.clip.{}.volume", pair.audio));
     d.drag(centre(line), (0.0, -12.0));
-    let (after, keys) = d.level(pair.audio);
+    let after = d.item(pair.audio).gain_db;
     assert!(after > before + 1.0, "{before} dB → {after} dB");
-    assert!(keys.is_empty());
+    assert_eq!(d.item(pair.audio).effect("volume"), Some(&volume));
     assert_eq!(d.item(pair.audio).start, start, "the clip did not move");
     let moved = d.rect(&format!("timeline.clip.{}.volume", pair.audio));
     assert!(moved[1] < line[1] - 8.0, "the line went up with the pointer: {line:?} → {moved:?}");
     d.shot("volume-line-dragged");
     d.exec("edit.undo", json!({}));
-    assert_eq!(d.level(pair.audio).0, before, "the drag was one undo step");
+    assert_eq!(d.item(pair.audio).gain_db, before, "the drag was one undo step");
 }
 
 /// The line belongs to the clip: a click on it selects the clip and a right-click opens the clip
-/// menu, only a drag (or the Pen tool) edits the level.
+/// menu; only a drag edits static Audio Gain.
 #[test]
 fn clicks_on_the_volume_line_still_reach_the_clip() {
     let (mut d, pair) = Driver::demo(&[]);
@@ -206,46 +186,6 @@ fn clicks_on_the_volume_line_still_reach_the_clip() {
     d.ok("ui.click", json!({"x": x, "y": y, "button": "right"}));
     d.frames(3);
     d.rect("timeline.clipMenu.clip.link");
-    assert!(d.level(pair.audio).1.is_empty());
-}
-
-#[test]
-fn volume_keyframes_on_the_timeline() {
-    let (mut d, pair) = Driver::demo(&[]);
-    let id = format!("timeline.clip.{}.volume", pair.audio);
-    let clip = d.rect(&format!("timeline.clip.{}", pair.audio));
-    let (_, y) = centre(d.rect(&id));
-    // the Pen tool adds keyframes on the line
-    d.ok("ui.set", json!({"tool": "Pen"}));
-    for f in [0.3, 0.7] {
-        d.ok("ui.click", json!({"x": clip[0] + clip[2] * f, "y": y}));
-        d.frames(3);
-    }
-    let (_, keys) = d.level(pair.audio);
-    assert_eq!(keys.len(), 2, "{keys:?}");
-    d.ok("ui.set", json!({"tool": "Selection"}));
-
-    // the line between them takes both down
-    d.drag((clip[0] + clip[2] * 0.5, y), (0.0, 10.0));
-    let (_, low) = d.level(pair.audio);
-    assert_eq!(low.iter().map(|k| k.0).collect::<Vec<_>>(), keys.iter().map(|k| k.0).collect::<Vec<_>>());
-    assert!(low[0].1 < keys[0].1 - 1.0 && (low[0].1 - low[1].1).abs() < 1e-9, "{keys:?} → {low:?}");
-    d.exec("edit.undo", json!({}));
-    assert_eq!(d.level(pair.audio).1, keys);
-
-    // a keyframe moves in time and level
-    let k = d.rect(&format!("{id}.kf.1"));
-    d.drag(centre(k), (40.0, -10.0));
-    let (_, moved) = d.level(pair.audio);
-    assert_eq!(moved[0], keys[0]);
-    assert!(moved[1].0 > keys[1].0 && moved[1].1 > keys[1].1, "{keys:?} → {moved:?}");
-    d.shot("volume-keyframes");
-    d.exec("edit.undo", json!({}));
-    assert_eq!(d.level(pair.audio).1, keys, "the keyframe drag was one undo step");
-
-    // right-click ▸ Delete
-    d.ok("ui.click", json!({"id": format!("{id}.kf.0"), "button": "right"}));
-    d.frames(3);
-    d.click(&format!("{id}.kf.0.delete"));
-    assert_eq!(d.level(pair.audio).1, keys[1..]);
+    assert_eq!(d.item(pair.audio).gain_db, 0.0);
+    assert!(d.item(pair.audio).effect("volume").unwrap().param("level").unwrap().keyframes.is_empty());
 }

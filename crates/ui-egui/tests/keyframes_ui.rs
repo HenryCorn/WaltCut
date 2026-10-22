@@ -326,11 +326,10 @@ fn select_all_in_effect_controls_selects_its_keyframes_not_the_clips() {
 }
 
 /// Effect Controls' divider (#643): dragging it widens the effect list or the keyframe area, each
-/// keeping a minimum width, and the width stays. The mouse wheel scrolls the rows over the
-/// keyframe area too, not only over the effect list.
+/// keeping a minimum width, and the width stays.
 #[test]
-fn effect_controls_divider_and_scrolling_anywhere() {
-    let (mut d, clip) = Driver::demo();
+fn effect_controls_divider_resizes_the_lane() {
+    let (mut d, _) = Driver::demo();
     let lane = d.rect("effectControls.lane");
     let div = d.rect("effectControls.divider");
     let (x, y) = (div[0] + div[2] / 2.0, div[1] + div[3] / 2.0);
@@ -351,17 +350,6 @@ fn effect_controls_divider_and_scrolling_anywhere() {
     // and all the way left, the effect list keeps the width its rows are laid out for
     drag_divider(&mut d, -3000.0);
     assert!(d.rect("effectControls.effect.motion")[2] >= 259.0, "the effect list stays wide enough for its values");
-
-    // enough effects to scroll; the wheel over the keyframe area scrolls the rows
-    for fx in ["amplify", "parametric_eq", "studio_reverb", "hard_limiter"] {
-        d.exec("effects.apply", json!({"clips": [clip.id], "effect": fx}));
-    }
-    let before = d.rect("effectControls.motion.scale.stopwatch");
-    let lane = d.rect("effectControls.lane");
-    d.ok("ui.scroll", json!({"x": lane[0] + lane[2] / 2.0, "y": lane[1] + lane[3] * 0.7, "dx": 0.0, "dy": -80.0}));
-    d.frames(4);
-    let after = d.find("effectControls.motion.scale.stopwatch");
-    assert!(after.is_none_or(|r| r[1] < before[1] - 20.0), "the rows scrolled up: {before:?} → {after:?}");
 }
 
 /// #967: empty lane space clears both the selected refs and the highlight, without an edit.

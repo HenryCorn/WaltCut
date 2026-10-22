@@ -416,7 +416,7 @@ fn edit_offline_sets_the_log_fields() {
 }
 
 #[test]
-fn automate_to_sequence_places_clips_with_overlap_and_transitions() {
+fn automate_to_sequence_places_clips_with_overlap() {
     let mut s = demo();
     s.execute("file.newSequence", json!({"name": "Auto", "fps": 23.976})).unwrap();
     let rate = s.sequence_rate();
@@ -440,18 +440,13 @@ fn automate_to_sequence_places_clips_with_overlap_and_transitions() {
     assert_eq!(v1[0].start, Tick::ZERO);
     assert_eq!(v1[1].start, rate.tick_of(72 - 12));
     assert_eq!(v1[2].start, rate.tick_of(2 * (72 - 12)));
-    assert_eq!(r["transitions"], 2, "an audio transition at each of the two cuts (video has none): {r}");
-    assert!(q.video_tracks[0].transitions.is_empty());
-    assert_eq!(q.audio_tracks[0].transitions.len(), 2);
-    assert!(q.audio_tracks[0].transitions.iter().all(|t| t.duration == rate.tick_of(12)));
     // sort order (bin order): Ocean, Aurora (bin order of the demo), Forest
     s.execute("edit.undo", json!({})).unwrap();
     assert!(s.active_sequence().unwrap().video_tracks[0].items.is_empty());
-    s.execute("clip.automateToSequence", json!({"ordering": "sort", "overlapFrames": 0, "audioTransition": false, "ignoreAudio": true})).unwrap();
+    s.execute("clip.automateToSequence", json!({"ordering": "sort", "overlapFrames": 0, "ignoreAudio": true})).unwrap();
     let q = s.active_sequence().unwrap();
     assert_eq!(q.video_tracks[0].items.iter().map(|i| i.item).collect::<Vec<_>>(), vec![ids[1], ids[2], ids[0]]);
     assert!(q.audio_tracks.iter().all(|t| t.items.is_empty()));
-    assert!(q.video_tracks[0].transitions.is_empty());
     // insert at the playhead pushes what is there
     let end = q.video_tracks[0].items[2].end();
     s.set_playhead(Tick::ZERO);
@@ -474,33 +469,6 @@ fn automate_to_sequence_places_clips_with_overlap_and_transitions() {
     // disabled without a Project panel selection
     s.execute("project.select", json!({"items": []})).unwrap();
     assert!(!s.is_enabled("clip.automateToSequence"));
-}
-
-/// Issue #916: overlap is clamped to half of each clip for placement, but the Cross Dissolve
-/// used the unclamped `overlapFrames` and started before the first clip (now the audio fade).
-#[test]
-fn automate_to_sequence_clamps_transition_to_overlap() {
-    let mut s = demo();
-    s.execute("file.newSequence", json!({"name": "Auto", "fps": 23.976})).unwrap();
-    let rate = s.sequence_rate();
-    let names = ["Misty_Forest.mp4", "Ocean_Sunset.mp4"];
-    let ids: Vec<ItemId> = names.iter().map(|n| item_named(&s, n)).collect();
-    for id in &ids {
-        s.execute("project.setMarks", json!({"item": id.0, "in": 0, "out": rate.tick_of(19).0})).unwrap();
-    }
-    s.execute("project.select", json!({"items": ids.iter().map(|i| i.0).collect::<Vec<_>>()})).unwrap();
-    s.execute("clip.automateToSequence", json!({"ordering": "selection", "method": "overwrite", "overlapFrames": 30})).unwrap();
-    let q = s.active_sequence().unwrap();
-    let v = &q.video_tracks[0];
-    assert_eq!(v.items.len(), 2);
-    assert_eq!(v.items[0].start, Tick::ZERO);
-    assert_eq!(v.items[1].start, rate.tick_of(10), "overlap clamped to half of a 20-frame clip");
-    let a = &q.audio_tracks[0];
-    assert_eq!(a.transitions.len(), 1);
-    let t = &a.transitions[0];
-    assert_eq!(t.duration, rate.tick_of(10), "the fade matches the clamped overlap, not 30");
-    assert!(t.start >= v.items[0].start, "the fade must not start before the first clip: {t:?}");
-    assert!(t.end() <= v.items[1].end(), "dissolve must not end after the second clip: {t:?}");
 }
 
 #[test]

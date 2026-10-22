@@ -82,7 +82,7 @@ pub(crate) fn select_all_keyframes(app: &mut FilmcraftApp) -> bool {
 }
 
 /// The selected clip (video first) and the audio linked to it when that audio is selected or
-/// linked selection is on — so clip audio FX (Parametric EQ, Custom Setup) stay visible on A/V pairs.
+/// linked selection is on, so clip Volume stays visible on A/V pairs.
 fn selected_clips(app: &FilmcraftApp) -> Vec<(ClipId, TrackItem, TrackKind)> {
     let Some(seq) = app.session.active_sequence() else { return Vec::new() };
     let picked: Vec<(ClipId, &TrackItem, TrackKind)> = app
@@ -118,12 +118,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     // keep only selected keyframes that still exist on a clip shown here
     app.ui.keyframe_selection.retain(|k| clips.iter().any(|(c, it, _)| c.0 == k.clip && keyframe_exists(it, k)));
     let Some((clip, it, _)) = clips.first().cloned() else {
-        // a transition clicked in the Timeline (#430)
-        if let Some(id) = crate::panels::transition_controls::selected(app) {
-            crate::panels::transition_controls::effect_controls(app, ui, rect, id);
-            return;
-        }
-        crate::dock::placeholder(ui, rect, &t, tl!("(no clip selected)"));
+        crate::dock::placeholder(ui, rect, &t, "(no clip selected)");
         return;
     };
     // Keep the immutable project snapshot alive while UI commands mutate the session.
@@ -266,9 +261,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 if !open {
                     continue;
                 }
-                if crate::panels::audio_fx_editor::has_editor(&e.effect) {
-                    custom_setup_row(app, bui, body, &lane, clip, idx, &e.effect);
-                }
                 for pd in &def.params {
                     param_row(app, bui, body, clip, idx, e, pd, mt_now, &mut actions, &lane, &lx, it, &mut keys);
                     if app.ui.expanded_fx.contains(&graph_key(clip, idx, pd.id))
@@ -349,23 +341,6 @@ pub(crate) fn row_label(ui: &egui::Ui, left_center: Pos2, text: &str, max_w: f32
 pub(crate) fn fit_to_row(ui: &mut egui::Ui) {
     ui.spacing_mut().interact_size.y = ROW_H - 4.0;
     ui.spacing_mut().button_padding.y = 1.0;
-}
-
-/// Premiere's "Custom Setup ▸ Edit…" row: opens the effect's Clip Fx Editor window.
-fn custom_setup_row(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: Rect, lane: &Rect, clip: ClipId, idx: usize, effect: &str) {
-    let t = app.tokens;
-    let (r, _) = ui.allocate_exact_size(vec2(body.width(), ROW_H), Sense::hover());
-    row_line(ui, r, lane, &t);
-    ui.painter().text(pos2(r.min.x + 42.0, r.center().y), Align2::LEFT_CENTER, tl!("Custom Setup"), Tokens::ui(12.0), t.text_dim);
-    let br = Rect::from_min_size(pos2(r.min.x + 160.0, r.min.y + 2.0), vec2(60.0, ROW_H - 4.0));
-    let resp = ui.interact(br, egui::Id::new(("fx-custom-setup", clip.0, idx)), Sense::click());
-    ui.painter().rect_filled(br, 3.0, if resp.hovered() { t.hover } else { t.field_bg });
-    ui.painter().rect_stroke(br, 3.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
-    ui.painter().text(br.center(), Align2::CENTER_CENTER, tl!("Edit…"), Tokens::ui(11.5), t.text);
-    app.auto.add(&format!("effectControls.effect.{effect}.edit"), br, "Edit…");
-    if resp.clicked() {
-        crate::panels::audio_fx_editor::open(app, crate::panels::audio_fx_editor::FxTarget::Clip { clip: clip.0, index: idx });
-    }
 }
 
 fn seq_name(app: &FilmcraftApp) -> String {
@@ -497,9 +472,6 @@ fn properties_nav(
     let at = pos2(row.max.x - PROPS_NAV_X, row.center().y);
     let id = egui::Id::new(("props-nav", effect, param, clip.0));
     if keyframe_nav(app, ui, at, prm, mt, it, id, &format!("properties.{effect}.{param}"), tip, actions) {
-        if it.effect(effect).is_none() {
-            actions.push(("effects.apply".into(), json!({"clips": [clip.0], "effect": effect})));
-        }
         actions.push(("effects.addKeyframe".into(), json!({"clip": clip.0, "effect": effect, "param": param})));
     }
 }
@@ -849,17 +821,6 @@ pub fn properties_panel(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "volume", "param": "level", "value": nv})));
             }
             properties_nav(app, bui, r, clip, it, mt, "volume", "level", &mut actions);
-            let r = row(bui, tl!("Pan"));
-            let mut vui = bui.new_child(
-                egui::UiBuilder::new()
-                    .max_rect(Rect::from_min_max(pos2(r.min.x + 150.0, r.min.y + 4.0), pos2(r.max.x - PROPS_VALUE_R, r.max.y - 4.0)))
-                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
-            );
-            let v = val("panner", "balance").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let (_, nv) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp-pan", clip.0)), v, 0.5, (-100.0, 100.0), 0, "", &t);
-            if let Some(nv) = nv {
-                actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "panner", "param": "balance", "value": nv})));
-            }
         }
         // speed footer
         bui.add_space(12.0);

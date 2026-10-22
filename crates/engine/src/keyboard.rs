@@ -17,7 +17,7 @@
 //! | `timeline.toggleAllSourceVideo` / `timeline.toggleAllSourceAudio` | Toggle All Source Video / Audio | Cmd+Alt+0 / Cmd+Alt+9 |
 //! | `timeline.toggleTargetV1` … `timeline.toggleTargetA8` | Toggle Target Video 1–8 / Audio 1–8 | |
 //! | `timeline.moveVideoTargetsUp` … `timeline.moveAudioTargetsDown` | Move All Video / Audio Targets Up / Down | |
-//! | `timeline.toggleMuteTargetedAudio` / `timeline.toggleSoloTargetedAudio` | Toggle Mute / Solo for All Targeted Audio Tracks | |
+//! | `timeline.toggleMuteTargetedAudio` | Toggle Mute for All Targeted Audio Tracks | |
 //! | `timeline.toggleOutputTargetedVideo` | Toggle Track Output for All Targeted Video Tracks | |
 //! | `clip.volumeUp` / `clip.volumeDown` | Increase / Decrease Clip Volume (1 dB) | ] / [ |
 //! | `clip.volumeUpMany` / `clip.volumeDownMany` | Increase / Decrease Clip Volume Many (Settings ▸ Audio ▸ Large Volume Adjustment) | Shift+] / Shift+[ |
@@ -359,14 +359,12 @@ fn toggle_targeted_tracks(s: &mut Session, kind: TrackKind, what: &'static str) 
     }
     let label = match what {
         "mute" => "Toggle Mute",
-        "solo" => "Toggle Solo",
         _ => "Toggle Track Output",
     };
     s.edit_sequence(label, |q, _, _| {
         // all on → all off, else all on
         let get = |t: &waltcut_project::Track| match what {
             "mute" => t.muted,
-            "solo" => t.solo,
             _ => !t.enabled,
         };
         let all = ids.iter().filter_map(|i| q.track(*i)).all(get);
@@ -374,7 +372,6 @@ fn toggle_targeted_tracks(s: &mut Session, kind: TrackKind, what: &'static str) 
             if let Some(t) = q.track_mut(*i) {
                 match what {
                     "mute" => t.muted = !all,
-                    "solo" => t.solo = !all,
                     _ => t.enabled = all,
                 }
             }
@@ -386,10 +383,7 @@ fn toggle_targeted_tracks(s: &mut Session, kind: TrackKind, what: &'static str) 
 
 // ------------------------------------------------------------------ audio
 
-const VOLUME_MIN_DB: f64 = -287.5;
-const VOLUME_MAX_DB: f64 = 15.0;
-
-/// Change the Volume level of the selected audio clips by `db` (keyframed levels shift as a whole).
+/// Change the gain of the selected audio clips by `db`.
 pub fn adjust_clip_volume(s: &mut Session, db: f64) -> Result<Value> {
     let clips = with_links(s, &s.state.selection.clone());
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
@@ -398,33 +392,16 @@ pub fn adjust_clip_volume(s: &mut Session, db: f64) -> Result<Value> {
     if audio.is_empty() {
         return Err(EngineError::Other("select audio clips".into()));
     }
-    let shift = |v: &ParamValue| match v {
-        ParamValue::Float(x) => ParamValue::Float((x + db).clamp(VOLUME_MIN_DB, VOLUME_MAX_DB)),
-        o => o.clone(),
-    };
     let label = if db > 0.0 { "Increase Clip Volume" } else { "Decrease Clip Volume" };
     s.edit_sequence(label, |q, _, _| {
         for c in &audio {
             let Some((_, it)) = q.find_item_mut(*c) else { continue };
-            let Some(p) = it.effect_mut("volume").and_then(|e| e.param_mut("level")) else { continue };
-            p.value = shift(&p.value);
-            for k in &mut p.keyframes {
-                k.value = shift(&k.value);
-            }
+            it.gain_db = (it.gain_db + db).clamp(-96.0, 96.0);
         }
         Ok(())
     })?;
-    let levels: Vec<Value> = s
-        .active_sequence()
-        .map(|q| {
-            audio
-                .iter()
-                .filter_map(|c| q.find_item(*c))
-                .filter_map(|(_, it)| it.effect("volume").and_then(|e| e.params.get("level")).and_then(|p| p.value.as_f64()))
-                .map(|v| json!(v))
-                .collect()
-        })
-        .unwrap_or_default();
+    let levels: Vec<Value> =
+        s.active_sequence().map(|q| audio.iter().filter_map(|c| q.find_item(*c)).map(|(_, it)| it.gain_db).map(|v| json!(v)).collect()).unwrap_or_default();
     Ok(json!({"levels": levels}))
 }
 
@@ -748,9 +725,6 @@ pub fn commands() -> Vec<CommandSpec> {
         spec("timeline.moveAudioTargetsDown", "Move All Audio Targets Down", None, "{}", has_seq, |s, _| move_targets(s, Audio, false)),
         spec("timeline.toggleMuteTargetedAudio", "Toggle Mute for All Targeted Audio Tracks", None, "{}", has_seq, |s, _| {
             toggle_targeted_tracks(s, Audio, "mute")
-        }),
-        spec("timeline.toggleSoloTargetedAudio", "Toggle Solo for All Targeted Audio Tracks", None, "{}", has_seq, |s, _| {
-            toggle_targeted_tracks(s, Audio, "solo")
         }),
         spec("timeline.toggleOutputTargetedVideo", "Toggle Track Output for All Targeted Video Tracks", None, "{}", has_seq, |s, _| {
             toggle_targeted_tracks(s, Video, "output")

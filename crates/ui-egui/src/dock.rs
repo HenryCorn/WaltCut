@@ -20,13 +20,10 @@ pub enum PanelKind {
     History,
     Source,
     EffectControls,
-    AudioClipMixer,
     Metadata,
     Program,
     Timeline,
     Tools,
-    AudioMeters,
-    AudioTrackMixer,
     EssentialGraphics,
     Properties,
     Events,
@@ -36,7 +33,7 @@ pub enum PanelKind {
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 21] = [
+    pub const ALL: [PanelKind; 18] = [
         PanelKind::Project,
         PanelKind::Libraries,
         PanelKind::Info,
@@ -45,13 +42,10 @@ impl PanelKind {
         PanelKind::History,
         PanelKind::Source,
         PanelKind::EffectControls,
-        PanelKind::AudioClipMixer,
         PanelKind::Metadata,
         PanelKind::Program,
         PanelKind::Timeline,
         PanelKind::Tools,
-        PanelKind::AudioMeters,
-        PanelKind::AudioTrackMixer,
         PanelKind::EssentialGraphics,
         PanelKind::Properties,
         PanelKind::Events,
@@ -69,13 +63,10 @@ impl PanelKind {
             PanelKind::History => "History",
             PanelKind::Source => "Source",
             PanelKind::EffectControls => "Effect Controls",
-            PanelKind::AudioClipMixer => "Audio Clip Mixer",
             PanelKind::Metadata => "Metadata",
             PanelKind::Program => "Program",
             PanelKind::Timeline => "Timeline",
             PanelKind::Tools => "Tools",
-            PanelKind::AudioMeters => "Audio Meters",
-            PanelKind::AudioTrackMixer => "Audio Track Mixer",
             PanelKind::EssentialGraphics => "Essential Graphics",
             PanelKind::Properties => "Properties",
             PanelKind::Events => "Events",
@@ -99,15 +90,13 @@ impl PanelKind {
             PanelKind::Timeline => Some("Shift+3"),
             PanelKind::Program => Some("Shift+4"),
             PanelKind::EffectControls => Some("Shift+5"),
-            PanelKind::AudioClipMixer => Some("Shift+9"),
             PanelKind::Effects => Some("Shift+7"),
-            PanelKind::AudioTrackMixer => Some("Shift+6"),
             _ => None,
         }
     }
     /// Narrow chrome-less panels (no tab strip; a slim grip instead).
     pub fn compact(self) -> bool {
-        matches!(self, PanelKind::Tools | PanelKind::AudioMeters)
+        matches!(self, PanelKind::Tools)
     }
 }
 
@@ -239,50 +228,13 @@ pub fn saved_layout(prefs: &WorkspacePrefs, name: &str) -> DockNode {
 
 pub fn saved_docking(prefs: &WorkspacePrefs, name: &str) -> Layout {
     let saved = prefs.saved.iter().find(|saved| saved.name == name).and_then(|saved| {
-        let mut layout = Layout {
+        let layout = Layout {
             root: serde_json::from_value(saved.layout.clone()).ok()?,
             floating: if saved.floating.is_null() { vec![] } else { serde_json::from_value(saved.floating.clone()).ok()? },
         };
-        if layout.floating.is_empty() {
-            migrate_legacy_effects(&mut layout.root);
-        }
         layout.validate().ok().map(|()| layout)
     });
     saved.unwrap_or_else(|| Layout { root: workspace(name), floating: vec![] })
-}
-
-/// Older Effects workspaces stored the same Effect Controls panel twice: selected beside
-/// Source, and an inactive duplicate beside Essential Graphics. Remove only that known
-/// duplicate shape; unrelated malformed or ambiguous saved layouts still fail validation.
-fn migrate_legacy_effects(root: &mut DockNode) {
-    let Ok(shared) = crate::dock_shared::encode(root, &[]) else { return };
-    if shared.panels().iter().filter(|panel| ***panel == PanelKind::EffectControls).count() != 2 {
-        return;
-    }
-    fn selected_source(node: &DockNode) -> bool {
-        match node {
-            DockNode::Tabs { panels, active } => {
-                panels.contains(&PanelKind::Source) && panels.contains(&PanelKind::AudioClipMixer) && panels.get(*active) == Some(&PanelKind::EffectControls)
-            }
-            DockNode::Split { a, b, .. } => selected_source(a) || selected_source(b),
-        }
-    }
-    fn remove_inactive(node: &mut DockNode) {
-        match node {
-            DockNode::Tabs { panels, active } if panels.as_slice() == [PanelKind::EffectControls, PanelKind::EssentialGraphics] && *active == 1 => {
-                panels.remove(0);
-                *active = 0;
-            }
-            DockNode::Split { a, b, .. } => {
-                remove_inactive(a);
-                remove_inactive(b);
-            }
-            DockNode::Tabs { .. } => {}
-        }
-    }
-    if selected_source(root) {
-        remove_inactive(root);
-    }
 }
 
 /// The default layout of a named workspace.
@@ -293,16 +245,8 @@ pub fn workspace(_name: &str) -> DockNode {
     // Timeline | Meters.
     vsplit(
         Ratio(0.57),
-        hsplit(
-            FixedB(450.0),
-            hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
-            tabs(&[Properties, EssentialGraphics], 0),
-        ),
-        hsplit(
-            Ratio(0.29),
-            tabs(&[Project, Libraries, Info, Effects, Markers, History], 0),
-            hsplit(FixedA(64.0), tabs(&[Tools], 0), hsplit(FixedB(116.0), tabs(&[Timeline], 0), tabs(&[AudioMeters], 0))),
-        ),
+        hsplit(FixedB(450.0), hsplit(Ratio(0.5), tabs(&[Source, EffectControls, Metadata], 0), tabs(&[Program], 0)), tabs(&[Properties, EssentialGraphics], 0)),
+        hsplit(Ratio(0.29), tabs(&[Project, Libraries, Info, Effects, Markers, History], 0), hsplit(FixedA(64.0), tabs(&[Tools], 0), tabs(&[Timeline], 0))),
     )
 }
 
@@ -336,25 +280,12 @@ impl DockNode {
     pub fn close(&mut self, p: PanelKind) {
         crate::dock_shared::apply_tree(self, craft_ui::docking::Action::Close { panel: p });
     }
-    /// Put the Timeline panel back where the workspaces keep it (left of the audio meters) after
-    /// it was closed, so opening a sequence always has somewhere to show it.
+    /// Put the Timeline panel back in the workspace after it was closed.
     pub fn restore_timeline(&mut self) {
         if self.contains(PanelKind::Timeline) {
             return;
         }
-        fn beside_meters(n: &mut DockNode) -> bool {
-            match n {
-                DockNode::Split { a, b, .. } => beside_meters(a) || beside_meters(b),
-                DockNode::Tabs { panels, .. } if panels.as_slice() == [PanelKind::AudioMeters] => {
-                    *n = hsplit(SplitSize::FixedB(116.0), tabs(&[PanelKind::Timeline], 0), tabs(&[PanelKind::AudioMeters], 0));
-                    true
-                }
-                DockNode::Tabs { .. } => false,
-            }
-        }
-        if !beside_meters(self) {
-            self.open_near(PanelKind::Timeline, PanelKind::Project);
-        }
+        self.open_near(PanelKind::Timeline, PanelKind::Project);
     }
     /// Add a panel as a tab next to `near` (or into the first group).
     pub fn open_near(&mut self, p: PanelKind, near: PanelKind) {

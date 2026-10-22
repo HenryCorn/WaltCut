@@ -50,7 +50,7 @@ pub struct ListParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RunParams {
-    /// Command id, e.g. `sequence.addEdit`, `timeline.trim`, `effects.apply`, `file.import`.
+    /// Command id, e.g. `sequence.addEdit`, `timeline.trim`, `effects.setParam`, `file.import`.
     pub id: String,
     /// Parameters object (see `params` in `command_list`).
     #[serde(default)]

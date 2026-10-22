@@ -1,5 +1,5 @@
 #![allow(clippy::option_map_unit_fn)]
-//! A ready-made demo project (synthetic footage, a cut sequence with transitions, titles-free
+//! A ready-made demo project (synthetic footage, a cut sequence, titles-free
 //! effects, markers and music) so the editor shows a realistic workspace with no files at all.
 
 use std::sync::Arc;
@@ -7,8 +7,7 @@ use std::sync::Arc;
 use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{DemoScene, Generator, MediaSource};
 use waltcut_project::{
-    BinId, ItemId, ItemKind, Label, Marker, MarkerId, MarkerKind, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackKind, Transition,
-    TransitionId, resolve_auto_points,
+    BinId, ItemId, ItemKind, Label, Marker, MarkerId, MarkerKind, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackKind, resolve_auto_points,
 };
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
@@ -148,19 +147,6 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
     }
     let s = p.sequence_mut(seq)?;
     s.video_tracks[1].items.push(ov);
-    // Audio crossfade between the first two shots.
-    let tr_len = r.tick_of(24);
-    let cut = |i: usize| placed[i].2;
-    s.audio_tracks[0].transitions.push(Transition {
-        id: TransitionId(900_010),
-        effect: waltcut_project::find_effect("constant_power")?.instance(),
-        start: cut(1) - tr_len.mul_ratio(1, 2),
-        duration: tr_len,
-        from: Some(placed[0].1),
-        to: Some(placed[1].1),
-        align: Default::default(),
-        reverse: false,
-    });
     let end = t;
     // Markers
     for (i, (sec, name, color)) in

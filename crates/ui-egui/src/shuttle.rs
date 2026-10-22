@@ -1,7 +1,7 @@
 //! Pitch-preserving shuttle playback. Pitch is corrected before changing the sample rate,
 //! so faster playback does not first discard the upper part of the audible spectrum.
 
-use waltcut_audio_dsp::{AudioEffect, effects::PitchShifter, resample::StreamResampler};
+use waltcut_audio_dsp::{AudioEffect, PitchShifter, resample::StreamResampler};
 use waltcut_engine::Session;
 use waltcut_project::ItemId;
 

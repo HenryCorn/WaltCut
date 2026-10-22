@@ -207,8 +207,6 @@ pub enum Dialog {
     AddTracks,
     /// Sequence ▸ Sequence Settings….
     SequenceSettings,
-    /// Set Transition Duration (double-click a transition in the Timeline).
-    TransitionDuration,
 }
 
 #[derive(Default)]
@@ -301,8 +299,6 @@ pub struct FilmcraftApp {
     /// The mouse press in progress (its start time) and the undo history when it began, for Escape
     /// to take back what the press changed (#580).
     value_press: Option<(f64, waltcut_engine::UndoMark)>,
-    /// BS.1770 loudness of the programme as it plays, and the next sample position to feed.
-    pub(crate) loudness: Option<(waltcut_audio_dsp::LoudnessMeter, i64)>,
     /// Status message last shown and when it first appeared (messages expire after a few seconds).
     status_seen: (String, f64),
     /// Screenshots waiting for their frame: (token, path, crop, reply, give-up time).
@@ -552,7 +548,6 @@ impl FilmcraftApp {
             synthetic: Vec::new(),
             mac_ctrl_click_armed: false,
             value_press: None,
-            loudness: None,
             status_seen: (String::new(), 0.0),
             pending_screenshots: Vec::new(),
             queued_screenshots: Vec::new(),
@@ -838,12 +833,7 @@ impl FilmcraftApp {
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
                 PanelKind::EssentialGraphics | PanelKind::Properties => PanelKind::Program,
-                PanelKind::Source
-                | PanelKind::EffectControls
-                | PanelKind::AudioClipMixer
-                | PanelKind::Metadata
-                | PanelKind::AudioTrackMixer
-                | PanelKind::Timecode => PanelKind::Source,
+                PanelKind::Source | PanelKind::EffectControls | PanelKind::Metadata | PanelKind::Timecode => PanelKind::Source,
                 _ => PanelKind::Project,
             };
             self.ui.dock.open_near(p, near);
@@ -951,11 +941,6 @@ impl FilmcraftApp {
         self.playback.anchor_tick = self.session.playhead();
         self.playback.audio_seen = (0, now);
         self.start_audio();
-        // Audio Track Mixer: an automation pass runs while playing forward in real time
-        if (self.playback.speed - 1.0).abs() < 1e-9 && !self.session.mixrec.active() {
-            let t = self.session.playhead();
-            let _ = self.session.execute("mixer.recordStart", json!({"time": t.0}));
-        }
     }
 
     pub fn stop(&mut self) {
@@ -970,12 +955,6 @@ impl FilmcraftApp {
         }
         self.scrub.device_stopped();
         self.playback.audio_clock = false;
-        if self.session.mixrec.active() {
-            let t = self.session.playhead();
-            if let Err(e) = self.session.execute("mixer.recordStop", json!({"time": t.0})) {
-                self.ui.status = e.to_string();
-            }
-        }
     }
 
     fn start_audio(&mut self) {
@@ -2056,35 +2035,29 @@ fn shuttle_mix_rate(device_rate: u32, speed: f64) -> Option<u32> {
 
 /// The program mix that playback plays: `mix(device_frame, interleaved, channels)` renders the
 /// active sequence at device rate `sr` from `device_frame`, with the live project snapshot (edits
-/// made while playing are heard), Output Mapping, the 5.1 mixdown.
+/// made while playing are heard) and Output Mapping.
 pub fn playback_mix(session: &Session, seq_id: waltcut_project::ItemId, sr: u32) -> impl FnMut(i64, &mut [f32], usize) + Send + 'static {
     let project = session.project.clone();
     let provider = session.media.provider(project.clone(), session.services.clone());
     let previews = session.previews.clone();
     // Settings ▸ Audio Hardware ▸ Output Mapping
     let map = [session.prefs.audio_hardware.map_left, session.prefs.audio_hardware.map_right];
-    // Preferences ▸ Audio ▸ 5.1 Mixdown Type: how a 5.1 Mix plays on a stereo device
-    let mixdown = waltcut_audio_dsp::channels::Mixdown::from_id(&session.prefs.audio.mixdown_type).unwrap_or_default();
-    previews.live.publish_project(project.clone());
+    previews.audio_project.publish(project.clone());
     let mut resampler = None;
     move |cursor: i64, buf: &mut [f32], ch: usize| {
-        // the newest project snapshot: mixer moves and other edits are heard while playing
-        let project = previews.live.project().filter(|p| p.sequence(seq_id).is_some()).unwrap_or_else(|| project.clone());
+        // The newest project snapshot: edits made while playing are heard.
+        let project = previews.audio_project.current().filter(|p| p.sequence(seq_id).is_some()).unwrap_or_else(|| project.clone());
         let Some(seq) = project.sequence(seq_id) else {
             buf.fill(0.0);
             return;
         };
         let n = buf.len() / ch.max(1);
         let seq_sr = seq.settings.sample_rate;
-        // a 5.1 Mix plays as six channels (L, R, C, LFE, Ls, Rs) on a device with at least six
-        use waltcut_audio_dsp::channels::Layout;
-        let layout = if ch >= 6 && seq.settings.audio_master == waltcut_project::AudioChannels::Surround51 { Layout::Surround51 } else { Layout::Stereo };
         let mix = if seq_sr == sr {
-            previews.mix_layout(&project, seq_id, cursor, n, &provider, layout, mixdown)
+            previews.mix(&project, seq_id, cursor, n, &provider)
         } else {
-            // Mix at the sequence rate as one continuous stream, interpolated to the device rate
-            // (started afresh when the rate or the channel layout changes while playing).
-            let key = (seq_sr, layout);
+            // Mix at the sequence rate as one continuous stream, interpolated to the device rate.
+            let key = seq_sr;
             if resampler.as_ref().is_none_or(|(k, _)| *k != key) {
                 resampler = Some((key, waltcut_audio_dsp::resample::StreamResampler::new(seq_sr, sr)));
             }
@@ -2092,19 +2065,18 @@ pub fn playback_mix(session: &Session, seq_id: waltcut_project::ItemId, sr: u32)
                 buf.fill(0.0);
                 return;
             };
-            let channels = r.process(cursor, n, |s0, m| previews.mix_layout(&project, seq_id, s0, m, &provider, layout, mixdown).channels);
+            let channels = r.process(cursor, n, |s0, m| previews.mix(&project, seq_id, s0, m, &provider).channels);
             waltcut_frame::AudioBuffer { sample_rate: sr, channels }
         };
-        if layout == Layout::Surround51 {
+        let Some(left) = mix.channels.first() else {
             buf.fill(0.0);
-            for (i, frame) in buf.chunks_mut(ch).enumerate() {
-                for (c, x) in frame.iter_mut().take(6).enumerate() {
-                    *x = mix.channels[c][i];
-                }
-            }
-        } else {
-            waltcut_engine::settings::map_output(&mix.channels[0], &mix.channels[1.min(mix.channels.len() - 1)], buf, ch, map);
-        }
+            return;
+        };
+        let Some(right) = mix.channels.get(1).or_else(|| mix.channels.first()) else {
+            buf.fill(0.0);
+            return;
+        };
+        waltcut_engine::settings::map_output(left, right, buf, ch, map);
     }
 }
 

@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use waltcut_project::{BinEntry, FindOp, FindQuery, FindRow, ItemId, ItemKind, MarkerKind, MediaRef, Project, SearchBin, TrackKind};
+use waltcut_project::{BinEntry, FindOp, FindQuery, FindRow, ItemId, ItemKind, MarkerKind, MediaRef, Project, SearchBin};
 use waltcut_time::{Tick, TimeDisplay, TimeRange};
 
 use crate::commands::{CommandSpec, always, bad, bool_p, has_project_selection, has_seq, str_p, u64_p};
@@ -160,7 +160,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Automate to Sequence…",
             &["Clip"],
             None,
-            r#"{"items":[id]?,"ordering":"sort|selection","placement":"sequentially|unnumberedMarkers","method":"insert|overwrite","overlapFrames":n=30,"stillFrames":n?,"audioTransition":bool=true,"ignoreAudio":bool=false,"ignoreVideo":bool=false}"#,
+            r#"{"items":[id]?,"ordering":"sort|selection","placement":"sequentially|unnumberedMarkers","method":"insert|overwrite","overlapFrames":n=30,"stillFrames":n?,"ignoreAudio":bool=false,"ignoreVideo":bool=false}"#,
             can_automate,
             automate_to_sequence,
         ),
@@ -183,16 +183,6 @@ enum At {
 pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
     let mut pool = commands();
     pool.extend(crate::sequence_extras::commands());
-    // Apply Default Transitions to Selection works on selected clips too (⇧D), not only on
-    // selected edit points; the Trim Monitor button keeps using the same id.
-    if let Some(c) = v.iter_mut().find(|c| c.id == "trim.applyDefaultTransition")
-        && let Some(i) = pool.iter().position(|c| c.id == "sequence.applyDefaultTransitionsToSelection")
-    {
-        let new = pool.remove(i);
-        c.enabled = new.enabled;
-        c.run = new.run;
-        c.params = new.params;
-    }
     let layout: Vec<(At, Vec<&'static str>)> = vec![
         (At::After("file.newBinFromSelection"), vec!["file.newSearchBin"]),
         (At::Before("file.closeProject"), vec!["file.close"]),
@@ -207,8 +197,6 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
         (At::After("edit.consolidateDuplicates"), vec!["edit.editOriginal"]),
         (At::After("clip.editSubclip"), vec!["clip.editOffline", "clip.sourceSettings"]),
         (At::After("clip.replaceFromBin"), vec!["clip.updateMetadata", "clip.generateAudioWaveform", "clip.automateToSequence"]),
-        (At::After("sequence.applyAudioTransition"), vec!["trim.applyDefaultTransition"]),
-        (At::After("sequence.showThroughEdits"), vec!["sequence.normalizeMixTrack"]),
         (At::After("sequence.makeSubsequence"), vec!["sequence.simplify"]),
         (At::After("markers.addChapter"), vec!["markers.addFlashCue"]),
         (At::Before("file.close"), vec!["file.open"]),
@@ -235,7 +223,7 @@ pub(crate) fn apply_layout(v: &mut Vec<CommandSpec>) {
 }
 
 /// The Sequence menu in Premiere's order (submenu items where their submenu goes).
-const SEQUENCE_MENU: [&str; 32] = [
+const SEQUENCE_MENU: [&str; 28] = [
     "sequence.settings",
     "sequence.renderEffectsInToOut",
     "sequence.renderInToOut",
@@ -248,8 +236,6 @@ const SEQUENCE_MENU: [&str; 32] = [
     "sequence.addEdit",
     "sequence.addEditAllTracks",
     "trim.edit",
-    "sequence.applyAudioTransition",
-    "trim.applyDefaultTransition",
     "sequence.lift",
     "sequence.extract",
     "sequence.closeGap",
@@ -261,13 +247,11 @@ const SEQUENCE_MENU: [&str; 32] = [
     "sequence.linkedSelection",
     "sequence.selectionFollowsPlayhead",
     "sequence.showThroughEdits",
-    "sequence.normalizeMixTrack",
     "sequence.makeSubsequence",
     "sequence.simplify",
     "sequence.addTracks",
     "sequence.deleteTracks",
     "sequence.colorSettings",
-    "mixer.addSubmix",
 ];
 
 /// Put the commands `ids` (those present) in this order, at the position of the first of them.
@@ -1164,10 +1148,10 @@ fn generate_waveform(s: &mut Session, p: &Value) -> Result<Value> {
 /// Clip ▸ Automate to Sequence…: place the selected Project panel items in the active sequence
 /// at the playhead (sequentially, or at the sequence's unnumbered — unnamed — markers), by insert
 /// or overwrite, on the source-patched tracks. Consecutive clips overlap by `overlapFrames`
-/// (taken from the outgoing clip's tail) and get the default transitions over the overlap. One
-/// undo step.
+/// (taken from the outgoing clip's tail). One undo step; no automatic fades are added.
 fn automate_to_sequence(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "clip.automateToSequence";
+    crate::commands::check_parameter_keys(p, cmd, &["items", "ordering", "placement", "method", "overlapFrames", "stillFrames", "ignoreAudio", "ignoreVideo"])?;
     let ordering = str_p(p, "ordering").unwrap_or("sort");
     let placement = str_p(p, "placement").unwrap_or("sequentially");
     let method = str_p(p, "method").unwrap_or("insert");
@@ -1275,35 +1259,10 @@ fn automate_to_sequence(s: &mut Session, p: &Value) -> Result<Value> {
         s.history.redo.clear();
         return Err(e);
     }
-    // default transitions over the overlaps (and at the cuts when there is no overlap)
-    let at = bool_p(p, "audioTransition").unwrap_or(true);
-    let mut transitions = 0;
-    if placement == "sequentially" && at {
-        let q = s.active_sequence().ok_or(EngineError::NoSequence)?;
-        let default_frames = rate.frame_at(s.prefs.timeline.audio_transition_duration(rate));
-        let mut edges = Vec::new();
-        for ((_, ids), ov) in placed.iter().skip(1).zip(cut_overlap.iter().chain(std::iter::repeat(&overlap))) {
-            let frames = if *ov > Tick::ZERO { rate.frame_at(*ov) } else { default_frames };
-            for c in ids {
-                let Some((tid, _)) = q.find_item(*c) else { continue };
-                let kind = q.track(tid).map(|t| t.kind);
-                let cmd = match kind {
-                    Some(TrackKind::Audio) if at => "sequence.applyAudioTransition",
-                    _ => continue,
-                };
-                edges.push((cmd, *c, frames));
-            }
-        }
-        for (cmd, c, frames) in edges {
-            if s.execute(cmd, json!({"clip": c.0, "edge": "in", "frames": frames})).is_ok() {
-                transitions += 1;
-            }
-        }
-    }
     crate::clip_ops::collapse_history(s, n0, "Automate to Sequence");
     let clips: Vec<u64> = placed.iter().flat_map(|(_, ids)| ids.iter().map(|c| c.0)).collect();
     s.state.selection = clips.iter().map(|c| waltcut_project::ClipId(*c)).collect();
-    Ok(json!({"placed": placed.len(), "clips": clips, "transitions": transitions, "starts": starts.iter().map(|t| t.0).collect::<Vec<_>>()}))
+    Ok(json!({"placed": placed.len(), "clips": clips, "starts": starts.iter().map(|t| t.0).collect::<Vec<_>>()}))
 }
 
 // ---------------------------------------------------------------------------------------------

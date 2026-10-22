@@ -10,8 +10,6 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
 pub mod audio;
-pub mod audio_fx;
-pub mod audio_transition;
 pub mod blend;
 pub mod colorman;
 pub mod drawing;
@@ -19,7 +17,6 @@ pub mod flow;
 pub mod graphic_clip;
 pub mod graphics;
 pub mod image;
-pub mod mixer;
 pub mod offline;
 pub mod plan;
 pub mod preview;
@@ -545,9 +542,6 @@ pub fn arc_source(s: impl waltcut_media::MediaSource + 'static) -> SharedSource 
 mod tests;
 
 #[cfg(test)]
-#[path = "mixer_tests.rs"]
-mod mixer_tests;
-
 #[cfg(test)]
 mod nest_tests;
 

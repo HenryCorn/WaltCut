@@ -79,8 +79,6 @@ pub const EXTRA_KEYS: &[Entry] = &[
     ("sequence.addEditAllTracks", "Cmd+Shift+K", ""),
     ("trim.edit", "Shift+T", ""),
     ("trim.extendToPlayhead", "E", ""),
-    ("sequence.applyAudioTransition", "Cmd+Shift+D", ""),
-    ("trim.applyDefaultTransition", "Shift+D", ""),
     ("sequence.lift", ";", ""),
     ("sequence.extract", "'", ""),
     ("view.zoomIn", "=", ""),
@@ -120,9 +118,7 @@ pub const EXTRA_KEYS: &[Entry] = &[
     ("window.panel.Timeline", "Shift+3", ""),
     ("window.panel.Program", "Shift+4", ""),
     ("window.panel.EffectControls", "Shift+5", ""),
-    ("window.panel.AudioTrackMixer", "Shift+6", ""),
     ("window.panel.Effects", "Shift+7", ""),
-    ("window.panel.AudioClipMixer", "Shift+9", ""),
     // Navigation and playback
     ("playhead.nextEdit", "Down", ""),
     ("playhead.prevEdit", "Up", ""),

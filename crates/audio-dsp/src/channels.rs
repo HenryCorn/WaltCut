@@ -1,4 +1,4 @@
-//! Channel layouts, format conversion (up/downmix) and the 5.1 surround panner.
+//! Output channel layouts and format conversion (up/downmix).
 //!
 //! **Channel order.** 5.1 audio is always in the SMPTE / WAVE order **L, R, C, LFE, Ls, Rs**
 //! ([`L`], [`R`], [`C`], [`LFE`], [`LS`], [`RS`]); stereo is L, R; mono is one channel. Codecs with a
@@ -19,17 +19,7 @@
 //! **Upmix** places the source on the front speakers without inventing content: mono → C (5.1) or
 //! both sides at unity (2.0, as mono clips are played everywhere else in FilmCraft); stereo → L, R.
 //!
-//! **5.1 panner** ([`Pan51`]): a puck at `(x, y)` in the listening square (x −1 left … +1 right,
-//! y −1 rear … +1 front). A point source at `(x, y)` is split front/rear and left/right with the
-//! sine/cosine constant-power law, and the front image is shared between the phantom L/R pair and
-//! the centre speaker by **Center %** (`k_c = center · (1 − |x|)` of the front power goes to C). The
-//! gains of a point source always have unit power (`Σ g² = 1`). Multichannel sources keep their
-//! layout around the puck: each source channel sits at its nominal speaker position moved by the
-//! puck's offset from front-centre (so the default puck (0, 1) at 100 % centre maps 5.1 to itself
-//! exactly). Stereo sources sit at the puck ± 1 in x. The LFE output is the source LFE (5.1) or
-//! the mean of the source channels (mono/stereo) times the **LFE** gain.
-
-use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4};
+use std::f32::consts::FRAC_1_SQRT_2;
 
 /// −3 dB, the BS.775 downmix coefficient.
 pub const K: f32 = FRAC_1_SQRT_2;
@@ -207,86 +197,6 @@ pub fn convert_owned(input: Vec<Vec<f32>>, to: Layout, mixdown: Mixdown) -> Vec<
     convert(&refs, from, to, mixdown)
 }
 
-// ------------------------------------------------------------------------------------- 5.1 panner
-
-/// The 5.1 panner of a track or send feeding a 5.1 bus.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Pan51 {
-    /// −1 (left) … +1 (right).
-    pub x: f32,
-    /// −1 (rear) … +1 (front).
-    pub y: f32,
-    /// Center %: 0 … 1, the share of the front image the centre speaker takes at x = 0.
-    pub center: f32,
-    /// LFE gain (linear).
-    pub lfe: f32,
-}
-
-impl Default for Pan51 {
-    /// Front centre, 100 % centre, LFE at unity.
-    fn default() -> Self {
-        Pan51 { x: 0.0, y: 1.0, center: 1.0, lfe: 1.0 }
-    }
-}
-
-/// Gains of a point source at `(x, y)` to the six 5.1 outputs (LFE is 0). `Σ g² = 1`.
-pub fn point_gains(x: f32, y: f32, center: f32) -> [f32; 6] {
-    let x = x.clamp(-1.0, 1.0);
-    let y = y.clamp(-1.0, 1.0);
-    let fb = (1.0 - y) * 0.5 * FRAC_PI_2;
-    let (f, b) = (fb.cos(), fb.sin());
-    let lr = (x + 1.0) * FRAC_PI_4;
-    let (gl, gr) = (lr.cos(), lr.sin());
-    let kc = (center.clamp(0.0, 1.0) * (1.0 - x.abs())).clamp(0.0, 1.0);
-    let ph = (1.0 - kc).sqrt();
-    let mut g = [0.0f32; 6];
-    g[L] = f * ph * gl;
-    g[R] = f * ph * gr;
-    g[C] = f * kc.sqrt();
-    g[LS] = b * gl;
-    g[RS] = b * gr;
-    // f32 sin/cos at the quadrant ends are not exactly 0 / 1: snap them so speaker positions
-    // route bit-exactly (a 5.1 source through the default panner is the identity)
-    for v in g.iter_mut() {
-        if v.abs() < 1e-6 {
-            *v = 0.0;
-        } else if (*v - 1.0).abs() < 1e-6 {
-            *v = 1.0;
-        }
-    }
-    g
-}
-
-/// Nominal source-channel positions relative to the puck's offset from front-centre.
-fn offsets(from: Layout) -> &'static [(f32, f32)] {
-    match from {
-        Layout::Mono => &[(0.0, 0.0)],
-        Layout::Stereo => &[(-1.0, 0.0), (1.0, 0.0)],
-        // L, R, C, LFE (not positioned), Ls, Rs
-        Layout::Surround51 => &[(-1.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (-1.0, -2.0), (1.0, -2.0)],
-    }
-}
-
-/// Panning matrix `m[out][in]` (6 outputs) of a `from` source through the 5.1 panner.
-pub fn pan51_matrix(from: Layout, p: Pan51) -> Vec<Vec<f32>> {
-    let ni = from.channels();
-    let mut m = vec![vec![0.0f32; ni]; 6];
-    for (i, (ox, oy)) in offsets(from).iter().enumerate() {
-        if from == Layout::Surround51 && i == LFE {
-            m[LFE][i] = p.lfe;
-            continue;
-        }
-        let g = point_gains(p.x + ox, p.y + oy, p.center);
-        for (o, row) in m.iter_mut().enumerate() {
-            row[i] = g[o];
-        }
-        if from != Layout::Surround51 {
-            m[LFE][i] = p.lfe / ni as f32;
-        }
-    }
-    m
-}
-
 /// Peak level (linear) per channel.
 pub fn peaks(input: &[&[f32]]) -> Vec<f32> {
     input.iter().map(|c| c.iter().fold(0f32, |a, x| a.max(x.abs()))).collect()
@@ -356,71 +266,5 @@ mod tests {
         assert_eq!(up.len(), 6);
         assert_eq!(up[C], vec![0.5; 3]);
         assert_eq!(up[L], vec![0.0; 3]);
-    }
-
-    #[test]
-    fn panner_point_gains_are_equal_power() {
-        for xi in -10..=10 {
-            for yi in -10..=10 {
-                for c in [0.0, 0.3, 1.0] {
-                    let g = point_gains(xi as f32 / 10.0, yi as f32 / 10.0, c);
-                    let p: f32 = g.iter().map(|v| v * v).sum();
-                    assert!((p - 1.0).abs() < 1e-5, "({xi}, {yi}, {c}) power {p}");
-                    assert_eq!(g[LFE], 0.0);
-                    assert!(g.iter().all(|v| *v >= -1e-7));
-                }
-            }
-        }
-        let k = K;
-        // speaker positions
-        let at = |x, y, c| point_gains(x, y, c);
-        assert!(close(at(0.0, 1.0, 1.0)[C], 1.0));
-        assert!(close(at(-1.0, 1.0, 1.0)[L], 1.0));
-        assert!(close(at(1.0, 1.0, 0.5)[R], 1.0));
-        assert!(close(at(-1.0, -1.0, 1.0)[LS], 1.0));
-        assert!(close(at(1.0, -1.0, 1.0)[RS], 1.0));
-        // phantom centre at 0 % centre: −3 dB each side
-        let g = at(0.0, 1.0, 0.0);
-        assert!(close(g[L], k) && close(g[R], k) && g[C] == 0.0);
-        // room centre: −3 dB front/rear, then −3 dB left/right
-        let g = at(0.0, 0.0, 0.0);
-        assert!(close(g[L], 0.5) && close(g[R], 0.5) && close(g[LS], 0.5) && close(g[RS], 0.5));
-        // 50 % centre at front centre: half the power to C
-        let g = at(0.0, 1.0, 0.5);
-        assert!(close(g[C] * g[C], 0.5) && close(g[L] * g[L] + g[R] * g[R], 0.5));
-    }
-
-    #[test]
-    fn panner_matrices() {
-        // 5.1 through the default panner is the identity
-        let m = pan51_matrix(Layout::Surround51, Pan51::default());
-        for (o, row) in m.iter().enumerate() {
-            for (i, g) in row.iter().enumerate() {
-                assert!(close(*g, if o == i { 1.0 } else { 0.0 }), "out {o} in {i} = {g}");
-            }
-        }
-        // stereo at front centre: L → L, R → R
-        let m = pan51_matrix(Layout::Stereo, Pan51 { lfe: 0.0, ..Pan51::default() });
-        assert!(close(m[L][0], 1.0) && close(m[R][1], 1.0) && m[C][0].abs() < 1e-6 && m[LFE][0] == 0.0);
-        // mono at the default puck: centre only; LFE gain = mean of inputs
-        let m = pan51_matrix(Layout::Mono, Pan51 { lfe: 0.5, ..Pan51::default() });
-        assert!(close(m[C][0], 1.0) && close(m[LFE][0], 0.5));
-        let m = pan51_matrix(Layout::Stereo, Pan51 { lfe: 0.5, ..Pan51::default() });
-        assert!(close(m[LFE][0], 0.25) && close(m[LFE][1], 0.25));
-        // every source channel keeps unit power (LFE aside)
-        for l in [Layout::Mono, Layout::Stereo, Layout::Surround51] {
-            let p = Pan51 { x: 0.37, y: -0.21, center: 0.6, lfe: 0.0 };
-            let m = pan51_matrix(l, p);
-            for i in 0..l.channels() {
-                if l == Layout::Surround51 && i == LFE {
-                    continue;
-                }
-                let pw: f32 = (0..6).map(|o| m[o][i] * m[o][i]).sum();
-                assert!((pw - 1.0).abs() < 1e-5);
-            }
-        }
-        // puck hard rear-left: 5.1 front channels collapse towards the rear left
-        let m = pan51_matrix(Layout::Surround51, Pan51 { x: -1.0, y: -1.0, center: 1.0, lfe: 1.0 });
-        assert!(close(m[LS][L], 1.0) && close(m[LS][C], 1.0) && close(m[LS][LS], 1.0));
     }
 }

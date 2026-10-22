@@ -20,7 +20,7 @@
 //! Automation ids (`sequenceSettings.` + …): `tab.general`, `tab.color`, `tab.vr`; General:
 //! `name`, `editingMode`, `timebase` (+ `timebase.option.<num>/<den>` while open), `width`, `height`,
 //! `aspect`, `scaleMotion`, `par`, `fields`, `videoDisplay` (+ `videoDisplay.option.<df|ndf|tc>`),
-//! `channelFormat` (+ `channelFormat.option.<Stereo|Mono|5.1|Adaptive>`), `channels`, `sampleRate`
+//! `sampleRate`
 //! (+ `sampleRate.option.<hz>`), `audioDisplay`, `previewFormat`, `previewCodec`, `previewWidth`,
 //! `previewHeight`, `maxBitDepth`, `maxRenderQuality`, `linearColor`; Color Management:
 //! `workingSpace` (+ `workingSpace.option.<id>`), `wideGamut`, `autoToneMap`; VR Properties:
@@ -28,7 +28,7 @@
 
 use serde_json::{Map, Value, json};
 use waltcut_color::WorkingSpace;
-use waltcut_project::{AudioChannels, SequenceSettings};
+use waltcut_project::SequenceSettings;
 use waltcut_time::FrameRate;
 
 use crate::FilmcraftApp;
@@ -57,17 +57,6 @@ const TIMEBASES: [(i64, i64); 15] = [
     (120, 1),
 ];
 const SAMPLE_RATES: [u32; 5] = [32_000, 44_100, 48_000, 88_200, 96_000];
-const MIXES: [&str; 4] = ["Stereo", "Mono", "5.1", "Adaptive"];
-
-fn mix_name(c: AudioChannels) -> &'static str {
-    match c {
-        AudioChannels::Mono => "Mono",
-        AudioChannels::Stereo => "Stereo",
-        AudioChannels::Surround51 => "5.1",
-        AudioChannels::Adaptive => "Adaptive",
-    }
-}
-
 /// Fill the draft from the active sequence and open the dialog on the General tab.
 pub fn open(app: &mut FilmcraftApp) {
     let Some(q) = app.session.active_sequence() else { return };
@@ -85,7 +74,6 @@ pub fn open(app: &mut FilmcraftApp) {
         height: st.height,
         scale_motion: true,
         drop_frame: st.drop_frame && st.frame_rate.supports_drop_frame(),
-        mix: mix_name(st.audio_master).into(),
         sample_rate: st.sample_rate,
         max_render_quality: st.max_render_quality,
         working_space: st.color.working.id().into(),
@@ -111,7 +99,6 @@ pub fn open_new(app: &mut FilmcraftApp) {
         height: st.height,
         scale_motion: true,
         drop_frame: st.drop_frame && st.frame_rate.supports_drop_frame(),
-        mix: mix_name(st.audio_master).into(),
         sample_rate: st.sample_rate,
         max_render_quality: st.max_render_quality,
         working_space: st.color.working.id().into(),
@@ -135,7 +122,6 @@ fn new_sequence_params(d: &SequenceSettingsDraft) -> (Map<String, Value>, Map<St
     p.insert("height".into(), json!(d.height));
     p.insert("fps".into(), json!(rate(d).as_f64()));
     p.insert("sampleRate".into(), json!(d.sample_rate));
-    p.insert("mix".into(), json!(d.mix));
     p.insert("video".into(), json!(d.video_tracks.min(256)));
     p.insert("audio".into(), json!(d.audio_tracks.min(256)));
     // what's left: only the settings `file.newSequence` has no parameter for
@@ -231,9 +217,6 @@ fn changes(d: &SequenceSettingsDraft, cur: &SequenceSettings, cur_name: &str) ->
     let df = d.drop_frame && r.supports_drop_frame();
     if df != (cur.drop_frame && cur.frame_rate.supports_drop_frame()) {
         p.insert("dropFrame".into(), json!(df));
-    }
-    if d.mix != mix_name(cur.audio_master) {
-        p.insert("mix".into(), json!(d.mix));
     }
     if d.sample_rate != cur.sample_rate {
         p.insert("sampleRate".into(), json!(d.sample_rate));
@@ -367,24 +350,6 @@ fn general(ui: &mut egui::Ui, d: &mut SequenceSettingsDraft, cur: &SequenceSetti
         });
     });
     section(ui, "Audio", |ui| {
-        row(ui, label_w, "Channel Format:", true, |ui| {
-            let shown = d.mix.clone();
-            let resp = egui::ComboBox::from_id_salt("seq-settings-mix").selected_text(t(&shown)).width(120.0).show_ui(ui, |ui| {
-                for m in MIXES {
-                    let o = ui.selectable_value(&mut d.mix, m.to_string(), t(m));
-                    elems.push((format!("sequenceSettings.channelFormat.option.{m}"), o.rect, m.to_string()));
-                }
-            });
-            elems.push(("sequenceSettings.channelFormat".into(), resp.response.rect, shown));
-            ui.add_enabled(false, egui::Label::new(tl!("Number of Channels:")));
-            let n = match d.mix.as_str() {
-                "Mono" => "1",
-                "5.1" => "6",
-                "Adaptive" => "—",
-                _ => "2",
-            };
-            fixed_combo(ui, elems, "channels", n, 60.0, NOT_YET);
-        });
         row(ui, label_w, "Sample Rate:", true, |ui| {
             let mut rates = SAMPLE_RATES.to_vec();
             if !rates.contains(&d.sample_rate) {
@@ -603,10 +568,7 @@ mod tests {
             ..Default::default()
         };
         let (p, rest) = new_sequence_params(&d);
-        assert_eq!(
-            Value::Object(p),
-            json!({"name":"Shorts","width":1080,"height":1920,"fps":24_000.0/1001.0,"sampleRate":48_000,"mix":"Stereo","video":2,"audio":4})
-        );
+        assert_eq!(Value::Object(p), json!({"name":"Shorts","width":1080,"height":1920,"fps":24_000.0/1001.0,"sampleRate":48_000,"video":2,"audio":4}));
         assert!(rest.is_empty(), "everything else is the default: {rest:?}");
         // what file.newSequence has no parameter for follows on the new sequence; a blank name
         // lets the command name it

@@ -27,8 +27,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use waltcut_audio_dsp::channels::{Layout, Mixdown};
-use waltcut_render::audio::to_layout;
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -73,6 +71,22 @@ pub enum RenderMode {
 type Memo = (Arc<Project>, ItemId, Arc<Vec<Segment>>);
 type AudioMemo = (Arc<Project>, ItemId, Arc<Vec<AudioSegment>>);
 
+/// The newest project snapshot consumed by the Program audio callback while edits continue.
+#[derive(Default)]
+pub struct AudioProjectSnapshot {
+    project: Mutex<Option<Arc<Project>>>,
+}
+
+impl AudioProjectSnapshot {
+    pub fn publish(&self, project: Arc<Project>) {
+        *self.project.lock().unwrap_or_else(|error| error.into_inner()) = Some(project);
+    }
+
+    pub fn current(&self) -> Option<Arc<Project>> {
+        self.project.lock().unwrap_or_else(|error| error.into_inner()).clone()
+    }
+}
+
 /// Preview files of one project, plus memoized segments for the latest project snapshots.
 #[derive(Default)]
 pub struct PreviewStore {
@@ -91,8 +105,8 @@ pub struct PreviewStore {
     audio_memo: Mutex<Vec<AudioMemo>>,
     /// Bumped whenever the set of preview files changes.
     pub generation: AtomicU64,
-    /// Live mixer state shared with playback: held controls, meters, newest project snapshot.
-    pub live: Arc<waltcut_render::mixer::LiveMix>,
+    /// Current project snapshot shared with playback.
+    pub audio_project: Arc<AudioProjectSnapshot>,
 }
 
 fn video_name(hash: &str) -> String {
@@ -383,39 +397,19 @@ impl PreviewStore {
         Some(samples)
     }
 
-    /// Sequence audio for playback and meters, as stereo (a 5.1 Mix folded with the BS.775
-    /// downmix): rendered audio previews where they are valid, the live mix everywhere else.
+    /// Sequence audio for playback, as stereo: rendered audio previews where valid, otherwise the
+    /// current project is mixed directly.
     pub fn mix(&self, project: &Arc<Project>, seq: ItemId, start: i64, frames: usize, sources: &dyn waltcut_render::SourceProvider) -> AudioBuffer {
-        self.mix_layout(project, seq, start, frames, sources, Layout::Stereo, Mixdown::FrontRear)
-    }
-
-    /// [`PreviewStore::mix`] in `layout`: a 5.1 Mix is folded to stereo with `mixdown` (Preferences ▸
-    /// Audio ▸ 5.1 Mixdown Type) or played as six channels on a 5.1 device; a stereo Mix is placed
-    /// on the front speakers of a 5.1 device. Rendered audio previews are stereo BS.775 folds, so
-    /// they are used only for stereo output of a stereo Mix or with the BS.775 mixdown.
-    #[allow(clippy::too_many_arguments)]
-    pub fn mix_layout(
-        &self,
-        project: &Arc<Project>,
-        seq: ItemId,
-        start: i64,
-        frames: usize,
-        sources: &dyn waltcut_render::SourceProvider,
-        layout: Layout,
-        mixdown: Mixdown,
-    ) -> AudioBuffer {
-        let Some(q) = project.sequence(seq) else { return AudioBuffer::silence(48_000, layout.channels(), frames) };
-        let live = Some(&*self.live);
+        let Ok(frames_i64) = i64::try_from(frames) else { return AudioBuffer::silence(48_000, 2, 0) };
+        let Some(end) = start.checked_add(frames_i64) else { return AudioBuffer::silence(48_000, 2, 0) };
+        let Some(q) = project.sequence(seq) else { return AudioBuffer::silence(48_000, 2, frames) };
+        let sample_rate = q.settings.sample_rate.max(1);
         let has_audio = self.files.read().unwrap_or_else(|e| e.into_inner()).iter().any(|n| n.ends_with(".wav"));
-        let surround = q.settings.audio_master == waltcut_project::AudioChannels::Surround51;
-        let previews_ok = layout == Layout::Stereo && (!surround || mixdown == Mixdown::FrontRear);
-        // held mixer controls are heard live (rendered previews don't know them)
-        if !has_audio || self.live.is_active() || !previews_ok {
-            return to_layout(waltcut_render::mixer::mix_graph(project, q, start, frames, sources, live), layout, mixdown);
+        if !has_audio {
+            return waltcut_render::audio::mix_sequence(project, q, start, frames, sources);
         }
         let segs = self.audio_segments(project, seq);
-        let mut out = AudioBuffer::silence(q.settings.sample_rate, 2, frames);
-        let end = start + frames as i64;
+        let mut out = AudioBuffer::silence(sample_rate, 2, frames);
         let mut pos = start;
         while pos < end {
             let i = segs.partition_point(|g| g.first_sample <= pos);
@@ -436,9 +430,12 @@ impl PreviewStore {
                     }
                 }
                 _ => {
-                    let b = to_layout(waltcut_render::mixer::mix_graph(project, q, pos, n, sources, live), Layout::Stereo, mixdown);
-                    for c in 0..2 {
-                        out.channels[c][off..off + n].copy_from_slice(&b.channels[c.min(b.channels.len() - 1)][..n]);
+                    let b = waltcut_render::audio::mix_sequence(project, q, pos, n, sources);
+                    for channel in 0..2 {
+                        let Some(target) = out.channels.get_mut(channel) else { continue };
+                        let Some(samples) = b.channels.get(channel) else { continue };
+                        let count = n.min(samples.len()).min(target.len().saturating_sub(off));
+                        target[off..off + count].copy_from_slice(&samples[..count]);
                     }
                 }
             }

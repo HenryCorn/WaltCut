@@ -1,8 +1,7 @@
-//! Effect definitions (parameter schemas, categories) and effect instances on track items.
+//! Retained parameter schemas and instances on track items.
 //!
-//! Definitions are data: the Effects panel tree, the Effect Controls rows and the MCP schema are
-//! all generated from [`EffectDef`]. Pixel/audio implementations live in the render/audio crates
-//! and are looked up by `EffectDef::id`.
+//! Retained intrinsic and graphic definitions drive Effect Controls and the MCP schema.
+//! Motion/Opacity/Volume processing lives in render; text/shape data shares the parameter engine.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -12,16 +11,10 @@ use waltcut_geom::Vec2;
 
 use crate::keyframe::{Param, ParamValue};
 
-mod audio;
-pub use audio::{GEQ10_LABELS, GEQ20_LABELS, GEQ30_LABELS, PREMIERE_AUDIO_EFFECTS};
-
-pub const EFFECT_TOP_FOLDERS: &[&str] = &["Presets", "Audio Effects", "Audio Transitions"];
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EffectKind {
     Video,
     Audio,
-    AudioTransition,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -64,8 +57,6 @@ pub struct EffectDef {
     pub id: &'static str,
     pub name: &'static str,
     pub kind: EffectKind,
-    /// Audio Effects-panel folder path; intrinsic and graphic parameters have no folder.
-    pub category: &'static [&'static str],
     pub params: Vec<ParamDef>,
     /// Intrinsic (fixed) effects appear on every clip and cannot be deleted.
     pub intrinsic: bool,
@@ -86,7 +77,6 @@ impl EffectDef {
             effect: self.id.to_string(),
             enabled: true,
             params: self.params.iter().map(|p| (p.id.to_string(), Param::new(p.default.clone()))).collect(),
-            post_fader: false,
             layer: None,
         }
     }
@@ -99,9 +89,6 @@ pub struct EffectInstance {
     pub effect: String,
     pub enabled: bool,
     pub params: BTreeMap<String, Param>,
-    /// Track/Mix inserts only: process after the fader instead of before it.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub post_fader: bool,
     /// Graphic layers only: stable uid, per-character styles and responsive pin
     /// ([`crate::graphic_design::LayerExtra`]). Schema v12.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -167,16 +154,6 @@ pub const BLEND_MODES: &[&str] = &[
     "Luminosity",
 ];
 
-pub(crate) fn f(id: &'static str, label: &'static str, def: f64, min: f64, max: f64, unit: &'static str) -> ParamDef {
-    ParamDef {
-        id,
-        label,
-        kind: ParamKind::Float { min, max, soft_min: min, soft_max: max, unit, decimals: 1 },
-        default: ParamValue::Float(def),
-        animatable: true,
-        group: None,
-    }
-}
 pub(crate) fn fs(
     id: &'static str,
     label: &'static str,
@@ -207,25 +184,6 @@ pub(crate) fn ch(id: &'static str, label: &'static str, opts: &'static [&'static
 pub(crate) fn ang(id: &'static str, label: &'static str, def: f64) -> ParamDef {
     ParamDef { id, label, kind: ParamKind::Angle, default: ParamValue::Float(def), animatable: true, group: None }
 }
-fn grp(mut p: ParamDef, g: &'static str) -> ParamDef {
-    p.group = Some(g);
-    p
-}
-
-fn audio(id: &'static str, name: &'static str, cat: &'static [&'static str], params: Vec<ParamDef>) -> EffectDef {
-    EffectDef { id, name, kind: EffectKind::Audio, category: cat, params, intrinsic: false, accelerated: false, float32: true, yuv: false }
-}
-
-const A_AMP: &[&str] = &["Audio Effects", "Amplitude and Compression"];
-const A_DELAY: &[&str] = &["Audio Effects", "Delay and Echo"];
-const A_FILTER: &[&str] = &["Audio Effects", "Filter and EQ"];
-const A_NOISE: &[&str] = &["Audio Effects", "Noise Reduction/Restoration"];
-const A_REVERB: &[&str] = &["Audio Effects", "Reverb"];
-const A_SPECIAL: &[&str] = &["Audio Effects", "Special"];
-const A_STEREO: &[&str] = &["Audio Effects", "Stereo Imagery"];
-const A_TIME: &[&str] = &["Audio Effects", "Time and Pitch"];
-const A_TRANS: &[&str] = &["Audio Transitions", "Crossfade"];
-
 fn build_effects() -> Vec<EffectDef> {
     let mut v = vec![
         // ---- intrinsic ----
@@ -233,7 +191,6 @@ fn build_effects() -> Vec<EffectDef> {
             id: "motion",
             name: "Motion",
             kind: EffectKind::Video,
-            category: &[],
             params: vec![
                 pt("position", "Position", f64::NAN, f64::NAN),
                 fs("scale", "Scale", 100.0, (0.0, 10000.0), (0.0, 100.0), "", 1),
@@ -251,7 +208,6 @@ fn build_effects() -> Vec<EffectDef> {
             id: "opacity",
             name: "Opacity",
             kind: EffectKind::Video,
-            category: &[],
             params: vec![fs("opacity", "Opacity", 100.0, (0.0, 100.0), (0.0, 100.0), "%", 1), ch("blend", "Blend Mode", BLEND_MODES, 0)],
             intrinsic: true,
             accelerated: true,
@@ -262,76 +218,13 @@ fn build_effects() -> Vec<EffectDef> {
             id: "volume",
             name: "Volume",
             kind: EffectKind::Audio,
-            category: &[],
             params: vec![b("bypass", "Bypass", false), fs("level", "Level", 0.0, (-287.5, 15.0), (-60.0, 15.0), "dB", 1)],
             intrinsic: true,
             accelerated: false,
             float32: true,
             yuv: false,
         },
-        EffectDef {
-            id: "channel_volume",
-            name: "Channel Volume",
-            kind: EffectKind::Audio,
-            category: &[],
-            params: vec![
-                b("bypass", "Bypass", false),
-                fs("left", "Left", 0.0, (-287.5, 6.0), (-60.0, 6.0), "dB", 1),
-                fs("right", "Right", 0.0, (-287.5, 6.0), (-60.0, 6.0), "dB", 1),
-            ],
-            intrinsic: true,
-            accelerated: false,
-            float32: true,
-            yuv: false,
-        },
-        EffectDef {
-            id: "panner",
-            name: "Panner",
-            kind: EffectKind::Audio,
-            category: &[],
-            params: vec![fs("balance", "Balance", 0.0, (-100.0, 100.0), (-100.0, 100.0), "", 1)],
-            intrinsic: true,
-            accelerated: false,
-            float32: true,
-            yuv: false,
-        },
-        // ---- audio effects ----
-        // (defined in effect/audio.rs; appended below)
-        EffectDef {
-            id: "constant_power",
-            name: "Constant Power",
-            kind: EffectKind::AudioTransition,
-            category: A_TRANS,
-            params: vec![],
-            intrinsic: false,
-            accelerated: false,
-            float32: true,
-            yuv: false,
-        },
-        EffectDef {
-            id: "constant_gain",
-            name: "Constant Gain",
-            kind: EffectKind::AudioTransition,
-            category: A_TRANS,
-            params: vec![],
-            intrinsic: false,
-            accelerated: false,
-            float32: true,
-            yuv: false,
-        },
-        EffectDef {
-            id: "exponential_fade",
-            name: "Exponential Fade",
-            kind: EffectKind::AudioTransition,
-            category: A_TRANS,
-            params: vec![],
-            intrinsic: false,
-            accelerated: false,
-            float32: true,
-            yuv: false,
-        },
     ];
-    v.extend(audio::defs());
     v.extend(crate::graphic::layer_defs());
     v
 }
@@ -357,7 +250,7 @@ pub fn intrinsic_video() -> Vec<EffectInstance> {
 }
 
 pub fn intrinsic_audio() -> Vec<EffectInstance> {
-    ["volume", "channel_volume", "panner"].iter().filter_map(|id| find_effect(id)).map(EffectDef::instance).collect()
+    ["volume"].iter().filter_map(|id| find_effect(id)).map(EffectDef::instance).collect()
 }
 
 #[cfg(test)]
@@ -375,13 +268,85 @@ mod tests {
         assert!(effect_defs().iter().filter(|d| d.kind == EffectKind::Video).all(|d| d.intrinsic || crate::graphic::is_layer(&d.instance())));
         assert!(find_effect_by_name("Gaussian Blur").is_none());
         assert_eq!(intrinsic_video().len(), 2);
+        assert_eq!(intrinsic_audio().len(), 1);
+        assert!(effect_defs().iter().filter(|d| d.kind == EffectKind::Audio).all(|d| d.id == "volume" && d.intrinsic));
     }
 
     #[test]
     fn persisted_removed_effects_are_rejected_not_silently_discarded() {
         let instance = find_effect("opacity").unwrap().instance();
         let original = serde_json::to_value(&instance).unwrap();
-        for id in ["gaussian_blur", "crop", "ultra_key", "warp_stabilizer", "cross_dissolve", "wipe", "time_remap", "remix", "unknown"] {
+        for id in [
+            "gaussian_blur",
+            "crop",
+            "ultra_key",
+            "warp_stabilizer",
+            "cross_dissolve",
+            "wipe",
+            "time_remap",
+            "remix",
+            "unknown",
+            "amplify",
+            "channel_mixer_a",
+            "channel_volume_a",
+            "deesser",
+            "dynamics_rack",
+            "dynamics",
+            "parametric_eq",
+            "hard_limiter",
+            "multiband_compressor",
+            "single_band_compressor",
+            "tube_compressor",
+            "analog_delay",
+            "delay",
+            "multitap_delay",
+            "bandpass",
+            "bass",
+            "fft_filter",
+            "graphic_eq",
+            "graphic_eq_20",
+            "graphic_eq_30",
+            "highpass",
+            "lowpass",
+            "notch",
+            "scientific_filter",
+            "simple_notch",
+            "simple_eq",
+            "treble",
+            "chorus_flanger",
+            "flanger",
+            "phaser",
+            "declicker",
+            "dehummer",
+            "denoise",
+            "dereverb",
+            "speech_enhance",
+            "convolution_reverb",
+            "studio_reverb",
+            "surround_reverb",
+            "binauralizer",
+            "distortion",
+            "fill_left",
+            "fill_right",
+            "guitar_suite",
+            "invert_a",
+            "loudness_radar",
+            "mastering",
+            "panner_ambisonics",
+            "swap_channels",
+            "vocal_enhancer",
+            "stereo_expander",
+            "stereo_width",
+            "pitch_shifter",
+            "balance_a",
+            "mute",
+            "volume_a",
+            "channel_volume",
+            "panner",
+            "constant_power",
+            "constant_gain",
+            "exponential_fade",
+        ] {
             let mut removed = original.clone();
             removed["effect"] = serde_json::json!(id);
             let error = serde_json::from_value::<EffectInstance>(removed).unwrap_err();
@@ -395,25 +360,15 @@ mod tests {
             assert_eq!(decoded.params.len(), instance.params.len());
         }
     }
+
     #[test]
-    fn loaded_video_tracks_cannot_contain_any_transition() {
-        let mut p = crate::Project::new("unsupported transition");
-        let seq = p.new_sequence("s", crate::SequenceSettings::default(), 1, 1, None);
-        let transition = crate::Transition {
-            id: crate::TransitionId(1),
-            effect: find_effect("constant_gain").unwrap().instance(),
-            start: waltcut_time::Tick::ZERO,
-            duration: waltcut_time::Tick(1),
-            from: None,
-            to: None,
-            align: Default::default(),
-            reverse: false,
-        };
-        let seq = p.sequence_mut(seq).unwrap();
-        seq.video_tracks[0].transitions.push(transition.clone());
-        assert!(seq.check_bounds().unwrap_err().contains("video transitions are not supported"));
-        seq.video_tracks[0].transitions.clear();
-        seq.audio_tracks[0].transitions.push(transition);
-        assert!(seq.check_bounds().is_ok());
+    fn removed_track_transition_data_and_insert_flags_are_rejected() {
+        let track = crate::Track::new(crate::TrackId(1), crate::TrackKind::Audio, "A1".into());
+        let mut json = serde_json::to_value(&track).unwrap();
+        json["transitions"] = serde_json::json!([]);
+        assert!(serde_json::from_value::<crate::Track>(json).is_err());
+        let mut json = serde_json::to_value(find_effect("volume").unwrap().instance()).unwrap();
+        json["post_fader"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<EffectInstance>(json).is_err());
     }
 }

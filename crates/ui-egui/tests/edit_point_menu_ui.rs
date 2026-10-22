@@ -81,12 +81,7 @@ impl Driver {
     fn cut_on_v1(&mut self) -> (ClipId, ClipId) {
         let seq = self.seq();
         let tr = &seq.video_tracks[0];
-        let bare = |a: ClipId, b: ClipId| !tr.transitions.iter().any(|t| t.from == Some(a) || t.to == Some(b));
-        tr.items
-            .windows(2)
-            .find(|w| w[0].end() == w[1].start && w[0].item != w[1].item && bare(w[0].id, w[1].id))
-            .map(|w| (w[0].id, w[1].id))
-            .expect("two touching clips on V1")
+        tr.items.windows(2).find(|w| w[0].end() == w[1].start && w[0].item != w[1].item).map(|w| (w[0].id, w[1].id)).expect("two touching clips on V1")
     }
 }
 
@@ -95,7 +90,7 @@ fn right_clicking_a_cut_opens_the_edit_point_menu() {
     let mut d = Driver::new();
     let (a, b) = d.cut_on_v1();
     d.right_click(b, 0.0);
-    for id in ["rippleIn", "rippleOut", "roll", "trimIn", "trimOut", "applyDefaultTransitions", "joinThroughEdits"] {
+    for id in ["rippleIn", "rippleOut", "roll", "trimIn", "trimOut", "joinThroughEdits"] {
         assert!(d.has(&format!("timeline.editPointMenu.{id}")), "{id}");
     }
     assert!(!d.has("timeline.clipMenu.edit.cut"), "not the clip menu");
@@ -109,11 +104,9 @@ fn right_clicking_a_cut_opens_the_edit_point_menu() {
     assert_eq!(ep.len(), 1);
     assert_eq!((ep[0].clip, ep[0].out, serde_json::to_value(ep[0].kind).unwrap()), (b, false, json!("trim")));
 
-    // Apply Default Transitions leaves a picture cut alone: only audio has transitions
+    // No audio or video transition action remains on the cut.
     d.right_click(b, 0.0);
-    let before = d.seq().video_tracks[0].transitions.len();
-    d.click("timeline.editPointMenu.applyDefaultTransitions");
-    assert_eq!(d.seq().video_tracks[0].transitions.len(), before, "no picture transition was added");
+    assert!(!d.has("timeline.editPointMenu.applyDefaultTransitions"));
 }
 
 #[test]

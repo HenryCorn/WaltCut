@@ -94,7 +94,7 @@ fn placing_media_with_two_streams_expands_tracks_and_keeps_stream_indices() {
 }
 
 #[test]
-fn clip_peaks_measure_the_stream_the_clip_plays() {
+fn a_missing_audio_stream_is_silent_in_the_program_mix() {
     let mut s = Session::default();
     let mut p = (*s.project).clone();
     let rate = FrameRate::FPS_24;
@@ -129,11 +129,18 @@ fn clip_peaks_measure_the_stream_the_clip_plays() {
     let q = s.project.sequence(seq).unwrap();
     let (a, b) = (q.audio_tracks[0].items[0].id, q.audio_tracks[1].items[0].id);
     assert!(ids.contains(&a) && ids.contains(&b));
-    let peaks = crate::mixer::clip_peaks(&s, &[a, b]);
-    let db = |c: waltcut_project::ClipId| peaks.iter().find(|(id, _)| *id == c).map(|(_, d)| *d).unwrap();
-    // The generator only has stream 0, so the clip playing stream 1 is silent, not a copy of stream 0.
-    assert!(db(a) > -30.0, "{peaks:?}");
-    assert!(db(b) < -100.0, "{peaks:?}");
+    let peak = |s: &Session| {
+        let q = s.project.sequence(seq).unwrap();
+        let provider = s.media.provider(s.project.clone(), s.services.clone());
+        waltcut_render::audio::mix_sequence(&s.project, q, 0, 480, &provider).peaks().into_iter().fold(0.0f32, f32::max)
+    };
+    assert!(peak(&s) > 0.01, "stream zero plays the generator's tone");
+    s.edit_sequence("Mute first stream", |q, _, _| {
+        q.audio_tracks[0].muted = true;
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(peak(&s), 0.0, "the generator has no stream one; it must not duplicate stream zero");
 }
 
 #[test]
@@ -145,7 +152,6 @@ fn missing_audio_tracks_are_cloned_from_the_destination() {
     assert!(have >= 1);
     if let Some(t) = p.sequence_mut(seq).and_then(|q| q.audio_tracks.get_mut(0)) {
         t.channels = AudioChannels::Mono;
-        t.volume_db = -3.0;
         t.locked = true;
     }
     let ids = ensure_audio_tracks(&mut p, seq, 0, have + 3, "test").unwrap();
@@ -154,7 +160,6 @@ fn missing_audio_tracks_are_cloned_from_the_destination() {
     for t in &q.audio_tracks[have..] {
         assert_eq!(t.kind, TrackKind::Audio);
         assert_eq!(t.channels, AudioChannels::Mono);
-        assert_eq!(t.volume_db, -3.0);
         assert!(t.items.is_empty() && !t.locked);
     }
     let mut unique = ids.clone();
