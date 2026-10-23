@@ -158,12 +158,9 @@ fn remux_other_codecs() {
         ("colr_pasp.mov", "remux_colr_pasp.mov", Brand::Mov),
         ("editlist_cut.mp4", "remux_editlist.mp4", Brand::Mp4),
         ("alac.m4a", "remux_alac.m4a", Brand::Mp4),
-        ("flac.mp4", "remux_flac.mp4", Brand::Mp4),
         ("opus.mp4", "remux_opus.mp4", Brand::Mp4),
         ("av1.mp4", "remux_av1.mp4", Brand::Mp4),
         ("vp9.mp4", "remux_vp9.mp4", Brand::Mp4),
-        ("ac3.mp4", "remux_ac3.mp4", Brand::Mp4),
-        ("dnxhd.mov", "remux_dnxhd.mov", Brand::Mov),
     ] {
         let Some(p) = fixture(src) else { continue };
         let (f, out) = remux(&p, name, brand, Finish::Faststart, None).unwrap();

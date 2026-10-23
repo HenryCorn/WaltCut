@@ -29,7 +29,7 @@ Design principles:
  L2  edit · codecs
  L1  frame · media · project · audio-dsp · text
  L0  foundation: time · geom · color · bitstream · testkit (dev-dependency only)
-     codecs/containers: isobmff · matroska · mxf · mpegts · ogg · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · dnx · apv · dng · aac · ac3 · mpa · opus
+     codecs/containers: isobmff · matroska · mpegts · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · aac · mpa · opus
 ```
 
 Crates are named `filmcraft-<dir>` (`crates/time` is `waltcut-time`). The apps are `filmcraft`
@@ -43,19 +43,13 @@ and `filmcraft-cli`.
 | `bitstream` | L0 | bit reader/writer, Exp-Golomb, emulation prevention |
 | `isobmff` | L0 | MP4/MOV demux and mux |
 | `matroska` | L0 | MKV/WebM demux |
-| `mxf` | L0 | MXF demux and mux (SMPTE ST 377-1): OP1a / OP-Atom, index tables, AVC / VC-3 / ProRes / MPEG-2 identification, PCM / AES3 sound, timecode; writer for OP1a / OP-Atom with VC-3, ProRes, AVC and PCM ([README](../crates/mxf/README.md)) |
 | `mpegts` | L0 | MPEG-2 Systems demux (H.222.0): transport streams (188 / 192-byte BDAV / 204), program streams (MPEG-2 / MPEG-1, VOB, MOD), PSI, PES, PTS / PCR, access-unit index built on open ([README](../crates/mpegts/README.md)) |
-| `ogg` | L0 | Ogg demux (RFC 3533), Ogg Opus timing (RFC 7845 granules, pre-skip, end trimming), Vorbis headers |
 | `h264`, `h264enc` | L0 | H.264 decoder; H.264 encoder |
 | `hevc` | L0 | H.265 Main/Main 10 decoder |
-| `prores` | L0 | ProRes decoder and encoder |
-| `dnx` | L0 | DNxHD / DNxHR (SMPTE ST 2019-1 VC-3) decoder and DNxHR encoder |
-| `apv` | L0 | Advanced Professional Video (IETF RFC 9924) decoder and encoder ([README](../crates/apv/README.md)) |
-| `dng` | L0 | DNG / CinemaDNG camera RAW decoder: TIFF container, uncompressed and lossless JPEG raw data, DNG processing to linear Rec. 709 ([README](../crates/dng/README.md)) |
+| `prores` | L0 | ProRes decoder and encoder, including 4444 with alpha |
 | `av1` | L0 | AV1 decoder (Main profile; bit-exact with libdav1d; see its README for the stage table) |
 | `mpeg2v` | L0 | MPEG-2 video (Main / 4:2:2 profile; frame and field pictures, dual prime) and MPEG-1 video decoder ([README](../crates/mpeg2v/README.md)) |
 | `aac` | L0 | AAC-LC decoder and encoder |
-| `ac3` | L0 | AC-3 (ATSC A/52) decoder ([README](../crates/ac3/README.md)) |
 | `mpa` | L0 | MPEG-1/2 Audio Layer I and II (MP1 / MP2) decoder ([README](../crates/mpa/README.md)) |
 | `testkit` | L0 | test-only helpers, used only as a dev-dependency: ffmpeg/ffprobe discovery, fixture dirs, golden images ([testing.md](testing.md)) |
 | `frame` | L1 | `VideoFrame` (planar YUV / RGBA8 / linear RGBA f32, colour metadata), `AudioBuffer` |
@@ -64,7 +58,7 @@ and `filmcraft-cli`.
 | `audio-dsp` | L1 | dependency-free output-rate resampling and pitch-preserving shuttle helpers used by live playback |
 | `text` | L1 | text engine: font database (bundled OFL fonts + system fonts), shaping (harfrust), bidi, line breaking, paragraph layout, glyph/path rasteriser, strokes ([crates/text/README.md](../crates/text/README.md)) |
 | `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…) |
-| `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
+| `codecs` | L2 | container + codec hub: MP4/MOV, MKV/WebM, AVI and MPEG TS / PS sources, GOP-aware seeking, decoder registry, audio decoding |
 | `render` | L3 | sequence evaluation, CPU compositor, retained Motion/Opacity/blend, graphic layers/keyframes and minimal mono/stereo audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
 | `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU agreement; empty library, dev-dependencies only |
@@ -214,7 +208,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   thumbnails, playback and export. The engine's `MediaPool` creates one per project item, lazily,
   through registered openers (`codecs::openers()`: MP4/MOV, MKV/WebM, audio files).
 - **Pixel aspect ratio.** Demuxers report it in `VideoStreamInfo::par` (MP4/MOV `pasp`, Matroska
-  display size, MXF aspect ratio, MPEG sequence header / VUI); Interpret Footage's
+  display size, MPEG sequence header / VUI); Interpret Footage's
   `Interpretation::par` overrides it (`clip.interpretFootage {pixelAspect}`), and
   `SequenceSettings::par` is the sequence's. Both go through `project::checked_par` (a zero term
   or more than 8:1 either way = square). `render::motion_matrix` works in square display units,
@@ -491,12 +485,9 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 | Format | Encoder | Container |
 |---|---|---|
 | `h264` | `waltcut-h264enc` (profile, level, CBR / VBR 1-pass / VBR 2-pass, keyframe distance) + `waltcut-aac` | MP4 or QuickTime (`isobmff`, the Multiplexer setting) |
-| `prores` | `waltcut-prores` (Proxy / LT / 422 / HQ) | MOV |
-| `dnxhr` | `waltcut-dnx` (LB / SQ / HQ / HQX) | MOV (`AVdh`) |
+| `prores` | `waltcut-prores` (Proxy / LT / 422 / HQ / 4444 with alpha) | MOV |
 | `mjpeg` | built in | MOV |
 | `aac` | `waltcut-aac` (AAC-LC, the audio settings' bitrate) | audio only: MPEG-4 audio `.m4a` (`isobmff`, priming in an edit list), or raw ADTS when the path ends in `.aac` |
-| `mxf-op1a` | DNxHR (default), ProRes or H.264 (Annex B, long GOP), `mxfVideoCodec`; PCM 16/24/32-bit integer | MXF OP1a (`waltcut-mxf` writer: frame-wrapped, index with temporal offsets, start timecode) |
-| `mxf-opatom` | as `mxf-op1a` | Avid-style MXF OP-Atom: clip-wrapped picture at `path`, one mono PCM file per channel (`<stem>_A1.mxf` …, `Report::extra_files`) |
 | `png`, `tiff`, `bmp`, `jpg` | `image` | numbered stills `<name>000.<ext>`, `<name>001.<ext>` … |
 | `tga`, `dpx`, `exr` | built in (`raster.rs`: uncompressed Targa 24/32-bit; DPX 10-bit RGB, SMPTE ST 268; OpenEXR half-float linear RGB(A), uncompressed scan lines) | numbered stills, as above |
 | `gif`, `wav`, `aiff` | built in / `image` | GIF / stereo RIFF WAVE (`WAVE_FORMAT_IEEE_FLOAT` + `fact` for float) / stereo AIFF (16-, 24- or 32-bit PCM; 32-bit float as AIFF-C `fl32`) |
@@ -504,12 +495,11 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 - **Reproducible.** The same project and settings give the same file on every machine. Frames render
   in batches of one per core, but the muxer gets them in fixed groups of 16 output frames
   (`INTERLEAVE` in `crates/export/src/job.rs`), each followed by its audio, and H.264 uses one slice
-  per four macroblock rows instead of one per core. MXF files are the exception: their UMIDs and
-  modification date come from the clock, as SMPTE ST 330 / ST 377 expect.
+  per four macroblock rows instead of one per core.
 - **Settings.** `ExportSettings` (serde, camelCase, every field optional) holds Video (frame size or
   Match Source, frame rate, Scale to Fit / Fill / Stretch, pixel aspect, field order — progressive
   only, profile / level, bitrate encoding, target / maximum / adaptive bitrate, keyframe distance,
-  maximum render quality), Audio (codec, sample rate, AAC bitrate, PCM / FLAC sample size: `bits` 16, 24 or 32
+  maximum render quality), Audio (codec, sample rate, AAC bitrate, PCM sample size: `bits` 16, 24 or 32
   and `float` for 32-bit float PCM in WAV, AIFF and QuickTime — `supports_sample_format` says
   which a codec and container store, and Export mode greys out the rest),
   Multiplexer (container choice), Effects (image / name / timecode overlays, video limiter),
@@ -517,7 +507,7 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
   `©cmt`). `settings.summary()` / `estimate_bytes()` feed Export mode's Summary.
 - **Presets.** `export::presets::builtin_presets()` are our own definitions (Match Source adaptive
   H.264 at 0.2 / 0.1 / 0.05 bits per pixel, 1080p / 2160p delivery, vertical 1080×1920, ProRes,
-  DNxHR, MXF OP1a (DNxHR HQ / ProRes 422 HQ / H.264) and OP-Atom (DNxHR, Avid), image sequences, GIF, WAV / AIFF). User presets and favourites persist in
+  image sequences, GIF, WAV / AIFF). User presets and favourites persist in
   `<data dir>/export-presets.json` (`export.presets.*`).
 - **Queue.** `export.queue.add` snapshots the project and the resolved settings (several sequences
   or ranges add several items); `export.queue.start` encodes ready items one after another as

@@ -6,7 +6,7 @@
 //! Every number comes from the file: sizes, strip offsets and counts are checked before use, the
 //! picture is capped at [`MAX_PIXELS`], and PackBits output stops at the bytes the image needs.
 
-use waltcut_dng::tiff::{Tiff, tags};
+use crate::tiff::{Tiff, tags};
 
 use super::Raster;
 use crate::{MediaError, Result};
@@ -25,7 +25,7 @@ const REFERENCE_BLACK_WHITE: u16 = 532;
 /// module decodes instead of the image crate).
 pub fn sniff(bytes: &[u8]) -> bool {
     let Ok((t, first)) = Tiff::new(bytes) else { return false };
-    let Ok((ifd, _)) = t.read_ifd(first, 0) else { return false };
+    let Ok(ifd) = t.read_ifd(first) else { return false };
     let num = |tag| ifd.get(tag).and_then(|e| t.uint(e).ok());
     num(tags::PHOTOMETRIC) == Some(PHOTOMETRIC_YCBCR) && matches!(num(tags::COMPRESSION).unwrap_or(COMPRESSION_NONE), COMPRESSION_NONE | COMPRESSION_PACKBITS)
 }
@@ -35,7 +35,7 @@ pub fn decode(name: &str, bytes: &[u8]) -> Result<Raster> {
     let bad = |what: &str| MediaError::Decode(format!("{name}: YCbCr TIFF: {what}"));
     let unsupported = |what: &str| MediaError::Unsupported(format!("{name}: YCbCr TIFF with {what}"));
     let (t, first) = Tiff::new(bytes).map_err(|_| bad("not a TIFF"))?;
-    let (ifd, _) = t.read_ifd(first, 0).map_err(|_| bad("unreadable image directory"))?;
+    let ifd = t.read_ifd(first).map_err(|_| bad("unreadable image directory"))?;
     let uints = |tag: u16| -> Result<Option<Vec<u64>>> { ifd.get(tag).map(|e| t.uints(e).map_err(|_| bad("unreadable field"))).transpose() };
     let one = |tag: u16| -> Result<Option<u64>> { Ok(uints(tag)?.and_then(|v| v.first().copied())) };
 

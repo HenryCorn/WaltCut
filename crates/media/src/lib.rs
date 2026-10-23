@@ -20,6 +20,7 @@ pub mod reader;
 pub mod sequence;
 pub mod still;
 pub mod tga;
+mod tiff;
 pub mod wav;
 
 use std::path::Path;
@@ -157,6 +158,10 @@ impl FrameRequest {
 
 pub trait MediaSource: Send + Sync {
     fn info(&self) -> &MediaInfo;
+    /// User-visible import notices, such as a retained picture track whose audio codec is unsupported.
+    fn notices(&self) -> &[String] {
+        &[]
+    }
     /// The frame displayed at media time `req.time`.
     fn video_frame(&self, req: FrameRequest) -> Result<Arc<VideoFrame>>;
     /// `frames` audio frames starting at sample index `start` (at `sample_rate`, media time).
@@ -172,11 +177,26 @@ pub trait MediaSource: Send + Sync {
 pub type SharedSource = Arc<dyn MediaSource>;
 
 /// File extensions we recognise at import (the media browser filters on these).
-pub const STILL_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "tif", "tiff", "bmp", "tga", "dpx", "exr", "hdr", "dng"];
-pub const AUDIO_EXTENSIONS: &[&str] = &["wav", "wave", "bwf", "aif", "aiff", "mp3", "mp2", "m4a", "aac", "flac", "ogg", "opus"];
-pub const VIDEO_EXTENSIONS: &[&str] = &[
-    "mp4", "m4v", "mov", "mkv", "webm", "avi", "mxf", "mts", "m2ts", "m2t", "ts", "mpg", "mpeg", "vob", "mod", "tod", "m2v", "m1v", "mpv", "3gp", "y4m", "apv",
-];
+pub const STILL_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "tif", "tiff", "bmp", "tga", "dpx", "exr", "hdr"];
+pub const AUDIO_EXTENSIONS: &[&str] = &["wav", "wave", "bwf", "aif", "aiff", "mp3", "mp2", "m4a", "aac", "opus"];
+pub const VIDEO_EXTENSIONS: &[&str] =
+    &["mp4", "m4v", "mov", "mkv", "webm", "avi", "mts", "m2ts", "m2t", "ts", "mpg", "mpeg", "vob", "mod", "tod", "m2v", "m1v", "mpv", "3gp", "y4m"];
+
+/// Actionable errors for formats deliberately outside the codec/container allowlist.
+pub fn unsupported_format_extension(name: &str) -> Option<&'static str> {
+    let ext = Path::new(name).extension()?.to_str()?.to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "mxf" => "MXF is not supported; export or convert to MP4/MOV, Matroska/WebM, AVI, or MPEG-TS/PS.",
+        "ogg" | "oga" | "ogv" | "ogx" => "Ogg is not supported; convert audio to AAC, MP2, or PCM, or video to a supported container.",
+        "flac" => "FLAC is not supported; convert audio to AAC, MP2, or PCM.",
+        "dng" => "DNG still images are not supported; export the image as TIFF, PNG, or JPEG.",
+        "dnx" => "DNx video is not supported; convert it to H.264, HEVC, ProRes, VP9, or AV1.",
+        "apv" => "APV video is not supported; convert it to H.264, HEVC, ProRes, VP9, or AV1.",
+        "vp8" => "VP8 video is not supported; convert it to VP9, H.264, HEVC, ProRes, or AV1.",
+        "ac3" | "eac3" => "AC-3/E-AC-3 audio is not supported; convert it to AAC, MP2, or PCM.",
+        _ => return None,
+    })
+}
 
 pub fn is_importable(path: &Path) -> bool {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
@@ -189,6 +209,9 @@ pub type Opener = fn(name: &str, bytes: Arc<[u8]>) -> Option<Result<SharedSource
 /// Open media from bytes, trying `extra` openers first, then the built-in ones (WAV, animated
 /// images, stills).
 pub fn open_bytes(name: &str, bytes: Arc<[u8]>, extra: &[Opener]) -> Result<SharedSource> {
+    if let Some(message) = unsupported_format_extension(name) {
+        return Err(MediaError::Unsupported(format!("{name}: {message}")));
+    }
     for o in extra {
         if let Some(r) = o(name, bytes.clone()) {
             return r;
@@ -218,6 +241,44 @@ pub fn open_path(path: &Path, extra: &[Opener]) -> Result<SharedSource> {
     let bytes = std::fs::read(path).map_err(|e| MediaError::Io(format!("{}: {e}", path.display())))?;
     let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     open_bytes(&name, bytes.into(), extra)
+}
+
+#[cfg(test)]
+mod unsupported_format_tests {
+    use super::*;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    #[test]
+    fn removed_formats_reject_empty_and_truncated_inputs_actionably() {
+        for (ext, token) in [
+            ("mxf", "mxf"),
+            ("ogg", "ogg"),
+            ("oga", "ogg"),
+            ("ogv", "ogg"),
+            ("ogx", "ogg"),
+            ("dnx", "dnx"),
+            ("apv", "apv"),
+            ("vp8", "vp8"),
+            ("dng", "dng"),
+            ("ac3", "ac-3"),
+            ("eac3", "e-ac-3"),
+            ("flac", "flac"),
+        ] {
+            for bytes in [Vec::new(), vec![0], vec![0, 1, 2, 3]] {
+                let name = format!("hostile.{ext}");
+                let result = catch_unwind(AssertUnwindSafe(|| open_bytes(&name, bytes.into(), &[])));
+                let Ok(result) = result else {
+                    panic!("{name}: opening hostile input panicked");
+                };
+                let Err(MediaError::Unsupported(message)) = result else {
+                    panic!("{name}: expected an actionable unsupported-format error");
+                };
+                let lower = message.to_ascii_lowercase();
+                assert!(lower.contains(token), "{name}: {message}");
+                assert!(lower.contains("convert") || lower.contains("export"), "{name}: missing conversion guidance: {message}");
+            }
+        }
+    }
 }
 
 /// A source that renders nothing (used for offline media): the "Media Offline" slate.

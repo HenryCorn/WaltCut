@@ -79,7 +79,7 @@ SUBCOMMANDS
          [--scale f] [--quality 0-100] [--no-audio] [--queue] [--allow-offline]
                                 export the active sequence and wait for it to finish: with an
                                 export preset (`export --list-presets`; built-in or the user's), or
-                                a format (h264|hevc|prores|dnxhr|apv|mjpeg|mxf-op1a|mxf-opatom|png|tiff|bmp|gif|wav|aiff|aac, guessed
+                                a format (h264|hevc|prores|mjpeg|png|tiff|bmp|gif|wav|aiff|aac, guessed
                                 from the extension); --range entire|inOut|workArea, or a custom
                                 range in seconds; --settings is ExportSettings JSON merged over the
                                 preset; --scale renders at a fraction of the frame size (0.5 =
@@ -92,7 +92,7 @@ SUBCOMMANDS
   render --seconds S --out f.png [--scale 0.5] [--allow-offline]
                                 render one Program frame to PNG (offline media: as for export)
   probe <media> [--image-sequence]
-                                media info as JSON, with MXF / Ogg / BWF details; with
+                                media info as JSON, with MPEG transport/program stream and BWF details; with
                                 --image-sequence <media> is the first numbered still of a sequence
   bench-decode <media> [--frames N]
   mcp                           MCP server on stdio (headless, or --bridge to the live app)
@@ -206,7 +206,6 @@ fn format_for(path: &str) -> Option<&'static str> {
     Some(match ext.as_str() {
         "mp4" | "m4v" => "h264",
         "mov" => "prores",
-        "mxf" => "mxf-op1a",
         "png" => "png",
         "gif" => "gif",
         "wav" => "wav",
@@ -498,7 +497,7 @@ async fn cli() {
 }
 
 /// The files an export wrote, from its result: `path` of a direct export, or each queued item's
-/// `path` (the format may have changed the extension: `out.mp4` exported as APV is `out.mp4.mov`).
+/// `path` (the format may have changed the extension).
 /// `requested` when the result names none.
 fn written_paths(result: &Value, requested: &str) -> Vec<String> {
     let paths: Vec<String> = match result.get("path").and_then(Value::as_str) {
@@ -624,8 +623,8 @@ mod format_tests {
     #[test]
     fn export_message_names_the_written_files() {
         use serde_json::json;
-        let direct = json!({"job": 1, "path": "out-apv.mp4.mov", "result": {"path": "out-apv.mp4.mov"}});
-        assert_eq!(super::written_paths(&direct, "out-apv.mp4"), ["out-apv.mp4.mov"]);
+        let direct = json!({"job": 1, "path": "out-prores.mp4.mov", "result": {"path": "out-prores.mp4.mov"}});
+        assert_eq!(super::written_paths(&direct, "out-prores.mp4"), ["out-prores.mp4.mov"]);
         let queued = json!({"added": [1, 2], "items": [{"path": "a.mp4.mov"}, {"path": "b.wav"}]});
         assert_eq!(super::written_paths(&queued, "a.mp4"), ["a.mp4.mov", "b.wav"]);
         assert_eq!(super::written_paths(&json!({}), "x.mov"), ["x.mov"]);
@@ -684,7 +683,6 @@ mod format_tests {
 
     #[test]
     fn export_format_from_extension() {
-        assert_eq!(super::format_for("out/clip.MXF"), Some("mxf-op1a"));
         assert_eq!(super::format_for("a.mov"), Some("prores"));
         assert_eq!(super::format_for("noext"), None);
     }

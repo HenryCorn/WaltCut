@@ -50,6 +50,7 @@ pub struct Mp4Source {
     video: GopCache,
     /// The playable audio tracks in file order: `info.audio_streams[k]` describes `audios[k]`.
     audios: Vec<Mp4Audio>,
+    notices: Vec<String>,
 }
 
 pub fn sniff(b: &[u8]) -> bool {
@@ -57,8 +58,8 @@ pub fn sniff(b: &[u8]) -> bool {
 }
 
 /// Audio packet start positions in source sample frames at `rate`: the running total of the sample
-/// durations, except that packets which all decode to the same length (AAC, MPEG audio, AC-3,
-/// E-AC-3) run on from one another, resynchronising to the total only across gaps of more than half
+/// durations, except that packets which all decode to the same length (AAC, MPEG audio) run on
+/// from one another, resynchronising to the total only across gaps of more than half
 /// a packet.
 /// A remux from Matroska (OBS's) carries the millisecond rounding of its timestamps into the
 /// durations: 1008, 1008, 1056… for 1024-sample AAC frames at 48 kHz (see
@@ -81,8 +82,6 @@ fn audio_starts(file: &Mp4File, bytes: &crate::Src, ti: usize, rate: u32) -> Vec
     let frame = match t.entries.first().map(|e| &e.codec) {
         Some(CodecConfig::Aac(a)) => fixed_packet_samples(FixedFrames::Aac(&a.asc), &[], rate),
         Some(CodecConfig::Mp3) => fixed_packet_samples(FixedFrames::MpegAudio, &first(), rate),
-        Some(CodecConfig::Ac3 { .. }) => fixed_packet_samples(FixedFrames::Ac3, &first(), rate),
-        Some(CodecConfig::Eac3 { .. }) => fixed_packet_samples(FixedFrames::Eac3, &first(), rate),
         _ => None,
     };
     let Some(frame) = frame else { return stamps };
@@ -151,13 +150,6 @@ fn color_from(entry: &waltcut_isobmff::SampleEntry, w: u32, h: u32) -> ColorInfo
             matrix: v.matrix_coefficients,
             full_range: Some(v.full_range),
         }),
-        CodecConfig::Apv(a) if a.color_description_present => Some(ColorCodes {
-            primaries: a.color_primaries,
-            transfer: a.transfer_characteristics,
-            matrix: a.matrix_coefficients,
-            full_range: Some(a.full_range),
-        }),
-        CodecConfig::Apv(_) => None,
         codec => crate::stream_color::from_codec_config(codec),
     };
     let sources: Vec<ColorCodes> = [colr, stream].into_iter().flatten().collect();
@@ -219,10 +211,56 @@ impl Mp4Source {
         // files can lack them: indexing `entries[0]` or dividing by the timescale used to panic).
         let playable = |t: &&waltcut_isobmff::Track, kind| t.kind == kind && !t.samples.is_empty() && !t.entries.is_empty() && t.timescale > 0;
         let vtrack = file.tracks.iter().position(|t| playable(&t, TrackKind::Video));
+        if let Some(track) = vtrack.and_then(|i| file.tracks.get(i))
+            && let Some(entry) = track.entries.first()
+        {
+            match &entry.codec {
+                CodecConfig::Dnx { .. } => {
+                    return Err(CodecError::Unsupported("DNx video is not supported; convert the file to H.264, HEVC, ProRes, VP9, or AV1.".into()));
+                }
+                CodecConfig::Apv(_) => {
+                    return Err(CodecError::Unsupported("APV video is not supported; convert the file to H.264, HEVC, ProRes, VP9, or AV1.".into()));
+                }
+                CodecConfig::Unknown { fourcc, .. } if fourcc.0 == *b"vp08" => {
+                    return Err(CodecError::Unsupported("VP8 video is not supported; convert the file to VP9, H.264, HEVC, ProRes, or AV1.".into()));
+                }
+                _ => {}
+            }
+        }
+        let unsupported_flac = file
+            .tracks
+            .iter()
+            .any(|t| t.kind == TrackKind::Audio && !t.samples.is_empty() && t.entries.first().is_some_and(|e| matches!(e.codec, CodecConfig::Flac(_))));
+        if unsupported_flac {
+            return Err(CodecError::Unsupported("FLAC audio is not supported; convert it to AAC, MP2, or PCM before importing.".into()));
+        }
+        let unsupported_ac3 = file.tracks.iter().any(|t| {
+            t.kind == TrackKind::Audio
+                && !t.samples.is_empty()
+                && t.entries.first().is_some_and(|e| matches!(e.codec, CodecConfig::Ac3 { .. } | CodecConfig::Eac3 { .. }))
+        });
+        let mut notices = Vec::new();
+        if unsupported_ac3 {
+            notices.push(
+                "AC-3/E-AC-3 audio is not supported; the video was imported without sound. Convert audio to AAC, MP2, or PCM and reimport to retain sound."
+                    .to_string(),
+            );
+        }
         // every audio track is a stream (the track count comes from the file: capped)
-        let atracks: Vec<usize> =
-            file.tracks.iter().enumerate().filter(|(_, t)| playable(t, TrackKind::Audio)).map(|(i, _)| i).take(waltcut_media::MAX_AUDIO_STREAMS).collect();
+        let atracks: Vec<usize> = file
+            .tracks
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| {
+                playable(t, TrackKind::Audio) && t.entries.first().is_some_and(|e| !matches!(e.codec, CodecConfig::Ac3 { .. } | CodecConfig::Eac3 { .. }))
+            })
+            .map(|(i, _)| i)
+            .take(waltcut_media::MAX_AUDIO_STREAMS)
+            .collect();
         if vtrack.is_none() && atracks.is_empty() {
+            if unsupported_ac3 {
+                return Err(CodecError::Unsupported("AC-3/E-AC-3 audio is not supported. Convert audio to AAC, MP2, or PCM and reimport.".into()));
+            }
             return Err(CodecError::Unsupported("no playable tracks".into()));
         }
         let mut color = ColorInfo::REC709;
@@ -273,20 +311,6 @@ impl Mp4Source {
             if rotation % 2 == 1 {
                 (info.width, info.height) = (info.height, info.width);
                 info.par = (info.par.1, info.par.0);
-            }
-            if matches!(entry.codec, CodecConfig::Dnx { .. }) {
-                // the sample entry doesn't say which VC-3 compression ID it is: read the first frame header
-                let s0 = &t.samples[0];
-                if let Some(h) = waltcut_media::reader::read_range(&*bytes.0, s0.offset, s0.size as usize).ok().and_then(|d| waltcut_dnx::probe(&d).ok()) {
-                    info.codec = waltcut_dnx::cid_name(h.cid);
-                    let sub = match h.chroma {
-                        waltcut_dnx::ChromaFormat::Yuv420 => "YUV 4:2:0",
-                        waltcut_dnx::ChromaFormat::Yuv422 => "YUV 4:2:2",
-                        waltcut_dnx::ChromaFormat::Yuv444 => "4:4:4",
-                    };
-                    info.pixel_format = format!("{sub} {}-bit", h.bit_depth);
-                    info.has_alpha = h.alpha;
-                }
             }
             if matches!(entry.codec, CodecConfig::ProRes { .. }) {
                 // a 4444 fourcc doesn't mean the frames carry alpha (alpha_channel_type does): read the first frame header
@@ -345,7 +369,7 @@ impl Mp4Source {
             .collect();
         snap_to_frame_grid(&mut file, vtrack);
         rebase_unedited_video(&mut file, vtrack, &mut audios);
-        Ok(Self { info, bytes, file, vtrack, video: GopCache::new(explicit_color).with_rotation(rotation).with_crop(aperture), audios })
+        Ok(Self { info, bytes, file, vtrack, video: GopCache::new(explicit_color).with_rotation(rotation).with_crop(aperture), audios, notices })
     }
 
     fn read(&self, track: usize, i: usize) -> crate::Result<Vec<u8>> {
@@ -443,6 +467,9 @@ impl VideoSamples for Mp4Video<'_> {
 impl MediaSource for Mp4Source {
     fn info(&self) -> &MediaInfo {
         &self.info
+    }
+    fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     fn video_frame(&self, req: FrameRequest) -> Result<Arc<VideoFrame>, MediaError> {
@@ -575,12 +602,7 @@ fn codec_label(c: &CodecConfig) -> String {
         ),
         CodecConfig::Hevc(_) => "HEVC".into(),
         CodecConfig::Vp9(c) => format!("VP9 (Profile {})", c.profile),
-        CodecConfig::Unknown { fourcc, .. } if fourcc.0 == *b"vp08" => "VP8".into(),
         CodecConfig::Av1(c) => format!("AV1 ({} Profile)", ["Main", "High", "Professional"].get(c.seq_profile as usize).unwrap_or(&"Main")),
-        CodecConfig::Apv(a) => match waltcut_apv::Profile::from_idc(a.profile_idc) {
-            Some(p) => p.name().into(),
-            None => "APV".into(),
-        },
         CodecConfig::ProRes { fourcc } => match &fourcc.0 {
             b"apco" => "Apple ProRes 422 Proxy".into(),
             b"apcs" => "Apple ProRes 422 LT".into(),
@@ -661,10 +683,6 @@ fn pixfmt_label(c: &CodecConfig) -> String {
                 _ => "4:2:0",
             };
             format!("YUV {sub} {}-bit", c.bit_depth.max(8))
-        }
-        CodecConfig::Apv(a) => {
-            let chroma = waltcut_apv::ChromaFormat::from_idc(a.chroma_format_idc).unwrap_or(waltcut_apv::ChromaFormat::Yuv422);
-            crate::apv::apv_pixfmt_label(chroma, a.bit_depth_minus8.saturating_add(8))
         }
         // 4444 until the first frame header says whether it codes alpha (`open_reader`)
         CodecConfig::ProRes { fourcc } if fourcc.0[2] == b'4' => "YUV 4:4:4 12-bit".into(),

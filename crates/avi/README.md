@@ -31,8 +31,9 @@ for (i, s) in file.streams.iter().enumerate() {
 | Key frames | from the index; a scan marks every chunk and says so (`keyframes_known`) |
 | Damage | sizes clamped to the file (a cut-off recording opens with what is there), `rec ` lists nested at most 3 deep, tables bounded by what the file could hold |
 
-`waltcut-codecs` maps the streams onto decoders (`AviSource`): Motion JPEG, H.264, HEVC and
-uncompressed RGB / YUV video; PCM, MP3, MP2 and AC-3 audio.
+`waltcut-codecs` maps supported streams onto decoders (`AviSource`): Motion JPEG, H.264, HEVC and
+uncompressed RGB / YUV video; PCM, MP3 and MP2 audio. An AVI with AC-3 audio and a retained video
+stream opens picture-only and reports how to convert the audio; an AC-3-only import is rejected.
 
 ## Tests
 

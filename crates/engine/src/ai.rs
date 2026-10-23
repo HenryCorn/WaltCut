@@ -269,8 +269,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
             Ok(n - skipped)
         })();
         let secs = t0.elapsed().as_secs_f64();
-        let report =
-            waltcut_export::Report { path: dir.to_string_lossy().to_string(), frames: 0, seconds: secs, bytes: 0, render_fps: 0.0, extra_files: Vec::new() };
+        let report = waltcut_export::Report { path: dir.to_string_lossy().to_string(), frames: 0, seconds: secs, bytes: 0, render_fps: 0.0 };
         let r = match r {
             Ok(done) => {
                 *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Restyled {done} of {n} frame(s)");

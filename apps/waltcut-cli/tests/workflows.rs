@@ -3,7 +3,7 @@
 //! JSON-RPC over stdio) and the CLI itself, on media that looks like what people shoot:
 //!
 //! - a phone clip: H.264 + AAC in MP4 with a variable frame rate (dropped frames);
-//! - a camera clip: long-GOP H.264 (one keyframe) in Matroska with two audio tracks (AAC, AC-3).
+//! - a camera clip: long-GOP H.264 (one keyframe) in Matroska with AAC and unsupported AC-3 audio.
 //!
 //! Each test imports, edits (extract, audio gain, title; ripple trims and colour matte),
 //! exports (H.264 MP4; save the project, reopen it in a new process and export ProRes)
@@ -48,7 +48,8 @@ fn phone_vfr_mp4(ffmpeg: &Path) -> Option<PathBuf> {
 }
 
 /// A camera-like clip: 6 s of 320×240 `testsrc2` at 25 fps as long-GOP H.264 (a single keyframe,
-/// B-frames) in Matroska, with two stereo audio tracks: 440 Hz in AAC and 1320 Hz in AC-3.
+/// B-frames) in Matroska, with stereo AAC and AC-3 tracks. AC-3 must be clearly reported and
+/// omitted while the supported AAC track remains available.
 fn camera_long_gop_mkv(ffmpeg: &Path) -> Option<PathBuf> {
     let out = waltcut_testkit::fixtures_dir("cli/workflows").join("camera_long_gop_2audio.mkv");
     waltcut_testkit::fixtures::generate(&out, |tmp| {
@@ -372,14 +373,15 @@ fn phone_vfr_clip_extract_gain_title_to_h264_mp4() {
     assert!((change + 6.0).abs() < 1.0, "second beep {change:.2} dB");
 }
 
-/// Camera footage: import a long-GOP H.264 Matroska file with two audio tracks through MCP, make
-/// a sequence (both tracks land on A1 and A2), ripple-trim 2.6 s off the head (decoding starts at
+/// Camera footage: import long-GOP H.264 Matroska with AAC and AC-3 through MCP; AC-3 is visibly
+/// unsupported and omitted, and the supported AAC lands on A1. Ripple-trim 2.6 s off the head
+/// (decoding starts at
 /// the only keyframe) and 15 frames off the tail, add a red colour matte and save the project;
 /// then a new `filmcraft-cli` process opens it and exports ProRes.
-/// The first exported frame is source frame 65, the matte follows the cut, and both audio
-/// tracks are in the mix at their own level and stop where the clip does.
+/// The first exported frame is source frame 65, the matte follows the cut, and AAC stops where the
+/// clip does.
 #[test]
-fn camera_long_gop_two_audio_tracks_trim_to_prores() {
+fn camera_long_gop_ac3_notice_and_aac_trim_to_prores() {
     let (ffmpeg, ffprobe) = waltcut_testkit::require_oracles!();
     let Some(src) = camera_long_gop_mkv(&ffmpeg) else {
         return waltcut_testkit::skip("camera workflow", "ffmpeg could not make the long-GOP Matroska fixture (libx264?)");
@@ -392,13 +394,19 @@ fn camera_long_gop_two_audio_tracks_trim_to_prores() {
         let mut m = Mcp::start(&data);
         let imported = m.tool("media_import", json!({"paths": [src]}));
         assert_eq!(imported["errors"], json!([]), "{imported}");
+        assert!(
+            imported["notices"][0]["messages"].as_array().is_some_and(|messages| {
+                messages.iter().any(|message| message.as_str().is_some_and(|text| text.contains("AC-3") && text.contains("without sound")))
+            }),
+            "AC-3 omission must be reported to the importing user: {imported}"
+        );
         let item = imported["items"][0].as_u64().unwrap();
         let made = m.run("file.newSequenceFromClip", json!({"items": [item]}));
         let clips: Vec<u64> = made["clips"].as_array().unwrap().iter().filter_map(Value::as_u64).collect();
-        assert_eq!(clips.len(), 3, "a video clip and one clip per audio track: {made}");
+        assert_eq!(clips.len(), 2, "a video clip and only the supported AAC track: {made}");
         let seq = m.tool("sequence_inspect", json!({}));
         assert_eq!(seq["settings"]["frame_rate"], json!({"num": 25, "den": 1}));
-        assert_eq!(seq["audio"].as_array().map(Vec::len), Some(2), "two audio tracks");
+        assert_eq!(seq["audio"].as_array().map(Vec::len), Some(1), "the unsupported AC-3 track must not be added");
         let video = clips_on(&seq, "video", 0)[0]["clip"].as_u64().unwrap();
 
         // 65 frames off the head and 15 off the tail, the linked audio following
@@ -406,10 +414,8 @@ fn camera_long_gop_two_audio_tracks_trim_to_prores() {
         m.run("timeline.trim", json!({"clip": video, "edge": "out", "mode": "ripple", "deltaFrames": -15}));
         let seq = m.tool("sequence_inspect", json!({}));
         let end = clips_on(&seq, "video", 0)[0]["endFrame"].as_u64().unwrap();
-        for t in 0..2 {
-            let a = &clips_on(&seq, "audio", t)[0];
-            assert_eq!((a["startFrame"].as_u64(), a["endFrame"].as_u64(), a["sourceIn"].as_i64()), (Some(0), Some(end), Some(660_441_600_000)), "A{}", t + 1);
-        }
+        let a = &clips_on(&seq, "audio", 0)[0];
+        assert_eq!((a["startFrame"].as_u64(), a["endFrame"].as_u64(), a["sourceIn"].as_i64()), (Some(0), Some(end), Some(660_441_600_000)), "AAC on A1");
 
         let matte = m.run("file.newColorMatte", json!({"color": "#ff0000", "seconds": 2.0}))["item"].as_u64().unwrap();
         m.run("timeline.place", json!({"item": matte, "track": "V1", "frame": end, "insert": false}));
@@ -444,16 +450,14 @@ fn camera_long_gop_two_audio_tracks_trim_to_prores() {
     }
     let red = &got[100];
     assert!(red.as_chunks::<3>().0.iter().all(|[r, g, b]| *r > 230 && *g < 25 && *b < 25), "the matte is red");
-    // sound: both tracks in the mix at their own level while the clip plays, silence on the matte
+    // sound: the AAC track in the mix at its own level while the clip plays; the unsupported AC-3
+    // track (1320 Hz) is not in it
     let got_pcm = pcm(&ffmpeg, &out, 0);
-    let (t1, t2) = (pcm(&ffmpeg, &src, 0), pcm(&ffmpeg, &src, 1));
+    let t1 = pcm(&ffmpeg, &src, 0);
     for at in [0.2, 1.5, 2.6] {
         let (low, high) = (tone(&got_pcm, at, 440.0), tone(&got_pcm, at, 1320.0));
-        let (want_low, want_high) = (tone(&t1, at + 2.6, 440.0), tone(&t2, at + 2.6, 1320.0));
-        assert!(
-            db(low / want_low).abs() < 1.0 && db(high / want_high).abs() < 1.0,
-            "at {at} s: 440 Hz {low:.4} (want {want_low:.4}), 1320 Hz {high:.4} (want {want_high:.4})"
-        );
+        let want_low = tone(&t1, at + 2.6, 440.0);
+        assert!(db(low / want_low).abs() < 1.0 && high < 0.001, "at {at} s: 440 Hz {low:.4} (want {want_low:.4}), 1320 Hz {high:.4} (want none)");
     }
     assert!(rms(&got_pcm, 3.0, 4.8) < 1e-3, "silence under the matte");
 }

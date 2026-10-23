@@ -20,11 +20,7 @@ waltcut-geom = { workspace = true }
 waltcut-text = { workspace = true }
 waltcut-isobmff = { workspace = true }
 waltcut-prores = { workspace = true }
-waltcut-dnx = { workspace = true }
-waltcut-apv = { workspace = true }
-waltcut-mxf = { workspace = true }
 waltcut-aac = { workspace = true }
-waltcut-flac = { workspace = true }
 waltcut-h264enc = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

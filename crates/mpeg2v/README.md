@@ -29,7 +29,7 @@ let info = waltcut_mpeg2v::probe(&es);                    // sequence header + e
 let au = waltcut_mpeg2v::scan_access_unit(&es[..]);       // picture types without decoding
 ```
 
-`decode` takes any chunk holding whole pictures (an access unit from a TS/PS/MXF/MOV sample).
+`decode` takes any chunk holding whole pictures (an access unit from a TS/PS/MOV sample).
 Pictures come out in display order (anchors are held until the next anchor) and carry the `pts`
 of the chunk their first field came in. `reset` forgets pictures but keeps the sequence
 parameters, so a random-access point without its own sequence header still decodes.

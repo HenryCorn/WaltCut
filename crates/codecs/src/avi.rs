@@ -5,7 +5,7 @@
 //! slot with an empty chunk (a "drop frame") repeats the picture before it. MPEG-4 Part 2
 //! (DivX / Xvid) and DV have no decoder yet: their streams are listed and report the codec.
 //!
-//! Audio: PCM (integer and float) straight from the chunks; MPEG audio (MP3, MP2) and AC-3 frames,
+//! Audio: PCM (integer and float) straight from the chunks; MPEG audio (MP3, MP2) frames,
 //! which AVI chunks need not follow, are found again across chunk boundaries
 //! ([`waltcut_mpegts::frame_bytes`]) and decoded as packets.
 
@@ -94,7 +94,6 @@ fn audio_codec(w: &WaveFormat) -> (ACodec, String) {
         3 if matches!(w.bits_per_sample, 32 | 64) => pcm(true),
         0x55 => (ACodec::Framed { ts: waltcut_mpegts::Codec::MpegAudio, layer: 3 }, "MP3".into()),
         0x50 => (ACodec::Framed { ts: waltcut_mpegts::Codec::MpegAudio, layer: 2 }, "MPEG Audio".into()),
-        0x2000 => (ACodec::Framed { ts: waltcut_mpegts::Codec::Ac3, layer: 0 }, "AC-3".into()),
         tag => {
             let name = format!("audio format 0x{tag:04X}");
             (ACodec::Unsupported(name.clone()), name)
@@ -141,6 +140,7 @@ pub struct AviSource {
     bottom_up: bool,
     video: GopCache,
     audios: Vec<AviAudio>,
+    notices: Vec<String>,
 }
 
 /// Whether an Annex B access unit holds an H.264 IDR or HEVC IRAP picture.
@@ -227,15 +227,27 @@ impl AviSource {
         let bytes = crate::Src(reader);
         let file = waltcut_avi::open(&bytes).map_err(|e| CodecError::Container(e.to_string()))?;
         let vstream = file.streams.iter().position(|s| s.kind == StreamKind::Video && s.video.is_some() && !s.chunks.is_empty());
+        let unsupported_ac3 =
+            file.streams.iter().any(|s| s.kind == StreamKind::Audio && s.audio.as_ref().is_some_and(|w| w.format_tag == 0x2000) && !s.chunks.is_empty());
+        let mut notices = Vec::new();
+        if unsupported_ac3 {
+            notices.push(
+                "AC-3 audio is not supported; the video was imported without sound. Convert audio to AAC, MP2, or PCM and reimport to retain sound."
+                    .to_string(),
+            );
+        }
         let astreams: Vec<usize> = file
             .streams
             .iter()
             .enumerate()
-            .filter(|(_, s)| s.kind == StreamKind::Audio && s.audio.is_some() && !s.chunks.is_empty())
+            .filter(|(_, s)| s.kind == StreamKind::Audio && s.audio.as_ref().is_some_and(|w| w.format_tag != 0x2000) && !s.chunks.is_empty())
             .map(|(i, _)| i)
             .take(waltcut_media::MAX_AUDIO_STREAMS)
             .collect();
         if vstream.is_none() && astreams.is_empty() {
+            if unsupported_ac3 {
+                return Err(CodecError::Unsupported("AC-3 audio is not supported. Convert audio to AAC, MP2, or PCM and reimport.".into()));
+            }
             return Err(CodecError::Unsupported("no playable streams".into()));
         }
         // video: frame slots, pictures and key frames
@@ -282,8 +294,8 @@ impl AviSource {
                         .collect()
                 };
                 let reorders = |p: &[i64]| p.windows(2).any(|w| w[1] < w[0]);
-                if crate::mxf::avc_presentation_order(&heads(300)).is_some_and(|p| reorders(&p))
-                    && let Some(ranks) = crate::mxf::avc_presentation_order(&heads(vframes.len()))
+                if crate::video::avc_presentation_order(&heads(300)).is_some_and(|p| reorders(&p))
+                    && let Some(ranks) = crate::video::avc_presentation_order(&heads(vframes.len()))
                 {
                     // the pictures keep the slots they occupy (empty drop-frame chunks between them
                     // stay), shown in their presentation order
@@ -402,7 +414,7 @@ impl AviSource {
         let mut vorder: Vec<usize> = (0..vframes.len()).collect();
         vorder.sort_by_key(|&i| vframes.get(i).map_or(0, |f| f.pts));
         let vorder_pts = vorder.iter().map(|&i| vframes.get(i).map_or(0, |f| f.pts)).collect();
-        Ok(Self { info, bytes, file, vstream, vcodec, vframes, vorder, vorder_pts, vslots, rate, bottom_up, video: GopCache::new(None), audios })
+        Ok(Self { info, bytes, file, vstream, vcodec, vframes, vorder, vorder_pts, vslots, rate, bottom_up, video: GopCache::new(None), audios, notices })
     }
 
     fn read(&self, stream: usize, chunk: usize) -> crate::Result<Vec<u8>> {
@@ -431,12 +443,9 @@ impl AviSource {
         let decoded = match &a.codec {
             ACodec::Pcm(cfg) => decode_pcm(&data, cfg),
             ACodec::Unsupported(name) => return Err(CodecError::Unsupported(name.clone())),
-            ACodec::Framed { ts, layer } => {
+            ACodec::Framed { ts: _, layer } => {
                 if st.decoder.is_none() {
-                    st.decoder = Some(match ts {
-                        waltcut_mpegts::Codec::Ac3 => PacketDecoder::ac3()?,
-                        _ => PacketDecoder::mpeg_audio(*layer, ainfo.sample_rate)?,
-                    });
+                    st.decoder = Some(PacketDecoder::mpeg_audio(*layer, ainfo.sample_rate)?);
                 }
                 let d = st.decoder.as_mut().ok_or_else(|| CodecError::Decode("no audio decoder".into()))?;
                 // non-sequential access: reset and prime with the packet before (the bit reservoir)
@@ -508,6 +517,9 @@ impl VideoSamples for AviVideo<'_> {
 impl MediaSource for AviSource {
     fn info(&self) -> &MediaInfo {
         &self.info
+    }
+    fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     fn video_frame(&self, req: FrameRequest) -> Result<Arc<VideoFrame>, MediaError> {

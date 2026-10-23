@@ -125,7 +125,7 @@ fn prores_export_roundtrip() {
     assert!(f[0] > 240 && f[1] < 15 && f[2] < 15, "{:?}", &f[..4]);
 }
 
-/// #2142: SDR ProRes, DNxHR and APV (MOV) and H.264 (MP4) exports carry a `colr` box with the
+/// #2142: SDR ProRes (MOV) and H.264 (MP4) exports carry a `colr` box with the
 /// export's BT.709 colour: Apple's media stack reads the colour of the MOV codecs only from there.
 #[test]
 fn sdr_exports_carry_a_colr_box() {
@@ -133,12 +133,7 @@ fn sdr_exports_carry_a_colr_box() {
     let (p, seq, m) = project();
     let nclc = ColorInfo::Nclc { primaries: 1, transfer: 1, matrix: 1 };
     let nclx = ColorInfo::Nclx { primaries: 1, transfer: 1, matrix: 1, full_range: false };
-    for (format, name, want) in [
-        (Format::ProRes, "colr-prores.mov", nclc.clone()),
-        (Format::DnxHr, "colr-dnxhr.mov", nclc.clone()),
-        (Format::Apv, "colr-apv.mov", nclc.clone()),
-        (Format::H264, "colr-h264.mp4", nclx),
-    ] {
+    for (format, name, want) in [(Format::ProRes, "colr-prores.mov", nclc.clone()), (Format::H264, "colr-h264.mp4", nclx)] {
         let path = tmp(name);
         export(&p, seq, &ExportSettings { format, path: path.clone(), include_audio: false, ..Default::default() }, &m, &Progress::default()).unwrap();
         let bytes = std::fs::read(&path).unwrap();
@@ -192,24 +187,6 @@ fn prores_4444_export_roundtrip() {
         } else {
             assert_eq!(px[3], 255, "flattened: {:?}", &px[..4]);
         }
-    }
-}
-
-#[test]
-fn dnxhr_export_roundtrip() {
-    let (p, seq, m) = project();
-    for (profile, label) in [("hq", "DNxHR HQ"), ("hqx", "DNxHR HQX"), ("sq", "DNxHR SQ")] {
-        let path = tmp(&format!("dnx_{profile}.mov"));
-        let s = ExportSettings { format: Format::DnxHr, path: path.clone(), dnx_profile: profile.into(), ..Default::default() };
-        export(&p, seq, &s, &m, &Progress::default()).unwrap();
-        let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-        let src = waltcut_codecs::open_bytes("dnx.mov", bytes).unwrap();
-        let info = src.info().video.clone().unwrap();
-        assert_eq!(info.codec, label);
-        let f = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 3))).unwrap();
-        assert!(f.format_label().contains("4:2:2"), "{}", f.format_label());
-        let px = f.to_rgba8();
-        assert!(px[0] > 240 && px[1] < 15 && px[2] < 15, "{profile}: {:?}", &px[..4]);
     }
 }
 

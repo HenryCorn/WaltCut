@@ -5,6 +5,93 @@ use waltcut_isobmff::{CodecConfig, SampleEntry};
 
 use crate::{CodecError, Result};
 
+/// Presentation-order ranks for a bounded set of H.264 access units in AVI, which has no PTS.
+pub(crate) fn avc_presentation_order(heads: &[Vec<u8>]) -> Option<Vec<i64>> {
+    use waltcut_bitstream::{annexb_nals, unescape_rbsp};
+    use waltcut_h264::params::{Pps, Sps};
+    use waltcut_h264::slice::{NalHeader, SliceHeader};
+    let mut spss: Vec<Option<Sps>> = vec![None; 32];
+    let mut ppss: Vec<Option<Pps>> = vec![None; 256];
+    let (mut prev_msb, mut prev_lsb, mut period) = (0i64, 0i64, 0i64);
+    let mut keys = Vec::with_capacity(heads.len());
+    for (i, head) in heads.iter().enumerate() {
+        let mut key = None;
+        for nal in annexb_nals(head) {
+            let Some(&header) = nal.first() else { continue };
+            let Ok(hdr) = NalHeader::parse(header) else { continue };
+            let rbsp = unescape_rbsp(nal.get(1..)?);
+            match hdr.nal_unit_type {
+                7 => {
+                    let sps = Sps::parse(&rbsp).ok()?;
+                    let id = sps.id as usize;
+                    *spss.get_mut(id)? = Some(sps);
+                }
+                8 => {
+                    let pps = Pps::parse(&rbsp, &spss).ok()?;
+                    let id = pps.id as usize;
+                    *ppss.get_mut(id)? = Some(pps);
+                }
+                1 | 5 => {
+                    let mut sps_of = None;
+                    let (sh, _, _) = SliceHeader::parse(&rbsp, hdr, |id| {
+                        let pps = ppss.get(id as usize).and_then(Option::as_ref).ok_or(waltcut_h264::Error::MissingParameterSet("PPS".into()))?;
+                        let sps = spss.get(pps.sps_id as usize).and_then(Option::as_ref).ok_or(waltcut_h264::Error::MissingParameterSet("SPS".into()))?;
+                        sps_of = Some(sps);
+                        Ok((pps, sps))
+                    })
+                    .ok()?;
+                    let sps = sps_of?;
+                    if sh.idr {
+                        if i > 0 {
+                            period += 1;
+                        }
+                        prev_msb = 0;
+                        prev_lsb = 0;
+                    }
+                    let poc = if sps.pic_order_cnt_type == 0 {
+                        let max = 1i64.checked_shl(sps.log2_max_poc_lsb)?;
+                        let lsb = sh.pic_order_cnt_lsb as i64;
+                        let msb = if lsb < prev_lsb && prev_lsb - lsb >= max / 2 {
+                            prev_msb + max
+                        } else if lsb > prev_lsb && lsb - prev_lsb > max / 2 {
+                            prev_msb - max
+                        } else {
+                            prev_msb
+                        };
+                        let top = msb + lsb;
+                        let poc = if sh.field_pic { top } else { top.min(top + sh.delta_pic_order_cnt_bottom as i64) };
+                        if hdr.nal_ref_idc != 0 {
+                            prev_msb = msb;
+                            prev_lsb = lsb;
+                        }
+                        poc
+                    } else {
+                        i as i64
+                    };
+                    if sh.has_mmco5() {
+                        period += 1;
+                        prev_msb = 0;
+                        prev_lsb = 0;
+                        key = Some((period - 1, poc));
+                    } else {
+                        key = Some((period, poc));
+                    }
+                    break;
+                }
+                _ => {}
+            }
+        }
+        keys.push(key?);
+    }
+    let mut order: Vec<usize> = (0..keys.len()).collect();
+    order.sort_by_key(|&i| keys.get(i).copied().unwrap_or_default());
+    let mut pts = vec![0i64; keys.len()];
+    for (rank, &i) in order.iter().enumerate() {
+        *pts.get_mut(i)? = i64::try_from(rank).ok()?;
+    }
+    Some(pts)
+}
+
 /// A decoded picture with its presentation timestamp (track timescale).
 pub struct DecodedFrame {
     pub pts: i64,
@@ -295,7 +382,7 @@ impl H264Decoder {
         let length_size = avcc_length_size(&avcc);
         Ok(Self { avcc, dec, length_size, draft: false, threads })
     }
-    /// A decoder for Annex B byte-stream samples (start codes, in-band parameter sets: MXF, TS).
+    /// A decoder for Annex B byte-stream samples (start codes, in-band parameter sets: MPEG-TS).
     pub fn annexb() -> Self {
         recycle_h264_planes();
         let threads = Self::threads_now();
@@ -606,60 +693,6 @@ pub fn vp9_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
     }
 }
 
-/// Our pure-Rust VP8 decoder (RFC 6386; #432): WebM / Matroska `V_VP8` and MP4 `vp08`.
-pub struct Vp8Decoder {
-    dec: waltcut_vp8::Decoder,
-}
-
-impl Default for Vp8Decoder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Vp8Decoder {
-    pub fn new() -> Self {
-        Self { dec: waltcut_vp8::Decoder::new() }
-    }
-
-    fn convert(p: waltcut_vp8::Picture) -> DecodedFrame {
-        use std::sync::Arc;
-        use waltcut_frame::{Chroma, PixelData};
-        // color_space 0 is BT.601 YUV (RFC 6386 9.2), studio swing; a container's Colour wins
-        let color = waltcut_color::ColorInfo { matrix: waltcut_color::Matrix::Bt601, ..waltcut_color::ColorInfo::REC709 };
-        let data = PixelData::Yuv8 { planes: [Arc::new(p.y), Arc::new(p.u), Arc::new(p.v)], chroma: Chroma::C420, alpha: None };
-        let frame = VideoFrame { width: p.width, height: p.height, data, color, par: (1, 1), pts: waltcut_time::Tick::ZERO };
-        DecodedFrame { pts: p.pts, frame, draft: false }
-    }
-}
-
-impl VideoDecoder for Vp8Decoder {
-    fn decode(&mut self, sample: &[u8], pts: i64) -> Result<Vec<DecodedFrame>> {
-        let pic = self.dec.decode(sample, pts).map_err(|e| CodecError::Decode(e.to_string()))?;
-        Ok(pic.into_iter().map(Self::convert).collect())
-    }
-    fn flush(&mut self) -> Vec<DecodedFrame> {
-        // no reordering: every picture comes out with its frame
-        Vec::new()
-    }
-    fn reset(&mut self) {
-        self.dec.reset();
-    }
-    fn name(&self) -> &str {
-        "FilmCraft VP8"
-    }
-    fn is_random_access(&self, sample: &[u8]) -> Option<bool> {
-        Some(waltcut_vp8::is_keyframe(sample))
-    }
-    fn is_disposable(&self, sample: &[u8]) -> bool {
-        self.dec.is_disposable(sample)
-    }
-}
-
-pub fn vp8_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
-    (e.format.0 == *b"vp08").then(|| Ok(Box::new(Vp8Decoder::new()) as Box<dyn VideoDecoder>))
-}
-
 /// Our AV1 decoder. The `av1C` configuration OBUs (sequence header) are fed before the first
 /// sample and again after every reset.
 pub struct Av1Decoder {
@@ -799,139 +832,6 @@ impl VideoDecoder for ProResDecoder {
 
 pub fn prores_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
     matches!(e.codec, CodecConfig::ProRes { .. }).then(|| Ok(Box::new(ProResDecoder) as Box<dyn VideoDecoder>))
-}
-
-/// Our APV (Advanced Professional Video, RFC 9924) decoder (every frame is intra; tiles decode in
-/// parallel).
-pub struct ApvDecoder;
-
-/// Convert a decoded APV frame to a [`VideoFrame`].
-pub fn apv_to_video_frame(f: waltcut_apv::Frame) -> VideoFrame {
-    use std::sync::Arc;
-    let chroma = match f.chroma {
-        waltcut_apv::ChromaFormat::Yuv422 => waltcut_frame::Chroma::C422,
-        waltcut_apv::ChromaFormat::Monochrome | waltcut_apv::ChromaFormat::Yuv444 | waltcut_apv::ChromaFormat::Yuv4444 => waltcut_frame::Chroma::C444,
-    };
-    let mut color = waltcut_color::ColorInfo { matrix: waltcut_frame::default_matrix(f.width, f.height), ..waltcut_color::ColorInfo::REC709 };
-    if let Some(m) = waltcut_color::Matrix::from_code(f.color.matrix) {
-        color.matrix = m;
-    }
-    if let Some(t) = waltcut_color::Transfer::from_code(f.color.transfer) {
-        color.transfer = t;
-    }
-    if let Some(p) = primaries_from_code(f.color.primaries) {
-        color.primaries = p;
-    }
-    if f.color.full_range {
-        color.range = waltcut_color::Range::Full;
-    }
-    let neutral = 1u16 << f.bit_depth.saturating_sub(1);
-    let (cb, cr) = if f.chroma == waltcut_apv::ChromaFormat::Monochrome {
-        let u = vec![neutral; (f.width as usize) * (f.height as usize)];
-        (u.clone(), u)
-    } else {
-        (f.cb, f.cr)
-    };
-    let data = if f.bit_depth == 8 {
-        let to8 = |p: Vec<u16>| Arc::new(p.into_iter().map(|v| v as u8).collect::<Vec<u8>>());
-        waltcut_frame::PixelData::Yuv8 { planes: [to8(f.y), to8(cb), to8(cr)], chroma, alpha: f.alpha.map(to8) }
-    } else {
-        waltcut_frame::PixelData::Yuv16 { planes: [Arc::new(f.y), Arc::new(cb), Arc::new(cr)], chroma, bits: f.bit_depth as u32, alpha: f.alpha.map(Arc::new) }
-    };
-    VideoFrame { width: f.width, height: f.height, data, color, par: (1, 1), pts: waltcut_time::Tick::ZERO }
-}
-
-impl VideoDecoder for ApvDecoder {
-    fn decode(&mut self, sample: &[u8], pts: i64) -> Result<Vec<DecodedFrame>> {
-        let f = waltcut_apv::decode_frame(sample).map_err(|e| CodecError::Decode(e.to_string()))?;
-        Ok(vec![DecodedFrame { pts, frame: apv_to_video_frame(f), draft: false }])
-    }
-    fn flush(&mut self) -> Vec<DecodedFrame> {
-        Vec::new()
-    }
-    fn reset(&mut self) {}
-    fn name(&self) -> &str {
-        "FilmCraft APV"
-    }
-    fn intra_only(&self) -> bool {
-        true
-    }
-}
-
-pub fn apv_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
-    matches!(e.codec, CodecConfig::Apv(_)).then(|| Ok(Box::new(ApvDecoder) as Box<dyn VideoDecoder>))
-}
-
-/// Our DNxHD / DNxHR (VC-3) decoder (every frame is intra; macroblock rows decode in parallel).
-pub struct DnxDecoder;
-
-/// Convert a decoded VC-3 frame to a [`VideoFrame`]. RGB (4:4:4) frames are converted to
-/// BT.709 video-range Y'CbCr 4:4:4 at the coded depth.
-pub fn dnx_to_video_frame(f: waltcut_dnx::Frame) -> VideoFrame {
-    use std::sync::Arc;
-    let chroma = match f.chroma {
-        waltcut_dnx::ChromaFormat::Yuv420 => waltcut_frame::Chroma::C420,
-        waltcut_dnx::ChromaFormat::Yuv422 => waltcut_frame::Chroma::C422,
-        waltcut_dnx::ChromaFormat::Yuv444 => waltcut_frame::Chroma::C444,
-    };
-    let mut color = waltcut_color::ColorInfo::REC709;
-    if matches!(f.color_volume, waltcut_dnx::ColorVolume::Bt2020Ncl | waltcut_dnx::ColorVolume::Bt2020Cl) {
-        color.matrix = waltcut_color::Matrix::Bt2020Ncl;
-        color.primaries = waltcut_color::Primaries::Bt2020;
-    }
-    let (mut y, mut cb, mut cr) = (f.y, f.cb, f.cr);
-    if f.rgb {
-        // planes hold G, B, R (video range); derive Y'CbCr with the stream's matrix
-        let (kr, kb) = color.matrix.kr_kb();
-        let kg = 1.0 - kr - kb;
-        let s = (1u32 << (f.bit_depth - 8)) as f32;
-        let max = ((1u32 << f.bit_depth) - 1) as f32;
-        let c = 224.0 / 219.0;
-        for i in 0..y.len() {
-            let (g, b, r) = (y[i] as f32, cb[i] as f32, cr[i] as f32);
-            let yy = kr * r + kg * g + kb * b;
-            let u = (b - yy) / (2.0 * (1.0 - kb)) * c + 128.0 * s;
-            let v = (r - yy) / (2.0 * (1.0 - kr)) * c + 128.0 * s;
-            y[i] = (yy + 0.5).clamp(0.0, max) as u16;
-            cb[i] = (u + 0.5).clamp(0.0, max) as u16;
-            cr[i] = (v + 0.5).clamp(0.0, max) as u16;
-        }
-    }
-    let par = match f.par {
-        (n, d) if n > 0 && d > 0 => (n as u32, d as u32),
-        // thin rasters (1440 / 960 wide) are anamorphic 16:9
-        _ if matches!(f.cid, 1244 | 1259 | 1260) => (4, 3),
-        _ if f.cid == 1258 => (4, 3),
-        _ => (1, 1),
-    };
-    let data = if f.bit_depth == 8 {
-        let to8 = |p: Vec<u16>| Arc::new(p.into_iter().map(|v| v as u8).collect::<Vec<u8>>());
-        waltcut_frame::PixelData::Yuv8 { planes: [to8(y), to8(cb), to8(cr)], chroma, alpha: f.alpha.map(to8) }
-    } else {
-        waltcut_frame::PixelData::Yuv16 { planes: [Arc::new(y), Arc::new(cb), Arc::new(cr)], chroma, bits: f.bit_depth as u32, alpha: f.alpha.map(Arc::new) }
-    };
-    VideoFrame { width: f.width, height: f.height, data, color, par, pts: waltcut_time::Tick::ZERO }
-}
-
-impl VideoDecoder for DnxDecoder {
-    fn decode(&mut self, sample: &[u8], pts: i64) -> Result<Vec<DecodedFrame>> {
-        let f = waltcut_dnx::decode_frame(sample).map_err(|e| CodecError::Decode(e.to_string()))?;
-        Ok(vec![DecodedFrame { pts, frame: dnx_to_video_frame(f), draft: false }])
-    }
-    fn flush(&mut self) -> Vec<DecodedFrame> {
-        Vec::new()
-    }
-    fn reset(&mut self) {}
-    fn name(&self) -> &str {
-        "FilmCraft DNxHD/DNxHR"
-    }
-    fn intra_only(&self) -> bool {
-        true
-    }
-}
-
-pub fn dnx_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
-    matches!(e.codec, CodecConfig::Dnx { .. }).then(|| Ok(Box::new(DnxDecoder) as Box<dyn VideoDecoder>))
 }
 
 /// Our MPEG-1 / MPEG-2 video decoder (Main / 4:2:2 profile, field and frame pictures).

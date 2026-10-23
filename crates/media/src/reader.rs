@@ -201,6 +201,9 @@ pub fn open_reader(name: &str, reader: SharedReader, reader_openers: &[ReaderOpe
 /// Media Browser's properties and thumbnails, #157): reading a multi-gigabyte AVI into
 /// memory to show its duration, or to find out it isn't supported, thrashes the disk.
 pub fn open_reader_within(name: &str, reader: SharedReader, reader_openers: &[ReaderOpener], extra: &[Opener], max_whole: u64) -> Result<SharedSource> {
+    if let Some(message) = crate::unsupported_format_extension(name) {
+        return Err(MediaError::Unsupported(format!("{name}: {message}")));
+    }
     let head = read_range(&*reader, 0, HEAD_LEN).map_err(|e| MediaError::Io(format!("{name}: {e}")))?;
     for o in reader_openers {
         if let Some(r) = o(name, &head, &reader) {

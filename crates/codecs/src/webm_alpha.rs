@@ -1,4 +1,4 @@
-//! WebM alpha (#402): a VP8 or VP9 track with `AlphaMode` 1 carries, in each block's
+//! WebM alpha (#402): a VP9 track with `AlphaMode` 1 carries, in each block's
 //! `BlockAdditional` with `BlockAddID` 1, a second stream of the same codec coded independently of
 //! the colour one. Its luma plane,
 //! full range, is the frame's alpha (the WebM convention, as libvpx-based decoders read it).
@@ -22,7 +22,7 @@ use crate::video::{DecodedFrame, VideoDecoder};
 /// How far back the alpha decoder looks for a key frame when it resynchronises.
 const MAX_RESYNC: usize = 600;
 /// Decoded alpha pictures waiting for their colour picture, and colour pictures waiting for their
-/// alpha (VP8 / VP9 pictures come out in order, so a few are plenty; past that a picture goes out opaque
+/// alpha (VP9 pictures come out in order, so a few are plenty; past that a picture goes out opaque
 /// rather than stall).
 const MAX_PENDING: usize = 8;
 

@@ -591,6 +591,15 @@ pub(crate) fn default_seq_settings_for(media: &MediaClip) -> SequenceSettings {
 
 /// Import bytes as a media item (engine-level; the UI reads files through services).
 pub fn import_bytes(s: &mut Session, path: &str, bytes: std::sync::Arc<[u8]>, bin: Option<waltcut_project::BinId>) -> Result<ItemId> {
+    import_bytes_with_notices(s, path, bytes, bin).map(|(id, _)| id)
+}
+
+pub fn import_bytes_with_notices(
+    s: &mut Session,
+    path: &str,
+    bytes: std::sync::Arc<[u8]>,
+    bin: Option<waltcut_project::BinId>,
+) -> Result<(ItemId, Vec<String>)> {
     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
     let identity = crate::relink::identity_of_bytes(&bytes);
     let src = s.media.open_bytes(&name, bytes)?;
@@ -600,6 +609,10 @@ pub fn import_bytes(s: &mut Session, path: &str, bytes: std::sync::Arc<[u8]>, bi
 /// Import a media file through the host's random-access reader ([`crate::Services::reader`]):
 /// only the container index is read now (web `Blob`s are never copied whole for containers).
 pub fn import_streamed(s: &mut Session, path: &str, bin: Option<waltcut_project::BinId>) -> Result<ItemId> {
+    import_streamed_with_notices(s, path, bin).map(|(id, _)| id)
+}
+
+pub fn import_streamed_with_notices(s: &mut Session, path: &str, bin: Option<waltcut_project::BinId>) -> Result<(ItemId, Vec<String>)> {
     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
     let identity = crate::relink::identity_of(&*s.services, path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     let src = s.media.open_file(path, &*s.services)?;
@@ -616,7 +629,7 @@ pub fn import_image_sequence(s: &mut Session, path: &str, bin: Option<waltcut_pr
     let missing: Vec<usize> = frames.iter().enumerate().filter(|(_, f)| f.is_none()).map(|(i, _)| i).collect();
     let src = crate::media_pool::open_image_sequence(path, &*s.services, rate, &name)?;
     let identity = crate::relink::identity_of(&*s.services, path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
-    let id = import_source(s, path, name, src, identity, bin)?;
+    let (id, _) = import_source(s, path, name, src, identity, bin)?;
     Ok((id, frames.len(), missing))
 }
 
@@ -632,7 +645,8 @@ fn import_source(
     src: waltcut_media::SharedSource,
     identity: waltcut_project::MediaIdentity,
     bin: Option<waltcut_project::BinId>,
-) -> Result<ItemId> {
+) -> Result<(ItemId, Vec<String>)> {
+    let notices = src.notices().to_vec();
     let mut info = src.info().clone();
     // Settings ▸ Labels ▸ Label Defaults
     let label = s.prefs.labels.for_media(info.kind, info.has_video(), info.has_audio());
@@ -662,7 +676,10 @@ fn import_source(
         ))
     })?;
     s.media.insert_file(id, path, src);
-    Ok(id)
+    if let Some(notice) = notices.first() {
+        s.events.push(crate::Event::Toast { message: notice.clone(), error: false });
+    }
+    Ok((id, notices))
 }
 
 fn new_generator(s: &mut Session, g: Generator, name: &str, label: Label, p: &Value) -> Result<Value> {
@@ -1253,6 +1270,7 @@ fn build() -> Vec<CommandSpec> {
             }
             let mut ids = Vec::new();
             let mut errors = Vec::new();
+            let mut notices = Vec::new();
             let mut image_sequences = Vec::new();
             // Image Sequence: each path is the first frame of a numbered still sequence. With
             // Settings ▸ Media ▸ Import image sequences on, a single numbered still is detected.
@@ -1273,12 +1291,22 @@ fn build() -> Vec<CommandSpec> {
                 let streamed = waltcut_media::is_importable(std::path::Path::new(&path)) && s.services.reader(&path).is_some();
                 let read = if streamed { Ok(Vec::new()) } else { s.services.read_file(&path) };
                 match read {
-                    Ok(_) if streamed => match import_streamed(s, &path, bin) {
-                        Ok(id) => ids.push(id.0),
+                    Ok(_) if streamed => match import_streamed_with_notices(s, &path, bin) {
+                        Ok((id, messages)) => {
+                            ids.push(id.0);
+                            if !messages.is_empty() {
+                                notices.push(json!({"path": path, "messages": messages}));
+                            }
+                        }
                         Err(e) => errors.push(format!("{path}: {e}")),
                     },
-                    Ok(b) => match import_bytes(s, &path, b.into(), bin) {
-                        Ok(id) => ids.push(id.0),
+                    Ok(b) => match import_bytes_with_notices(s, &path, b.into(), bin) {
+                        Ok((id, messages)) => {
+                            ids.push(id.0);
+                            if !messages.is_empty() {
+                                notices.push(json!({"path": path, "messages": messages}));
+                            }
+                        }
                         Err(e) => errors.push(format!("{path}: {e}")),
                     },
                     Err(e) => errors.push(format!("{path}: {e}")),
@@ -1290,6 +1318,9 @@ fn build() -> Vec<CommandSpec> {
             let mut out = json!({"items": ids, "errors": errors});
             if !image_sequences.is_empty() {
                 out["imageSequences"] = json!(image_sequences);
+            }
+            if !notices.is_empty() {
+                out["notices"] = json!(notices);
             }
             // Newly imported files may resolve paths the project already listed as offline
             // (issue #110): rebuild s.offline.missing so the "Media missing" badge clears, and drop
@@ -1411,7 +1442,7 @@ fn build() -> Vec<CommandSpec> {
             "Media…",
             ["File", "Export"],
             None,
-            r#"{"path":str,"preset":str?,"settings":ExportSettings?,"format":"h264|hevc|prores|dnxhr|apv|mjpeg|mxf-op1a|mxf-opatom|png|tiff|bmp|jpg|tga|dpx|exr|gif|wav|aiff|aac|flac"?,"audioCodec":"auto|aac|pcm|flac"?,"flacLevel":0..8=5,"width":u32?,"height":u32?,"fps":f64?,"bitrateKbps":u32?,"bitrateMode":"cbr|vbr1Pass|vbr2Pass|crf"?,"crf":0..51=23,"hardwareEncoding":"off|auto"?,"scale":f32=1,"audio":bool=true,"quality":0..100,"alpha":bool=false,"exrCompression":"none|rle|zips|zip"?,"proresProfile":"proxy|lt|standard|hq|4444|4444xq"?,"dnxProfile":"lb|sq|hq|hqx"?,"apvProfile":"422-10|422-12|444-10|444-12"?,"mxfVideoCodec":"dnxhr|proRes|h264"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startSeconds":f64?,"endSeconds":f64?,"wait":bool=false}"#,
+            r#"{"path":str,"preset":str?,"settings":ExportSettings?,"format":"h264|hevc|prores|mjpeg|png|tiff|bmp|jpg|tga|dpx|exr|gif|wav|aiff|aac"?,"audioCodec":"auto|aac|pcm"?,"width":u32?,"height":u32?,"fps":f64?,"bitrateKbps":u32?,"bitrateMode":"cbr|vbr1Pass|vbr2Pass|crf"?,"crf":0..51=23,"hardwareEncoding":"off|auto"?,"scale":f32=1,"audio":bool=true,"quality":0..100,"alpha":bool=false,"exrCompression":"none|rle|zips|zip"?,"proresProfile":"proxy|lt|standard|hq|4444|4444xq"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startSeconds":f64?,"endSeconds":f64?,"wait":bool=false}"#,
             has_seq,
             crate::export_tools::export_media
         ),

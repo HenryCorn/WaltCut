@@ -25,8 +25,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use waltcut_engine::export::presets::{DEFAULT_PRESET, preset_key};
 use waltcut_engine::export::{
-    AudioCodec, BitrateMode, ExportSettings, ExrCompression, FieldOrder, Format, GpuRendering, H264Profile, HardwareEncoding, Multiplexer, MxfVideoCodec,
-    Placement, SampleFormat, Scaling, TextOverlay, builtin_presets, format_bytes,
+    AudioCodec, BitrateMode, ExportSettings, ExrCompression, FieldOrder, Format, GpuRendering, H264Profile, HardwareEncoding, Multiplexer, Placement,
+    SampleFormat, Scaling, TextOverlay, builtin_presets, format_bytes,
 };
 use waltcut_engine::time::{FrameRate, Tick};
 
@@ -540,11 +540,7 @@ fn settings_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         if s.has_video() && section(ui, &mut reg, &mut ex.open_sections, "video", tl!("Video"), &t) {
             video_section(ui, &mut reg, s, &t, seq_w, seq_h, seq_hdr);
         }
-        if (s.has_audio()
-            || !s.has_video()
-            || s.format.is_mp4_video()
-            || matches!(s.format, Format::ProRes | Format::DnxHr | Format::Apv | Format::Mjpeg)
-            || s.format.is_mxf())
+        if (s.has_audio() || !s.has_video() || s.format.is_mp4_video() || matches!(s.format, Format::ProRes | Format::Mjpeg))
             && !s.is_image_sequence()
             && s.format != Format::Gif
             && section(ui, &mut reg, &mut ex.open_sections, "audio", tl!("Audio"), &t)
@@ -562,8 +558,8 @@ fn settings_column(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         if section(ui, &mut reg, &mut ex.open_sections, "effects", tl!("Effects"), &t) {
             pick_overlay = effects_section(ui, &mut reg, s, &t);
         }
-        if matches!(s.format, Format::H264 | Format::Hevc | Format::Av1 | Format::ProRes | Format::DnxHr | Format::Apv | Format::Mjpeg)
-            && section(ui, &mut reg, &mut ex.open_sections, "metadata", tl!("Metadata"), &t)
+        if matches!(s.format, Format::H264 | Format::Hevc | Format::Av1 | Format::ProRes | Format::Mjpeg)
+            && section(ui, &mut reg, &mut ex.open_sections, "metadata", "Metadata", &t)
         {
             let m = &mut s.metadata;
             for (key, label, v) in [
@@ -647,14 +643,6 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
             s.pixel_aspect = PARS[i].1;
         }
     });
-    if s.format.is_mxf() {
-        row(ui, t, tl!("Video Codec"), |ui| {
-            let labels: Vec<(String, bool)> = MxfVideoCodec::ALL.iter().map(|c| (c.label().to_string(), true)).collect();
-            if let Some(i) = combo(ui, reg, "export.video.mxfCodec", s.mxf_video_codec.label(), &labels, 180.0) {
-                s.mxf_video_codec = MxfVideoCodec::ALL[i];
-            }
-        });
-    }
     if s.supports_alpha() {
         row(ui, t, tl!("Alpha"), |ui| {
             check(ui, reg, "export.video.alpha", &mut s.alpha, tl!("Include Alpha Channel"));
@@ -748,9 +736,9 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
                     *k = v as u32;
                 }
             });
-            // The system's hardware encoder where there is one (VideoToolbox on macOS, NVENC on NVIDIA
-            // GPUs on Windows, VA-API on Linux); everything it does not take (two-pass, HDR, MXF) and
-            // every machine without one keeps the built-in encoder.
+            // The system's hardware encoder where there is one (VideoToolbox on macOS, NVENC on
+            // NVIDIA GPUs on Windows, VA-API on Linux); unsupported settings and machines without
+            // one keep the built-in encoder.
             // H.265 and AV1 have only hardware encoders: choosing the format is the opt-in.
             if !hevc {
                 row(ui, t, "Hardware Encoding", |ui| {
@@ -769,26 +757,6 @@ fn video_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
                 let cur = keys.iter().position(|k| *k == s.prores_profile).unwrap_or(3);
                 if let Some(i) = combo(ui, reg, "export.video.proresProfile", labels[cur], &opts(&labels), 220.0) {
                     s.prores_profile = keys[i].into();
-                }
-            });
-        }
-        Format::DnxHr => {
-            row(ui, t, tl!("Profile"), |ui| {
-                let keys = ["lb", "sq", "hq", "hqx"];
-                let labels = ["DNxHR LB", "DNxHR SQ", "DNxHR HQ", "DNxHR HQX (10-bit)"];
-                let cur = keys.iter().position(|k| *k == s.dnx_profile).unwrap_or(2);
-                if let Some(i) = combo(ui, reg, "export.video.dnxProfile", labels[cur], &opts(&labels), 220.0) {
-                    s.dnx_profile = keys[i].into();
-                }
-            });
-        }
-        Format::Apv => {
-            row(ui, t, tl!("Profile"), |ui| {
-                let keys = ["422-10", "422-12", "444-10", "444-12"];
-                let labels = ["APV 422-10", "APV 422-12", "APV 444-10", "APV 444-12"];
-                let cur = keys.iter().position(|k| *k == s.apv_profile).unwrap_or(0);
-                if let Some(i) = combo(ui, reg, "export.video.apvProfile", labels[cur], &opts(&labels), 220.0) {
-                    s.apv_profile = keys[i].into();
                 }
             });
         }
@@ -836,23 +804,18 @@ fn audio_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
             return;
         }
     }
-    row(ui, t, tl!("Audio Format"), |ui| {
-        let fixed = audio_only || s.format.is_mxf();
+    row(ui, t, "Audio Format", |ui| {
+        let fixed = audio_only;
         let cur = match s.audio_codec() {
             AudioCodec::Aac => "AAC",
-            AudioCodec::Flac => tl!("FLAC (lossless)"),
-            _ => tl!("Uncompressed (PCM)"),
+            _ => "Uncompressed (PCM)",
         };
-        // MP4 takes AAC or FLAC; QuickTime any of the three
-        let labels = vec![
-            ("AAC".to_string(), !audio_only),
-            (tl!("Uncompressed (PCM)").to_string(), !s.format.is_mp4_with(s.multiplexer)),
-            (tl!("FLAC (lossless)").to_string(), true),
-        ];
+        // MP4 takes AAC; QuickTime takes AAC or PCM.
+        let labels = vec![("AAC".to_string(), !audio_only), ("Uncompressed (PCM)".to_string(), !s.format.is_mp4_with(s.multiplexer))];
         if fixed {
             ui.label(cur);
         } else if let Some(i) = combo(ui, reg, "export.audio.codec", cur, &labels, 180.0) {
-            s.audio.codec = [AudioCodec::Aac, AudioCodec::Pcm, AudioCodec::Flac][i.min(2)];
+            s.audio.codec = [AudioCodec::Aac, AudioCodec::Pcm][i.min(1)];
         }
     });
     row(ui, t, tl!("Sample Rate"), |ui| {
@@ -872,34 +835,21 @@ fn audio_section(ui: &mut egui::Ui, reg: &mut Reg, s: &mut ExportSettings, t: &T
             }
         });
     } else {
-        row(ui, t, tl!("Sample Size"), |ui| {
-            // every size, the ones this codec and container cannot store greyed out; a size the
-            // audio format no longer takes (float after switching to FLAC) becomes 32-bit integer
+        row(ui, t, "Sample Size", |ui| {
+            // every size, the ones this codec and container cannot store greyed out.
             if !s.supports_sample_format(s.audio.sample_format()) {
                 s.audio.set_sample_format(SampleFormat::Int32);
             }
             let sizes = [tl!("16 bit"), tl!("24 bit"), tl!("32 bit"), tl!("32 bit float")];
             let why = |f: SampleFormat| match (s.supports_sample_format(f), s.audio_codec()) {
                 (true, _) => None,
-                (false, AudioCodec::Flac) => Some(tl!("FLAC stores whole-number samples only")),
-                (false, _) if s.format.is_mxf() => Some(tl!("MXF export writes integer PCM only")),
-                (false, _) => Some(tl!("Not supported by FilmCraft's encoders yet")),
+                (false, _) => Some("Not supported by FilmCraft's encoders yet"),
             };
             let labels: Vec<(String, Option<&str>)> = SampleFormat::ALL.iter().zip(sizes).map(|(&f, l)| (l.to_string(), why(f))).collect();
             let cur = SampleFormat::ALL.iter().position(|&f| f == s.audio.sample_format()).and_then(|i| sizes.get(i).copied()).unwrap_or(sizes[0]);
             if let Some(&f) = combo_why(ui, reg, "export.audio.bits", cur, &labels, 120.0).and_then(|i| SampleFormat::ALL.get(i)) {
                 s.audio.set_sample_format(f);
             }
-        });
-    }
-    if s.audio_codec() == AudioCodec::Flac {
-        // every level is lossless: higher levels take longer for smaller files
-        row(ui, t, tl!("Compression Level"), |ui| {
-            let mut level = f64::from(s.audio.flac_level.min(8));
-            if drag(ui, reg, "export.audio.flacLevel", &mut level, 0.0..=8.0, 0.05, "", 0) {
-                s.audio.flac_level = level.round() as u8;
-            }
-            ui.label(egui::RichText::new(tl!("0 fastest, 8 smallest")).size(12.0));
         });
     }
 }

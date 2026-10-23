@@ -73,7 +73,7 @@ let availability = waltcut_platform::register(); // Available("VideoToolbox") on
   held NVENC back. The encoder runs preset P5 with high-quality tuning, CABAC (CAVLC
   for Baseline), one B-frame when the profile and GPU allow it, and an IDR at every keyframe
   distance; the parameter sets go into `avcC`. Export ▸ Hardware encoding (off by default) selects it.
-  It declines two-pass VBR, HDR, MXF, interlaced output, sizes outside NVENC's limits and systems
+  It declines two-pass VBR, HDR, non-H.264 formats, interlaced output, sizes outside NVENC's limits and systems
   without an NVIDIA GPU or driver, and the software encoder runs instead. A failure during an export
   ends it with an error, since a hardware stream cannot be finished in software. The same session,
   ring and input path encode H.265, see [Hardware H.265 (HEVC) encoding (Windows,
@@ -148,7 +148,7 @@ let availability = waltcut_platform::register(); // Available("VideoToolbox") on
   equal bitrate) and the bitrate lands closer to the target without them, so frame reordering is
   off: compressed frames come out in presentation order, with no composition offsets or edit list.
 - **What it declines** (the built-in encoder is used, nothing fails): the setting off, other formats,
-  MXF (Annex B), two-pass VBR, HDR, odd sizes (4:2:0 cannot crop an odd number of samples),
+  non-H.264 formats, two-pass VBR, HDR, odd sizes (4:2:0 cannot crop an odd number of samples),
   non-square pixels, and any configuration VideoToolbox cannot create a hardware session for
   (logged at `info`).
 - **A hardware encoder that fails in the middle of an export is an error**, unlike the decoder:
@@ -231,7 +231,7 @@ level 4 High tier, which many hardware decoders refuse; it is now level 4.1 Main
 - **There is no fallback encoder.** A request NVENC cannot take is counted in
   `export.hardware.declined` and ends the export with "H.265 export with NVENC: …" and the reason:
   10-bit on a GPU without it (HDR), interlaced output, two-pass (`ExportSettings::validate` refuses it first), non-square pixels,
-  MXF, sizes above 65535, odd sizes, sizes outside the GPU's limits (129×33 to 8192×8192 on the RTX
+  unsupported output formats, sizes above 65535, odd sizes, sizes outside the GPU's limits (129×33 to 8192×8192 on the RTX
   5060). On a machine without an HEVC encoder the format is not available and an export fails with
   "encoder not available yet". Frames, sessions and declines are the same `export.hardware` counters
   as for H.264.
@@ -296,7 +296,7 @@ level 4 High tier, which many hardware decoders refuse; it is now level 4.1 Main
 | `tests/nvenc.rs` (Windows / Linux, NVIDIA) | H.264 from NVENC (1280×720, 6 Mbps, 72 frames) decodes with our decoder at worst 46.9 dB luma PSNR; IDR at 0, 24 and 48; dts / pts right |
 | `tests/nvenc_export.rs` (Windows / Linux; fallback also tested without NVIDIA) | Export with hardware encoding against the software encoder through the export pipeline: the two decoded files at worst 54.8 dB luma PSNR; ffmpeg decodes the file without errors; declined cases go to the software encoder; the counters |
 | `tests/nvenc_hevc.rs` (Windows, NVIDIA with HEVC) | HEVC from NVENC (1280×720, 6 Mbps, 72 frames, keyframe every 24) decodes with our HEVC decoder at worst 48.9 dB luma / 51.0 dB chroma PSNR; IDR at 0, 24, 48; dts strictly increasing, pts a permutation, `sps_max_num_reorder_pics` within the dts shift; no parameter sets in the samples; the `hvcC`'s profile / tier / level bytes are the SPS's own; VUI BT.709 limited and timing `(1, 24)`; hostile configurations, sizes, planes and encoders dropped mid-stream give errors, never panics; keyframes every 1–2 pictures without B-frames |
-| `tests/nvenc_hevc_export.rs` (Windows, NVIDIA with HEVC) | H.265 export through the real pipeline, MP4 and QuickTime, toggle Auto and Off: counters (72 frames, 1 session, 0 declined), our decoder against the software H.264 export at worst 54.8 dB luma PSNR, ffprobe `codec_name=hevc`, `profile=Main`, `codec_tag_string=hvc1`, `pix_fmt=yuv420p`, BT.709 limited, 72 frames, 24/1, keyframes at 0 and 48, start 0, `ffmpeg -xerror` clean; with AAC audio; 1920×1080 and 642×362 cropped back from the coded size; every decline (HDR, analysis pass, two-pass, interlaced, non-square pixels, MXF, sizes over 65535, odd sizes, sizes outside the GPU's limits) an error naming NVENC, counted once; H.264 with hardware encoding Off never touches NVENC |
+| `tests/nvenc_hevc_export.rs` (Windows, NVIDIA with HEVC) | H.265 export through the real pipeline, MP4 and QuickTime, toggle Auto and Off: counters (72 frames, 1 session, 0 declined), our decoder against the software H.264 export at worst 54.8 dB luma PSNR, ffprobe `codec_name=hevc`, `profile=Main`, `codec_tag_string=hvc1`, `pix_fmt=yuv420p`, BT.709 limited, 72 frames, 24/1, keyframes at 0 and 48, start 0, `ffmpeg -xerror` clean; with AAC audio; 1920×1080 and 642×362 cropped back from the coded size; every decline (HDR, analysis pass, two-pass, interlaced, non-square pixels, unsupported output formats, sizes over 65535, odd sizes, sizes outside the GPU's limits) an error naming NVENC, counted once; H.264 with hardware encoding Off never touches NVENC |
 | `tests/nvenc_rgba_input.rs` (Windows, NVIDIA) | RGBA input, HEVC Main and H.264 High, 1280×720: solid red, green, blue, white, black and grey decode (our decoder) to the exact BT.709 limited codes of `rgba_to_yuv420_8`, within 2; a moving picture at worst 47.7 dB luma / 50.7 dB chroma PSNR against that conversion; Main 10 has no RGBA input; short pictures and planar / RGBA pictures for the other kind of encoder are errors |
 | `tests/nvenc_hevc_probe.rs` (Windows) | the HEVC probe in a fresh process: its cost, the cached answer, `available(Hevc)` following it after `register()` (twice) |
 | `tests/nvenc_hevc_warm.rs` (Windows) | `register()` answers the HEVC and the Main 10 questions on a thread of its own, before anyone asks; the answers are kept and `hdr_available(Hevc)` follows the Main 10 probe |

@@ -26,20 +26,8 @@ fn write_subs(dir: &Path) {
 }
 
 /// Every fixture `spec`/`fixture` knows (for `cargo xtask fixtures`).
-pub const ALL_FIXTURES: &[&str] = &[
-    "h264_aac.mkv",
-    "vp9_opus.webm",
-    "flac.mkv",
-    "vorbis.mkv",
-    "subs.mkv",
-    "webvtt.webm",
-    "cues_front.mkv",
-    "hevc_hdr.mkv",
-    "prores_pcm.mkv",
-    "mjpeg_ac3.mkv",
-    "av1.mkv",
-    "live.mkv",
-];
+pub const ALL_FIXTURES: &[&str] =
+    &["h264_aac.mkv", "vp9_opus.webm", "subs.mkv", "webvtt.webm", "cues_front.mkv", "hevc_hdr.mkv", "prores_pcm.mkv", "mjpeg_ac3.mkv", "av1.mkv", "live.mkv"];
 
 /// Fixture name → ffmpeg arguments (after `-y -v error`, before the output path).
 /// `None` for fixtures written through a pipe (no Cues, unknown sizes).
@@ -49,8 +37,6 @@ pub fn spec(name: &str) -> Option<Vec<String>> {
     Some(match name {
         "h264_aac.mkv" => cat(&[V, A, &["-t", "2"], x264, &["-c:a", "aac"]]),
         "vp9_opus.webm" => cat(&[V, A, &["-t", "2", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-g", "10", "-c:a", "libopus"]]),
-        "flac.mkv" => cat(&[A, &["-t", "2", "-c:a", "flac"]]),
-        "vorbis.mkv" => cat(&[A, &["-t", "2", "-ac", "2", "-c:a", "vorbis", "-strict", "-2"]]),
         "subs.mkv" => cat(&[
             V,
             &["-i", "in.srt", "-i", "in.srt", "-t", "2", "-map", "0:v", "-map", "1:s", "-map", "2:s"],

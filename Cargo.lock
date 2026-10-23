@@ -4700,29 +4700,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5773a4c030a19d9bfaa090f49746ff35c75dfddfa700df7a5939d5e076a57039"
 dependencies = [
  "lazy_static",
- "symphonia-bundle-flac",
  "symphonia-bundle-mp3",
  "symphonia-codec-aac",
  "symphonia-codec-alac",
  "symphonia-codec-pcm",
- "symphonia-codec-vorbis",
  "symphonia-core",
  "symphonia-format-isomp4",
- "symphonia-format-ogg",
  "symphonia-format-riff",
  "symphonia-metadata",
-]
-
-[[package]]
-name = "symphonia-bundle-flac"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91565e180aea25d9b80a910c546802526ffd0072d0b8974e3ebe59b686c9976"
-dependencies = [
- "log",
- "symphonia-core",
- "symphonia-metadata",
- "symphonia-utils-xiph",
 ]
 
 [[package]]
@@ -4769,17 +4754,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symphonia-codec-vorbis"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f025837c309cd69ffef572750b4a2257b59552c5399a5e49707cc5b1b85d1c73"
-dependencies = [
- "log",
- "symphonia-core",
- "symphonia-utils-xiph",
-]
-
-[[package]]
 name = "symphonia-core"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4799,18 +4773,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "243739585d11f81daf8dac8d9f3d18cc7898f6c09a259675fc364b382c30e0a5"
 dependencies = [
  "encoding_rs",
- "log",
- "symphonia-core",
- "symphonia-metadata",
- "symphonia-utils-xiph",
-]
-
-[[package]]
-name = "symphonia-format-ogg"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b4955c67c1ed3aa8ae8428d04ca8397fbef6a19b2b051e73b5da8b1435639cb"
-dependencies = [
  "log",
  "symphonia-core",
  "symphonia-metadata",
@@ -5375,24 +5337,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waltcut-ac3"
-version = "0.10.0"
-dependencies = [
- "thiserror 2.0.21",
- "waltcut-testkit",
-]
-
-[[package]]
-name = "waltcut-apv"
-version = "0.10.0"
-dependencies = [
- "rayon",
- "thiserror 2.0.21",
- "waltcut-bitstream",
- "waltcut-testkit",
-]
-
-[[package]]
 name = "waltcut-audio-dsp"
 version = "0.10.0"
 dependencies = [
@@ -5453,8 +5397,6 @@ dependencies = [
  "waltcut-gpu",
  "waltcut-media",
  "waltcut-mpegts",
- "waltcut-mxf",
- "waltcut-ogg",
  "waltcut-platform",
  "waltcut-project",
  "waltcut-render",
@@ -5473,13 +5415,10 @@ dependencies = [
  "symphonia",
  "thiserror 2.0.21",
  "waltcut-aac",
- "waltcut-ac3",
- "waltcut-apv",
  "waltcut-av1",
  "waltcut-avi",
  "waltcut-bitstream",
  "waltcut-color",
- "waltcut-dnx",
  "waltcut-frame",
  "waltcut-h264",
  "waltcut-hevc",
@@ -5489,13 +5428,10 @@ dependencies = [
  "waltcut-mpa",
  "waltcut-mpeg2v",
  "waltcut-mpegts",
- "waltcut-mxf",
- "waltcut-ogg",
  "waltcut-opus",
  "waltcut-prores",
  "waltcut-testkit",
  "waltcut-time",
- "waltcut-vp8",
  "waltcut-vp9",
 ]
 
@@ -5505,25 +5441,6 @@ version = "0.10.0"
 dependencies = [
  "proptest",
  "serde",
-]
-
-[[package]]
-name = "waltcut-dng"
-version = "0.10.0"
-dependencies = [
- "rayon",
- "thiserror 2.0.21",
- "waltcut-dng",
-]
-
-[[package]]
-name = "waltcut-dnx"
-version = "0.10.0"
-dependencies = [
- "rayon",
- "thiserror 2.0.21",
- "waltcut-bitstream",
- "waltcut-testkit",
 ]
 
 [[package]]
@@ -5549,7 +5466,6 @@ dependencies = [
  "thiserror 2.0.21",
  "waltcut-codecs",
  "waltcut-color",
- "waltcut-dng",
  "waltcut-edit",
  "waltcut-export",
  "waltcut-format",
@@ -5558,7 +5474,6 @@ dependencies = [
  "waltcut-geom",
  "waltcut-isobmff",
  "waltcut-media",
- "waltcut-mxf",
  "waltcut-project",
  "waltcut-render",
  "waltcut-testkit",
@@ -5576,32 +5491,19 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "waltcut-aac",
- "waltcut-apv",
  "waltcut-codecs",
  "waltcut-color",
- "waltcut-dnx",
- "waltcut-flac",
  "waltcut-frame",
  "waltcut-geom",
  "waltcut-h264enc",
  "waltcut-isobmff",
  "waltcut-media",
- "waltcut-mxf",
  "waltcut-project",
  "waltcut-prores",
  "waltcut-render",
  "waltcut-testkit",
  "waltcut-text",
  "waltcut-time",
-]
-
-[[package]]
-name = "waltcut-flac"
-version = "0.10.0"
-dependencies = [
- "thiserror 2.0.21",
- "waltcut-bitstream",
- "waltcut-testkit",
 ]
 
 [[package]]
@@ -5743,7 +5645,6 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "waltcut-color",
- "waltcut-dng",
  "waltcut-frame",
  "waltcut-testkit",
  "waltcut-time",
@@ -5772,20 +5673,6 @@ name = "waltcut-mpegts"
 version = "0.10.0"
 dependencies = [
  "thiserror 2.0.21",
- "waltcut-testkit",
-]
-
-[[package]]
-name = "waltcut-mxf"
-version = "0.10.0"
-dependencies = [
- "waltcut-testkit",
-]
-
-[[package]]
-name = "waltcut-ogg"
-version = "0.10.0"
-dependencies = [
  "waltcut-testkit",
 ]
 
@@ -5922,13 +5809,6 @@ dependencies = [
  "waltcut-render",
  "waltcut-text",
  "waltcut-time",
-]
-
-[[package]]
-name = "waltcut-vp8"
-version = "0.10.0"
-dependencies = [
- "thiserror 2.0.21",
 ]
 
 [[package]]

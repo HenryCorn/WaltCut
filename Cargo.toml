@@ -19,23 +19,15 @@ waltcut-bitstream = { path = "crates/bitstream" }
 waltcut-isobmff = { path = "crates/isobmff" }
 waltcut-avi = { path = "crates/avi" }
 waltcut-matroska = { path = "crates/matroska" }
-waltcut-mxf = { path = "crates/mxf" }
 waltcut-mpegts = { path = "crates/mpegts" }
 waltcut-mpeg2v = { path = "crates/mpeg2v" }
-waltcut-ac3 = { path = "crates/ac3" }
 waltcut-mpa = { path = "crates/mpa" }
-waltcut-ogg = { path = "crates/ogg" }
 waltcut-h264 = { path = "crates/h264" }
 waltcut-hevc = { path = "crates/hevc" }
-waltcut-vp8 = { path = "crates/vp8" }
 waltcut-vp9 = { path = "crates/vp9" }
 waltcut-prores = { path = "crates/prores" }
-waltcut-dnx = { path = "crates/dnx" }
-waltcut-apv = { path = "crates/apv" }
-waltcut-dng = { path = "crates/dng" }
 waltcut-av1 = { path = "crates/av1" }
 waltcut-aac = { path = "crates/aac" }
-waltcut-flac = { path = "crates/flac" }
 waltcut-opus = { path = "crates/opus" }
 waltcut-h264enc = { path = "crates/h264enc" }
 waltcut-audio-dsp = { path = "crates/audio-dsp" }
@@ -103,35 +95,17 @@ opt-level = 3
 [profile.dev.package.waltcut-prores]
 opt-level = 3
 
-[profile.dev.package.waltcut-dnx]
-opt-level = 3
-
-[profile.dev.package.waltcut-apv]
-opt-level = 3
-
-[profile.dev.package.waltcut-dng]
-opt-level = 3
-
 [profile.dev.package.waltcut-av1]
 opt-level = 3
 
 [profile.dev.package.waltcut-aac]
 opt-level = 3
 
-[profile.dev.package.waltcut-flac]
-opt-level = 3
-
 # Shuttle pitch correction and streaming playback resampling.
 [profile.dev.package.waltcut-audio-dsp]
 opt-level = 3
 
-[profile.dev.package.waltcut-mxf]
-opt-level = 3
-
 [profile.dev.package.waltcut-opus]
-opt-level = 3
-
-[profile.dev.package.waltcut-vp8]
 opt-level = 3
 
 [profile.dev.package.waltcut-vp9]

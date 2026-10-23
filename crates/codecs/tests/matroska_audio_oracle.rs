@@ -1,5 +1,5 @@
 //! Matroska audio made by ffmpeg, against ffmpeg's decode (#236). ffmpeg stamps blocks to the
-//! millisecond, so at 44.1 kHz AAC (1024-sample), MP3 (1152) and AC-3 (1536) packets are each
+//! millisecond, so at 44.1 kHz AAC (1024-sample) and MP3 (1152) packets are each
 //! stamped up to half a millisecond off their exact start. Read back block by block, as playback
 //! reads it, a tone must stay as smooth as ffmpeg's decode of it: no holes or overlaps between
 //! packets.
@@ -16,12 +16,11 @@ fn roughness(x: &[f32], from: usize) -> f32 {
 #[test]
 fn matroska_audio_plays_without_holes() {
     let ff = waltcut_testkit::require_ffmpeg!();
-    let cases: [(&str, u32, &[&str]); 5] = [
+    let cases: [(&str, u32, &[&str]); 4] = [
         ("tone_aac_48k.mkv", 48_000, &["-c:a", "aac", "-b:a", "160k"]),
         ("tone_aac_44k.mkv", 44_100, &["-c:a", "aac", "-b:a", "160k"]),
         ("tone_mp3_44k.mkv", 44_100, &["-c:a", "libmp3lame", "-b:a", "192k"]),
         ("tone_mp2_44k.mkv", 44_100, &["-c:a", "mp2", "-b:a", "192k"]),
-        ("tone_ac3_44k.mkv", 44_100, &["-c:a", "ac3", "-b:a", "192k"]),
     ];
     for (name, rate, codec) in cases {
         let input = format!("sine=frequency=440:sample_rate={rate}:duration=3");
@@ -76,7 +75,7 @@ fn noise(n: usize) -> Vec<f32> {
 }
 
 /// #790: ffmpeg stores the encoder priming as `CodecDelay` (1024 samples = 21.333 ms for AAC at
-/// 48 kHz, 256 = 5.805 ms for AC-3 at 44.1 kHz, 1105 = 25.057 ms for MP3), and block timestamps to
+/// 48 kHz, 1105 = 25.057 ms for MP3), and block timestamps to
 /// the millisecond. Taking the rounded delay as the start of the first packet played the whole
 /// track up to 16 samples late.
 ///
@@ -88,12 +87,9 @@ fn noise(n: usize) -> Vec<f32> {
 #[test]
 fn matroska_audio_is_sample_aligned_with_ffmpeg() {
     let ff = waltcut_testkit::require_ffmpeg!();
-    let cases: [(&str, u32, &[&str]); 6] = [
+    let cases: [(&str, u32, &[&str]); 3] = [
         ("ref_aac_48k.mkv", 48_000, &["-c:a", "aac", "-b:a", "256k"]),
         ("ref_aac_44k.mkv", 44_100, &["-c:a", "aac", "-b:a", "256k"]),
-        ("ref_ac3_44k.mkv", 44_100, &["-c:a", "ac3", "-b:a", "448k"]),
-        ("ref_ac3_48k.mkv", 48_000, &["-c:a", "ac3", "-b:a", "448k"]),
-        ("ref_eac3_48k.mkv", 48_000, &["-c:a", "eac3", "-b:a", "384k"]),
         ("ref_mp3_44k.mkv", 44_100, &["-c:a", "libmp3lame", "-b:a", "320k"]),
     ];
     for (name, rate, codec) in cases {
@@ -144,4 +140,75 @@ fn matroska_audio_is_sample_aligned_with_ffmpeg() {
         let diff = mid.iter().zip(&ours[at as usize..]).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
         assert!(diff < 1e-3, "{name}: a read from {at} differs from continuous decoding by {diff}");
     }
+}
+
+#[test]
+fn ac3_audio_in_retained_matroska_is_picture_only_with_notice() {
+    let ff = waltcut_testkit::require_ffmpeg!();
+    let Some(path) = fixture(
+        &ff,
+        "picture_ac3.mkv",
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=25:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "ac3",
+            "-b:a",
+            "192k",
+        ],
+    ) else {
+        return;
+    };
+    let src = waltcut_codecs::open_bytes("picture_ac3.mkv", bytes(&path)).unwrap();
+    assert!(src.info().video.is_some());
+    assert!(src.info().audio_streams.is_empty());
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
+}
+
+#[test]
+fn flac_audio_in_retained_matroska_is_rejected_actionably() {
+    let ff = waltcut_testkit::require_ffmpeg!();
+    let Some(path) = fixture(
+        &ff,
+        "picture_flac.mkv",
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=25:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "flac",
+        ],
+    ) else {
+        return;
+    };
+    let err = waltcut_codecs::open_bytes("picture_flac.mkv", bytes(&path)).err().expect("FLAC import must fail");
+    let message = err.to_string().to_ascii_lowercase();
+    assert!(message.contains("flac") && message.contains("convert"), "{err}");
 }

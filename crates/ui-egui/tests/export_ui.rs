@@ -441,12 +441,10 @@ fn export_mode_file_name_can_be_emptied_and_retyped() {
 }
 
 /// Sample Size lists every size (16, 24, 32 bit and 32 bit float) the way Audio Format lists every
-/// codec: what the chosen audio format and container cannot store is shown greyed out and cannot
-/// be picked, and a size that stops being available (float after switching to FLAC) becomes
-/// 32-bit integer.
+/// codec: unsupported sample sizes are shown greyed out and cannot be picked.
 #[test]
 fn sample_size_lists_every_size_and_greys_out_what_the_format_cannot_store() {
-    use waltcut_engine::export::{AudioCodec, ExportSettings, Format, SampleFormat};
+    use waltcut_engine::export::{ExportSettings, Format, SampleFormat};
     let mut d = Driver::new("sample-size");
     d.ok("ui.set", json!({"mode": "export"}));
     d.frames(4);
@@ -471,34 +469,6 @@ fn sample_size_lists_every_size_and_greys_out_what_the_format_cannot_store() {
     d.snapshot("export-sample-size-wav");
     d.click("export.audio.bits.option.3");
     assert_eq!(d.app().ui.export.settings.audio.sample_format(), SampleFormat::Float32);
-
-    // FLAC: float is greyed out, so the float choice becomes 32-bit integer and clicking float
-    // changes nothing
-    d.app().ui.export.settings.format = Format::Flac;
-    d.frames(4);
-    assert_eq!(d.app().ui.export.settings.audio_codec(), AudioCodec::Flac);
-    assert_eq!(d.app().ui.export.settings.audio.sample_format(), SampleFormat::Int32);
-    open_sizes(&mut d);
-    d.snapshot("export-sample-size-flac");
-    d.click("export.audio.bits.option.3");
-    assert_eq!(d.app().ui.export.settings.audio.sample_format(), SampleFormat::Int32, "32 bit float is not available for FLAC");
-    if d.has("export.audio.bits.option.0") {
-        d.click("export.audio.bits");
-    }
-    d.click("export.audio.bits");
-    d.click("export.audio.bits.option.1");
-    assert_eq!(d.app().ui.export.settings.audio.sample_format(), SampleFormat::Int24);
-
-    // MXF: integer PCM only
-    d.app().ui.export.settings = ExportSettings { format: Format::MxfOp1a, ..Default::default() };
-    d.frames(4);
-    open_sizes(&mut d);
-    d.snapshot("export-sample-size-mxf");
-    d.click("export.audio.bits.option.3");
-    assert!(!d.app().ui.export.settings.audio.float, "32 bit float is not available for MXF");
-    if d.has("export.audio.bits.option.0") {
-        d.click("export.audio.bits");
-    }
 
     // QuickTime PCM (ProRes): all four again
     d.app().ui.export.settings = ExportSettings { format: Format::ProRes, ..Default::default() };

@@ -77,7 +77,7 @@ workflows' commands once the reduction is finished.
 | Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
-| Export | `file.exportMedia`, `file.exportFrame`, `export.quick` (no export queue) |
+| Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |
 
 ### Media formats
 

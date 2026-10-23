@@ -1,4 +1,4 @@
-//! Shared helpers for the codecs oracle tests (MXF, Ogg). ffmpeg/ffprobe are external fixture
+//! Shared helpers for the codecs oracle tests (MPEG TS / PS). ffmpeg/ffprobe are external fixture
 //! generators and oracles only (never linked).
 #![allow(dead_code)]
 

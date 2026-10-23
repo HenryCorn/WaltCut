@@ -1,4 +1,4 @@
-//! Step-wise export of the encoded-video formats (H.264 MP4/MOV, ProRes / DNxHR / Motion-JPEG MOV).
+//! Step-wise export of encoded-video formats (H.264 MP4/MOV, ProRes / Motion-JPEG MOV).
 //!
 //! [`Exporter::step`] renders, encodes and muxes one batch of frames (plus the audio up to its
 //! end) per call, so a host without threads (the web app) can run an export a slice at a time
@@ -69,7 +69,6 @@ use waltcut_render::SourceProvider;
 use waltcut_time::FrameRate;
 
 use crate::audio_out::AudioOut;
-use crate::mxf_out::{MxfMux, MxfSetup};
 use crate::pipeline::Pipeline;
 use crate::settings::{AudioCodec, BitrateMode};
 use crate::{
@@ -172,10 +171,6 @@ pub struct Exporter {
     queued: Vec<EncodedPacket>,
     /// Created after the first group was encoded (encoders may finalise their codec config then).
     mux: Option<Mp4Writer<Out>>,
-    /// MXF exports write through this instead of `mux`.
-    mxf: Option<MxfMux>,
-    seq: ItemId,
-    project: Arc<Project>,
     vt: usize,
     at: Option<usize>,
     t0: std::time::Instant,
@@ -183,10 +178,7 @@ pub struct Exporter {
 
 /// Whether [`Exporter`] handles a format.
 pub fn stepped(format: Format) -> bool {
-    matches!(
-        format,
-        Format::H264 | Format::Hevc | Format::Av1 | Format::ProRes | Format::DnxHr | Format::Apv | Format::Mjpeg | Format::MxfOp1a | Format::MxfOpAtom
-    )
+    matches!(format, Format::H264 | Format::Hevc | Format::Av1 | Format::ProRes | Format::Mjpeg)
 }
 
 /// Whether an export is HDR: an HDR working space, SDR not asked for, and a format whose encoder
@@ -195,7 +187,7 @@ pub(crate) fn hdr_output(working_hdr: bool, sdr: bool, format: Format, hdr_avail
     working_hdr
         && !sdr
         && match format {
-            Format::H264 | Format::ProRes | Format::DnxHr | Format::Apv => true,
+            Format::H264 | Format::ProRes => true,
             Format::Hevc => hdr_available(Format::Hevc),
             _ => false,
         }
@@ -222,7 +214,7 @@ impl Exporter {
         }
         settings.validate()?;
         let q = project.sequence(seq).ok_or(ExportError::NoSequence)?;
-        // HDR sequences export HDR (H.264 / ProRes / DNxHR / APV, and H.265 where a registered encoder
+        // HDR sequences export HDR (H.264 / ProRes, and H.265 where a registered encoder
         // writes Main 10) unless SDR is asked for; elsewhere H.265 is tone-mapped 8-bit SDR
         let pipe = q.settings.color;
         let hdr_out = hdr_output(pipe.working.is_hdr(), settings.sdr, settings.video_format(), crate::hdr_available);
@@ -257,7 +249,6 @@ impl Exporter {
                     audio_factories().read().unwrap_or_else(|e| e.into_inner()).iter().find_map(|f| f(settings.format, a.sr, a.channels as u32, &settings));
                 Some(found.ok_or_else(|| ExportError::Unsupported("AAC encoder not available".into()))??)
             }
-            (Some(a), AudioCodec::Flac) => Some(Box::new(crate::FlacAudio::new(a.sr, a.channels as u32, &settings)?)),
             _ => None,
         };
         Ok(Self {
@@ -277,9 +268,6 @@ impl Exporter {
             first_pass: two_pass,
             queued: Vec::new(),
             mux: None,
-            mxf: None,
-            seq,
-            project: project.clone(),
             vt: 0,
             at: None,
             t0: std::time::Instant::now(),
@@ -340,12 +328,6 @@ impl Exporter {
     }
 
     fn write_audio(&mut self, planar: Option<Vec<Vec<f32>>>) -> Result<()> {
-        if let Some(m) = self.mxf.as_mut() {
-            return match planar {
-                Some(buf) => m.write_audio(&buf),
-                None => Ok(()),
-            };
-        }
         let (Some(at), Some(buf)) = (self.at, planar) else { return Ok(()) };
         let n = buf.first().map_or(0, Vec::len);
         if n == 0 {
@@ -371,9 +353,6 @@ impl Exporter {
     }
 
     fn write_video(&mut self, packets: Vec<EncodedPacket>) -> Result<()> {
-        if let Some(m) = self.mxf.as_mut() {
-            return m.write_video(packets);
-        }
         let mux = self.mux.as_mut().ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?;
         for p in packets {
             mux.write_sample(self.vt, WriteSample { data: &p.data, duration: p.duration, composition_offset: p.composition_offset, is_sync: p.key })
@@ -384,23 +363,6 @@ impl Exporter {
 
     /// Create the muxer and its tracks (after the first batch was encoded).
     fn open_mux(&mut self) -> Result<()> {
-        if self.settings.format.is_mxf() {
-            let q = self.project.sequence(self.seq).ok_or(ExportError::NoSequence)?;
-            // start timecode of the first exported frame, at the output rate
-            let seq_rate = q.settings.frame_rate;
-            let start = self.pipe.rate.frame_at(seq_rate.tick_of(q.start_timecode)) + self.f0;
-            let name = self.project.item(self.seq).map(|i| i.name.clone()).unwrap_or_default();
-            self.mxf = Some(MxfMux::new(MxfSetup {
-                settings: &self.settings,
-                name,
-                width: self.pipe.w,
-                height: self.pipe.h,
-                rate: self.pipe.rate,
-                audio: self.audio.as_ref().map(|a| (a.sr, a.channels)),
-                timecode: (start, q.settings.drop_frame),
-            })?);
-            return Ok(());
-        }
         let file = Out::create(&self.settings)?;
         let mut opts = WriterOptions::new(self.brand);
         opts.metadata = self.settings.metadata.udta();
@@ -458,7 +420,7 @@ impl Exporter {
         if waltcut_media::pending::take() {
             return Ok(Step::Pending);
         }
-        if self.mux.is_none() && self.mxf.is_none() {
+        if self.mux.is_none() {
             self.open_mux()?;
         }
         let mut tail = std::mem::take(&mut self.queued);
@@ -467,25 +429,18 @@ impl Exporter {
         self.write_audio(mixed)?;
         if let (Some(at), Some(a)) = (self.at, self.aenc.as_mut()) {
             let mux = self.mux.as_mut().ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?;
-            for (au, duration) in a.flush_timed()? {
-                mux.write_sample(at, WriteSample { data: &au, duration, composition_offset: 0, is_sync: true }).map_err(|e| ExportError::Io(e.to_string()))?;
-            }
-            if let Some(entry) = a.final_sample_entry() {
-                mux.set_sample_entry(at, entry).map_err(|e| ExportError::Io(e.to_string()))?;
+            for au in a.flush()? {
+                mux.write_sample(at, WriteSample { data: &au, duration: a.frame_size(), composition_offset: 0, is_sync: true })
+                    .map_err(|e| ExportError::Io(e.to_string()))?;
             }
         }
-        let (bytes, extra_files) = match self.mxf.take() {
-            Some(m) => m.finish(&self.settings)?,
-            None => {
-                let w = self
-                    .mux
-                    .take()
-                    .ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?
-                    .finish()
-                    .map_err(|e| ExportError::Io(e.to_string()))?;
-                (w.finish(&self.settings)?, Vec::new())
-            }
-        };
+        let w = self
+            .mux
+            .take()
+            .ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?
+            .finish()
+            .map_err(|e| ExportError::Io(e.to_string()))?;
+        let bytes = w.finish(&self.settings)?;
         note_stage(Stage::Finish, finishing.elapsed());
         let secs = self.t0.elapsed().as_secs_f64();
         let nframes = self.frames();
@@ -493,14 +448,7 @@ impl Exporter {
             progress.finished.store(true, Ordering::Relaxed);
             progress.set_status(format!("Done in {secs:.1}s"));
         }
-        Ok(Step::Done(Report {
-            path: self.settings.path.clone(),
-            frames: nframes,
-            seconds: secs,
-            bytes,
-            render_fps: nframes as f64 / secs.max(1e-6),
-            extra_files,
-        }))
+        Ok(Step::Done(Report { path: self.settings.path.clone(), frames: nframes, seconds: secs, bytes, render_fps: nframes as f64 / secs.max(1e-6) }))
     }
 
     /// Encode (and mux) the batch starting at `self.next`, rendering the one after it meanwhile.
@@ -599,7 +547,7 @@ impl Exporter {
             self.queued.extend(packets);
             if cuts.contains(&(fi + 1)) {
                 timed(Stage::Mux, || -> Result<()> {
-                    if self.mux.is_none() && self.mxf.is_none() {
+                    if self.mux.is_none() {
                         self.open_mux()?;
                     }
                     let packets = std::mem::take(&mut self.queued);
