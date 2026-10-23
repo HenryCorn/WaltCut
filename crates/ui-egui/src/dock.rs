@@ -13,14 +13,11 @@ use crate::theme::Tokens;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PanelKind {
     Project,
-    Libraries,
-    Info,
     Effects,
     Markers,
     History,
     Source,
     EffectControls,
-    Metadata,
     Program,
     Timeline,
     Tools,
@@ -28,21 +25,16 @@ pub enum PanelKind {
     Properties,
     Events,
     Progress,
-    Timecode,
-    ProjectNotes,
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 18] = [
+    pub const ALL: [PanelKind; 13] = [
         PanelKind::Project,
-        PanelKind::Libraries,
-        PanelKind::Info,
         PanelKind::Effects,
         PanelKind::Markers,
         PanelKind::History,
         PanelKind::Source,
         PanelKind::EffectControls,
-        PanelKind::Metadata,
         PanelKind::Program,
         PanelKind::Timeline,
         PanelKind::Tools,
@@ -50,20 +42,15 @@ impl PanelKind {
         PanelKind::Properties,
         PanelKind::Events,
         PanelKind::Progress,
-        PanelKind::Timecode,
-        PanelKind::ProjectNotes,
     ];
     pub fn title(self) -> &'static str {
         match self {
             PanelKind::Project => "Project",
-            PanelKind::Libraries => "Libraries",
-            PanelKind::Info => "Info",
             PanelKind::Effects => "Effects",
             PanelKind::Markers => "Markers",
             PanelKind::History => "History",
             PanelKind::Source => "Source",
             PanelKind::EffectControls => "Effect Controls",
-            PanelKind::Metadata => "Metadata",
             PanelKind::Program => "Program",
             PanelKind::Timeline => "Timeline",
             PanelKind::Tools => "Tools",
@@ -71,8 +58,6 @@ impl PanelKind {
             PanelKind::Properties => "Properties",
             PanelKind::Events => "Events",
             PanelKind::Progress => "Progress",
-            PanelKind::Timecode => "Timecode",
-            PanelKind::ProjectNotes => "Project Notes",
         }
     }
     pub fn id(self) -> String {
@@ -245,8 +230,8 @@ pub fn workspace(_name: &str) -> DockNode {
     // Timeline | Meters.
     vsplit(
         Ratio(0.57),
-        hsplit(FixedB(450.0), hsplit(Ratio(0.5), tabs(&[Source, EffectControls, Metadata], 0), tabs(&[Program], 0)), tabs(&[Properties, EssentialGraphics], 0)),
-        hsplit(Ratio(0.29), tabs(&[Project, Libraries, Info, Effects, Markers, History], 0), hsplit(FixedA(64.0), tabs(&[Tools], 0), tabs(&[Timeline], 0))),
+        hsplit(FixedB(450.0), hsplit(Ratio(0.5), tabs(&[Source, EffectControls], 0), tabs(&[Program], 0)), tabs(&[Properties, EssentialGraphics], 0)),
+        hsplit(Ratio(0.29), tabs(&[Project, Effects, Markers, History], 0), hsplit(FixedA(64.0), tabs(&[Tools], 0), tabs(&[Timeline], 0))),
     )
 }
 
@@ -785,10 +770,10 @@ mod tests {
     #[test]
     fn close_and_open() {
         let mut d = workspace("Editing");
-        d.close(PanelKind::Metadata);
-        assert!(!d.contains(PanelKind::Metadata));
-        d.open_near(PanelKind::Metadata, PanelKind::Program);
-        assert!(d.is_visible(PanelKind::Metadata));
+        d.close(PanelKind::History);
+        assert!(!d.contains(PanelKind::History));
+        d.open_near(PanelKind::History, PanelKind::Program);
+        assert!(d.is_visible(PanelKind::History));
         let s = serde_json::to_string(&d).unwrap();
         let back: DockNode = serde_json::from_str(&s).unwrap();
         assert_eq!(back, d);
@@ -810,8 +795,8 @@ mod tests {
         assert!(d.is_visible(PanelKind::Timeline));
         // a tree without Project or Program: the panel joins the first group
         let mut d = hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects], 0), tabs(&[PanelKind::Markers], 0));
-        d.open_near(PanelKind::Info, PanelKind::Source);
-        assert!(d.is_visible(PanelKind::Info));
-        assert_eq!(d, hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects, PanelKind::Info], 1), tabs(&[PanelKind::Markers], 0)));
+        d.open_near(PanelKind::History, PanelKind::Source);
+        assert!(d.is_visible(PanelKind::History));
+        assert_eq!(d, hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects, PanelKind::History], 1), tabs(&[PanelKind::Markers], 0)));
     }
 }

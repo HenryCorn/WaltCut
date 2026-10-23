@@ -36,21 +36,8 @@ use crate::{EngineError, Session};
 pub const APPLICATION: &str = "Application";
 
 /// Panels that can have panel-specific shortcuts (the shortcut editor's "Commands" menu).
-pub const PANELS: &[&str] = &[
-    "Timeline",
-    "Program",
-    "Source",
-    "Project",
-    "Effect Controls",
-    "Effects",
-    "History",
-    "Markers",
-    "Metadata",
-    "Audio Track Mixer",
-    "Audio Clip Mixer",
-    "Essential Graphics",
-    "Properties",
-];
+pub const PANELS: &[&str] =
+    &["Timeline", "Program", "Source", "Project", "Effect Controls", "Effects", "History", "Markers", "Essential Graphics", "Properties"];
 
 pub const DEFAULT_PRESET: &str = "FilmCraft Default";
 pub const BUILTIN_PRESETS: [&str; 1] = [DEFAULT_PRESET];

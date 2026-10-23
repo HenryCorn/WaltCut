@@ -249,7 +249,7 @@ fn floating_panel_blocks_os_drop_and_hover_but_uncovered_timeline_still_accepts(
             step(&mut h);
         }
         let at = point_on_row(&h, "timeline.track.V1.target");
-        float_panel(&mut h, "Info", [at.x - 20.0, at.y - 60.0, 320.0, 200.0]);
+        float_panel(&mut h, "Markers", [at.x - 20.0, at.y - 60.0, 320.0, 200.0]);
         let project = h.state().session.project.clone();
         let covered_preview = hover_at(&mut h, at);
         assert!(std::sync::Arc::ptr_eq(&project, &h.state().session.project), "hover does not edit the project");
@@ -258,7 +258,7 @@ fn floating_panel_blocks_os_drop_and_hover_but_uncovered_timeline_still_accepts(
         assert_eq!(h.state().session.project.items.len(), items_before + 1);
         assert_eq!(clip_counts(&h), (0, 0), "a covered Timeline must not be edited");
         assert!(!covered_preview, "a covered Timeline must not preview a placement");
-        float_panel(&mut h, "Info", [5.0, 5.0, 320.0, 200.0]);
+        float_panel(&mut h, "Markers", [5.0, 5.0, 320.0, 200.0]);
         let at = point_on_row(&h, "timeline.track.V1.target");
         assert!(hover_at(&mut h, at));
         drop_at(&mut h, at, &still(&format!("drop_uncovered_{scale}.png")));
@@ -274,7 +274,7 @@ fn floating_timeline_accepts_once_and_another_float_can_occlude_it() {
     assert!(hover_at(&mut h, at));
     drop_at(&mut h, at, &still("drop_floating_timeline.png"));
     assert_eq!(clip_counts(&h), (1, 0));
-    float_panel(&mut h, "Info", [at.x - 20.0, at.y - 60.0, 320.0, 200.0]);
+    float_panel(&mut h, "Markers", [at.x - 20.0, at.y - 60.0, 320.0, 200.0]);
     assert!(!hover_at(&mut h, at));
     drop_at(&mut h, at, &still("drop_occluded_floating_timeline.png"));
     assert_eq!(clip_counts(&h), (1, 0));
@@ -285,8 +285,8 @@ fn offscreen_float_uses_rendered_clamp_and_maximized_timeline_ignores_hidden_flo
     let mut h = harness();
     let at = point_on_row(&h, "timeline.track.V1.target");
     // The very wide offscreen float is clamped back to x=0, over this row.
-    float_panel(&mut h, "Info", [-5000.0, at.y - 60.0, 1500.0, 200.0]);
-    let visible = control_rect(&h, "panel.Info");
+    float_panel(&mut h, "Markers", [-5000.0, at.y - 60.0, 1500.0, 200.0]);
+    let visible = control_rect(&h, "panel.Markers");
     assert!(visible.contains(at), "rendered={visible:?}, drop={at:?}, floats={:?}", h.state().ui.floating);
     assert!(!hover_at(&mut h, at));
     drop_at(&mut h, at, &still("drop_clamped_occlusion.png"));

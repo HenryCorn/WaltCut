@@ -158,16 +158,10 @@ fn every_panel_opens_from_the_window_menu() {
     let menu = d.ok("ui.menu.list", json!({}));
     let window: Vec<String> =
         menu.as_array().unwrap().iter().filter(|m| m["path"] == json!(["Window"])).filter_map(|m| m["label"].as_str().map(str::to_string)).collect();
-    for p in ["Events", "Metadata", "Progress", "Project Notes", "Timecode"] {
+    for p in ["Events", "Progress"] {
         assert!(window.iter().any(|w| w == p), "{p} not in Window: {window:?}");
     }
-    for (panel, key) in [
-        ("Metadata", "metadata."),
-        ("Timecode", "timecode.row.0"),
-        ("Events", "events.clearAll"),
-        ("Progress", "progress.showFinished"),
-        ("ProjectNotes", "notes.text"),
-    ] {
+    for (panel, key) in [("Events", "events.clearAll"), ("Progress", "progress.showFinished")] {
         d.ok("ui.menu.invoke", json!({"id": format!("window.panel.{panel}")}));
         d.frames(3);
         assert!(d.has(&format!("panel.tab.{panel}")), "{panel} has no tab");
@@ -231,7 +225,7 @@ fn wheel_over_a_tab_strip_switches_tabs() {
     let mut d = Driver::demo();
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, -40.0);
-    assert_eq!(shown(&mut d), PanelKind::Libraries);
+    assert_eq!(shown(&mut d), PanelKind::Effects);
     wheel(&mut d, 40.0);
     assert_eq!(shown(&mut d), PanelKind::Project);
     wheel(&mut d, 120.0);
@@ -250,119 +244,18 @@ fn wheel_over_a_tab_strip_switches_tabs() {
             phase: egui::TouchPhase::Move,
         });
         d.frames(1);
-        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Libraries };
+        let expect = if step < 3 { PanelKind::Project } else { PanelKind::Effects };
         assert_eq!(shown(&mut d), expect, "after {} pt", (step + 1) * 10);
     }
 
-    d.ok("ui.scroll", json!({"id": "panel.Libraries", "dy": -40.0}));
+    d.ok("ui.scroll", json!({"id": "panel.Effects", "dy": -40.0}));
     d.frames(2);
-    assert_eq!(shown(&mut d), PanelKind::Libraries, "the wheel over the content keeps the tab");
+    assert_eq!(shown(&mut d), PanelKind::Effects, "the wheel over the content keeps the tab");
 
     for _ in 0..10 {
         wheel(&mut d, -40.0);
     }
     assert_eq!(shown(&mut d), PanelKind::History, "no wrap past the last tab");
-}
-
-#[test]
-fn metadata_panel_edits_a_field_with_undo() {
-    let mut d = Driver::demo();
-    let item = d.app().session.project.items.values().filter(|i| i.as_media().is_some()).map(|i| i.id).min().unwrap();
-    d.app().session.state.project_selection = vec![item];
-    d.app().ui.focused = waltcut_ui_egui::dock::PanelKind::Project;
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.Metadata"}));
-    d.ok("ui.set", json!({"focused": "Project"}));
-    d.frames(3);
-    let name = d.app().session.project.item(item).unwrap().name.clone();
-    assert_eq!(d.label("metadata.header"), format!("Clip: {name}"));
-    for id in [
-        "metadata.field.Name",
-        "metadata.label",
-        "metadata.field.MediaStart",
-        "metadata.field.MediaDuration",
-        "metadata.field.Scene",
-        "metadata.field.LogNote",
-        "metadata.field.FilePath",
-        "metadata.section.File",
-    ] {
-        assert!(d.has(id), "{id} missing: {:?}", d.ids("metadata."));
-    }
-    d.snapshot("panels-metadata", Some("metadata."));
-    // type into Scene and commit with Enter: one undo step
-    let undo0 = d.app().session.history.undo.len();
-    d.click("metadata.field.Scene");
-    d.ok("ui.type", json!({"text": "42A"}));
-    d.frames(2);
-    d.ok("ui.key", json!({"key": "Enter"}));
-    d.frames(3);
-    assert_eq!(d.app().session.project.item(item).unwrap().metadata.get("Scene").map(String::as_str), Some("42A"));
-    assert_eq!(d.app().session.history.undo.len(), undo0 + 1);
-    assert_eq!(d.label("metadata.field.Scene"), "42A");
-    d.exec("edit.undo", json!({}));
-    d.frames(2);
-    assert!(!d.app().session.project.item(item).unwrap().metadata.contains_key("Scene"));
-    // the same edit from an agent
-    d.exec("metadata.set", json!({"item": item.0, "field": "Tape Name", "value": "A001"}));
-    d.frames(2);
-    assert_eq!(d.label("metadata.field.TapeName"), "A001");
-}
-
-/// #620: notes typed into Project Notes land in the project; one typing session is one undo step.
-#[test]
-fn project_notes_panel_types_into_the_project_with_undo() {
-    let mut d = Driver::demo();
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.ProjectNotes"}));
-    d.frames(3);
-    let undo0 = d.app().session.history.undo.len();
-    d.click("notes.text");
-    d.ok("ui.type", json!({"text": "Fix logo"}));
-    d.frames(2);
-    d.ok("ui.key", json!({"key": "Enter"}));
-    d.ok("ui.type", json!({"text": "at 1:02"}));
-    d.frames(3);
-    assert_eq!(d.app().session.project.notes, "Fix logo\nat 1:02");
-    assert_eq!(d.app().session.history.undo.len(), undo0 + 1);
-    assert_eq!(d.label("notes.text"), "Fix logo\nat 1:02");
-    d.exec("edit.undo", json!({}));
-    d.frames(2);
-    assert_eq!(d.app().session.project.notes, "");
-    // an agent writes them, the panel shows them
-    d.exec("project.setNotes", json!({"text": "From the script"}));
-    d.frames(2);
-    assert_eq!(d.label("notes.text"), "From the script");
-}
-
-#[test]
-fn timecode_panel_rows_and_modes() {
-    let mut d = Driver::demo();
-    d.exec("playhead.set", json!({"timecode": "00:00:02:00"}));
-    d.ok("ui.menu.invoke", json!({"id": "window.panel.Timecode"}));
-    d.frames(3);
-    assert_eq!(d.label("timecode.row.0"), "00:00:02:00");
-    d.click("timecode.addRow");
-    assert_eq!(d.ui_panels()["timecode"]["rows"].as_array().unwrap().len(), 2);
-    // the new row is a duration: the sequence's
-    let (dur, df, rate) = {
-        let q = d.app().session.active_sequence().unwrap();
-        (q.duration(), q.settings.drop_frame, q.settings.frame_rate)
-    };
-    let want = waltcut_time::format_time(dur, rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
-    assert_eq!(d.label("timecode.row.1"), want);
-    // frames display and Remaining through ui.set
-    d.ok("ui.set", json!({"panels": {"timecode": {"rows": [{"mode": "current", "display": "Frames"}, {"mode": "remaining"}]}}}));
-    d.frames(2);
-    let frame = rate.frame_at(d.app().session.playhead());
-    assert_eq!(d.label("timecode.row.0"), frame.to_string());
-    let rem = waltcut_time::format_time(dur - d.app().session.playhead(), rate, df, waltcut_time::TimeDisplay::Timecode, 48000);
-    assert_eq!(d.label("timecode.row.1"), rem);
-    d.snapshot("panels-timecode", Some("timecode."));
-    // right-click menu: Media Time
-    d.ok("ui.click", json!({"id": "timecode.row.1", "button": "right"}));
-    d.frames(2);
-    if d.has("timecode.row.1.mode.media") {
-        d.click("timecode.row.1.mode.media");
-        assert_eq!(d.ui_panels()["timecode"]["rows"][1]["mode"], json!("media"));
-    }
 }
 
 #[test]
@@ -432,7 +325,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     let mut d = Driver::demo();
     for theme in ["dark", "light"] {
         d.ok("ui.set", json!({"theme": theme}));
-        for panel in ["Program", "EssentialGraphics", "Timeline", "Libraries"] {
+        for panel in ["Program", "EssentialGraphics", "Timeline", "Effects"] {
             d.ok("ui.panel.show", json!({"panel": panel}));
             d.ok("ui.set", json!({"focused": panel}));
             d.frames(3);
