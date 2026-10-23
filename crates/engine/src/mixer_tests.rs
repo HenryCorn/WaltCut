@@ -68,9 +68,9 @@ impl Session {
 #[test]
 fn strip_settings_undo_redo_and_inspect() {
     let mut s = demo();
-    s.execute("mixer.setStrip", json!({"strip": "A1", "volumeDb": -6.0, "pan": -30.0, "mode": "Touch", "recordArm": true, "solo": true})).unwrap();
+    s.execute("mixer.setStrip", json!({"strip": "A1", "volumeDb": -6.0, "pan": -30.0, "mode": "Touch", "solo": true})).unwrap();
     let t = a1(&s);
-    assert_eq!((t.volume_db, t.pan, t.mixer.mode, t.mixer.record_arm, t.solo), (-6.0, -30.0, AutomationMode::Touch, true, true));
+    assert_eq!((t.volume_db, t.pan, t.mixer.mode, t.solo), (-6.0, -30.0, AutomationMode::Touch, true));
     s.execute("mixer.setStrip", json!({"strip": "Mix", "volumeDb": -3.0})).unwrap();
     assert_eq!(s.active_sequence().unwrap().master_volume_db, -3.0);
     s.execute("edit.undo", json!({})).unwrap();

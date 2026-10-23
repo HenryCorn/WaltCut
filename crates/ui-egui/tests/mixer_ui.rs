@@ -178,17 +178,7 @@ fn track_mixer_controls_by_id_and_by_drag() {
     d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
     d.frames(3);
     let ids = d.ids("mixer.");
-    for id in [
-        "mixer.A1.fader",
-        "mixer.A1.pan",
-        "mixer.A1.mode",
-        "mixer.A1.mute",
-        "mixer.A1.solo",
-        "mixer.A1.record",
-        "mixer.A1.output",
-        "mixer.Mix.fader",
-        "mixer.showEffects",
-    ] {
+    for id in ["mixer.A1.fader", "mixer.A1.pan", "mixer.A1.mode", "mixer.A1.mute", "mixer.A1.solo", "mixer.A1.output", "mixer.Mix.fader", "mixer.showEffects"] {
         assert!(ids.iter().any(|i| i == id), "{id} missing from {ids:?}");
     }
     // automation mode from the dropdown

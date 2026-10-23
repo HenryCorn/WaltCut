@@ -484,9 +484,6 @@ pub struct UiState {
     /// Audio Track Mixer ▸ Show/Hide Tracks: strip ids (audio tracks, submixes) not shown.
     #[serde(default)]
     pub mixer_hidden: Vec<u64>,
-    /// Audio Track Mixer ▸ Meter Input(s) Only: record-armed track meters show the recording input.
-    #[serde(default)]
-    pub mixer_meter_input_only: bool,
     /// Audio Gain dialog draft (mode, dB values).
     #[serde(default)]
     pub audio_gain: AudioGainDraft,
@@ -819,7 +816,6 @@ impl Default for UiState {
             play_after_render: true,
             mixer_fx_open: false,
             mixer_hidden: Vec::new(),
-            mixer_meter_input_only: false,
             settings: None,
             audio_gain: AudioGainDraft::default(),
             add_tracks: AddTracksDraft::default(),

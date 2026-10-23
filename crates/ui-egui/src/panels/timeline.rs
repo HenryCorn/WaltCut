@@ -1213,7 +1213,6 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
     let hw = app.ui.timeline.header_w;
     let tg = app.session.targeting();
     let mut actions: Vec<(String, Value)> = Vec::new();
-    let mut vo_action = None;
     for r in rows {
         let Some(tr) = seq.track(r.track) else { continue };
         let clip_rect = if r.kind == TrackKind::Video { vclip } else { aclip };
@@ -1349,11 +1348,7 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             if so.clicked() {
                 actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "solo": !tr.solo})));
             }
-            let vr = small(x + 42.0, upper_y);
-            if let Some(a) = super::voiceover::header_button(app, ui, r.track, vr, visible, &label, t) {
-                vo_action = Some(a);
-            }
-            let kr = small(x + 64.0, upper_y);
+            let kr = small(x + 42.0, upper_y);
             super::timeline_automation::header_button(app, ui, seq, r, kr, visible, &label, t);
         }
         // 5. name on the lower line (or inline when short)
@@ -1398,9 +1393,6 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
         if let Err(e) = app.session.execute(&cmd, params) {
             app.ui.status = e.to_string();
         }
-    }
-    if let Some(a) = vo_action {
-        super::voiceover::run(app, &ui.ctx().clone(), a);
     }
 }
 

@@ -308,7 +308,7 @@ fn project_scratch_folders_outside_the_project_are_not_used() {
 }
 
 /// The Captured Audio and Video and Audio Previews folders a project names follow the same rule:
-/// voice-over takes and pasted images go next to the project unless the folder is
+/// pasted images go next to the project unless the folder is
 /// inside the project's folder; folders on another computer are never used.
 #[test]
 fn project_captured_folder_outside_the_project_is_not_used() {
@@ -328,7 +328,7 @@ fn project_captured_folder_outside_the_project_is_not_used() {
             Ok(())
         })
         .unwrap();
-        assert_eq!(crate::voiceover::media_dir(&s, &serde_json::Value::Null, "Captured"), beside, "{dir}");
+        assert_eq!(crate::paste_media::media_dir(&s, "Captured"), beside, "{dir}");
         let paths = crate::project_tools::scratch_paths(&s);
         assert_eq!(paths["captured"]["path"], json!(beside), "{dir}");
         assert_eq!(paths["audioPreviews"]["path"], json!(beside), "{dir}");
@@ -339,7 +339,7 @@ fn project_captured_folder_outside_the_project_is_not_used() {
         Ok(())
     })
     .unwrap();
-    assert_eq!(crate::voiceover::media_dir(&s, &serde_json::Value::Null, "Captured"), inner);
+    assert_eq!(crate::paste_media::media_dir(&s, "Captured"), inner);
     assert!(s.execute("file.projectSettings.scratchDisks", json!({"captured": "file://192.0.2.1/s/cap"})).is_err());
     let _ = std::fs::remove_dir_all(&d);
 }

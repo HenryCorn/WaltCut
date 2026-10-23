@@ -24,7 +24,6 @@
 mod app_nap;
 mod args;
 mod audio;
-mod audio_in;
 mod control_server;
 mod file_filters;
 mod graphics;
@@ -197,8 +196,6 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
                 log::warn!("auto-save and crash recovery unavailable: {e}");
             }
         }
-        // voice-over recording reads the microphone through cpal
-        session.voiceover.input = Some(Box::new(audio_in::CpalIn::new(&session.prefs.audio_hardware.device_class)));
         let (project, media) = args::project_and_media(&files);
         if let Some(p) = project {
             if let Err(e) = session.execute("file.open", json!({"path": p})) {

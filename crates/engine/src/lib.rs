@@ -43,7 +43,6 @@ pub mod shortcut_presets;
 pub mod shortcuts;
 pub mod source_monitor;
 pub mod trim;
-pub mod voiceover;
 
 use std::sync::Arc;
 
@@ -356,8 +355,6 @@ pub struct Session {
     pub previews: Arc<previews::PreviewStore>,
     /// Audio Track Mixer automation pass in progress.
     pub mixrec: mixer::Recorder,
-    /// Voice-over recording: the input device and the take in progress.
-    pub voiceover: voiceover::VoiceOver,
     /// Dynamic (J/K/L) trimming and trim-mode loop playback in progress.
     pub trim_play: trim::TrimPlayback,
     /// Keyboard shortcuts (active bindings, presets; `shortcuts.*` commands).
@@ -439,7 +436,6 @@ impl Session {
             persistence: None,
             previews: Arc::new(previews::PreviewStore::temp()),
             mixrec: Default::default(),
-            voiceover: Default::default(),
             trim_play: Default::default(),
             shortcuts: shortcuts::Shortcuts::new(),
             offline: Default::default(),
@@ -1083,6 +1079,8 @@ mod audio_effects_tests;
 #[cfg(test)]
 mod audio_placement_tests;
 #[cfg(test)]
+mod audio_reduction_tests;
+#[cfg(test)]
 mod autosave_tests;
 #[cfg(test)]
 mod avi_import_tests;
@@ -1178,8 +1176,6 @@ mod track_params_tests;
 mod trim_tests;
 #[cfg(test)]
 mod video_catalogue_tests;
-#[cfg(test)]
-mod voiceover_tests;
 
 #[cfg(test)]
 mod source_placement_tests;

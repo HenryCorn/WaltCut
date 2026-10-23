@@ -715,9 +715,6 @@ impl FilmcraftApp {
         let hardware_changed = prev.as_ref().is_none_or(|q| q.audio_hardware != p.audio_hardware);
         let pitch_changed = prev.as_ref().is_some_and(|q| q.audio.maintain_pitch_shuttling != p.audio.maintain_pitch_shuttling);
         if hardware_changed {
-            if let Some(input) = self.session.voiceover.input.as_mut() {
-                input.configure_host(&p.audio_hardware.device_class);
-            }
             let rate = self.session.active_sequence().map(|q| q.settings.sample_rate);
             if let Some(a) = self.audio.as_mut() {
                 a.stop();
@@ -928,12 +925,7 @@ impl FilmcraftApp {
         // restart from the end → from the start (Settings ▸ Timeline ▸ "At playback end, return to
         // beginning when restarting playback")
         let dur = self.session.active_sequence().map(|q| q.duration()).unwrap_or_default();
-        // (not while a voice-over take starts: it was put exactly where the take must begin, e.g. on empty timeline past the end)
-        if speed > 0.0
-            && self.session.prefs.timeline.return_to_beginning
-            && !self.session.voiceover.recording()
-            && self.session.playhead() >= dur - self.session.sequence_rate().frame_duration()
-        {
+        if speed > 0.0 && self.session.prefs.timeline.return_to_beginning && self.session.playhead() >= dur - self.session.sequence_rate().frame_duration() {
             self.session.set_playhead(Tick::ZERO);
         }
         // A loop restart keeps counting into the same meter.
@@ -964,8 +956,6 @@ impl FilmcraftApp {
             let t = self.session.playhead();
             let _ = self.session.execute("mixer.recordStart", json!({"time": t.0}));
         }
-        // voice-over: the capture starts with the audio clock
-        panels::voiceover::on_play(self);
     }
 
     pub fn stop(&mut self) {
@@ -986,7 +976,6 @@ impl FilmcraftApp {
                 self.ui.status = e.to_string();
             }
         }
-        panels::voiceover::on_stop(self);
     }
 
     fn start_audio(&mut self) {
@@ -1088,8 +1077,7 @@ impl FilmcraftApp {
         if let Some(end) = self.playback.stop_at.filter(|e| t >= *e && self.playback.speed > 0.0 && !self.playback.looping) {
             self.session.set_playhead(self.playback.rest_at.unwrap_or(end));
             self.stop();
-        } else if t >= hi && self.playback.speed > 0.0 && (self.playback.looping || !self.session.voiceover.recording()) {
-            // a voice-over take keeps playing (and recording) into the empty timeline past the end
+        } else if t >= hi && self.playback.speed > 0.0 {
             if self.playback.looping {
                 self.session.set_playhead(lo);
                 self.play(self.playback.speed);
@@ -2068,7 +2056,7 @@ fn shuttle_mix_rate(device_rate: u32, speed: f64) -> Option<u32> {
 
 /// The program mix that playback plays: `mix(device_frame, interleaved, channels)` renders the
 /// active sequence at device rate `sr` from `device_frame`, with the live project snapshot (edits
-/// made while playing are heard), Output Mapping, the 5.1 mixdown and voice-over cues.
+/// made while playing are heard), Output Mapping, the 5.1 mixdown.
 pub fn playback_mix(session: &Session, seq_id: waltcut_project::ItemId, sr: u32) -> impl FnMut(i64, &mut [f32], usize) + Send + 'static {
     let project = session.project.clone();
     let provider = session.media.provider(project.clone(), session.services.clone());
@@ -2077,7 +2065,6 @@ pub fn playback_mix(session: &Session, seq_id: waltcut_project::ItemId, sr: u32)
     let map = [session.prefs.audio_hardware.map_left, session.prefs.audio_hardware.map_right];
     // Preferences ▸ Audio ▸ 5.1 Mixdown Type: how a 5.1 Mix plays on a stereo device
     let mixdown = waltcut_audio_dsp::channels::Mixdown::from_id(&session.prefs.audio.mixdown_type).unwrap_or_default();
-    let cues = panels::voiceover::cues(session, sr);
     previews.live.publish_project(project.clone());
     let mut resampler = None;
     move |cursor: i64, buf: &mut [f32], ch: usize| {
@@ -2118,7 +2105,6 @@ pub fn playback_mix(session: &Session, seq_id: waltcut_project::ItemId, sr: u32)
         } else {
             waltcut_engine::settings::map_output(&mix.channels[0], &mix.channels[1.min(mix.channels.len() - 1)], buf, ch, map);
         }
-        panels::voiceover::mix_cues(buf, ch, cursor, &cues);
     }
 }
 
@@ -2623,38 +2609,6 @@ mod text_focus_shortcut_tests {
         for key in [Key::A, Key::R, Key::J, Key::Z, Key::C, Key::T] {
             assert!(lets_text_field_keep(Modifiers::NONE, true), "{key:?} is a Telex key the tools stole");
         }
-    }
-}
-
-#[cfg(test)]
-mod voiceover_playback_tests {
-    use super::*;
-
-    #[test]
-    fn a_voice_over_take_records_into_the_empty_timeline_past_the_end() {
-        let mut session = Session::default();
-        session.execute("file.openDemoProject", json!({})).unwrap();
-        session.execute("audio.voiceover.settings", json!({"prerollSeconds": 0.0})).unwrap();
-        session.prefs.timeline.return_to_beginning = true;
-        let ctx = egui::Context::default();
-        let mut app = FilmcraftApp::new(session);
-        app.audio = None;
-        let dur = app.session.active_sequence().map(|q| q.duration()).unwrap();
-        let from = app.session.sequence_rate().snap(dur + Tick::from_seconds_f64(60.0));
-        app.session.set_playhead(from);
-        panels::voiceover::toggle(&mut app, None).unwrap();
-        // play() keeps the record point instead of returning to the beginning
-        assert!(app.playback.playing);
-        assert_eq!(app.session.playhead(), from);
-        app.end_preroll(0.0);
-        // and one second later the take is still playing and recording, not stopped at the end
-        let mut output = ctx.run_ui(egui::RawInput { time: Some(1.0), ..Default::default() }, |ui| app.advance_playback(ui.ctx()));
-        output.textures_delta.clear();
-        assert!(app.playback.playing);
-        assert!(app.session.voiceover.recording());
-        assert!(app.session.playhead() > from, "{:?} <= {from:?}", app.session.playhead());
-        app.session.execute("audio.voiceover.stop", json!({"discard": true})).unwrap();
-        app.stop();
     }
 }
 
