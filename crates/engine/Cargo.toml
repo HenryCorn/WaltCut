@@ -36,6 +36,7 @@ craft-docpath = { workspace = true }
 same-file = "1"
 
 [dev-dependencies]
+rayon = { workspace = true }
 waltcut-testkit = { workspace = true }
 waltcut-isobmff = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "gif"] }

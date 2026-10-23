@@ -407,16 +407,21 @@ impl MediaSource for SlateSource {
         let v = self.info.video.as_ref().ok_or(MediaError::NoStream("video"))?;
         let s = req.scale.clamp(1.0 / 64.0, 1.0);
         let (w, h) = (((v.width as f32 * s).round() as u32).max(2), ((v.height as f32 * s).round() as u32).max(2));
-        let mut last = self.last.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(f) = last.as_ref()
-            && f.width == w
-            && f.height == h
         {
-            return Ok(Arc::new((**f).clone().with_pts(req.time)));
+            let last = self.last.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(f) = last.as_ref()
+                && f.width == w
+                && f.height == h
+            {
+                return Ok(Arc::new((**f).clone().with_pts(req.time)));
+            }
         }
+        // Drawn with the lock released: the slate paints in parallel on the rayon pool, and a worker
+        // waiting in that nested join can pick up another export job that needs this same lock, so
+        // holding it here deadlocked exports of several offline clips (intermittently).
         let px = waltcut_render::offline::slate_rgba8(w as usize, h as usize, &self.name, self.reason);
         let f = Arc::new(VideoFrame::rgba8(w, h, px));
-        *last = Some(f.clone());
+        *self.last.lock().unwrap_or_else(|e| e.into_inner()) = Some(f.clone());
         Ok(Arc::new((*f).clone().with_pts(req.time)))
     }
     fn audio(&self, _start: i64, frames: usize, sample_rate: u32) -> waltcut_media::Result<AudioBuffer> {
@@ -526,6 +531,40 @@ mod tests {
         fn reader(&self, _path: &str) -> Option<std::io::Result<waltcut_media::SharedReader>> {
             Some(Ok(Arc::new(waltcut_media::reader::MemReader(self.0.clone()))))
         }
+    }
+
+    /// The slate paints in parallel on the rayon pool. A worker waiting in that nested join takes other
+    /// queued jobs, which need the source's cache lock: holding the lock while painting deadlocked
+    /// exports of offline media (intermittently, under load). A small pool and many different sizes
+    /// make a cache miss, and so a paint, on every request.
+    #[test]
+    fn slate_frames_requested_from_the_rayon_pool_do_not_deadlock() {
+        use waltcut_media::generators::GeneratorSource;
+        use waltcut_media::{FrameRequest, Generator};
+        use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick};
+
+        let matte = GeneratorSource::new(Generator::ColorMatte { color: [0.2, 0.2, 0.2, 1.0] }, 3840, 2160, FrameRate::FPS_24, Tick(TICKS_PER_SECOND));
+        let source = Arc::new(SlateSource::new(matte.info().clone(), "a.mov", OfflineReason::Missing));
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+        let (done, finished) = std::sync::mpsc::channel();
+        let worker = source.clone();
+        std::thread::spawn(move || {
+            pool.install(|| {
+                // independent frame jobs, as an export queues them: a worker waiting inside one slate's
+                // parallel paint picks up the next job and asks the same source for its frame
+                rayon::scope(|scope| {
+                    for i in 0..128u32 {
+                        let source = worker.clone();
+                        scope.spawn(move |_| {
+                            let request = FrameRequest { time: Tick::ZERO, scale: 0.40 + (i % 60) as f32 * 0.01 };
+                            assert!(source.video_frame(request).is_ok());
+                        });
+                    }
+                });
+            });
+            let _ = done.send(());
+        });
+        assert!(finished.recv_timeout(std::time::Duration::from_secs(60)).is_ok(), "the slate source deadlocked on the rayon pool");
     }
 
     #[test]

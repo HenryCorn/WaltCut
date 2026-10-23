@@ -5490,6 +5490,7 @@ dependencies = [
  "craft-docpath",
  "image",
  "log",
+ "rayon",
  "same-file",
  "serde",
  "serde_json",
