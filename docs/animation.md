@@ -31,6 +31,27 @@ used to position or fade a drawing.
   shows the current input and pressure when available.
 - The lower barrel button erases while drawing when the tablet driver maps it to the secondary
   mouse button.
+- **Input samples.** On macOS every pointer event of a pen becomes one sample with its own
+  position, pressure, monotonic event time and phase (down, move, up). A stroke is built from that
+  ordered stream, so several positions with different pressures inside one UI frame keep their
+  own pressure, the stroke ends exactly where the pen came up, and replaying the same samples
+  gives the same stroke however they were batched into frames. Without a pen queue (a mouse, a
+  headless run) the stroke is built from the UI's pointer events in the same way, at full pressure.
+  Timestamps stay with the input samples (diagnostics and replay); a saved stroke keeps position
+  and pressure.
+- **Thinning.** A sample is kept when it is at least 0.75 screen points from the last kept one or
+  its pressure differs by 0.02 or more; the sample that ends the stroke is always kept. A stroke
+  holds at most 20 000 samples; past that the newest sample replaces the last (the end follows
+  the pen) and the status bar says so. The pen queue holds 4 096 samples between frames; if it
+  overflows the oldest moves are dropped (never the stroke's first and last samples) and the loss
+  is counted.
+- **Cancel.** Escape, or the window losing focus, abandons the stroke being drawn; nothing is
+  committed and the status bar says so.
+- **Diagnostics.** `ui.inspect` reports `ui.brush.pen`: the input source (`Pointer`, `Pen`, or
+  `PenFallback` when the pen queue disagreed with the pointer by more than 12 points and was not
+  used for that frame), samples received, thinned, queue-dropped and invalid, cancelled and
+  truncated strokes, and the point count, duration and sampling rate of the last stroke. These
+  numbers describe what WaltCut received from the driver, not how good the tablet is.
 
 ## AI Restyle
 

@@ -124,6 +124,10 @@ pub struct HostHooks {
     /// Drawing-tablet pen pressure (0..1) while the pointer is a pen, for the Brush tool. `None`
     /// from the hook (a mouse) or no hook: strokes are drawn at full pressure.
     pub pen_pressure: Option<Box<dyn Fn() -> Option<f32>>>,
+    /// Drain the pen's queued pointer samples (position, pressure, time, phase), oldest first, into
+    /// the vector and report what was lost. `None`: strokes are built from the UI's own pointer
+    /// events (a mouse).
+    pub pen_samples: Option<Box<dyn FnMut(&mut Vec<panels::drawing_input::PenSample>) -> panels::drawing_input::PenQueueReport>>,
     pub pick_save: Option<Box<dyn FnMut(&str) -> Option<String>>>,
     pub pick_open_project: Option<Box<dyn FnMut() -> Option<String>>>,
     /// Save dialog with a filter: (filter name, extensions, suggested file name) → path. The
