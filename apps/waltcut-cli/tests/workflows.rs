@@ -450,16 +450,14 @@ fn camera_long_gop_ac3_notice_and_aac_trim_to_prores() {
     }
     let red = &got[100];
     assert!(red.as_chunks::<3>().0.iter().all(|[r, g, b]| *r > 230 && *g < 25 && *b < 25), "the matte is red");
-    // sound: both tracks in the mix at their own level while the clip plays, silence on the matte
+    // sound: the AAC track in the mix at its own level while the clip plays; the unsupported AC-3
+    // track (1320 Hz) is not in it
     let got_pcm = pcm(&ffmpeg, &out, 0);
-    let (t1, t2) = (pcm(&ffmpeg, &src, 0), pcm(&ffmpeg, &src, 1));
+    let t1 = pcm(&ffmpeg, &src, 0);
     for at in [0.2, 1.5, 2.6] {
         let (low, high) = (tone(&got_pcm, at, 440.0), tone(&got_pcm, at, 1320.0));
-        let (want_low, want_high) = (tone(&t1, at + 2.6, 440.0), tone(&t2, at + 2.6, 1320.0));
-        assert!(
-            db(low / want_low).abs() < 1.0 && db(high / want_high).abs() < 1.0,
-            "at {at} s: 440 Hz {low:.4} (want {want_low:.4}), 1320 Hz {high:.4} (want {want_high:.4})"
-        );
+        let want_low = tone(&t1, at + 2.6, 440.0);
+        assert!(db(low / want_low).abs() < 1.0 && high < 0.001, "at {at} s: 440 Hz {low:.4} (want {want_low:.4}), 1320 Hz {high:.4} (want none)");
     }
     assert!(rms(&got_pcm, 3.0, 4.8) < 1e-3, "silence under the matte");
 }

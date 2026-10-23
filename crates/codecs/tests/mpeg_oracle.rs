@@ -413,7 +413,7 @@ fn avchd_ac3_audio() {
     let src = open(&f);
     check_video(&ff, &f, 0, 6);
     assert!(src.info().audio_streams.is_empty(), "unsupported AC-3 is not presented as usable audio");
-    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without that audio")), "{:?}", src.notices());
 }
 
 #[test]
@@ -464,7 +464,7 @@ fn program_streams() {
     let src = open(&f);
     assert!(src.info().video.is_some());
     assert!(src.info().audio_streams.is_empty(), "unsupported AC-3 is not presented as usable audio");
-    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without sound")), "{:?}", src.notices());
+    assert!(src.notices().iter().any(|notice| notice.contains("AC-3") && notice.contains("without that audio")), "{:?}", src.notices());
     // MPEG-1 system stream
     let f = make(&ff, "mpeg1_system.mpg");
     let src = open(&f);
