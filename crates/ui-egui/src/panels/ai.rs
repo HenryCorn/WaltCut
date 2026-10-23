@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 use waltcut_engine::ai::CONFIRM_ABOVE_FRAMES;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RestyleRange {
@@ -86,7 +86,7 @@ const ASSIST_PRESETS: [(&str, &str, &str, f32); 3] = [
 ];
 
 /// How many frames a request would send.
-fn frame_count(app: &FilmcraftApp, w: &AiWindow) -> Option<u64> {
+fn frame_count(app: &WaltCutApp, w: &AiWindow) -> Option<u64> {
     let seq = app.session.active_sequence()?;
     let fd = seq.settings.frame_rate.frame_duration().0.max(1);
     let span = match w.range {
@@ -101,7 +101,7 @@ fn frame_count(app: &FilmcraftApp, w: &AiWindow) -> Option<u64> {
     Some(((span + step - 1) / step).max(1) as u64)
 }
 
-pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn window(app: &mut WaltCutApp, ctx: &egui::Context) {
     if !app.ui.ai.open {
         return;
     }
@@ -237,7 +237,7 @@ pub fn window(app: &mut FilmcraftApp, ctx: &egui::Context) {
     app.ui.ai.open = open;
 }
 
-fn run(app: &mut FilmcraftApp, cmd: &str, p: Value) {
+fn run(app: &mut WaltCutApp, cmd: &str, p: Value) {
     if let Err(e) = app.session.execute(cmd, p) {
         app.ui.status = e.to_string();
     }

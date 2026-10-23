@@ -230,7 +230,7 @@ fn explicit_sequence_uses_its_rate_not_the_active_sequences_rate() {
 fn quick_export_has_a_real_default_destination_and_handles_sequence_names_with_dots() {
     let directory = Scratch::new("quick");
     let (mut session, _) = session();
-    session.path = Some(directory.path("project.fcproj"));
+    session.path = Some(directory.path("project.waltcut"));
     std::fs::write(session.path.as_ref().unwrap(), b"project remains unchanged").unwrap();
     let before = session.project.to_json();
     let result = session.execute("export.quick", json!({"format":"prores","range":"custom","startFrame":0,"endFrame":2,"wait":true})).unwrap();
@@ -382,5 +382,5 @@ fn shutdown_joins_the_active_export_and_leaves_no_orphan_job() {
     let job = session.jobs.iter().find(|j| Some(j.id) == started["job"].as_u64()).unwrap();
     assert!(job.result.lock().unwrap().is_some(), "shutdown joins the worker even when cancellation races completion");
     assert_eq!(session.project.to_json(), before);
-    assert!(!std::fs::read_dir(&directory.0).unwrap().any(|e| e.unwrap().file_name().to_string_lossy().starts_with(".filmcraft-export-")));
+    assert!(!std::fs::read_dir(&directory.0).unwrap().any(|e| e.unwrap().file_name().to_string_lossy().starts_with(".waltcut-export-")));
 }

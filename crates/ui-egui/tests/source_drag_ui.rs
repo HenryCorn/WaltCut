@@ -2,9 +2,9 @@ use egui_kittest::Harness;
 use serde_json::json;
 use waltcut_engine::Session;
 use waltcut_time::Tick;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 
-fn step(h: &mut Harness<'static, FilmcraftApp>) {
+fn step(h: &mut Harness<'static, WaltCutApp>) {
     let ctx = h.ctx.clone();
     let mut raw = std::mem::take(h.input_mut());
     eframe::App::raw_input_hook(h.state_mut(), &ctx, &mut raw);
@@ -12,18 +12,18 @@ fn step(h: &mut Harness<'static, FilmcraftApp>) {
     ctx.request_repaint(); // Direct engine edits in a harness do not wake the native event loop.
     h.step();
 }
-fn harness(item: u64) -> Harness<'static, FilmcraftApp> {
+fn harness(item: u64) -> Harness<'static, WaltCutApp> {
     let mut s = Session::default();
     s.execute("file.openDemoProject", json!({})).unwrap();
     s.execute("file.newSequence", json!({"name":"Drop test","width":1280,"height":720,"fps":24})).unwrap();
     s.execute("source.open", json!({"item":item})).unwrap();
-    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| FilmcraftApp::new(s));
+    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| WaltCutApp::new(s));
     for _ in 0..4 {
         step(&mut h);
     }
     h
 }
-fn pointer(h: &mut Harness<'static, FilmcraftApp>, pos: egui::Pos2, pressed: Option<bool>) {
+fn pointer(h: &mut Harness<'static, WaltCutApp>, pos: egui::Pos2, pressed: Option<bool>) {
     h.input_mut().events.push(egui::Event::PointerMoved(pos));
     if pressed == Some(true) {
         step(h); // Establish hover before pressing, as the live control-channel drag does.
@@ -34,12 +34,12 @@ fn pointer(h: &mut Harness<'static, FilmcraftApp>, pos: egui::Pos2, pressed: Opt
     step(h);
 }
 
-fn control_rect(h: &Harness<'static, FilmcraftApp>, id: &str) -> egui::Rect {
+fn control_rect(h: &Harness<'static, WaltCutApp>, id: &str) -> egui::Rect {
     let [x, y, w, height] = h.state().auto.elements.iter().find(|e| e.id == id).or_else(|| h.state().auto.find(id)).unwrap().rect;
     egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(w, height))
 }
 
-fn drag(h: &mut Harness<'static, FilmcraftApp>, control: &str, audio: bool, change_marks: bool) {
+fn drag(h: &mut Harness<'static, WaltCutApp>, control: &str, audio: bool, change_marks: bool) {
     let from = control_rect(h, control).center();
     let panel = control_rect(h, "panel.Timeline");
     let row = control_rect(h, if audio { "timeline.track.A1.target" } else { "timeline.track.V1.target" });
@@ -124,7 +124,7 @@ fn clear_in_out_shortcut_addresses_the_focused_monitor_and_is_undoable() {
     h.state_mut().session.execute("markers.markOut", json!({"time":out.0})).unwrap();
     let before = h.state().session.project.to_json();
     let modifiers = egui::Modifiers { shift: true, command: true, ctrl: !cfg!(target_os = "macos"), mac_cmd: cfg!(target_os = "macos"), ..Default::default() };
-    let press = |h: &mut Harness<'static, FilmcraftApp>| {
+    let press = |h: &mut Harness<'static, WaltCutApp>| {
         h.input_mut().events.push(egui::Event::Key { key: egui::Key::X, physical_key: Some(egui::Key::X), pressed: true, repeat: false, modifiers });
         step(h);
         h.input_mut().events.push(egui::Event::Key { key: egui::Key::X, physical_key: Some(egui::Key::X), pressed: false, repeat: false, modifiers });
@@ -155,14 +155,14 @@ fn clear_in_out_shortcut_addresses_the_focused_monitor_and_is_undoable() {
     }
 }
 
-fn marked_harness() -> Harness<'static, FilmcraftApp> {
+fn marked_harness() -> Harness<'static, WaltCutApp> {
     let mut h = harness(5);
     let view = waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap();
     h.state_mut().session.execute("project.setMarks", json!({"item":5,"in":view.rate.tick_of(48).0,"out":view.rate.tick_of(95).0})).unwrap();
     step(&mut h);
     h
 }
-fn marked_range(h: &Harness<'static, FilmcraftApp>) -> waltcut_time::TimeRange {
+fn marked_range(h: &Harness<'static, WaltCutApp>) -> waltcut_time::TimeRange {
     waltcut_engine::clip_ops::source_view(&h.state().session, waltcut_engine::project::ItemId(5)).unwrap().selected_range()
 }
 #[test]
@@ -245,7 +245,7 @@ fn range_move_clamps_to_media_bounds_and_keeps_duration() {
         assert!(after.start >= view.start && after.end() <= view.end);
     }
 }
-fn chord(h: &mut Harness<'static, FilmcraftApp>, key: egui::Key, shift: bool, primary: bool) {
+fn chord(h: &mut Harness<'static, WaltCutApp>, key: egui::Key, shift: bool, primary: bool) {
     let modifiers = egui::Modifiers {
         shift,
         command: primary,
@@ -376,7 +376,7 @@ fn program_handles_exist_only_for_explicit_marks_and_clear_hides_them() {
     h.state_mut().session.execute("timeline.place", json!({"item":5})).unwrap();
     let seq = h.state().session.state.active_sequence.unwrap();
     step(&mut h);
-    let has = |h: &Harness<'static, FilmcraftApp>, id: &str| h.state().auto.elements.iter().any(|e| e.id == id);
+    let has = |h: &Harness<'static, WaltCutApp>, id: &str| h.state().auto.elements.iter().any(|e| e.id == id);
     assert!(!has(&h, "program.range.in") && !has(&h, "program.range.out") && !has(&h, "program.range.body"));
     assert!(has(&h, "program.playhead"));
     h.state_mut().session.execute("project.setMarks", json!({"item":seq.0,"in":Tick::from_seconds_f64(2.0).0})).unwrap();

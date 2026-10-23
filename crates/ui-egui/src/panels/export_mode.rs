@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use waltcut_engine::export::Format;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::native_dialogs::FileDialog;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,7 +56,7 @@ impl ExportUi {
     }
 }
 
-pub fn export_params(app: &FilmcraftApp) -> Value {
+pub fn export_params(app: &WaltCutApp) -> Value {
     let ex = &app.ui.export;
     let mut p = json!({"path": ex.path, "format": ex.format.id(), "range": ex.range});
     if ex.range == "custom" {
@@ -66,7 +66,7 @@ pub fn export_params(app: &FilmcraftApp) -> Value {
     p
 }
 
-fn sync_sequence(app: &mut FilmcraftApp) {
+fn sync_sequence(app: &mut WaltCutApp) {
     let Some(seq) = app.session.state.active_sequence else { return };
     if app.ui.export.for_sequence != Some(seq.0) {
         app.ui.export.for_sequence = Some(seq.0);
@@ -78,7 +78,7 @@ fn sync_sequence(app: &mut FilmcraftApp) {
     }
 }
 
-fn controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, quick: bool) {
+fn controls(app: &mut WaltCutApp, ui: &mut egui::Ui, quick: bool) {
     sync_sequence(app);
     if app.session.state.active_sequence.is_none() {
         ui.label("Open a sequence to export.");
@@ -215,14 +215,14 @@ fn controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, quick: bool) {
     }
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect.shrink(20.0)), |ui| {
         ui.heading("Export");
         controls(app, ui, false);
     });
 }
 
-pub fn quick_export(app: &mut FilmcraftApp, ctx: &egui::Context, position: egui::Pos2) {
+pub fn quick_export(app: &mut WaltCutApp, ctx: &egui::Context, position: egui::Pos2) {
     if !app.ui.export.quick_open {
         return;
     }

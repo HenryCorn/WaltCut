@@ -258,7 +258,7 @@ fn fixtures(only: &[String]) -> Result<(), String> {
         return Err(format!("no fixture generator for {unknown:?} (known: {})", known.join(", ")));
     }
     let Some(ff) = waltcut_testkit::ffmpeg() else {
-        return Err("ffmpeg not found: set FILMCRAFT_FFMPEG=/path/to/ffmpeg or put ffmpeg on PATH".into());
+        return Err("ffmpeg not found: set WALTCUT_FFMPEG=/path/to/ffmpeg or put ffmpeg on PATH".into());
     };
     println!("ffmpeg:   {}", ff.display());
     println!("fixtures: {}", waltcut_testkit::fixtures::fixtures_root().display());

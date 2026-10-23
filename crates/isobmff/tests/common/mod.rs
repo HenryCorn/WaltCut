@@ -15,12 +15,12 @@ pub fn tool(name: &str) -> Option<PathBuf> {
     }
 }
 
-/// ffmpeg, or `None` after printing `SKIPPED` (a failure with `FILMCRAFT_REQUIRE_ORACLES=1`).
+/// ffmpeg, or `None` after printing `SKIPPED` (a failure with `WALTCUT_REQUIRE_ORACLES=1`).
 pub fn ffmpeg() -> Option<PathBuf> {
     waltcut_testkit::ffmpeg_or_skip("isobmff oracle")
 }
 
-/// ffprobe, or `None` after printing `SKIPPED` (a failure with `FILMCRAFT_REQUIRE_ORACLES=1`).
+/// ffprobe, or `None` after printing `SKIPPED` (a failure with `WALTCUT_REQUIRE_ORACLES=1`).
 pub fn ffprobe() -> Option<PathBuf> {
     waltcut_testkit::ffprobe_or_skip("isobmff oracle")
 }

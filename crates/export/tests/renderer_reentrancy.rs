@@ -15,7 +15,7 @@ use waltcut_project::{ItemId, ItemKind, Label, MediaClip, MediaRef, Project, Seq
 use waltcut_render::{Image, RenderOptions, SourceMap, SourceProvider};
 use waltcut_time::{FrameRate, Tick, TimeRange};
 
-const CHILD: &str = "FILMCRAFT_RENDERER_REENTRANCY_CASE";
+const CHILD: &str = "WALTCUT_RENDERER_REENTRANCY_CASE";
 const FRAMES: i64 = 6;
 static CREATED: AtomicUsize = AtomicUsize::new(0);
 static RENDERED: AtomicUsize = AtomicUsize::new(0);

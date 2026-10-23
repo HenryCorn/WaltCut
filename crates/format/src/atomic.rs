@@ -59,7 +59,7 @@ mod tests {
     use super::*;
 
     fn tmpdir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("filmcraft-atomic-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("waltcut-atomic-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn replaces_and_leaves_no_temp_files() {
         let d = tmpdir("replace");
-        let p = d.join("a.fcproj");
+        let p = d.join("a.waltcut");
         atomic_write(&p, b"one").unwrap();
         atomic_write(&p, b"two").unwrap();
         assert_eq!(fs::read(&p).unwrap(), b"two");
@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn failed_write_keeps_old_file() {
         let d = tmpdir("fail");
-        let p = d.join("a.fcproj");
+        let p = d.join("a.waltcut");
         atomic_write(&p, b"good").unwrap();
         // Renaming a file over a non-empty directory fails: the original target must survive.
         let dir_target = d.join("sub");
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn missing_directory_is_an_error() {
         let d = tmpdir("missing");
-        assert!(atomic_write(&d.join("nope/a.fcproj"), b"x").is_err());
+        assert!(atomic_write(&d.join("nope/a.waltcut"), b"x").is_err());
         fs::remove_dir_all(&d).unwrap();
     }
 }

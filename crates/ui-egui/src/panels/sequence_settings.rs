@@ -10,12 +10,12 @@
 //! non-drop-frame timecode for the NTSC rates, audio Channel Format and Sample Rate, Maximum Render
 //! Quality, and the Color Management tab (working colour space, wide gamut, auto tone map).
 //!
-//! Premiere settings FilmCraft has no equivalent for yet are shown greyed out with their current
+//! Premiere settings WaltCut has no equivalent for yet are shown greyed out with their current
 //! value and a "not supported yet" hint, rather than editable and silently ignored: Editing Mode,
 //! Pixel Aspect Ratio (rendered, and set by New Sequence From Clip, but not editable here yet), Fields, the Frames and Feet + Frames display
 //! formats, Number of Channels, audio Display Format, the Video Previews format, codec and size,
 //! Maximum Bit Depth, and the VR Properties tab. Composite in Linear Color is shown on and greyed:
-//! FilmCraft always composites in linear light.
+//! WaltCut always composites in linear light.
 //!
 //! Automation ids (`sequenceSettings.` + …): `tab.general`, `tab.color`, `tab.vr`; General:
 //! `name`, `editingMode`, `timebase` (+ `timebase.option.<num>/<den>` while open), `width`, `height`,
@@ -31,12 +31,12 @@ use waltcut_color::WorkingSpace;
 use waltcut_project::SequenceSettings;
 use waltcut_time::FrameRate;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::i18n::t;
 use crate::state::SequenceSettingsDraft;
 
-const NOT_YET: &str = "Not supported in FilmCraft yet";
-const LINEAR: &str = "FilmCraft always composites in linear light";
+const NOT_YET: &str = "Not supported in WaltCut yet";
+const LINEAR: &str = "WaltCut always composites in linear light";
 
 /// The Timebase list (frames per second as num/den), Premiere's common rates.
 const TIMEBASES: [(i64, i64); 15] = [
@@ -58,7 +58,7 @@ const TIMEBASES: [(i64, i64); 15] = [
 ];
 const SAMPLE_RATES: [u32; 5] = [32_000, 44_100, 48_000, 88_200, 96_000];
 /// Fill the draft from the active sequence and open the dialog on the General tab.
-pub fn open(app: &mut FilmcraftApp) {
+pub fn open(app: &mut WaltCutApp) {
     let Some(q) = app.session.active_sequence() else { return };
     let st = &q.settings;
     let name = app.session.state.active_sequence.and_then(|id| app.session.project.item(id)).map(|i| i.name.clone()).unwrap_or_default();
@@ -85,7 +85,7 @@ pub fn open(app: &mut FilmcraftApp) {
 
 /// File ▸ New ▸ Sequence…: the dialog as New Sequence, from the default settings, named like
 /// `file.newSequence` would name it, with three video and three audio tracks.
-pub fn open_new(app: &mut FilmcraftApp) {
+pub fn open_new(app: &mut WaltCutApp) {
     let st = SequenceSettings::default();
     let n = app.session.project.sequences().count() + 1;
     app.ui.sequence_settings = SequenceSettingsDraft {
@@ -426,7 +426,7 @@ fn vr(ui: &mut egui::Ui, elems: &mut Elems) {
 }
 
 /// Draw the dialog. Returns whether it stays open.
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) -> bool {
     let new_sequence = app.ui.sequence_settings.new_sequence;
     // New Sequence compares against the defaults it started from; Sequence Settings against the
     // active sequence

@@ -5,13 +5,13 @@ use egui_kittest::Harness;
 use serde_json::json;
 use waltcut_engine::Session;
 use waltcut_time::Tick;
-use waltcut_ui_egui::{AudioOut, FilmcraftApp, dock::PanelKind, menus};
+use waltcut_ui_egui::{AudioOut, WaltCutApp, dock::PanelKind, menus};
 
-fn app(item: u64) -> FilmcraftApp {
+fn app(item: u64) -> WaltCutApp {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
     session.execute("source.open", json!({"item":item})).unwrap();
-    FilmcraftApp::new(session)
+    WaltCutApp::new(session)
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn space_targets_the_focused_monitor_and_output_is_exclusive() {
 
 #[test]
 fn empty_source_returns_a_useful_error() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     assert!(app.play_source().unwrap_err().contains("Source monitor"));
     assert!(!app.source_playback.clock.playing);
 }

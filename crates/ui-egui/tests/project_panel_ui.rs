@@ -4,7 +4,7 @@
 //! bins opened in place / in a tab / in a window, and the Media Browser (navigation, Favorites,
 //! Edit Columns…, import, drag to the Project panel, Open In Source Monitor).
 //!
-//! Set `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` to also render offscreen with wgpu and write
+//! Set `WALTCUT_UI_SNAPSHOT_DIR=<dir>` to also render offscreen with wgpu and write
 //! `project-*.png` / `media-browser-*.png`.
 
 #![allow(dead_code)]
@@ -16,11 +16,11 @@ use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::project_panel::{FREEFORM_POS, FREEFORM_STACK, ViewMode};
 use waltcut_project::{BinEntry, ItemId};
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     snapshots: Option<std::path::PathBuf>,
 }
@@ -28,8 +28,8 @@ struct Driver {
 impl Driver {
     fn with(session: Session) -> Self {
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
-        let snapshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
+        let app = WaltCutApp::new(session).with_control(rx);
+        let snapshots = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if snapshots.is_some() {
             b = b.wgpu();
@@ -121,7 +121,7 @@ impl Driver {
         self.frames(2);
     }
 
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 
@@ -626,7 +626,7 @@ fn media_dir(tag: &str) -> std::path::PathBuf {
 fn file_dialog_import_uses_shown_bin_unless_explicit() {
     let dir = media_dir("import-bin");
     let path = dir.join("a-interview.wav").to_string_lossy().into_owned();
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     app.hooks.pick_files = Some(Box::new(move |_| vec![path.clone()]));
     let parent = app.session.execute("file.newBin", json!({"name": "Footage"})).unwrap()["bin"].as_u64().unwrap();
     let child = app.session.execute("file.newBin", json!({"name": "Selects", "parent": parent})).unwrap()["bin"].as_u64().unwrap();
@@ -699,7 +699,7 @@ fn double_click_empty_area_imports_with_a_project_loaded() {
             session.execute("file.openDemoProject", json!({})).expect("demo project");
         }
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(session).with_control(rx);
+        let mut app = WaltCutApp::new(session).with_control(rx);
         let picks = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let seen = picks.clone();
         app.hooks.pick_files = Some(Box::new(move |_| {
@@ -768,7 +768,7 @@ fn double_click_imports_with_audio_in_the_timeline() {
     let item = waltcut_engine::commands::import_bytes(&mut session, "/tone.wav", bytes, None).unwrap();
     session.execute("timeline.place", json!({"item": item.0, "audioTrack": "A1", "seconds": 0.0})).unwrap();
     let (tx, rx) = channel();
-    let mut app = FilmcraftApp::new(session).with_control(rx);
+    let mut app = WaltCutApp::new(session).with_control(rx);
     let picks = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let seen = picks.clone();
     app.hooks.pick_files = Some(Box::new(move |_| {

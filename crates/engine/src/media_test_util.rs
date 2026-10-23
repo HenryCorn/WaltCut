@@ -14,7 +14,7 @@ use crate::Session;
 
 pub fn tmp_dir(name: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let d = waltcut_testkit::workspace_root().join("target").join(format!("filmcraft-{name}-{}-{nanos}", std::process::id()));
+    let d = waltcut_testkit::workspace_root().join("target").join(format!("waltcut-{name}-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }

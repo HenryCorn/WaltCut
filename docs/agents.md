@@ -1,54 +1,54 @@
 # Agents
 
-FilmCraft is built to be driven by AI agents, and largely built by them. Part 1 covers using
-FilmCraft from an agent. Part 2 covers developing WaltCut as an agent.
+WaltCut is built to be driven by AI agents, and largely built by them. Part 1 covers using
+WaltCut from an agent. Part 2 covers developing WaltCut as an agent.
 
-# Part 1: driving FilmCraft
+# Part 1: driving WaltCut
 
 ## 1. MCP server
 
-`filmcraft-cli mcp` serves MCP on stdio. It has two modes:
+`waltcut-cli mcp` serves MCP on stdio. It has two modes:
 
 | Mode | Command | What it drives |
 |---|---|---|
-| Headless | `filmcraft-cli mcp --demo` or `--project p.fcproj` (neither = empty project) | an in-process engine session, no window |
-| Bridge | `filmcraft-cli mcp --bridge 127.0.0.1:9876` | the running desktop app started with `filmcraft --control 9876` |
+| Headless | `waltcut-cli mcp --demo` or `--project p.waltcut` (neither = empty project) | an in-process engine session, no window |
+| Bridge | `waltcut-cli mcp --bridge 127.0.0.1:9876` | the running desktop app started with `waltcut --control 9876` |
 
 Headless MCP accepts only `--demo` or `--project`, and bridge MCP accepts `--bridge`.
 Other options are rejected (exit 2):
 there are no folder-confinement flags such as `--automation-read-root`, so the server can read
 and write wherever the user can.
 
-**Claude Code.** The repository's `.mcp.json` registers both servers (`filmcraft` = bridge,
-`filmcraft-headless` = demo). Both point at `target/release/filmcraft-cli`, so build it first:
+**Claude Code.** The repository's `.mcp.json` registers both servers (`waltcut` = bridge,
+`waltcut-headless` = demo). Both point at `target/release/waltcut-cli`, so build it first:
 
 ```sh
 cargo build --release -p waltcut-cli -p waltcut
-./target/release/filmcraft --control 9876 &      # only for the bridge server
+./target/release/waltcut --control 9876 &      # only for the bridge server
 claude                                           # approve the project MCP servers when asked
 ```
 
 To register the server by hand, or for another MCP client, use the absolute binary path:
 
 ```sh
-claude mcp add filmcraft-headless -- /abs/path/filmcraft/target/release/filmcraft-cli mcp --demo
+claude mcp add waltcut-headless -- /abs/path/waltcut/target/release/waltcut-cli mcp --demo
 ```
 
 ```json
-{ "mcpServers": { "filmcraft": { "command": "/abs/path/filmcraft-cli", "args": ["mcp", "--bridge", "127.0.0.1:9876"] } } }
+{ "mcpServers": { "waltcut": { "command": "/abs/path/waltcut-cli", "args": ["mcp", "--bridge", "127.0.0.1:9876"] } } }
 ```
 
 ### From an installed release
 
-The release packages ship `filmcraft-cli` alongside the desktop app, so no build is needed:
+The release packages ship `waltcut-cli` alongside the desktop app, so no build is needed:
 
 | Install | CLI |
 |---|---|
-| macOS | the separate `filmcraft-cli-<version>-macos-<arch>.zip` release asset (the `.app` holds only the desktop app) |
+| macOS | the separate `waltcut-cli-<version>-macos-<arch>.zip` release asset (the `.app` holds only the desktop app) |
 
 ```sh
 # macOS, with the CLI unzipped onto PATH
-claude mcp add filmcraft -- filmcraft-cli mcp
+claude mcp add waltcut -- waltcut-cli mcp
 ```
 
 ### Tools
@@ -79,11 +79,11 @@ Typical loop: `project_inspect` / `sequence_inspect` → get ids → `command_ru
 ### Conventions
 
 The server follows a few conventions that make it predictable for agents. They are not
-FilmCraft-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
+WaltCut-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
 driven one app can drive the others.
 
 - **Core tools.** `command_list`, `command_run`, `command_batch`, `doc_inspect` and `render_preview`
-  work in both modes. The FilmCraft tools above stay as they are.
+  work in both modes. The WaltCut tools above stay as they are.
 - **Titles and annotations.** Every tool has a `title` and the four MCP hints (`readOnlyHint`,
   `destructiveHint`, `idempotentHint`, `openWorldHint`), so a client can let the read-only tools
   (lists, inspects, renders, screenshots) run without asking and ask before edits. When you add a
@@ -94,8 +94,8 @@ driven one app can drive the others.
 - **Errors.** A failing command is an `isError` result with the engine's message. A line that is not
   JSON gets a `-32700` parse error (id `null`) and the server keeps serving. A command that panics is
   reported as `internal error: …`, and the session stays usable.
-- **Resources.** `filmcraft://document` (the project tree and active sequence, as `doc_inspect`) and
-  `filmcraft://commands` (the command catalog, as `command_list`), both `application/json`. For MCP
+- **Resources.** `waltcut://document` (the project tree and active sequence, as `doc_inspect`) and
+  `waltcut://commands` (the command catalog, as `command_list`), both `application/json`. For MCP
   2026-07-28 clients such as current Claude Code, list and read results carry the `ttlMs` and
   `cacheScope` hints that revision requires.
 
@@ -130,7 +130,7 @@ progress and stop it:
   ignore the token.
 - Bridge mode works the same way: the export runs as an app job (the app stays responsive and shows
   "Exporting… NN%" in its status bar) and the call returns when it is written, however long it
-  takes. `filmcraft-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
+  takes. `waltcut-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
 
 ### Retained output contract (#25 draft)
 
@@ -140,10 +140,10 @@ the simple destination/format/range controls. Unknown arguments, removed formats
 commands and advanced delivery settings are errors, not ignored compatibility options.
 
 ```sh
-filmcraft-cli --project p.fcproj export movie.mp4 --start 0 --end 0.25
-filmcraft-cli --project p.fcproj export alpha.mov --format prores --range inOut
-filmcraft-cli --project p.fcproj export frames.png --format png --start 0 --end 0.25
-filmcraft-cli --project p.fcproj render --seconds 0.25 --out frame.png
+waltcut-cli --project p.waltcut export movie.mp4 --start 0 --end 0.25
+waltcut-cli --project p.waltcut export alpha.mov --format prores --range inOut
+waltcut-cli --project p.waltcut export frames.png --format png --start 0 --end 0.25
+waltcut-cli --project p.waltcut render --seconds 0.25 --out frame.png
 ```
 
 Media range bounds must be paired; custom ends are exclusive. An explicit non-custom range cannot
@@ -159,7 +159,7 @@ are pending. No real iPhone file has been checked; #25 is not complete, accepted
 
 ## 2. Control channel
 
-`filmcraft --control 9876` (or `FILMCRAFT_CONTROL_PORT=9876`) listens on `127.0.0.1` only. Send one
+`waltcut --control 9876` (or `WALTCUT_CONTROL_PORT=9876`) listens on `127.0.0.1` only. Send one
 JSON request per line and get one JSON reply per line. Full method table:
 [control-protocol.md](control-protocol.md).
 
@@ -214,32 +214,32 @@ Notes:
 - `timeline.move` takes linked partners along while Linked Selection is on: moving a picture
   clip moves its sound by the same offset (pass `"linked": false` to move only the listed clips).
   It returns `{"moved": [ids]}`, every clip that moved.
-- Without a window, `filmcraft-cli run script.jsonl` (lines of `{"id":"…","params":{…}}`) runs the
+- Without a window, `waltcut-cli run script.jsonl` (lines of `{"id":"…","params":{…}}`) runs the
   same commands headlessly. See §2b for the rest of the CLI.
 
 ## 2b. Command-line interface
 
 Every command is also one shell call away. Options go anywhere; output is JSON; exit status is 0 on
-success, 1 when a command fails and 2 on a usage error. `filmcraft-cli help`, `filmcraft-cli --help`
-and `filmcraft-cli -h` print the reference and exit successfully.
-If the reader of stdout closes the pipe early (`filmcraft-cli commands | head`), the CLI drops the rest
+success, 1 when a command fails and 2 on a usage error. `waltcut-cli help`, `waltcut-cli --help`
+and `waltcut-cli -h` print the reference and exit successfully.
+If the reader of stdout closes the pipe early (`waltcut-cli commands | head`), the CLI drops the rest
 of its output but still finishes the work, saves included, and the exit status still reports
 failures; any other stdout write error is reported and makes the status 1.
 
 ```sh
-filmcraft-cli commands razor                     # find ids (add --json for machine output)
-filmcraft-cli describe timeline.razor            # one command: menu, shortcut, params, enabled now
-filmcraft-cli --demo inspect sequence            # project / sequence as JSON
-filmcraft-cli --project p.fcproj --save exec timeline.razor seconds=3.5
-filmcraft-cli --project p.fcproj exec effects.apply '{"effect":"Gaussian Blur"}'
-filmcraft-cli --project p.fcproj exec markers.exportCsv path=review.csv
-filmcraft-cli --project p.fcproj --save import a.mov b.wav
-filmcraft-cli --project p.fcproj export out.mp4  # format from the extension; waits for the job
-filmcraft-cli --project p.fcproj export out --preset "YouTube 1080p Full HD" --start 0 --end 10
-filmcraft-cli export --list-presets prores       # built-in + user presets (--data-dir for another library)
-filmcraft-cli --project p.fcproj exec export.queue.add preset="Apple ProRes 422 HQ" path=renders/ start=true wait=true
-echo '{"id":"file.newBin","params":{"name":"Selects"}}' | filmcraft-cli --project p.fcproj --save run -
-filmcraft-cli --bridge 127.0.0.1:9876 exec window.workspace.color   # the running app
+waltcut-cli commands razor                     # find ids (add --json for machine output)
+waltcut-cli describe timeline.razor            # one command: menu, shortcut, params, enabled now
+waltcut-cli --demo inspect sequence            # project / sequence as JSON
+waltcut-cli --project p.waltcut --save exec timeline.razor seconds=3.5
+waltcut-cli --project p.waltcut exec effects.apply '{"effect":"Gaussian Blur"}'
+waltcut-cli --project p.waltcut exec markers.exportCsv path=review.csv
+waltcut-cli --project p.waltcut --save import a.mov b.wav
+waltcut-cli --project p.waltcut export out.mp4  # format from the extension; waits for the job
+waltcut-cli --project p.waltcut export out --preset "YouTube 1080p Full HD" --start 0 --end 10
+waltcut-cli export --list-presets prores       # built-in + user presets (--data-dir for another library)
+waltcut-cli --project p.waltcut exec export.queue.add preset="Apple ProRes 422 HQ" path=renders/ start=true wait=true
+echo '{"id":"file.newBin","params":{"name":"Selects"}}' | waltcut-cli --project p.waltcut --save run -
+waltcut-cli --bridge 127.0.0.1:9876 exec window.workspace.color   # the running app
 ```
 
 `key=value` values are parsed as JSON when they can be (`3.5`, `true`, `[1,2]`), otherwise taken as
@@ -282,7 +282,7 @@ For any UI change, look at the result:
 3. Assert on `ui.inspect`, `ui.elements` and `sequence.inspect`.
 4. Take `ui.screenshot` (the whole window and the panel you changed) and open the PNG.
 
-Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: FilmCraft only, openly licensed
+Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: WaltCut only, openly licensed
 media, sidecar and `ATTRIBUTION.md` entry.
 
 # Part 2: developing WaltCut

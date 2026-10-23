@@ -1,11 +1,11 @@
 //! # waltcut-automation
 //!
-//! The FilmCraft MCP server (official `rmcp` SDK, stdio transport).
+//! The WaltCut MCP server (official `rmcp` SDK, stdio transport).
 //!
 //! * **Headless** mode drives an in-process [`waltcut_engine::Session`]: every engine command,
 //!   project/sequence inspection and frame rendering (PNG) — no window needed.
 //! * **Bridge** mode forwards to a running desktop app over the JSON-lines control channel
-//!   (`filmcraft --control <port>`), so agents can also inspect, screenshot, click, drag, scroll
+//!   (`waltcut --control <port>`), so agents can also inspect, screenshot, click, drag, scroll
 //!   and type in the live UI — every menu, panel, timeline gesture and keystroke.
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
@@ -15,7 +15,7 @@ pub mod long_job;
 pub mod server;
 
 pub use bridge::BridgeClient;
-pub use server::FilmcraftMcp;
+pub use server::WaltCutMcp;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AutomationError {

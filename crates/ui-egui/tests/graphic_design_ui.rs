@@ -5,11 +5,11 @@ use std::sync::mpsc::{Sender, channel};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     shots: Option<std::path::PathBuf>,
 }
@@ -27,8 +27,8 @@ impl Driver {
         std::fs::create_dir_all(&dir).unwrap();
         session.prefs_path = Some(dir.join("prefs.json"));
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
-        let shots = std::env::var_os("FILMCRAFT_UI_SHOTS").map(std::path::PathBuf::from);
+        let app = WaltCutApp::new(session).with_control(rx);
+        let shots = std::env::var_os("WALTCUT_UI_SHOTS").map(std::path::PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if shots.is_some() {
             b = b.wgpu().with_pixels_per_point(1.0);

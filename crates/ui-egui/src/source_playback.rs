@@ -8,7 +8,7 @@ use waltcut_project::ItemId;
 use waltcut_render::SourceProvider;
 use waltcut_time::Tick;
 
-use crate::{AUDIO_STALL_S, FilmcraftApp, Playback};
+use crate::{AUDIO_STALL_S, Playback, WaltCutApp};
 
 #[derive(Default)]
 pub struct SourcePlayback {
@@ -19,7 +19,7 @@ pub struct SourcePlayback {
     failure: Arc<Mutex<Option<String>>>,
 }
 
-impl FilmcraftApp {
+impl WaltCutApp {
     pub fn toggle_source_play(&mut self) -> Result<(), String> {
         if self.source_playback.clock.playing {
             self.stop_source();

@@ -2,7 +2,7 @@
 
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** trivial (status line, revision history and roadmap link added; content checked against the crate list)
 
-FilmCraft is a Cargo workspace of small crates with strictly enforced layering. The engine is
+WaltCut is a Cargo workspace of small crates with strictly enforced layering. The engine is
 headless: every feature can be reached without a window, and the egui UI is one client among the
 CLI, the JSON control channel and the MCP server.
 
@@ -32,8 +32,8 @@ Design principles:
      codecs/containers: isobmff · matroska · mpegts · h264 · h264enc · hevc · vp9 · av1 · mpeg2v · prores · aac · mpa · opus
 ```
 
-Crates are named `filmcraft-<dir>` (`crates/time` is `waltcut-time`). The apps are `filmcraft`
-and `filmcraft-cli`.
+Crates are named `waltcut-<dir>` (`crates/time` is `waltcut-time`). The apps are `waltcut`
+and `waltcut-cli`.
 
 | Crate | Layer | Purpose |
 |---|---|---|
@@ -66,9 +66,9 @@ and `filmcraft-cli`.
 | `engine` | L4 | `Session`, command registry, undo history, media pool, jobs |
 | `ui-egui` | L5 | the egui frontend: docking, panels, timeline, monitors, playback, control-channel handlers |
 | `automation` | L5 | MCP server (`rmcp`, stdio), headless or bridged to the running app |
-| `platform` | L5 | OS media FFI only: hardware video decoding (VideoToolbox H.264 / HEVC on macOS; Media Foundation / Direct3D 11 H.264 / HEVC / VP9 / AV1 on Windows; VA-API H.264 / HEVC on Linux, with our own parsers and DPBs driving the stateless hardware; a no-op elsewhere) behind `codecs::VideoDecoder`, with transparent fallback to our decoders, and hardware H.264 encoding (VideoToolbox, opt-in) and H.265 encoding (VideoToolbox, the only H.265 encoder; the format exists only where a hardware encoder does) and NVIDIA NVENC H.264 (Windows and 64-bit Linux, opt-in) and H.265 (Windows, FilmCraft's only H.265 encoder there) encoding behind `export::VideoEncoder`; H.264 declines to the built-in encoder for what the hardware does not take. The one crate allowed `unsafe` ([ADR 0001](adr/0001-platform-ffi.md), [README](../crates/platform/README.md)) |
-| `filmcraft` | L6 | desktop binary: eframe/wgpu window, cpal audio output, file dialogs, native macOS menu, TCP control server |
-| `filmcraft-cli` | L6 | headless CLI: `exec`, `run`, `inspect`, `describe`, `commands`, `import`, `export`, `render`, `probe`, `mcp`; `--bridge` targets the running app |
+| `platform` | L5 | OS media FFI only: hardware video decoding (VideoToolbox H.264 / HEVC on macOS; Media Foundation / Direct3D 11 H.264 / HEVC / VP9 / AV1 on Windows; VA-API H.264 / HEVC on Linux, with our own parsers and DPBs driving the stateless hardware; a no-op elsewhere) behind `codecs::VideoDecoder`, with transparent fallback to our decoders, and hardware H.264 encoding (VideoToolbox, opt-in) and H.265 encoding (VideoToolbox, the only H.265 encoder; the format exists only where a hardware encoder does) and NVIDIA NVENC H.264 (Windows and 64-bit Linux, opt-in) and H.265 (Windows, WaltCut's only H.265 encoder there) encoding behind `export::VideoEncoder`; H.264 declines to the built-in encoder for what the hardware does not take. The one crate allowed `unsafe` ([ADR 0001](adr/0001-platform-ffi.md), [README](../crates/platform/README.md)) |
+| `waltcut` | L6 | desktop binary: eframe/wgpu window, cpal audio output, file dialogs, native macOS menu, TCP control server |
+| `waltcut-cli` | L6 | headless CLI: `exec`, `run`, `inspect`, `describe`, `commands`, `import`, `export`, `render`, `probe`, `mcp`; `--bridge` targets the running app |
 
 ### What `cargo xtask layers` enforces
 
@@ -80,7 +80,7 @@ are exempt):
 |---|---|
 | Every crate has a layer | A new crate fails the check until it is added to `LAYERS`. |
 | Only downward edges | A crate may not depend on a crate in a higher layer. |
-| Same-layer edges are listed | From L1 up, a same-layer edge must be in `SAME_LAYER`: `media→frame`, `project→media`, `project→frame`, `gpu→render`, `export→render`, `cli→filmcraft`, plus a few reserved for planned crates. |
+| Same-layer edges are listed | From L1 up, a same-layer edge must be in `SAME_LAYER`: `media→frame`, `project→media`, `project→frame`, `gpu→render`, `export→render`, `cli→waltcut`, plus a few reserved for planned crates. |
 | L0 codecs stay standalone | L0 crates other than `time`, `geom`, `color`, `bitstream`, `testkit` may depend on no workspace crate except `waltcut-bitstream`. External crates such as `thiserror` and `rayon` are allowed. |
 | No UI/OS crates below L5 | `egui`, `eframe`, `egui-wgpu`, `winit`, `rfd`, `cpal`, `muda` are allowed only in L5 and L6. |
 
@@ -140,7 +140,7 @@ EffectInstance
 - **Effect definitions are data.** `project::effect::effect_defs()` lists every video effect,
   audio effect and transition with its parameter schema. The Effects panel tree, the Effect
   Controls rows and the parameter docs agents see are all generated from it.
-- **Project files** (`.fcproj`) are the project serialised as JSON. Saves are atomic: write a
+- **Project files** (`.waltcut`) are the project serialised as JSON. Saves are atomic: write a
   temporary sibling file, then rename it over the target.
 
 ## 4. Command system (`waltcut-engine`)
@@ -285,7 +285,7 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   transforms remain on the GPU fast path. Graphic/drawing layers, non-plain nested sequences,
   log conversion and frame interpolation can be rasterised on the CPU and handed to the GPU as
   images. Broad video effects, grading and video transitions are deleted in the #24 stacked draft;
-  there are no effect compute stages or transition shaders. `FILMCRAFT_CPU_COMPOSITE=1` forces
+  there are no effect compute stages or transition shaders. `WALTCUT_CPU_COMPOSITE=1` forces
   the CPU compositor in the desktop app. Native macOS CPU/GPU checks are pending, not claimed here.
 - **CPU compositor shortcuts.** The CPU compositor, also the export fallback, works on
   premultiplied linear `f32` images, 33 MB at 1080p, so what it does not allocate, convert or mix
@@ -530,9 +530,9 @@ All of these dispatch the same command ids.
 | Surface | Where | Scope |
 |---|---|---|
 | UI | `ui-egui` menus, shortcuts, panels | `menus::invoke` → engine or UI command |
-| CLI | `filmcraft-cli` | `exec <id> key=value…`, `run script.jsonl` (one `{"id","params"}` per line), `inspect`, `import`, `export`, `render`, `probe`; `--save`, `--bridge` |
-| Control channel | `filmcraft --control <port>` | JSON lines on loopback TCP: engine commands plus synthetic input, inspection and screenshots of the live UI |
-| MCP | `filmcraft-cli mcp` | stdio MCP server: headless in-process session, or `--bridge` to the control channel |
+| CLI | `waltcut-cli` | `exec <id> key=value…`, `run script.jsonl` (one `{"id","params"}` per line), `inspect`, `import`, `export`, `render`, `probe`; `--save`, `--bridge` |
+| Control channel | `waltcut --control <port>` | JSON lines on loopback TCP: engine commands plus synthetic input, inspection and screenshots of the live UI |
+| MCP | `waltcut-cli mcp` | stdio MCP server: headless in-process session, or `--bridge` to the control channel |
 
 - **Automation ids.** Every interactive widget calls `app.auto.add(id, rect, label)` each frame
   (`crates/ui-egui/src/automation.rs`). Agents click by id, e.g. `tools.Razor`,

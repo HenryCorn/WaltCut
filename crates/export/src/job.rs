@@ -343,7 +343,7 @@ impl Exporter {
     fn open_mux(&mut self) -> Result<()> {
         let file = Out::create(&self.settings)?;
         let mut opts = WriterOptions::new(self.brand);
-        opts.metadata = vec![("©too".into(), format!("FilmCraft {}", env!("CARGO_PKG_VERSION")))];
+        opts.metadata = vec![("©too".into(), format!("WaltCut {}", env!("CARGO_PKG_VERSION")))];
         let mut mux = Mp4Writer::new(file, opts).map_err(|e| ExportError::Io(e.to_string()))?;
         let mut vcfg = TrackConfig::new(self.venc.sample_entry(), self.venc.timescale());
         vcfg.media_start = self.venc.media_start();

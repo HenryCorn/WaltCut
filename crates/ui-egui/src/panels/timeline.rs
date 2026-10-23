@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use waltcut_project::{ClipId, ItemId, MarkerId, Sequence, TrackId, TrackItem, TrackKind};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeDisplay, format_time};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::icons::{self, Icon};
 use crate::state::{ThumbnailMode, TimelineView, Tool};
 use crate::theme::Tokens;
@@ -252,7 +252,7 @@ pub fn scroll_to_reveal(ph: f64, scroll: f64, pps: f64, width: f64) -> Option<f6
 }
 
 /// Explicit navigation reveals the playhead even when its time has not changed (#1188).
-pub(crate) fn reveal_playhead(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub(crate) fn reveal_playhead(app: &mut WaltCutApp, ctx: &egui::Context) {
     let ph = app.session.playhead().seconds();
     let v = &mut app.ui.timeline;
     if let Some(scroll) = scroll_to_reveal(ph, v.target_scroll, v.target_pps, f64::from(app.last_timeline_width)) {
@@ -277,11 +277,11 @@ pub fn zoom_about(v: &mut TimelineView, factor: f64, anchor_secs: f64, width: f3
 const TRACK_HEADER_TINT: f32 = 0.18;
 const TRACK_LANE_TINT: f32 = 0.10;
 
-fn label_color(app: &FilmcraftApp, l: waltcut_project::Label) -> Color32 {
+fn label_color(app: &WaltCutApp, l: waltcut_project::Label) -> Color32 {
     crate::panels::settings::label_color(app, l)
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let ctx = ui.ctx().clone();
     let Some(seq_id) = app.session.state.active_sequence else {
@@ -648,7 +648,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let _ = (visible, TICKS_PER_SECOND);
 }
 
-fn empty_state(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+fn empty_state(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     ui.painter().text(rect.center() - vec2(0.0, 12.0), Align2::CENTER_CENTER, tl!("Drop media here to create sequence."), Tokens::ui(13.0), t.text_dim);
     if app.session.project.items.values().any(|i| matches!(i.kind, waltcut_project::ItemKind::Sequence(_))) {
@@ -719,7 +719,7 @@ fn lighten(c: Color32, f: f32) -> Color32 {
 }
 
 /// Whether a clip lies inside the sequence In/Out range (Premiere brightens those).
-fn in_range(app: &FilmcraftApp, it: &TrackItem) -> bool {
+fn in_range(app: &WaltCutApp, it: &TrackItem) -> bool {
     let Some(q) = app.session.active_sequence() else { return false };
     if q.mark_in.is_none() && q.mark_out.is_none() {
         return false;
@@ -786,7 +786,7 @@ pub fn zoomed_thumbnail_tiles(
 
 #[allow(clippy::too_many_arguments)]
 fn draw_clip(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ctx: &egui::Context,
     p: &egui::Painter,
     body: Rect,
@@ -890,7 +890,7 @@ fn draw_clip(
     }
 }
 
-fn draw_waveform(app: &mut FilmcraftApp, p: &egui::Painter, body: Rect, it: &TrackItem, col: Color32) {
+fn draw_waveform(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, it: &TrackItem, col: Color32) {
     let Some(peaks) = request_peaks(app, it.item, it.audio_stream) else { return };
     let pkey = (it.item, it.audio_stream);
     let spp = 256.0;
@@ -971,7 +971,7 @@ fn sequence_audio_key(project: &waltcut_project::Project, item: ItemId) -> u64 {
 /// Waveform peaks of a nested sequence's mix, in the same form as a media item's (min, max per
 /// 256 samples at 48 kHz). They are mixed in the background, and again whenever the sequence's
 /// sound changes; until the new ones are ready the old ones stay on show.
-fn request_sequence_peaks(app: &mut FilmcraftApp, item: ItemId) -> Option<Arc<Vec<(f32, f32)>>> {
+fn request_sequence_peaks(app: &mut WaltCutApp, item: ItemId) -> Option<Arc<Vec<(f32, f32)>>> {
     let revision = app.session.revision;
     let key = match app.tl.seq_keys_seen.get(&item) {
         Some(&(rev, key)) if rev == revision => key,
@@ -1055,7 +1055,7 @@ fn source_peaks(src: &dyn waltcut_media::MediaSource, stream: usize, dur: Tick) 
 }
 
 /// Waveform peaks of audio stream `stream` of `item` (a clip's `audio_stream`).
-pub(crate) fn request_peaks(app: &mut FilmcraftApp, item: ItemId, stream: usize) -> Option<Arc<Vec<(f32, f32)>>> {
+pub(crate) fn request_peaks(app: &mut WaltCutApp, item: ItemId, stream: usize) -> Option<Arc<Vec<(f32, f32)>>> {
     if app.session.project.sequence(item).is_some() {
         return request_sequence_peaks(app, item);
     }
@@ -1114,7 +1114,7 @@ fn patch_button(ui: &mut egui::Ui, r: Rect, clip: Rect, label: &str, on: bool, s
 }
 
 #[allow(clippy::too_many_arguments)]
-fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows: &[Row], rect: Rect, vclip: Rect, aclip: Rect, t: &Tokens) {
+fn draw_headers(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, rows: &[Row], rect: Rect, vclip: Rect, aclip: Rect, t: &Tokens) {
     let hw = app.ui.timeline.header_w;
     let tg = app.session.targeting();
     let mut actions: Vec<(String, Value)> = Vec::new();
@@ -1301,7 +1301,7 @@ pub fn ruler_steps(frame_px: f64, base: i64) -> (i64, i64) {
     (minor, label_step)
 }
 
-fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequence, layout: &Layout, t: &Tokens, seq_id: ItemId) {
+fn draw_top(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequence, layout: &Layout, t: &Tokens, seq_id: ItemId) {
     let p = ui.painter().clone();
     let rate = seq.settings.frame_rate;
     let hw = app.ui.timeline.header_w;
@@ -1498,7 +1498,7 @@ fn zoom_thumb(bar: Rect, seq_seconds: f64, scroll: f64, pps: f64) -> (f32, f32, 
     (bar.min.x + at, w, if travel > 0.5 { range / travel as f64 } else { 0.0 })
 }
 
-fn zoom_scrollbar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, seq_seconds: f64, t: &Tokens) {
+fn zoom_scrollbar(app: &mut WaltCutApp, ui: &mut egui::Ui, bar: Rect, seq_seconds: f64, t: &Tokens) {
     let p = ui.painter();
     p.rect_filled(bar, bar.height() / 2.0, t.separator);
     let v = &mut app.ui.timeline;
@@ -1612,17 +1612,17 @@ fn vertical_scrollbar(ui: &mut egui::Ui, bar: Rect, value: &mut f32, max: f32, i
 }
 
 /// Snap `t` to nearby candidates (edits, playhead, markers, in/out). Returns snapped tick.
-fn snap(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exclude: &[ClipId]) -> Tick {
+fn snap(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, t: Tick, exclude: &[ClipId]) -> Tick {
     snap_to(app, seq, layout, t, exclude, true)
 }
 
 /// Where a dragged playhead lands: [`snap`], but not onto itself, or it would stick where it is
 /// and only move in jumps of `SNAP_PX` (#164).
-fn snap_playhead(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick) -> Tick {
+fn snap_playhead(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, t: Tick) -> Tick {
     snap_to(app, seq, layout, t, &[], false)
 }
 
-fn snap_to(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exclude: &[ClipId], to_playhead: bool) -> Tick {
+fn snap_to(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, t: Tick, exclude: &[ClipId], to_playhead: bool) -> Tick {
     if !app.session.state.snapping {
         return t;
     }
@@ -1661,7 +1661,7 @@ fn snap_to(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exc
 
 /// What the Timeline shows at `pos` for the control channel's `ui.timeline.hit`, with `kind`: the
 /// trim a press of the current tool with `mods` starts there (null when it would not trim).
-pub fn hit_json(app: &FilmcraftApp, pos: Pos2, mods: egui::Modifiers) -> Value {
+pub fn hit_json(app: &WaltCutApp, pos: Pos2, mods: egui::Modifiers) -> Value {
     let (Some(layout), Some(seq)) = (app.tl.layout.as_ref(), app.session.active_sequence()) else { return json!({"hit": "none"}) };
     let t = layout.tick_at(pos.x);
     let grab = grab_at(seq, layout, pos, app.ui.tool, mods, app.session.prefs.trim.selection_tool_roll_ripple);
@@ -1681,7 +1681,7 @@ pub fn hit_json(app: &FilmcraftApp, pos: Pos2, mods: egui::Modifiers) -> Value {
 }
 
 /// Screen point of a clip (centre, or its in/out edge).
-pub fn locate(app: &FilmcraftApp, clip: u64, edge: Option<&str>) -> Option<(f32, f32)> {
+pub fn locate(app: &WaltCutApp, clip: u64, edge: Option<&str>) -> Option<(f32, f32)> {
     let layout = app.tl.layout.as_ref()?;
     let seq = app.session.active_sequence()?;
     let (tid, it) = seq.find_item(ClipId(clip))?;
@@ -1695,7 +1695,7 @@ pub fn locate(app: &FilmcraftApp, clip: u64, edge: Option<&str>) -> Option<(f32,
     Some((x, y))
 }
 
-fn preview_drag(app: &FilmcraftApp, seq: &Sequence, out: &mut HashMap<ClipId, (Tick, Tick, Option<TrackId>)>, edited: &mut HashMap<ClipId, TrackItem>) {
+fn preview_drag(app: &WaltCutApp, seq: &Sequence, out: &mut HashMap<ClipId, (Tick, Tick, Option<TrackId>)>, edited: &mut HashMap<ClipId, TrackItem>) {
     // the item as the edge move leaves it, and its place in the preview
     let mut moved = |it: &TrackItem, edge: waltcut_edit::Edge, delta: Tick| {
         let mut e = it.clone();
@@ -1802,7 +1802,7 @@ fn shift_track(seq: &Sequence, tid: TrackId, delta: i32) -> Option<TrackId> {
 /// open their dialog through `menus::invoke`, like the same item in the Clip menu.
 /// The menu of a right-clicked Timeline marker (automation ids `timeline.markerMenu.<command>`);
 /// the marker is under the playhead, where Clear Selected Marker looks for it (#695).
-fn marker_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui, marker: MarkerId) {
+fn marker_menu(app: &mut WaltCutApp, ctx: &egui::Context, ui: &mut egui::Ui, marker: MarkerId) {
     let Some(marker) = app.session.active_sequence().and_then(|q| q.markers.iter().find(|m| m.id == marker)).cloned() else {
         ui.close();
         return;
@@ -1886,7 +1886,7 @@ pub(crate) const EDIT_POINT_TYPES: &[(&str, &str, &str, waltcut_edit::Edge)] = &
 ];
 
 /// The edit point context menu (#219).
-fn edit_point_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, target: EditPointTarget) {
+fn edit_point_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, target: EditPointTarget) {
     let selected = app.session.state.edit_points.first().copied();
     for &(label, id, kind, edge) in EDIT_POINT_TYPES {
         let clip = match edge {
@@ -1928,7 +1928,7 @@ fn edit_point_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, ta
 }
 
 /// The menu of a right-clicked gap: Ripple Delete closes it.
-fn gap_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui) {
+fn gap_menu(app: &mut WaltCutApp, ctx: &egui::Context, ui: &mut egui::Ui) {
     let label = tl!("Ripple Delete");
     let r = ui.add_enabled(app.session.state.gap_selection.is_some(), egui::Button::new(label));
     app.auto.add("timeline.gapMenu.edit.rippleDelete", r.rect, label);
@@ -1981,7 +1981,7 @@ pub(crate) fn wheel_input(ctx: &egui::Context) -> WheelInput {
 }
 
 /// Puts the playhead where the pointer is on the ruler: what a press does before any drag (#1090).
-fn scrub_playhead(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, p: Pos2, shift: bool) {
+fn scrub_playhead(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, p: Pos2, shift: bool) {
     app.stop();
     let mut tt = seq.settings.frame_rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO));
     if shift || app.session.prefs.timeline.snap_playhead {
@@ -1994,7 +1994,7 @@ fn scrub_playhead(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, p: Po
     app.session.set_playhead(tt);
 }
 
-fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &Layout, rect: Rect) {
+fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &Layout, rect: Rect) {
     let ctx = ui.ctx().clone();
     let area = Rect::from_min_max(pos2(layout.content.min.x, layout.ruler.min.y), layout.content.max);
     let resp = ui.interact(area, egui::Id::new("timeline-area"), Sense::click_and_drag());
@@ -2752,11 +2752,11 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
 mod trim_preview_tests {
     use super::*;
 
-    fn demo() -> (FilmcraftApp, Sequence) {
+    fn demo() -> (WaltCutApp, Sequence) {
         let mut s = waltcut_engine::Session::default();
         s.execute("file.openDemoProject", serde_json::json!({})).unwrap();
         let seq = s.active_sequence().unwrap().clone();
-        (FilmcraftApp::new(s), seq)
+        (WaltCutApp::new(s), seq)
     }
 
     fn assert_same_media(before: &TrackItem, after: &TrackItem) {

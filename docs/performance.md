@@ -7,7 +7,7 @@ and `.md` (options and sections: [testing.md](testing.md) §5). Agents read live
 ## Interactive builds and redraw work
 
 For interactive editing, build with `cargo build --release -p waltcut` and
-launch `target/release/filmcraft`. The development profile optimizes dependencies and codec hot
+launch `target/release/waltcut`. The development profile optimizes dependencies and codec hot
 loops, but still builds the editor at optimization level 1; it is not the release performance
 baseline. Keep the same build profile when comparing code changes.
 
@@ -334,7 +334,7 @@ compositor and the decoders, not by the encoder, so a different hardware codec d
 
 ### Quality per bit
 
-30 s with a banner (15–45 s of that timeline), exported by FilmCraft as ProRes 422 HQ (the reference)
+30 s with a banner (15–45 s of that timeline), exported by WaltCut as ProRes 422 HQ (the reference)
 and by each encoder at several bitrates; ffmpeg's `psnr` and `ssim` of the decoded 4:2:0 pictures against
 the reference. Average PSNR over the three planes, and SSIM (higher is better):
 

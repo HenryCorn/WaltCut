@@ -8,11 +8,11 @@ use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::shortcut_presets as presets;
 use waltcut_engine::shortcuts::Platform;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -21,7 +21,7 @@ impl Driver {
         let mut s = Session::default();
         s.execute("file.openDemoProject", json!({})).unwrap();
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(s).with_control(rx);
+        let mut app = WaltCutApp::new(s).with_control(rx);
         app.hooks.open_path = Some(Box::new(|_, _| Ok(())));
         let harness = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000).build_eframe(move |_cc| app);
         let mut d = Driver { harness, tx };
@@ -66,7 +66,7 @@ impl Driver {
         self.frames(2);
     }
 
-    fn app(&self) -> &FilmcraftApp {
+    fn app(&self) -> &WaltCutApp {
         self.harness.state()
     }
 }
@@ -84,7 +84,7 @@ fn premiere_table_has_no_dangling_ids_or_new_conflicts() {
     for (id, keys, panel) in presets::EXTRA_KEYS.iter().chain(presets::PANEL_KEYS).copied() {
         assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "Premiere table: `{id}` ({keys} {panel}) is not a command");
     }
-    for (id, _, _) in presets::FILMCRAFT_PANEL.iter().chain(presets::PANEL_KEYS) {
+    for (id, _, _) in presets::WALTCUT_PANEL.iter().chain(presets::PANEL_KEYS) {
         assert!(waltcut_engine::find_command(id).is_some() || ui.iter().any(|u| u == id), "panel table: `{id}` is not a command");
     }
     let mut s = Session::default();

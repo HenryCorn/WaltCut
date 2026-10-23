@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>WaltCut app icon</title>
+  <rect width="1024" height="1024" rx="224" fill="#141b2e"/>
+  <line x1="170" y1="804" x2="854" y2="804" stroke="#f4efe6" stroke-opacity="0.55" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="170" cy="733" r="62" fill="#f4efe6" fill-opacity="0.100"/>
+  <circle cx="255.5" cy="521.688" r="62" fill="#f4efe6" fill-opacity="0.155"/>
+  <circle cx="341" cy="370.75" r="62" fill="#f4efe6" fill-opacity="0.210"/>
+  <circle cx="426.5" cy="280.188" r="62" fill="#f4efe6" fill-opacity="0.265"/>
+  <circle cx="512" cy="250" r="62" fill="#f4efe6" fill-opacity="0.320"/>
+  <circle cx="597.5" cy="280.188" r="62" fill="#f4efe6" fill-opacity="0.375"/>
+  <circle cx="683" cy="370.75" r="62" fill="#f4efe6" fill-opacity="0.430"/>
+  <circle cx="768.5" cy="521.688" r="62" fill="#f4efe6" fill-opacity="0.485"/>
+  <circle cx="854" cy="733" r="62" fill="#ff8a3d"/>
+  <circle cx="833" cy="711" r="16" fill="#ffc28f" fill-opacity="0.9"/>
+</svg>

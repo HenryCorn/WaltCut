@@ -9,7 +9,7 @@ use waltcut_project::graphic_design::layer_uid;
 use waltcut_project::{ClipId, RollMode, TrackItem};
 use waltcut_time::Tick;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::theme::Tokens;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -33,7 +33,7 @@ fn row_label(ui: &mut egui::Ui, label: &str, t: &Tokens) -> egui::Ui {
 }
 
 /// Responsive Design – Time (intro / outro and roll / crawl), shown with no layer selected.
-pub fn responsive_time(app: &FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, it: &TrackItem, autos: &mut Elems, actions: &mut Vec<(String, Value)>) {
+pub fn responsive_time(app: &WaltCutApp, ui: &mut egui::Ui, clip: ClipId, it: &TrackItem, autos: &mut Elems, actions: &mut Vec<(String, Value)>) {
     let t = app.tokens;
     let rate = app.session.sequence_rate();
     let m = it.graphic.as_deref().cloned().unwrap_or_default();
@@ -94,7 +94,7 @@ pub fn responsive_time(app: &FilmcraftApp, ui: &mut egui::Ui, clip: ClipId, it: 
 
 /// Responsive Design – Position for the selected layer: Pin To and the pinned edges.
 pub fn responsive_position(
-    app: &FilmcraftApp,
+    app: &WaltCutApp,
     ui: &mut egui::Ui,
     clip: ClipId,
     it: &TrackItem,
@@ -158,7 +158,7 @@ pub fn responsive_position(
 }
 
 /// Menu / shortcut entry points of this module (None for other ids).
-pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let empty = params.as_object().is_none_or(|m| m.is_empty());
     match id {
         "file.replaceFonts" if empty => {
@@ -171,7 +171,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     }
 }
 
-pub fn replace_dialog(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn replace_dialog(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.replace_fonts.clone() else { return };
     let used = waltcut_engine::graphic_design::fonts_used(&app.session);
     let mut elems: Elems = Vec::new();

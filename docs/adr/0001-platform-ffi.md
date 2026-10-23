@@ -16,7 +16,7 @@ and animation-flow visual acceptance are pending, not claimed passing.
 
 ## Context
 
-FilmCraft is pure Rust and the workspace sets `unsafe_code = "forbid"`. Every codec has a
+WaltCut is pure Rust and the workspace sets `unsafe_code = "forbid"`. Every codec has a
 clean-room software decoder, and those remain the reference. But decoding 4K H.264 / HEVC in
 software costs 85–120 ms of CPU per frame on an M4 Pro, so 4K playback drops frames under load,
 while every current computer has a hardware video decoder the operating system exposes
@@ -135,7 +135,7 @@ hold; VA-API differs from the other two backends in three ways.
   C compiler's view of it, as for NVENC. Only `vaapi::va` carries `#[allow(unsafe_code)]`; the
   declarations, the H.264 front end (`vaapi::h264`) and the decoder (`VaDecoder`) are safe code.
 - **Decoding is stateless:** the host parses the stream and keeps the decoded picture buffer; the GPU
-  only decodes slice data. FilmCraft does that host side with the software decoders' own parsers and
+  only decodes slice data. WaltCut does that host side with the software decoders' own parsers and
   DPBs (`waltcut_h264::dpb` and `waltcut_hevc::dpb` are generic over what a picture is), so the two decoders decide alike by
   construction, and the front end is tested on every OS against a stand-in for the hardware. The
   one place they cannot agree is concealment: pictures predicted from frames that were never decoded

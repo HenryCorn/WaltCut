@@ -3,9 +3,9 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 use waltcut_engine::Session;
 use waltcut_time::{FrameRate, Tick};
-use waltcut_ui_egui::{FilmcraftApp, dock::PanelKind, menus};
+use waltcut_ui_egui::{WaltCutApp, dock::PanelKind, menus};
 
-fn step(h: &mut Harness<'static, FilmcraftApp>) {
+fn step(h: &mut Harness<'static, WaltCutApp>) {
     let ctx = h.ctx.clone();
     let mut raw = std::mem::take(h.input_mut());
     eframe::App::raw_input_hook(h.state_mut(), &ctx, &mut raw);
@@ -13,7 +13,7 @@ fn step(h: &mut Harness<'static, FilmcraftApp>) {
     ctx.request_repaint();
     h.step();
 }
-fn harness() -> Harness<'static, FilmcraftApp> {
+fn harness() -> Harness<'static, WaltCutApp> {
     let mut s = Session::default();
     s.execute("file.newSequence", json!({"name":"Program clip","width":128,"height":72,"fps":24})).unwrap();
     let item = waltcut_engine::demo::add_generator(
@@ -31,14 +31,14 @@ fn harness() -> Harness<'static, FilmcraftApp> {
         None,
     );
     s.execute("source.open", json!({"item":item.0})).unwrap();
-    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| FilmcraftApp::new(s));
+    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| WaltCutApp::new(s));
     for _ in 0..3 {
         step(&mut h);
     }
     h
 }
-fn click(h: &mut Harness<'static, FilmcraftApp>, id: &str) {
-    fn center(h: &Harness<'static, FilmcraftApp>, id: &str) -> egui::Pos2 {
+fn click(h: &mut Harness<'static, WaltCutApp>, id: &str) {
+    fn center(h: &Harness<'static, WaltCutApp>, id: &str) -> egui::Pos2 {
         let e = h.state().auto.elements.iter().find(|e| e.id == id).or_else(|| h.state().auto.find(id)).unwrap_or_else(|| {
             panic!(
                 "missing {id}; available {:?}",
@@ -60,7 +60,7 @@ fn click(h: &mut Harness<'static, FilmcraftApp>, id: &str) {
     }
     step(h);
 }
-fn has(h: &Harness<'static, FilmcraftApp>, id: &str) -> bool {
+fn has(h: &Harness<'static, WaltCutApp>, id: &str) -> bool {
     h.state().auto.elements.iter().any(|e| e.id == id)
 }
 

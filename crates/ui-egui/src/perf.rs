@@ -5,9 +5,9 @@
 
 use serde_json::{Value, json};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 
-pub fn stats(app: &FilmcraftApp) -> Value {
+pub fn stats(app: &WaltCutApp) -> Value {
     let mut v = waltcut_engine::perf::stats(&app.session);
     let (shown, dropped) = app.playback.meter.counts();
     let (images, image_bytes, plans, plan_bytes) = app.frames.cache_entries();

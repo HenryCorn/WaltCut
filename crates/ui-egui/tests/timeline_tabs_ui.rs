@@ -10,13 +10,13 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::project::ItemId;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
-    /// `FILMCRAFT_UI_SNAPSHOT_DIR`: where to write PNGs of the window (rendered with wgpu).
+    /// `WALTCUT_UI_SNAPSHOT_DIR`: where to write PNGs of the window (rendered with wgpu).
     snapshots: Option<PathBuf>,
 }
 
@@ -25,8 +25,8 @@ impl Driver {
         let mut s = Session::default();
         s.execute("file.openDemoProject", json!({})).unwrap();
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(s).with_control(rx);
-        let snapshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(PathBuf::from);
+        let app = WaltCutApp::new(s).with_control(rx);
+        let snapshots = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if snapshots.is_some() {
             b = b.wgpu();
@@ -70,7 +70,7 @@ impl Driver {
         self.ok("engine.execute", json!({"command": command, "params": params}))
     }
 
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 }
@@ -256,10 +256,10 @@ fn tabs_that_do_not_fit_are_reached_through_a_list() {
 
 #[test]
 fn a_reopened_project_shows_its_tabs_as_they_were_left() {
-    let dir = std::env::temp_dir().join(format!("filmcraft-tabs-ui-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("waltcut-tabs-ui-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("tabs.fcproj").to_string_lossy().to_string();
+    let path = dir.join("tabs.waltcut").to_string_lossy().to_string();
 
     let mut d = Driver::new();
     let main = d.active();

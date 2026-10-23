@@ -1,7 +1,7 @@
-asset:        filmcraft-timeline.png
+asset:        waltcut-timeline.png
 title:        README: timeline and loudness detail
 author:       FilmCraft contributors (screenshot); film/footage/music credits below
-source:       original work (screenshot of FilmCraft captured with its ui.screenshot control command)
+source:       original work (screenshot of WaltCut captured with its ui.screenshot control command)
 license:      MIT OR Apache-2.0 (screenshot); embedded film frames are public domain, music CC0-1.0
 license-file:
 added:        2026-09-30 by Claude (agent) for Brandon Thomas

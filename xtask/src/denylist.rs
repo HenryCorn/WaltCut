@@ -12,7 +12,7 @@
 const CRATES: &[&str] = &["ac3", "apv", "captions", "cfb", "dng", "dnx", "flac", "interchange", "mxf", "ogg", "scopes", "speech", "tts", "tts-text", "vp8"];
 
 /// Application crates the reduction deleted (directory under `apps/`).
-const APPS: &[&str] = &["filmcraft-web"];
+const APPS: &[&str] = &["filmcraft-web", "waltcut-web"];
 
 /// Command-id families (the part before the first dot) that no registration may use.
 const COMMAND_PREFIXES: &[&str] = &["captions", "essentialSound", "lumetri", "lut", "masks", "mixer", "multicam", "transcript", "tts"];

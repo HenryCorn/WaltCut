@@ -1,23 +1,23 @@
-//! The desktop app's command line (`filmcraft --help`).
+//! The desktop app's command line (`waltcut --help`).
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-/// `filmcraft --help`.
+/// `waltcut --help`.
 pub const USAGE: &str = "\
-Usage: filmcraft [options] [project.fcproj | media files...]
+Usage: waltcut [options] [project.waltcut | media files...]
 
 Options:
   --control <port>   start the localhost JSON-lines control server
-                     (also: FILMCRAFT_CONTROL_PORT)
+                     (also: WALTCUT_CONTROL_PORT)
   --control-input-only  accept widget input only from the control server
-                     (requires --control or FILMCRAFT_CONTROL_PORT)
+                     (requires --control or WALTCUT_CONTROL_PORT)
   --demo             open the demo project
   --empty            start with an empty project
   --recover          recover the newest unsaved changes without asking
   --no-recover       start without asking about unsaved changes
   --data-dir <dir>   folder for auto-save, crash recovery and logs
-                     (also: FILMCRAFT_DATA_DIR)
+                     (also: WALTCUT_DATA_DIR)
   --graphics <mode>  start with this graphics mode and keep it: default,
                      dx12 (Windows), software (Windows, Linux);
                      `--graphics default` undoes an automatic fallback
@@ -50,7 +50,7 @@ pub struct Launch {
 }
 
 /// Parse the arguments after the program name. `env_control_port` is the value of
-/// `FILMCRAFT_CONTROL_PORT`, used when `--control` is not given (an empty value counts as unset).
+/// `WALTCUT_CONTROL_PORT`, used when `--control` is not given (an empty value counts as unset).
 ///
 /// An option we don't know, or one without a usable value, is an error: opening a window for a
 /// mistyped flag helps nobody, and starting without the control server that was asked for leaves
@@ -110,18 +110,18 @@ pub fn parse(env_control_port: Option<String>, args: impl IntoIterator<Item = Os
     if l.control_port.is_none()
         && let Some(port) = env_control_port.as_deref().map(str::trim).filter(|p| !p.is_empty())
     {
-        l.control_port = Some(port.parse().map_err(|_| format!("FILMCRAFT_CONTROL_PORT needs a port number, got `{port}`"))?);
+        l.control_port = Some(port.parse().map_err(|_| format!("WALTCUT_CONTROL_PORT needs a port number, got `{port}`"))?);
     }
     if l.control_input_only && l.control_port.is_none() {
-        return Err("--control-input-only requires --control or FILMCRAFT_CONTROL_PORT".into());
+        return Err("--control-input-only requires --control or WALTCUT_CONTROL_PORT".into());
     }
     Ok(Cli::Run(l))
 }
 
-/// Whether a launch file is a FilmCraft project. The extension's case does not matter: Windows file
-/// associations and the Linux MIME glob start the app for `CUT.FCPROJ` too (#850).
+/// Whether a launch file is a WaltCut project. The extension's case does not matter: Windows file
+/// associations and the Linux MIME glob start the app for `CUT.WALTCUT` too (#850).
 pub fn is_project(path: &str) -> bool {
-    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("fcproj"))
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("waltcut"))
 }
 
 /// `path` made absolute against the working directory, so a project or media file named relative
@@ -170,7 +170,7 @@ mod tests {
         }
     }
 
-    /// `filmcraft --help` used to open the app with "--help" as a media file to import.
+    /// `waltcut --help` used to open the app with "--help" as a media file to import.
     #[test]
     fn help_and_version_do_not_start_the_app() {
         assert_eq!(parse_args(&["--help"]), Ok(Cli::Help));
@@ -200,12 +200,12 @@ mod tests {
         assert!(parse_args(&["--help", "--control"]).is_err());
     }
 
-    /// A bad `FILMCRAFT_CONTROL_PORT` used to start the app without the control server, silently.
+    /// A bad `WALTCUT_CONTROL_PORT` used to start the app without the control server, silently.
     #[test]
     fn a_bad_port_in_the_environment_is_an_error_like_a_bad_control_flag() {
         for bad in ["abc", "70000", "-1", "98 76", "9876x", "\u{fffd}"] {
             let e = parse_env(Some(bad), &[]).unwrap_err();
-            assert!(e.contains("FILMCRAFT_CONTROL_PORT") && e.contains(bad), "{bad}: {e}");
+            assert!(e.contains("WALTCUT_CONTROL_PORT") && e.contains(bad), "{bad}: {e}");
             assert!(parse_env(Some(bad), &["--empty", "a.mp4"]).is_err(), "{bad}");
             // the flag wins, so the environment's value is not looked at; nor for --help / --version
             assert_eq!(parse_env(Some(bad), &["--control", "9"]).map(|c| matches!(c, Cli::Run(l) if l.control_port == Some(9))), Ok(true), "{bad}");
@@ -237,11 +237,11 @@ mod tests {
                 graphics: None
             }
         );
-        let l = launch(&["--control", "9876", "--empty", "--no-recover", "--data-dir", "/tmp/fc", "cut.fcproj", "a.mp4"]);
+        let l = launch(&["--control", "9876", "--empty", "--no-recover", "--data-dir", "/tmp/fc", "cut.waltcut", "a.mp4"]);
         assert_eq!(l.control_port, Some(9876));
         assert_eq!((l.demo, l.startup_flag, l.recover), (false, true, Some(false)));
         assert_eq!(l.data_dir, Some(std::path::PathBuf::from("/tmp/fc")));
-        assert_eq!(l.files, ["cut.fcproj", "a.mp4"]);
+        assert_eq!(l.files, ["cut.waltcut", "a.mp4"]);
         assert_eq!((launch(&["--demo"]).demo, launch(&["--demo"]).startup_flag, launch(&["--recover"]).recover), (true, true, Some(true)));
         // `--` ends the options; a lone `-` and macOS' process serial number are not options
         assert_eq!(launch(&["--", "--odd name.mov", "-h"]).files, ["--odd name.mov", "-h"]);
@@ -262,14 +262,14 @@ mod tests {
         assert_eq!(l.files, ["caf\u{fffd}.mov", "caf\u{fffd}.mov"]);
     }
 
-    /// Windows file associations and the Linux MIME glob match `CUT.FCPROJ` too; it used to be
+    /// Windows file associations and the Linux MIME glob match `CUT.WALTCUT` too; it used to be
     /// imported as a media file instead of opened (#850).
     #[test]
     fn a_project_is_recognised_whatever_the_case_of_its_extension() {
-        for p in ["cut.fcproj", "CUT.FCPROJ", "Cut.FcProj", "/edits/a b.fcproj", r"C:\Edits\CUT.FCPROJ"] {
+        for p in ["cut.waltcut", "CUT.WALTCUT", "Cut.WaltCut", "/edits/a b.waltcut", r"C:\Edits\CUT.WALTCUT"] {
             assert!(is_project(p), "{p}");
         }
-        for p in ["cut.mp4", "fcproj", ".fcproj", "a.fcproj.mov", "a.fcprojx", ""] {
+        for p in ["cut.mp4", "waltcut", ".waltcut", "a.waltcut.mov", "a.waltcutx", ""] {
             assert!(!is_project(p), "{p}");
         }
     }
@@ -281,9 +281,9 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let nested = Path::new("clips").join("a.mp4");
         let already = cwd.join("b.wav").to_string_lossy().into_owned();
-        let files = ["Cut.FCPROJ".to_string(), nested.to_string_lossy().into_owned(), "other.fcproj".to_string(), already.clone()];
+        let files = ["Cut.WALTCUT".to_string(), nested.to_string_lossy().into_owned(), "other.waltcut".to_string(), already.clone()];
         let (project, media) = project_and_media(&files);
-        assert_eq!(project, Some(cwd.join("Cut.FCPROJ").to_string_lossy().into_owned()));
+        assert_eq!(project, Some(cwd.join("Cut.WALTCUT").to_string_lossy().into_owned()));
         assert_eq!(media, [cwd.join(&nested).to_string_lossy().into_owned(), already]);
         for p in media.iter().chain(&project) {
             assert!(Path::new(p).is_absolute() && !p.starts_with(r"\\?\"), "{p}");
