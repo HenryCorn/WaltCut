@@ -1,19 +1,7 @@
-//! Print FilmCraft's effect and transition catalog as the Effects panel lists it, as JSON: one
-//! object per item with its `id`, display `name`, `kind` (`Video`, `Audio`, `VideoTransition`,
-//! `AudioTransition`) and Effects-panel folder `path` (e.g. `["Video Effects", "Blur & Sharpen"]`).
-//! Items with no Effects-panel folder (intrinsic Motion / Opacity / Volume…, graphic layers) and
-//! the hidden obsolete transitions are left out, as in the panel (the same top-level folder filter
-//! as `panels/effects.rs`). `cargo xtask parity --area effects|transitions` reads this to measure
-//! coverage against a reference list.
-//!
-//! ```sh
-//! cargo run -p waltcut-project --example effect_catalog
-//! ```
-
 use std::process::ExitCode;
 
 use serde_json::json;
-use waltcut_project::vtransition::EFFECT_TOP_FOLDERS;
+use waltcut_project::effect::EFFECT_TOP_FOLDERS;
 
 fn main() -> ExitCode {
     let items: Vec<serde_json::Value> = waltcut_project::effect_defs()

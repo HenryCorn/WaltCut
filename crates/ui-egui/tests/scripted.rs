@@ -169,87 +169,6 @@ fn first_media_item(v: &Value) -> Option<u64> {
 }
 
 #[test]
-fn apply_effect_appears_in_effect_controls() {
-    let mut d = Driver::demo();
-    let clip = track_clips(&d.sequence(), 0)[0]["clip"].as_u64().unwrap();
-    d.exec("timeline.select", json!({"clips": [clip]}));
-    d.exec("effects.apply", json!({"effect": "Gaussian Blur"}));
-    let seq = d.sequence();
-    let fx: Vec<String> = track_clips(&seq, 0)[0]["effects"].as_array().unwrap().iter().filter_map(|e| e["effect"].as_str().map(str::to_string)).collect();
-    assert!(fx.iter().any(|e| e == "gaussian_blur"), "{fx:?}");
-    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
-    d.frames(3);
-    let ids = d.element_ids("effectControls.effect.");
-    assert!(ids.iter().any(|i| i == "effectControls.effect.gaussian_blur"), "{ids:?}");
-    d.ok("ui.menu.invoke", json!({"id": "edit.undo"}));
-    d.frames(2);
-    assert!(!d.element_ids("effectControls.effect.").iter().any(|i| i == "effectControls.effect.gaussian_blur"));
-}
-
-#[test]
-fn effects_panel_lists_the_premiere_transition_folders() {
-    let mut d = Driver::demo();
-    d.ok("ui.panel.show", json!({"panel": "Effects"}));
-    d.frames(3);
-    let folders = d.element_ids("effects.folder.");
-    for f in waltcut_project::vtransition::VIDEO_TRANSITION_FOLDERS {
-        assert!(folders.contains(&format!("effects.folder.Video Transitions/{f}")), "{f}: {folders:?}");
-    }
-    assert!(folders.iter().any(|f| f == "effects.folder.Legacy"), "{folders:?}");
-    // search opens the matching folders: every modern wipe, and the legacy ones
-    d.ok("ui.set", json!({"effectsSearch": "wipe"}));
-    d.frames(3);
-    let items = d.element_ids("effects.item.");
-    for id in
-        ["clock_wipe", "linear_wipe", "neon_wipe", "panel_wipe", "plateau_wipe", "radial_wipe", "soft_wipe", "star_wipe", "stretch_wipe", "vr_gradient_wipe"]
-    {
-        assert!(items.iter().any(|i| i == &format!("effects.item.{id}")), "{id}: {items:?}");
-    }
-    d.ok("ui.set", json!({"effectsSearch": "legacy"}));
-    d.frames(3);
-    let items = d.element_ids("effects.item.");
-    for id in ["additive_dissolve_legacy", "clock_wipe_legacy", "cross_dissolve_legacy", "push_legacy", "whip_legacy"] {
-        assert!(items.iter().any(|i| i == &format!("effects.item.{id}")), "{id}: {items:?}");
-    }
-    // a folder whose own name has a slash keeps all of it (Noise Reduction/Restoration, not Restoration)
-    d.ok("ui.set", json!({"effectsSearch": "denoise"}));
-    d.frames(3);
-    let noise = d.ok("ui.elements", json!({"prefix": "effects.folder.Audio Effects/Noise Reduction/Restoration"}));
-    assert_eq!(noise[0]["label"], json!("Noise Reduction/Restoration"), "{noise}");
-    // obsolete transitions stay out of the panel
-    d.ok("ui.set", json!({"effectsSearch": "venetian"}));
-    d.frames(3);
-    assert!(d.element_ids("effects.item.").is_empty());
-    // clicking a sub-folder toggles it
-    d.ok("ui.set", json!({"effectsSearch": ""}));
-    d.frames(2);
-    d.ok("ui.click", json!({"id": "effects.folder.Video Transitions/Dissolve"}));
-    d.frames(2);
-    assert!(!d.element_ids("effects.item.").iter().any(|i| i == "effects.item.cross_dissolve"));
-    // applying from the panel's command path works for a legacy transition
-    let cut = track_clips(&d.sequence(), 0)[1]["start"].as_i64().unwrap();
-    d.exec("playhead.set", json!({"time": cut}));
-    d.exec("sequence.applyVideoTransition", json!({"effect": "Iris Round"}));
-    let seq = d.sequence();
-    assert!(seq["video"][0]["transitions"].as_array().unwrap().iter().any(|t| t["effect"] == "iris_round"), "{seq}");
-}
-
-#[test]
-fn cmd_d_applies_the_default_transition_to_the_selected_clip() {
-    // #1124: the playhead is mid-clip, away from every cut
-    let mut d = Driver::demo();
-    let clip = track_clips(&d.sequence(), 0)[2].clone();
-    let id = clip["clip"].clone();
-    let mid = (clip["start"].as_i64().unwrap() + clip["end"].as_i64().unwrap()) / 2;
-    d.exec("playhead.set", json!({"time": mid}));
-    d.exec("timeline.select", json!({"clips": [id]}));
-    d.ok("ui.key", json!({"key": "Cmd+D"}));
-    d.frames(2);
-    let seq = d.sequence();
-    assert!(seq["video"][0]["transitions"].as_array().unwrap().iter().any(|t| t["to"] == id && t["effect"] == "cross_dissolve"), "{seq}");
-}
-
-#[test]
 fn playback_toggle_and_stop() {
     let mut d = Driver::demo();
     assert_eq!(d.inspect()["playback"]["playing"], json!(false));
@@ -305,15 +224,8 @@ fn trim_monitor_buttons_and_dynamic_jkl_trimming() {
     d.exec("trim.selectEditPoint", json!({"clip": clip, "edge": "out", "kind": "roll"}));
     d.frames(3);
     let ids = d.element_ids("trimMonitor.");
-    for id in [
-        "trimMonitor.outgoing",
-        "trimMonitor.incoming",
-        "trimMonitor.outShift",
-        "trimMonitor.inShift",
-        "trimMonitor.forward",
-        "trimMonitor.backwardMany",
-        "trimMonitor.applyTransition",
-    ] {
+    for id in ["trimMonitor.outgoing", "trimMonitor.incoming", "trimMonitor.outShift", "trimMonitor.inShift", "trimMonitor.forward", "trimMonitor.backwardMany"]
+    {
         assert!(ids.iter().any(|x| x == id), "{id} missing from {ids:?}");
     }
     // +1 button rolls the cut one frame
@@ -564,24 +476,19 @@ fn recording_a_shortcut_skips_the_modifier_key_presses() {
 }
 
 #[test]
-fn eyedropper_picks_a_key_color_on_a_selected_clip() {
-    // #1023: the selected clip's transform handles covered the Program picture and took the click
+fn effects_panel_omits_removed_video_catalogue() {
     let mut d = Driver::demo();
-    let clip = track_clips(&d.sequence(), 0)[0]["clip"].clone();
-    d.exec("timeline.select", json!({"clips": [clip]}));
-    d.exec("effects.apply", json!({"effect": "Color Key"}));
-    d.ok("ui.panel.show", json!({"panel": "EffectControls"}));
-    d.frames(4);
-    let color = |d: &mut Driver| d.sequence()["video"][0]["items"][0]["effects"][0]["params"]["color"]["value"].clone();
-    let before = color(&mut d);
-    d.ok("ui.click", json!({"id": "effectControls.color_key.color.eyedropper"}));
-    d.frames(2);
-    d.ok("ui.click", json!({"id": "program.picture"}));
-    for _ in 0..200 {
-        if color(&mut d) != before {
-            break;
-        }
-        d.frames(1);
+    d.ok("ui.panel.show", json!({"panel": "Effects"}));
+    d.frames(3);
+    let folders = d.element_ids("effects.folder.");
+    assert!(folders.iter().all(|f| !f.contains("Video Effects") && !f.contains("Video Transitions")));
+    for removed in ["gaussian", "dissolve", "crop", "legacy"] {
+        d.ok("ui.set", json!({"effectsSearch": removed}));
+        d.frames(3);
+        assert!(d.element_ids("effects.item.").is_empty(), "{removed}");
     }
-    assert_ne!(color(&mut d), before, "the eyedropper filled Key Color from the Program picture");
+    d.ok("ui.set", json!({"effectsSearch": "denoise"}));
+    d.frames(3);
+    let noise = d.ok("ui.elements", json!({"prefix": "effects.folder.Audio Effects/Noise Reduction/Restoration"}));
+    assert_eq!(noise[0]["label"], json!("Noise Reduction/Restoration"));
 }

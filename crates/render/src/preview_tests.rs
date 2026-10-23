@@ -2,10 +2,10 @@
 
 use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{DemoScene, Generator, MediaSource};
-use waltcut_project::{ClipId, ItemId, ItemKind, Label, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackKind, find_effect};
+use waltcut_project::{ClipId, ItemId, ItemKind, Label, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackKind};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
-use crate::preview::{Need, Segment, audio_segments, effect_cost_ms, segment_at, video_segments};
+use crate::preview::{Segment, audio_segments, segment_at, video_segments};
 
 fn add_gen(p: &mut Project, g: GeneratorSource) -> ItemId {
     let info = g.info().clone();
@@ -50,12 +50,6 @@ fn place(p: &mut Project, seq: ItemId, track: usize, item: ItemId, start_f: i64,
     id
 }
 
-fn add_fx(p: &mut Project, seq: ItemId, clip: ClipId, id: &str) {
-    let mut inst = find_effect(id).unwrap().instance();
-    waltcut_project::resolve_auto_points(&mut inst, (1920, 1080), (1920, 1080));
-    p.sequence_mut(seq).unwrap().find_item_mut(clip).unwrap().1.effects.push(inst);
-}
-
 fn bounds(s: &[Segment]) -> Vec<(i64, i64)> {
     s.iter().map(|s| (s.first_frame, s.first_frame + s.frames)).collect()
 }
@@ -86,40 +80,15 @@ fn segments_split_at_every_edit_point_and_skip_gaps() {
 }
 
 #[test]
-fn transitions_are_their_own_segments() {
-    let (mut p, matte, ocean, seq) = setup();
-    let a = place(&mut p, seq, 0, ocean, 0, 48);
-    let b = place(&mut p, seq, 0, matte, 48, 48);
-    let r = FrameRate::FPS_24;
-    let tr = waltcut_project::Transition {
-        id: Default::default(),
-        effect: find_effect("cross_dissolve").unwrap().instance(),
-        start: r.tick_of(36),
-        duration: r.tick_of(24),
-        from: Some(a),
-        to: Some(b),
-        align: Default::default(),
-        reverse: false,
-    };
-    p.sequence_mut(seq).unwrap().video_tracks[0].transitions.push(tr);
-    let s = video_segments(&p, seq);
-    assert_eq!(bounds(&s), vec![(0, 36), (36, 48), (48, 60), (60, 96)]);
-    assert_eq!(s[1].clips, vec![a, b]);
-    assert_eq!(s[1].need, Need::Realtime);
-}
-
-#[test]
 fn editing_one_clip_invalidates_only_its_segments() {
     let (mut p, matte, ocean, seq) = setup();
     let a = place(&mut p, seq, 0, ocean, 0, 48);
     let b = place(&mut p, seq, 0, matte, 48, 48);
-    add_fx(&mut p, seq, a, "gaussian_blur");
-    add_fx(&mut p, seq, b, "tint");
     let before = video_segments(&p, seq);
     // change a parameter of A's effect
     let q = p.sequence_mut(seq).unwrap();
     let (_, it) = q.find_item_mut(a).unwrap();
-    it.effect_mut("gaussian_blur").unwrap().params.values_mut().next().unwrap().value = ParamValue::Float(42.0);
+    it.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().value = ParamValue::Float(42.0);
     let after = video_segments(&p, seq);
     assert_ne!(by_frame(&before, 10), by_frame(&after, 10), "A changed");
     assert_eq!(by_frame(&before, 60), by_frame(&after, 60), "B untouched");
@@ -140,9 +109,8 @@ fn editing_one_clip_invalidates_only_its_segments() {
 #[test]
 fn renaming_relabelling_and_moving_keep_hashes() {
     let (mut p, matte, ocean, seq) = setup();
-    let a = place(&mut p, seq, 0, ocean, 0, 48);
+    place(&mut p, seq, 0, ocean, 0, 48);
     let b = place(&mut p, seq, 0, matte, 48, 48);
-    add_fx(&mut p, seq, a, "tint");
     let before = video_segments(&p, seq);
     let q = p.sequence_mut(seq).unwrap();
     for it in q.video_tracks[0].items.iter_mut() {
@@ -166,10 +134,8 @@ fn renaming_relabelling_and_moving_keep_hashes() {
 #[test]
 fn hashes_are_stable_across_save_and_load() {
     let (mut p, matte, ocean, seq) = setup();
-    let a = place(&mut p, seq, 0, ocean, 0, 48);
+    place(&mut p, seq, 0, ocean, 0, 48);
     let b = place(&mut p, seq, 1, matte, 24, 48);
-    add_fx(&mut p, seq, a, "tint");
-    add_fx(&mut p, seq, b, "gaussian_blur");
     let q = p.sequence_mut(seq).unwrap();
     let (_, it) = q.find_item_mut(b).unwrap();
     let m = it.effect_mut("motion").unwrap();
@@ -181,62 +147,6 @@ fn hashes_are_stable_across_save_and_load() {
     assert_eq!(before, after);
     // and identical across repeated computation
     assert_eq!(video_segments(&p, seq), before);
-}
-
-#[test]
-fn need_classification_none_yellow_red() {
-    let (mut p, matte, _ocean, seq) = setup();
-    let a = place(&mut p, seq, 0, matte, 0, 24);
-    let b = place(&mut p, seq, 0, matte, 24, 24);
-    let c = place(&mut p, seq, 0, matte, 48, 24);
-    add_fx(&mut p, seq, b, "tint");
-    for fx in ["gaussian_blur", "sharpen", "levels", "noise"] {
-        add_fx(&mut p, seq, c, fx);
-    }
-    let s = video_segments(&p, seq);
-    let need = |f| segment_at(&s, f).unwrap().need;
-    assert_eq!(need(0), Need::None, "untouched clip matching the sequence plays natively");
-    assert_eq!(need(30), Need::Realtime, "one cheap effect: yellow");
-    assert_eq!(need(60), Need::Render, "four heavy effects: red ({} ms)", segment_at(&s, 60).unwrap().cost_ms);
-    let _ = a;
-    // a clip at a different frame size than the sequence needs scaling: yellow
-    let (mut p, _m, ocean, seq) = setup();
-    place(&mut p, seq, 0, ocean, 0, 24);
-    let s = video_segments(&p, seq);
-    let ocean_matches = p.item(ocean).unwrap().as_media().unwrap().info.video.as_ref().is_some_and(|v| v.width == 1920 && v.height == 1080);
-    let want = if ocean_matches && p.item(ocean).unwrap().frame_rate() == FrameRate::FPS_24 { Need::None } else { Need::Realtime };
-    assert_eq!(s[0].need, want);
-}
-
-#[test]
-fn effect_tiers_are_ordered() {
-    assert!(effect_cost_ms("levels") > effect_cost_ms("tint"));
-    assert!(effect_cost_ms("tint") > effect_cost_ms("crop"));
-    assert_eq!(effect_cost_ms("gaussian_blur"), effect_cost_ms("levels"));
-}
-
-/// Times every standard video effect on a 1080p frame (run with `--release --ignored --nocapture`)
-/// to calibrate [`effect_cost_ms`].
-#[test]
-#[ignore]
-fn effect_costs() {
-    use crate::effects::{FxCtx, apply};
-    let mut rows = Vec::new();
-    for d in waltcut_project::effect_defs().iter().filter(|d| d.kind == waltcut_project::EffectKind::Video && !d.intrinsic) {
-        let mut img = crate::Image::filled(1920, 1080, [0.4, 0.5, 0.6, 1.0]);
-        let e = d.instance();
-        let cx = FxCtx { t: Tick::ZERO, px_scale: 1.0, seconds: 0.0, timecode: "00:00:00:00", clip_name: "x", env: None, frame_rate: 24.0 };
-        apply(&mut img, &e, &cx);
-        let t0 = std::time::Instant::now();
-        for _ in 0..3 {
-            apply(&mut img, &e, &cx);
-        }
-        rows.push((t0.elapsed().as_secs_f64() * 1000.0 / 3.0, d.id));
-    }
-    rows.sort_by(|a, b| b.0.total_cmp(&a.0));
-    for (ms, id) in rows {
-        println!("{ms:8.2} ms  {id:24} tier {:.0}", effect_cost_ms(id));
-    }
 }
 
 /// Put `item` on track 0 of `kind` in `seq` from frame `start_f` for `dur_f` frames.
@@ -284,7 +194,7 @@ fn a_nests_audio_previews_follow_the_sound_of_its_sequence() {
     assert_eq!(audio_hashes(&p, outer), audio);
 
     // the picture inside the nest changes: its audio preview stays valid
-    add_fx(&mut p, inner, pic, "tint");
+    p.sequence_mut(inner).unwrap().find_item_mut(pic).unwrap().1.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().value = ParamValue::Float(50.0);
     assert_ne!(by_frame(&video_segments(&p, outer), 30), by_frame(&picture, 30));
     assert_eq!(audio_hashes(&p, outer), audio, "a video effect inside the nest");
     assert_eq!(audio_hashes(&p, top), deep);

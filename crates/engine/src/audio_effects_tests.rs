@@ -105,11 +105,6 @@ fn shared_names_resolve_by_track_kind() {
         let it = s.active_sequence().unwrap().find_item(ClipId(clip)).unwrap().1.clone();
         assert_eq!(it.effects.last().unwrap().effect, id, "{name}");
     }
-    // On a video clip "Invert" is still the video effect.
-    let v = s.active_sequence().unwrap().video_tracks[0].items[0].id.0;
-    s.execute("effects.apply", json!({"clips": [v], "effect": "Invert"})).unwrap();
-    let it = s.active_sequence().unwrap().find_item(ClipId(v)).unwrap().1.clone();
-    assert!(it.effects.iter().any(|e| e.effect == "invert"));
 }
 
 /// #696: applying an audio effect to the video side of an A/V pair lands on the linked audio.

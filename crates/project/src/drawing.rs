@@ -7,7 +7,7 @@
 //! a polyline of pressure samples from a mouse or drawing tablet.
 //!
 //! A drawing clip places the drawing on a video track like any other source, so Motion, Opacity,
-//! blend modes, masks and standard effects all apply. Strokes are plain data: the renderer
+//! blend modes and their keyframes apply. Strokes are plain data: the renderer
 //! rasterises them (`waltcut_render::drawing`) and the UI paints its own live preview.
 
 use serde::{Deserialize, Serialize};

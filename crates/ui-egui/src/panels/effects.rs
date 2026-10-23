@@ -1,4 +1,4 @@
-//! Effects panel: searchable folder tree of presets, audio/video effects and transitions (from the
+//! Effects panel: searchable folder tree of retained presets, audio effects and audio transitions (from the
 //! effect definitions). Drag onto a clip or edit point; double-click applies to the selection.
 
 use egui::{Align2, Rect, Sense, pos2, vec2};
@@ -20,8 +20,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     bui.set_clip_rect(body);
     let filter = q.to_lowercase();
     let defs = waltcut_project::effect_defs();
-    // folder tree: top-level categories in Premiere's order
-    let tops = waltcut_project::vtransition::EFFECT_TOP_FOLDERS;
+    let tops = waltcut_project::effect::EFFECT_TOP_FOLDERS;
     let mut apply: Option<String> = None;
     let mut preset_action: Option<(String, String)> = None;
     egui::ScrollArea::vertical().id_salt("fx-scroll").auto_shrink([false, false]).show(&mut bui, |ui| {
@@ -33,11 +32,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 }
                 continue;
             }
-            let mut items: Vec<_> = defs.iter().filter(|d| d.category.first() == Some(&top)).filter(|d| crate::i18n::matches_query(d.name, &filter)).collect();
-            // Premiere lists effect folders and effects alphabetically (obsolete ones last)
-            if top == "Video Effects" || top == "Legacy" {
-                items.sort_by_key(|d| (d.category.get(1) == Some(&"Obsolete"), d.category.get(1).copied().unwrap_or(""), d.name.to_ascii_lowercase()));
-            }
+            let items: Vec<_> = defs.iter().filter(|d| d.category.first() == Some(&top)).filter(|d| d.name.to_lowercase().contains(filter.as_str())).collect();
             if !filter.is_empty() && items.is_empty() {
                 continue;
             }
@@ -69,7 +64,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     // inside the top folder, or inside its sub-folder
                     let x = r.min.x + tree_x(if s.is_empty() { 1 } else { 2 }) + 30.0;
                     let icon_r = Rect::from_center_size(pos2(x - 12.0, r.center().y), vec2(13.0, 13.0));
-                    let is_tr = matches!(d.kind, waltcut_project::EffectKind::VideoTransition | waltcut_project::EffectKind::AudioTransition);
+                    let is_tr = matches!(d.kind, waltcut_project::EffectKind::AudioTransition);
                     ui.painter().rect_stroke(icon_r, 2.0, egui::Stroke::new(1.0, t.text_dim), egui::StrokeKind::Inside);
                     if is_tr {
                         ui.painter().line_segment([icon_r.left_bottom(), icon_r.right_top()], egui::Stroke::new(1.0, t.text_dim));

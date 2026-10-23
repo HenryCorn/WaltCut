@@ -1,7 +1,6 @@
 //! On-screen transform handles on the Program monitor (#639). Selecting Motion in Effect Controls
 //! (its header or one of its properties), or double-clicking a clip's picture in the Program
-//! monitor, draws a box around the clip's picture with eight handles and the anchor point. The
-//! Transform effect gets the same box for its own properties while it is the selected effect.
+//! monitor, draws a box around the clip's picture with eight handles and the anchor point.
 //!
 //! Dragging inside the box changes Position. A handle changes Scale about the anchor point; with
 //! Uniform Scale off a side handle changes only the width and a top or bottom handle only the
@@ -97,11 +96,6 @@ struct Drag {
     turned: f64,
 }
 
-/// Scale's parameter: Motion's `scale` is the height when Uniform Scale is off.
-fn height_param(effect: &str) -> &'static str {
-    if effect == "transform" { "scale_height" } else { "scale" }
-}
-
 fn sp(m: &Affine, v: Vec2) -> Pos2 {
     let q = m.apply(v);
     pos2(q.x as f32, q.y as f32)
@@ -133,7 +127,7 @@ fn within(points: [Pos2; 8], view: Rect) -> [Pos2; 8] {
     points.map(|p| pos2(p.x.max(view.min.x).min(view.max.x), p.y.max(view.min.y).min(view.max.y)))
 }
 
-/// The box of effect `e` (Motion or Transform) of clip `it` at media time `mt`, on the monitor
+/// The box of effect `e` (Motion) of clip `it` at media time `mt`, on the monitor
 /// picture `pic` showing a `frame`-sized sequence, with its handles kept inside `reach`.
 fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<Placement> {
     let seq = app.session.active_sequence()?;
@@ -148,24 +142,9 @@ fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, p
     };
     let centre = Vec2::new(f64::from(size.0) / 2.0, f64::from(size.1) / 2.0);
     let uniform = e.param("uniform_scale").and_then(|p| p.value.as_bool()).unwrap_or(true);
-    let (height, width, rotation) = (e.f64_at(height_param(&e.effect), mt), e.f64_at("scale_width", mt), e.f64_at("rotation", mt));
-    let (outer, to_screen, position, anchor) = if e.effect == "transform" {
-        let (anchor, position) = (point("anchor", centre), point("position", centre));
-        let (sh, sw) = (height / 100.0, if uniform { height } else { width } / 100.0);
-        // as the render places it (`waltcut_render::gpufx`, "transform")
-        let axis = e.f64_at("skew_axis", mt);
-        let shear = Affine { c: e.f64_at("skew", mt).to_radians().tan(), ..Affine::IDENTITY };
-        let skew = Affine::rotate_deg(axis).then_apply(&shear).then_apply(&Affine::rotate_deg(-axis));
-        let own = Affine::translate(position.x, position.y)
-            .then_apply(&Affine::rotate_deg(rotation))
-            .then_apply(&skew)
-            .then_apply(&Affine::scale(sw, sh))
-            .then_apply(&Affine::translate(-anchor.x, -anchor.y));
-        (motion, motion.then_apply(&own), position, anchor)
-    } else {
-        let frame_centre = Vec2::new(f64::from(seq.settings.width) / 2.0, f64::from(seq.settings.height) / 2.0);
-        (view, motion, point("position", frame_centre), point("anchor", centre))
-    };
+    let (height, width, rotation) = (e.f64_at("scale", mt), e.f64_at("scale_width", mt), e.f64_at("rotation", mt));
+    let frame_centre = Vec2::new(f64::from(seq.settings.width) / 2.0, f64::from(seq.settings.height) / 2.0);
+    let (outer, to_screen, position, anchor) = (view, motion, point("position", frame_centre), point("anchor", centre));
     let quad = quad_of(&to_screen, size);
     let anchor_at = sp(&to_screen, anchor);
     quad.iter().chain([&anchor_at]).all(|p| p.x.is_finite() && p.y.is_finite()).then_some(Placement {
@@ -183,7 +162,7 @@ fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, p
     })
 }
 
-/// The selected effect (its clip and index) and its box, while it is Motion or Transform of a
+/// The selected effect (its clip and index) and its box, while it is Motion of a
 /// selected clip under the playhead.
 fn selected_placement(app: &FilmcraftApp, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<(Target, &'static EffectDef, Placement)> {
     let sel = app.session.state.selected_effect.as_ref()?;
@@ -198,7 +177,7 @@ fn selected_placement(app: &FilmcraftApp, pic: Rect, reach: Rect, frame: (u32, u
     }
     let index = sel.index(&it.effects)?;
     let e = it.effects.get(index).filter(|e| e.enabled)?;
-    let def = e.def().filter(|d| d.id == "motion" || d.id == "transform")?;
+    let def = e.def().filter(|d| d.id == "motion")?;
     let pl = placement(app, it, e, it.source_time_at(ph), pic, reach, frame)?;
     Some(((sel.clip, index), def, pl))
 }
@@ -251,7 +230,7 @@ fn scale_factors(pl: &Placement, n: usize, start: Pos2, cur: Pos2) -> (f64, f64)
 }
 
 /// The parameter values a drag sets with the pointer at `cur`.
-fn changes(d: &Drag, effect: &str, cur: Pos2) -> Vec<(&'static str, Value)> {
+fn changes(d: &Drag, cur: Pos2) -> Vec<(&'static str, Value)> {
     let pl = &d.from;
     let moved = cur - d.start;
     // the ranges Effect Controls' fields take
@@ -263,7 +242,7 @@ fn changes(d: &Drag, effect: &str, cur: Pos2) -> Vec<(&'static str, Value)> {
         Grab::Anchor => vec![("anchor", point(pl.anchor + unscale(&pl.to_screen, moved))), ("position", point(pl.position + unscale(&pl.outer, moved)))],
         Grab::Handle(n) => {
             let (fx, fy) = scale_factors(pl, n, d.start, cur);
-            let (height, width) = (height_param(effect), "scale_width");
+            let (height, width) = ("scale", "scale_width");
             match n {
                 _ if pl.uniform => vec![(height, scale(pl.height * fy))],
                 4 | 6 => vec![(height, scale(pl.height * fy))],
@@ -435,7 +414,7 @@ pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, fra
                 ui.data_mut(|m| m.insert_temp(drag_id, d));
             }
             if resp.drag_started_by(left) || resp.drag_delta() != egui::Vec2::ZERO {
-                for (param, value) in changes(&d, def.id, cur) {
+                for (param, value) in changes(&d, cur) {
                     actions.push(("effects.setParam".into(), json!({"clip": sel.0.0, "effect": sel.1, "param": param, "value": value, "merge": MERGE})));
                 }
             }

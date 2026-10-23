@@ -1144,21 +1144,17 @@ pub fn audio_gain(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"mode": mode, "clips": applied.len(), "gainDb": applied.iter().map(|(c, g)| json!({"clip": c.0, "gainDb": g})).collect::<Vec<_>>()}))
 }
 
-/// Effects panel ▸ Set Selected as Default Transition (video or audio, from the effect's kind).
+/// Effects panel ▸ Set Selected as Default Audio Transition.
 fn set_default_transition(s: &mut Session, p: &Value) -> Result<Value> {
     let id = str_p(p, "effect").ok_or_else(|| bad("effects.setDefaultTransition", "need `effect`"))?;
-    use waltcut_project::vtransition::find_transition;
     let def = find_effect(id)
-        .or_else(|| find_transition(id, waltcut_project::EffectKind::VideoTransition))
-        .or_else(|| find_transition(id, waltcut_project::EffectKind::AudioTransition))
         .or_else(|| waltcut_project::effect_defs().iter().find(|d| d.name.eq_ignore_ascii_case(id)))
         .ok_or_else(|| bad("effects.setDefaultTransition", format!("no effect `{id}`")))?;
     match def.kind {
         waltcut_project::EffectKind::AudioTransition => s.state.default_audio_transition = def.id.to_string(),
-        waltcut_project::EffectKind::VideoTransition => s.state.default_video_transition = def.id.to_string(),
         _ => return Err(bad("effects.setDefaultTransition", format!("`{}` is not a transition", def.name))),
     }
-    Ok(json!({"video": s.state.default_video_transition, "audio": s.state.default_audio_transition}))
+    Ok(json!({"audio": s.state.default_audio_transition}))
 }
 
 fn not_recording(s: &Session) -> std::result::Result<(), String> {

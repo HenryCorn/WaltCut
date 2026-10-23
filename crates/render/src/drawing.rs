@@ -143,6 +143,50 @@ mod tests {
     }
 
     #[test]
+    fn cels_and_erasers_keep_animated_motion_opacity_and_blend_in_both_plans() {
+        use waltcut_project::drawing::{Cel, Drawing};
+        use waltcut_project::{ItemKind, Keyframe, Label, ParamValue, Project, SequenceSettings, TrackKind};
+        use waltcut_time::{FrameRate, Tick, TimeRange};
+
+        let rate = FrameRate::FPS_24;
+        let mut p = Project::new("retained drawing");
+        let mut drawing = Drawing::new(64, 32, rate);
+        drawing.cels = vec![
+            Cel { frame: 0, strokes: vec![stroke(Brush::Pen, &[(8.0, 16.0, 1.0), (56.0, 16.0, 1.0)], 6.0), stroke(Brush::Eraser, &[(32.0, 16.0, 1.0)], 10.0)] },
+            Cel { frame: 24, strokes: vec![] },
+        ];
+        let item = p.add_item("cels", Label::Iris, ItemKind::Drawing(drawing.into()), None);
+        let seq = p.new_sequence("animation", SequenceSettings { width: 64, height: 32, frame_rate: rate, ..Default::default() }, 1, 0, None);
+        let mut clip = p.make_track_item(item, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, rate.tick_of(48)), rate).unwrap();
+        clip.effect_mut("motion").unwrap().param_mut("position").unwrap().value = ParamValue::Vec2(Vec2::new(36.0, 16.0));
+        clip.effect_mut("motion").unwrap().param_mut("scale").unwrap().keyframes =
+            vec![Keyframe::new(Tick::ZERO, ParamValue::Float(100.0)), Keyframe::new(rate.tick_of(24), ParamValue::Float(50.0))];
+        clip.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().keyframes =
+            vec![Keyframe::new(Tick::ZERO, ParamValue::Float(0.0)), Keyframe::new(rate.tick_of(24), ParamValue::Float(100.0))];
+        let multiply = waltcut_project::effect::BLEND_MODES.iter().position(|m| *m == "Multiply").unwrap();
+        clip.effect_mut("opacity").unwrap().param_mut("blend").unwrap().value = ParamValue::Choice(multiply as u32);
+        p.sequence_mut(seq).unwrap().video_tracks[0].items.push(clip);
+        let sources = crate::SourceMap::default();
+        let opts = crate::RenderOptions::default();
+        for frame in [12, 30] {
+            let time = rate.tick_of(frame);
+            let cpu = crate::render_sequence(&p, seq, time, opts, &sources);
+            let plan = crate::plan::plan_frame(&p, seq, time, opts, &sources);
+            let crate::plan::FramePlan::Layers { layers, .. } = &plan else { panic!("drawing must stay a composited layer") };
+            assert_eq!(layers[0].blend, crate::Blend::Multiply);
+            let planned = crate::plan::execute_cpu(&plan);
+            assert_eq!(cpu.px, planned.px);
+            if frame == 12 {
+                assert!((alpha(&cpu, 22, 16) - 0.5).abs() < 0.01, "held cel with animated opacity");
+                assert_eq!(alpha(&cpu, 36, 16), 0.0, "eraser follows Motion");
+                assert_eq!(alpha(&cpu, 10, 16), 0.0, "animated Motion scales and positions the cel");
+            } else {
+                assert!(cpu.px.iter().all(|v| *v == 0.0), "next empty cel replaces the held drawing");
+            }
+        }
+    }
+
+    #[test]
     fn a_line_covers_its_path_and_nothing_else() {
         let mut img = Image::new(64, 32);
         render_strokes(&[stroke(Brush::Pen, &[(8.0, 16.0, 1.0), (56.0, 16.0, 1.0)], 6.0)], &Affine::scale(1.0, 1.0), &mut img);

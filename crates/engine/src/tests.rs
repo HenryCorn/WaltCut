@@ -343,12 +343,10 @@ fn zero_fps_is_refused() {
 fn effects_and_keyframes() {
     let mut s = demo();
     let c = s.active_sequence().unwrap().video_tracks[0].items[1].id.0;
-    s.execute("effects.apply", json!({"clips": [c], "effect": "Gaussian Blur"})).unwrap();
-    s.execute("effects.setParam", json!({"clip": c, "effect": "gaussian_blur", "param": "blurriness", "value": 25.0})).unwrap();
+    s.execute("effects.setParam", json!({"clip": c, "effect": "opacity", "param": "opacity", "value": 25.0})).unwrap();
     let q = s.active_sequence().unwrap();
     let it = q.find_item(waltcut_project::ClipId(c)).unwrap().1;
-    assert_eq!(it.effects[0].effect, "gaussian_blur", "standard effects render before intrinsics");
-    assert_eq!(it.effects[0].params["blurriness"].value, waltcut_project::ParamValue::Float(25.0));
+    assert_eq!(it.effect("opacity").unwrap().params["opacity"].value, waltcut_project::ParamValue::Float(25.0));
     s.execute("effects.toggleAnimation", json!({"clip": c, "effect": "motion", "param": "scale"})).unwrap();
     let it = s.active_sequence().unwrap().find_item(waltcut_project::ClipId(c)).unwrap().1.clone();
     assert!(it.effect("motion").unwrap().params["scale"].is_animated());
@@ -589,97 +587,12 @@ fn transitions_and_markers() {
     let q = s.active_sequence().unwrap();
     let cut = q.video_tracks[0].items[2].start;
     s.execute("playhead.set", json!({"time": cut.0})).unwrap();
-    s.execute("sequence.applyVideoTransition", json!({"effect": "wipe"})).unwrap();
+    s.execute("sequence.applyAudioTransition", json!({"effect": "constant_gain"})).unwrap();
     let q = s.active_sequence().unwrap();
-    assert!(q.video_tracks[0].transitions.iter().any(|t| t.effect.effect == "wipe"));
+    assert!(q.audio_tracks[0].transitions.iter().any(|t| t.effect.effect == "constant_gain"));
     let n = q.markers.len();
     s.execute("markers.add", json!({"name": "Test"})).unwrap();
     assert_eq!(s.active_sequence().unwrap().markers.len(), n + 1);
-}
-
-#[test]
-fn every_video_transition_applies_via_command() {
-    let mut s = demo();
-    let cut = s.active_sequence().unwrap().video_tracks[0].items[2].start;
-    s.execute("playhead.set", json!({"time": cut.0})).unwrap();
-    let defs: Vec<_> =
-        waltcut_project::effect_defs().iter().filter(|d| d.kind == waltcut_project::EffectKind::VideoTransition && d.category[0] != "Obsolete").collect();
-    assert_eq!(defs.len(), 84 + 21);
-    for (i, d) in defs.iter().enumerate() {
-        // alternate id and display-name lookups
-        let name = if i % 2 == 0 { d.id } else { d.name };
-        let r = s.execute("sequence.applyVideoTransition", json!({"effect": name})).unwrap_or_else(|e| panic!("{}: {e}", d.id));
-        let q = s.active_sequence().unwrap();
-        let tr = q.video_tracks[0].transitions.iter().find(|t| t.id.0 == r["transition"].as_u64().unwrap()).unwrap();
-        assert_eq!(tr.effect.effect, d.id);
-        // rendering the middle of the transition works through the engine
-        let mid = tr.start + tr.duration.mul_ratio(1, 2);
-        s.execute("playhead.set", json!({"time": mid.0})).unwrap();
-        s.execute("edit.undo", json!({})).unwrap();
-        assert!(s.active_sequence().unwrap().video_tracks[0].transitions.iter().all(|t| t.id.0 != r["transition"].as_u64().unwrap()));
-        s.execute("playhead.set", json!({"time": cut.0})).unwrap();
-    }
-    // names shared with video effects resolve to the transition here
-    let r = s.execute("sequence.applyVideoTransition", json!({"effect": "Mosaic"})).unwrap();
-    let q = s.active_sequence().unwrap();
-    assert!(q.video_tracks[0].transitions.iter().any(|t| t.id.0 == r["transition"].as_u64().unwrap() && t.effect.effect == "mosaic_transition"));
-    assert!(s.execute("sequence.applyVideoTransition", json!({"effect": "Constant Power"})).is_err());
-}
-
-#[test]
-fn transition_params_and_reverse_via_commands() {
-    let mut s = demo();
-    let cut = s.active_sequence().unwrap().video_tracks[0].items[2].start;
-    s.execute("playhead.set", json!({"time": cut.0})).unwrap();
-    let r = s
-        .execute(
-            "sequence.applyVideoTransition",
-            json!({"effect": "Iris Round", "params": {"border_width": 12.0, "border_color": "#ff0000", "antialias": "High"}, "reverse": true}),
-        )
-        .unwrap();
-    let id = r["transition"].as_u64().unwrap();
-    let find = |s: &Session| s.active_sequence().unwrap().video_tracks[0].transitions.iter().find(|t| t.id.0 == id).cloned().unwrap();
-    let tr = find(&s);
-    assert!(tr.reverse);
-    assert_eq!(tr.effect.params["border_width"].value, waltcut_project::ParamValue::Float(12.0));
-    assert_eq!(tr.effect.params["antialias"].value, waltcut_project::ParamValue::Choice(3));
-    s.execute("sequence.setTransition", json!({"transition": id, "params": {"center": [100.0, 50.0], "border_width": 9999.0}, "reverse": false})).unwrap();
-    let tr = find(&s);
-    assert!(!tr.reverse);
-    assert_eq!(tr.effect.params["border_width"].value, waltcut_project::ParamValue::Float(200.0), "clamped to the range");
-    assert!(s.execute("sequence.setTransition", json!({"transition": id, "params": {"nope": 1}})).is_err());
-    assert!(s.execute("sequence.setTransition", json!({"transition": id, "params": {"antialias": "Ultra"}})).is_err());
-    s.execute("edit.undo", json!({})).unwrap();
-    assert!(find(&s).reverse, "setTransition is one undo step");
-    s.execute("sequence.setTransition", json!({"transition": id, "reset": true})).unwrap();
-    assert_eq!(find(&s).effect.params["border_width"].value, waltcut_project::ParamValue::Float(0.0));
-    let seq = s.execute("sequence.inspect", json!({})).unwrap();
-    let js = seq["video"][0]["transitions"].as_array().unwrap().iter().find(|t| t["id"] == id).unwrap().clone();
-    assert_eq!(js["effect"], "iris_round");
-    assert!(js["params"]["border_width"].is_object() || js["params"]["border_width"].is_number(), "{js}");
-}
-
-#[test]
-fn effects_list_reports_transition_folders() {
-    let s = demo();
-    let mut s = s;
-    let all = s.execute("effects.list", json!({"kind": "VideoTransition"})).unwrap();
-    let all = all.as_array().unwrap();
-    assert!(all.iter().all(|e| e["kind"] == "VideoTransition" && e["folder"].is_string()));
-    let wipes = s.execute("effects.list", json!({"folder": "Video Transitions/Wipe", "detail": true})).unwrap();
-    let wipes = wipes.as_array().unwrap();
-    assert_eq!(wipes.len(), 9);
-    let lw = wipes.iter().find(|e| e["id"] == "linear_wipe").unwrap();
-    assert_eq!(lw["folder"], "Wipe");
-    assert_eq!(lw["path"], "Video Transitions/Wipe");
-    let aa = lw["paramInfo"].as_array().unwrap().iter().find(|p| p["id"] == "antialias").unwrap();
-    assert_eq!(aa["type"], "choice");
-    assert_eq!(aa["options"].as_array().unwrap().len(), 4);
-    let legacy = s.execute("effects.list", json!({"folder": "Legacy/Video Transitions"})).unwrap();
-    assert_eq!(legacy.as_array().unwrap().len(), 21);
-    // the default transition accepts names shared with video effects
-    s.execute("effects.setDefaultTransition", json!({"effect": "Mosaic"})).unwrap();
-    assert_eq!(s.state.default_video_transition, "mosaic_transition");
 }
 
 #[test]
@@ -918,25 +831,26 @@ fn a_merge_key_folds_several_parameters_into_one_undo_step() {
 #[test]
 fn effect_selection_survives_reordering_and_clears_dangling_handles() {
     let mut s = demo_unlocked();
-    let id = v1(&s)[0].0;
-    let motion_sel = Some(EffectSel { clip: ClipId(id), effect: "motion".into(), instance: 0 });
-    s.execute("effects.select", json!({"clip": id, "effect": "motion"})).unwrap();
+    let id = s.active_sequence().unwrap().audio_tracks[0].items[0].id.0;
+    let motion_sel = Some(EffectSel { clip: ClipId(id), effect: "volume".into(), instance: 0 });
+    s.execute("effects.select", json!({"clip": id, "effect": "volume"})).unwrap();
     assert_eq!(s.state.selected_effect, motion_sel);
-    // applying an effect puts it first; Motion stays the selected effect
-    s.execute("effects.apply", json!({"clips": [id], "effect": "gaussian_blur"})).unwrap();
+    // Audio inserts do not disturb the selected intrinsic volume.
+    s.execute("effects.apply", json!({"clips": [id], "effect": "amplify"})).unwrap();
     assert_eq!(s.state.selected_effect, motion_sel);
-    s.execute("effects.remove", json!({"clip": id, "index": 0})).unwrap();
-    assert_eq!(s.state.selected_effect, motion_sel, "and when one before it is removed");
+    let index = s.active_sequence().unwrap().find_item(ClipId(id)).unwrap().1.effects.len() - 1;
+    s.execute("effects.remove", json!({"clip": id, "index": index})).unwrap();
+    assert_eq!(s.state.selected_effect, motion_sel, "and when an insert is removed");
     s.execute("effects.select", json!({"none": true})).unwrap();
     assert!(s.state.selected_effect.is_none());
     // an applied effect that undo takes away, and one removed
-    s.execute("effects.apply", json!({"clips": [id], "effect": "transform"})).unwrap();
-    s.execute("effects.select", json!({"clip": id, "effect": "transform"})).unwrap();
+    s.execute("effects.apply", json!({"clips": [id], "effect": "hard_limiter"})).unwrap();
+    s.execute("effects.select", json!({"clip": id, "effect": "hard_limiter"})).unwrap();
     assert!(s.state.selected_effect.is_some());
     s.undo();
     assert!(s.state.selected_effect.is_none(), "selection follows undo");
     s.redo();
-    s.execute("effects.select", json!({"clip": id, "effect": "transform"})).unwrap();
+    s.execute("effects.select", json!({"clip": id, "effect": "hard_limiter"})).unwrap();
     let effects = s.active_sequence().unwrap().find_item(ClipId(id)).unwrap().1.effects.clone();
     let index = s.state.selected_effect.as_ref().unwrap().index(&effects).unwrap();
     s.execute("effects.remove", json!({"clip": id, "index": index})).unwrap();
@@ -956,10 +870,10 @@ fn effect_selection_survives_reordering_and_clears_dangling_handles() {
     }
 }
 
-/// The demo's first video transition between two clips: (id, start, duration, cut).
+/// The demo's first audio transition between two clips: (id, start, duration, cut).
 fn demo_crossing(s: &Session) -> (u64, Tick, Tick, Tick) {
     let q = s.active_sequence().unwrap();
-    q.video_tracks
+    q.audio_tracks
         .iter()
         .find_map(|t| {
             t.transitions.iter().find(|x| x.from.is_some() && x.to.is_some()).map(|x| (x.id.0, x.start, x.duration, t.item(x.to.unwrap()).unwrap().start))

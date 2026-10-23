@@ -65,7 +65,7 @@ fn composites_tracks_and_opacity() {
 }
 
 #[test]
-fn animated_opacity_composites_whole_media_layers_with_effects_on_or_off() {
+fn animated_opacity_composites_whole_media_layers() {
     let (mut p, red, ocean, seq, map) = setup();
     place(&mut p, seq, 0, ocean, 0, 72);
     let top = place(&mut p, seq, 1, red, 0, 72);
@@ -74,10 +74,10 @@ fn animated_opacity_composites_whole_media_layers_with_effects_on_or_off() {
     let opacity = it.effect_mut("opacity").unwrap().param_mut("opacity").unwrap();
     opacity.put_keyframe(rate.tick_of(0), ParamValue::Float(0.0));
     opacity.put_keyframe(rate.tick_of(48), ParamValue::Float(100.0));
-    for effects in [false, true] {
+    {
         for frame in [0, 12, 24, 36, 48] {
             let t = rate.tick_of(frame);
-            let opts = RenderOptions { effects, ..Default::default() };
+            let opts = RenderOptions::default();
             let img = render_sequence(&p, seq, t, opts, &map);
             let mut bottom = p.clone();
             bottom.sequence_mut(seq).unwrap().video_tracks[1].items.clear();
@@ -88,7 +88,7 @@ fn animated_opacity_composites_whole_media_layers_with_effects_on_or_off() {
                 let expected = [alpha + bg[0] * (1.0 - alpha), bg[1] * (1.0 - alpha), bg[2] * (1.0 - alpha), 1.0];
                 let actual = img.get(x, y);
                 for (a, e) in actual.into_iter().zip(expected) {
-                    assert!((a - e).abs() < 1e-5, "frame {frame}, effects {effects}: {actual:?} != {expected:?}");
+                    assert!((a - e).abs() < 1e-5, "frame {frame}: {actual:?} != {expected:?}");
                 }
             }
         }
@@ -122,58 +122,6 @@ fn motion_scale_and_position() {
     assert!(img.get(80, 45)[3] > 0.99);
     assert!(img.get(10, 10)[3] > 0.99, "top-left quadrant covered");
     assert_eq!(img.get(200, 120)[3], 0.0, "rest transparent");
-}
-
-#[test]
-fn cross_dissolve_midpoint() {
-    let (mut p, red, _o, seq, map) = setup();
-    let a = place(&mut p, seq, 0, red, 0, 24);
-    let blue_src = GeneratorSource::new(Generator::ColorMatte { color: [0.0, 0.0, 1.0, 1.0] }, 320, 180, FrameRate::FPS_24, Tick(10 * TICKS_PER_SECOND));
-    let info = blue_src.info().clone();
-    let blue = p.add_item(
-        "blue",
-        Label::Iris,
-        ItemKind::Media(MediaClip {
-            media: MediaRef::Generator(blue_src.generator.clone()),
-            info,
-            interpret: Default::default(),
-            mark_in: None,
-            mark_out: None,
-            markers: vec![],
-            offline: false,
-            identity: None,
-        }),
-        None,
-    );
-    let mut map = map;
-    map.0.insert(blue, Arc::new(blue_src));
-    let b = place(&mut p, seq, 0, blue, 24, 24);
-    let r = FrameRate::FPS_24;
-    let tr = waltcut_project::Transition {
-        id: waltcut_project::TransitionId(999),
-        effect: waltcut_project::find_effect("cross_dissolve").unwrap().instance(),
-        start: r.tick_of(18),
-        duration: r.tick_of(12),
-        from: Some(a),
-        to: Some(b),
-        align: Default::default(),
-        reverse: false,
-    };
-    p.sequence_mut(seq).unwrap().video_tracks[0].transitions.push(tr);
-    let img = render_sequence(&p, seq, r.tick_of(24), RenderOptions::default(), &map);
-    let c = img.get(10, 10);
-    assert!((c[0] - 0.5).abs() < 0.05 && (c[2] - 0.5).abs() < 0.05, "{c:?}");
-    // Iris Round at 50 %: B opens in the centre; reversed, A closes into the centre instead.
-    for reverse in [false, true] {
-        let trs = &mut p.sequence_mut(seq).unwrap().video_tracks[0].transitions;
-        trs[0].effect = waltcut_project::find_effect("iris_round").unwrap().instance();
-        trs[0].reverse = reverse;
-        let opts = RenderOptions { scale: 0.25, ..RenderOptions::default() };
-        let img = render_sequence(&p, seq, r.tick_of(24), opts, &map);
-        let (mid, corner) = (img.get(img.w / 2, img.h / 2), img.get(2, 2));
-        let (centre_is_b, corner_is_b) = (mid[2] > 0.9 && mid[0] < 0.1, corner[2] > 0.9 && corner[0] < 0.1);
-        assert_eq!((centre_is_b, corner_is_b), (!reverse, reverse), "reverse={reverse}: {mid:?} {corner:?}");
-    }
 }
 
 #[test]
@@ -234,74 +182,6 @@ fn plan_matches_reference_renderer() {
         let max = got.px.iter().zip(&reference.px).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
         assert!(max < 0.02, "frame {f}: max diff {max}");
     }
-}
-
-#[test]
-fn push_plan_preserves_reference_track_order_and_reverse() {
-    let (mut p, red, ocean, seq, map) = setup();
-    place(&mut p, seq, 0, ocean, 0, 48);
-    let a = place(&mut p, seq, 1, red, 0, 24);
-    let b = place(&mut p, seq, 1, ocean, 24, 24);
-    let rate = FrameRate::FPS_24;
-    let s = p.sequence_mut(seq).unwrap();
-    for item in &mut s.video_tracks[1].items {
-        item.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().value = ParamValue::Float(55.0);
-        item.effect_mut("motion").unwrap().param_mut("scale").unwrap().value = ParamValue::Float(75.0);
-    }
-    s.video_tracks[1].transitions.push(waltcut_project::Transition {
-        id: waltcut_project::TransitionId(999),
-        effect: waltcut_project::find_effect("push").unwrap().instance(),
-        start: rate.tick_of(18),
-        duration: rate.tick_of(12),
-        from: Some(a),
-        to: Some(b),
-        align: Default::default(),
-        reverse: false,
-    });
-    for reverse in [false, true] {
-        for scale in [1.0, 0.5] {
-            for missing in [false, true] {
-                let tr = &mut p.sequence_mut(seq).unwrap().video_tracks[1].transitions[0];
-                tr.reverse = reverse;
-                tr.to = if missing { None } else { Some(b) };
-                for f in [18, 21, 24, 29] {
-                    let opts = RenderOptions { scale, ..Default::default() };
-                    let plan = plan::plan_frame(&p, seq, rate.tick_of(f), opts, &map);
-                    assert!(matches!(plan, plan::FramePlan::Composite { .. }));
-                    let got = plan::execute_cpu(&plan);
-                    let reference = render_sequence(&p, seq, rate.tick_of(f), opts, &map);
-                    let max = got.px.iter().zip(&reference.px).map(|(a, b)| (a - b).abs()).fold(0.0, f32::max);
-                    assert!(max < 1e-5, "reverse {reverse}, scale {scale}, missing {missing}, frame {f}: {max}");
-                }
-            }
-        }
-    }
-}
-
-#[test]
-fn morph_cut_frames_render_on_the_cpu_with_the_morph() {
-    // the GPU compositor can only cross-fade layers: a Morph Cut frame is planned whole on the
-    // CPU, so preview and export show the optical-flow morph, not a dissolve
-    let (mut p, red, ocean, seq, map) = setup();
-    let a = place(&mut p, seq, 0, red, 0, 24);
-    let b = place(&mut p, seq, 0, ocean, 24, 24);
-    let rate = FrameRate::FPS_24;
-    p.sequence_mut(seq).unwrap().video_tracks[0].transitions.push(waltcut_project::Transition {
-        id: waltcut_project::TransitionId(998),
-        effect: waltcut_project::find_effect("morph_cut").unwrap().instance(),
-        start: rate.tick_of(18),
-        duration: rate.tick_of(12),
-        from: Some(a),
-        to: Some(b),
-        align: Default::default(),
-        reverse: false,
-    });
-    let opts = RenderOptions { scale: 0.5, ..Default::default() };
-    assert!(plan::is_cpu_frame(&p, seq, rate.tick_of(24)));
-    assert!(!plan::is_cpu_frame(&p, seq, rate.tick_of(10)), "outside the transition the frame stays on the GPU");
-    let plan = plan::plan_frame(&p, seq, rate.tick_of(24), opts, &map);
-    assert!(matches!(plan, plan::FramePlan::Image(_)));
-    assert_eq!(plan::execute_cpu(&plan).px, render_sequence(&p, seq, rate.tick_of(24), opts, &map).px);
 }
 
 /// A project with a 4 s bars-and-tone clip (1 kHz at −20 dBFS) on A1, with extra audio effects.

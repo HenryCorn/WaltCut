@@ -10,7 +10,7 @@
 //!
 //! Automation ids (`<p>` = the dialog prefix below, `<key>` = a parameter):
 //! - every dialog: `<p>.ok`, `<p>.cancel`, and `<p>.<key>` for each control;
-//! - Paste Attributes `pasteAttributes.*`: `motion`, `opacity`, `timeRemapping`, `volume`,
+//! - Paste Attributes `pasteAttributes.*`: `motion`, `opacity`, `volume`,
 //!   `channelVolume`, `panner`, `effects`, `effect.<id>`, `scaleTimes`;
 //! - Remove Attributes `removeAttributes.*`: the same without `scaleTimes`;
 //! - Offline File `offlineFile.*`: `fileName`, `name`, `tapeName`, `video`, `audio`, `width`,
@@ -64,8 +64,8 @@ fn meta(command: &str) -> Option<(&'static str, &'static str)> {
     })
 }
 
-fn intrinsic_video() -> [(&'static str, &'static str); 3] {
-    [("motion", tl!("Motion")), ("opacity", tl!("Opacity")), ("timeRemapping", tl!("Time Remapping"))]
+fn intrinsic_video() -> [(&'static str, &'static str); 2] {
+    [("motion", "Motion"), ("opacity", "Opacity")]
 }
 fn intrinsic_audio() -> [(&'static str, &'static str); 3] {
     [("volume", tl!("Volume")), ("channelVolume", tl!("Channel Volume")), ("panner", tl!("Panner"))]
@@ -151,7 +151,7 @@ fn defaults(app: &FilmcraftApp, id: &str) -> (Value, Value) {
                     }
                 }
             }
-            let mut p = json!({"motion": has_v, "opacity": has_v, "timeRemapping": has_v, "volume": has_a, "channelVolume": has_a, "panner": has_a,
+            let mut p = json!({"motion": has_v, "opacity": has_v, "volume": has_a, "channelVolume": has_a, "panner": has_a,
                 "effects": names.iter().map(|n| n.0.clone()).collect::<Vec<_>>()});
             if id == "edit.pasteAttributes" {
                 p["scaleTimes"] = json!(true);

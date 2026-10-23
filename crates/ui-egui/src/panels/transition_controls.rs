@@ -1,6 +1,5 @@
-//! A selected transition (#430): its Effect Controls (Duration, Alignment, Reverse and its own
-//! settings, as Premiere's Change transition settings / Align transitions / Change transition
-//! duration pages describe them) and the Set Transition Duration dialog a double-click on it in
+//! A selected audio transition (#430): its Effect Controls (Duration, Alignment and Reverse)
+//! and the Set Transition Duration dialog a double-click on it in
 //! the Timeline opens. Every change is one `sequence.setTransition`; dragging a value is one undo
 //! step.
 //!
@@ -11,12 +10,8 @@
 //! [`trn::drag_span`]); each drag is one undo step. Clicking or dragging the ruler moves the
 //! playhead. The divider between the settings and the timeline is the clip view's.
 //!
-//! Not here yet: the A/B preview thumbnails with their Start / End sliders, Show Actual Sources,
-//! and a rolling edit by dragging clip A or B in the transition's timeline.
-//!
 //! Automation ids: `effectControls.transition.duration`, `.alignment` (+ `.alignment.option.<center|
-//! start|end>` while open), `.reverse`, `.reset`, `.param.<id>` (a point's are `.param.<id>.x` /
-//! `.y`; a list's entries `.param.<id>.option.<n>` while open); its timeline's
+//! start|end>` while open), `.reverse`, `.reset`; its timeline's
 //! `effectControls.transition.timeline`, `.timeline.ruler`, `.timeline.a` / `.timeline.b` (the
 //! clips, labelled with their names), `.timeline.span` (the transition) with its ends
 //! `.timeline.span.in` / `.timeline.span.out`, `.timeline.playhead`; `effectControls.divider`;
@@ -26,7 +21,7 @@ use egui::{Align2, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
 use serde_json::{Value, json};
 use waltcut_edit::Edge;
 use waltcut_edit::transitions::{self as trn, Alignment};
-use waltcut_project::{ParamKind, ParamValue, Transition, TransitionId};
+use waltcut_project::{Transition, TransitionId};
 use waltcut_time::{FrameRate, Tick};
 
 use crate::FilmcraftApp;
@@ -87,7 +82,6 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
     };
     let Some(seq) = app.session.active_sequence() else { return };
     let (rate, drop_frame) = (seq.settings.frame_rate.sane(), seq.settings.drop_frame);
-    let (fw, fh) = (f64::from(seq.settings.width), f64::from(seq.settings.height));
     let seq_name = app.session.state.active_sequence.and_then(|i| app.session.project.item(i)).map(|i| i.name.clone()).unwrap_or_default();
     let def = x.effect.def();
     let name = def.map_or(x.effect.effect.as_str(), |d| d.name).to_string();
@@ -156,16 +150,6 @@ pub fn effect_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, id
             }
             ui.end_row();
             row_line(ui);
-
-            for pd in def.map(|d| d.params.as_slice()).unwrap_or(&[]) {
-                let value = x.effect.params.get(pd.id).map_or(&pd.default, |p| &p.value);
-                ui.label(crate::i18n::t(pd.label));
-                if let Some(v) = param_widget(ui, &mut elems, pd.id, &pd.kind, value, (fw, fh)) {
-                    changes.push(v);
-                }
-                ui.end_row();
-                row_line(ui);
-            }
         });
         ui.add_space(8.0);
         let r = ui.button(tl!("Reset"));
@@ -398,93 +382,6 @@ fn paint_ruler(p: &egui::Painter, ruler: Rect, view: (Tick, Tick), rate: FrameRa
     }
 }
 
-/// One of a transition's own settings. Returns the change, as `sequence.setTransition` params.
-fn param_widget(ui: &mut egui::Ui, elems: &mut Elems, pid: &str, kind: &ParamKind, value: &ParamValue, frame: (f64, f64)) -> Option<Value> {
-    let eid = format!("effectControls.transition.param.{pid}");
-    let drag = |r: &egui::Response| json!({"merge": true, "begin": r.drag_started() || !r.dragged()});
-    match (kind, value) {
-        (ParamKind::Float { min, max, soft_min, soft_max, unit, decimals }, ParamValue::Float(v)) => {
-            let mut v = *v;
-            let speed = ((soft_max - soft_min) / 200.0).max(0.001);
-            let r = ui.add(crate::widgets::number_drag(&mut v).range(*min..=*max).speed(speed).max_decimals(usize::from(*decimals)).suffix(*unit));
-            elems.push((eid, r.rect, format!("{v}")));
-            r.changed().then(|| {
-                let mut c = drag(&r);
-                c["params"] = json!({ pid: v });
-                c
-            })
-        }
-        (ParamKind::Angle, ParamValue::Float(v)) => {
-            let mut v = *v;
-            let r = ui.add(crate::widgets::number_drag(&mut v).speed(0.5).suffix("°"));
-            elems.push((eid, r.rect, format!("{v}")));
-            r.changed().then(|| {
-                let mut c = drag(&r);
-                c["params"] = json!({ pid: v });
-                c
-            })
-        }
-        (ParamKind::Bool, ParamValue::Bool(b)) => {
-            let mut b = *b;
-            let r = ui.checkbox(&mut b, "");
-            elems.push((eid, r.rect, b.to_string()));
-            r.changed().then(|| json!({"params": { pid: b }}))
-        }
-        (ParamKind::Choice(opts), ParamValue::Choice(c)) => {
-            let shown = opts.get(*c as usize).copied().unwrap_or("");
-            let mut picked = None;
-            let mut options = Vec::new();
-            let r = egui::ComboBox::from_id_salt(("tr-param", pid.to_string())).selected_text(crate::i18n::t(shown)).show_ui(ui, |ui| {
-                for (i, o) in opts.iter().enumerate() {
-                    let r = ui.selectable_label(i == *c as usize, crate::i18n::t(o));
-                    if r.clicked() && i != *c as usize {
-                        picked = Some(i);
-                    }
-                    options.push((format!("{eid}.option.{i}"), r.rect, o.to_string()));
-                }
-            });
-            elems.extend(options);
-            elems.push((eid, r.response.rect, shown.to_string()));
-            picked.map(|i| json!({"params": { pid: i }}))
-        }
-        (ParamKind::Color, ParamValue::Color(c)) => {
-            let mut c = *c;
-            let r = ui.color_edit_button_rgba_unmultiplied(&mut c);
-            elems.push((eid, r.rect, format!("{c:?}")));
-            r.changed().then(|| {
-                let mut v = drag(&r);
-                v["params"] = json!({ pid: [c[0], c[1], c[2], c[3]] });
-                v
-            })
-        }
-        (ParamKind::Point, ParamValue::Vec2(p)) => {
-            // an automatic point (NaN) is the frame's centre until it is moved
-            let (mut px, mut py) = (if p.x.is_nan() { frame.0 / 2.0 } else { p.x }, if p.y.is_nan() { frame.1 / 2.0 } else { p.y });
-            let mut out = None;
-            ui.horizontal(|ui| {
-                let rx = ui.add(crate::widgets::number_drag(&mut px).speed(1.0).prefix("x "));
-                let ry = ui.add(crate::widgets::number_drag(&mut py).speed(1.0).prefix("y "));
-                elems.push((format!("{eid}.x"), rx.rect, format!("{px}")));
-                elems.push((format!("{eid}.y"), ry.rect, format!("{py}")));
-                for r in [&rx, &ry] {
-                    if r.changed() {
-                        let mut v = drag(r);
-                        v["params"] = json!({ pid: [px, py] });
-                        out = Some(v);
-                    }
-                }
-            });
-            out
-        }
-        (_, v) => {
-            let r = ui.label(RichText::new(format!("{v:?}")).weak());
-            elems.push((eid, r.rect, String::new()));
-            None
-        }
-    }
-}
-
-/// Double-click a transition in the Timeline: Set Transition Duration.
 pub fn open_duration(app: &mut FilmcraftApp, id: TransitionId) {
     let Some((x, ..)) = lookup(app, id) else { return };
     let rate = app.session.active_sequence().map(|q| q.settings.frame_rate.sane()).unwrap_or_default();

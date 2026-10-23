@@ -85,7 +85,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Paste Attributes…",
             &["Edit"],
             Some("Cmd+Alt+V"),
-            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"timeRemapping":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true,"scaleTimes":bool=true}"#,
+            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true,"scaleTimes":bool=true}"#,
             can_paste_attributes,
             paste_attributes,
         ),
@@ -94,7 +94,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Remove Attributes…",
             &["Edit"],
             None,
-            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"timeRemapping":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true}"#,
+            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true}"#,
             has_selection,
             remove_attributes,
         ),
@@ -970,14 +970,7 @@ struct AttrSel {
 fn attr_sel(p: &Value) -> AttrSel {
     let on = |k: &str| bool_p(p, k).unwrap_or(true);
     let mut intrinsic = Vec::new();
-    for (k, id) in [
-        ("motion", "motion"),
-        ("opacity", "opacity"),
-        ("timeRemapping", "time_remap"),
-        ("volume", "volume"),
-        ("channelVolume", "channel_volume"),
-        ("panner", "panner"),
-    ] {
+    for (k, id) in [("motion", "motion"), ("opacity", "opacity"), ("volume", "volume"), ("channelVolume", "channel_volume"), ("panner", "panner")] {
         if on(k) {
             intrinsic.push(id);
         }

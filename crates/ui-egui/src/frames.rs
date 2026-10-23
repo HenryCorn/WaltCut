@@ -846,7 +846,7 @@ fn plan_job(job: &Job, seq: ItemId, pool: &Arc<MediaPool>, services: &Arc<dyn Se
         // One full-frame layer: the preview scaled to the output size.
         let (w, h) = waltcut_render::output_size(q, job.scale);
         let matrix = waltcut_geom::Affine::scale(w as f64 / frame.width.max(1) as f64, h as f64 / frame.height.max(1) as f64);
-        let layers = vec![waltcut_render::plan::PlanLayer { frame, matrix, opacity: 1.0, blend: waltcut_render::Blend::Normal, fx: None, input: None }];
+        let layers = vec![waltcut_render::plan::PlanLayer { frame, matrix, opacity: 1.0, blend: waltcut_render::Blend::Normal, input: None }];
         return (waltcut_render::plan::FramePlan::Layers { width: w, height: h, layers }, true);
     }
     let provider = provider(job, pool, services);

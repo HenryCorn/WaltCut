@@ -33,8 +33,6 @@ pub fn stats(app: &FilmcraftApp) -> Value {
     v["gpu"] = app.gpu.as_ref().map_or(Value::Null, |g| {
         json!({
             "uploadedBytes": g.compositor.uploaded_bytes,
-            "transitions": g.compositor.gpu_transitions,
-            "cpuTransitions": g.compositor.cpu_transitions,
             "submitMs": g.last_ms,
         })
     });

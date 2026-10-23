@@ -457,11 +457,11 @@ pub fn export(o: &Opts) -> Vec<Value> {
     let dir = std::env::temp_dir().join(format!("filmcraft-bench-export-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("tmp dir");
     let mut rows = Vec::new();
-    // Scenes: (id, format, label, extension, effects-heavy). `--only` matches the id exactly here,
-    // so `--only h264` runs the plain scene and `--only h264_fx` only the layered one.
+    // Scenes: (id, format, label, extension, layered). `--only` matches the id exactly here,
+    // so `--only h264` runs the plain scene and `--only h264_layers` only the layered one.
     let scenes = [
         ("h264", "h264", "H.264 + AAC (MP4)", "mp4", false),
-        ("h264_fx", "h264", "H.264 + AAC, 3 layers + effects", "mp4", true),
+        ("h264_layers", "h264", "H.264 + AAC, 3 composited layers", "mp4", true),
         ("prores", "prores", "ProRes 422 (MOV)", "mov", false),
     ];
     for (id, format, label, ext, fx) in scenes.into_iter().filter(|f| o.only.as_deref().is_none_or(|x| x == f.0)) {
@@ -479,12 +479,11 @@ pub fn export(o: &Opts) -> Vec<Value> {
             let mut s = Session::default();
             let a = playback::import(&mut s, &path);
             let seq = if fx {
-                // PiP layers: (scale %, position, rotation, opacity %); effects per layer, GPU-capable only
+                // PiP layers: (scale %, position, rotation, opacity %); intrinsic composition, GPU-capable
                 let layers = [(a, 100.0, None, 0.0, 100.0), (a, 50.0, Some((480.0, -270.0)), 0.0, 100.0), (a, 33.0, Some((-560.0, 300.0)), 0.0, 70.0)];
-                let per_layer: [&[&str]; 3] = [&["proc_amp", "gaussian_blur", "vignette"], &["brightness_contrast"], &["sharpen"]];
-                playback::build_sequence_fx(&mut s, 1920, 1080, &layers, &per_layer, secs)
+                playback::build_sequence(&mut s, 1920, 1080, &layers, secs)
             } else {
-                playback::build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], &[], secs)
+                playback::build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], secs)
             };
             // build_sequence adds video only: add the clip's audio on A1 for the AAC encode
             s.edit("audio", |p, _| {

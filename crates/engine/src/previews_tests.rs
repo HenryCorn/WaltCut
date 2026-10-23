@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use waltcut_media::Generator;
 use waltcut_media::generators::GeneratorSource;
-use waltcut_project::{ClipId, Label, ParamValue, SequenceSettings, TrackKind, find_effect};
+use waltcut_project::{ClipId, Label, ParamValue, SequenceSettings, TrackKind};
 use waltcut_time::{FrameRate, TICKS_PER_SECOND, Tick, TimeRange};
 
 use crate::Session;
@@ -44,7 +44,7 @@ fn session_with(name: &str, video: Generator) -> (Session, ClipId) {
     for e in a.effects.iter_mut().chain(b.effects.iter_mut()) {
         waltcut_project::resolve_auto_points(e, (64, 36), (64, 36));
     }
-    a.effects.push(find_effect("tint").unwrap().instance());
+    a.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().value = ParamValue::Float(90.0);
     let a_id = a.id;
     let q = p.sequence_mut(seq).unwrap();
     q.video_tracks[0].items = vec![a, b];
@@ -96,7 +96,7 @@ fn render_turns_green_edit_invalidates_and_undo_restores() {
     // edit the effect → stale
     s.edit_sequence("Tint", |q, _, _| {
         let (_, it) = q.find_item_mut(a).unwrap();
-        it.effect_mut("tint").unwrap().params.values_mut().find(|p| matches!(p.value, ParamValue::Float(_))).unwrap().value = ParamValue::Float(30.0);
+        it.effect_mut("opacity").unwrap().param_mut("opacity").unwrap().value = ParamValue::Float(30.0);
         Ok(())
     })
     .unwrap();

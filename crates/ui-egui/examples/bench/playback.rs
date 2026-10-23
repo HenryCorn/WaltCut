@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_project::{ItemId, ParamValue, Project, SequenceSettings, TrackKind, find_effect, resolve_auto_points};
+use waltcut_project::{ItemId, ParamValue, Project, SequenceSettings, TrackKind, resolve_auto_points};
 use waltcut_time::{FrameRate, Tick, TimeRange};
 use waltcut_ui_egui::frames::{FrameKey, FrameServer, JobRecord, PREROLL_TIMEOUT_S, PlaybackMeter, Target, process_cpu_time, thread_cpu_time};
 
@@ -37,13 +37,7 @@ pub fn import(s: &mut Session, path: &Path) -> ItemId {
 
 /// One clip per track from t = 0 (`layers[0]` on V1), with (scale %, position, rotation°,
 /// opacity %) Motion/Opacity settings per layer.
-pub fn build_sequence(s: &mut Session, w: u32, h: u32, layers: &[(ItemId, f64, Option<(f64, f64)>, f64, f64)], effects: &[&str], secs: f64) -> ItemId {
-    let per_layer: Vec<&[&str]> = (0..layers.len()).map(|i| if i == 0 { effects } else { &[][..] }).collect();
-    build_sequence_fx(s, w, h, layers, &per_layer, secs)
-}
-
-/// As [`build_sequence`], with the effect ids of each layer (`per_layer[i]` on V(i+1)).
-pub fn build_sequence_fx(s: &mut Session, w: u32, h: u32, layers: &[(ItemId, f64, Option<(f64, f64)>, f64, f64)], per_layer: &[&[&str]], secs: f64) -> ItemId {
+pub fn build_sequence(s: &mut Session, w: u32, h: u32, layers: &[(ItemId, f64, Option<(f64, f64)>, f64, f64)], secs: f64) -> ItemId {
     let rate = FrameRate::FPS_23_976;
     let sizes: Vec<(u32, u32)> = layers
         .iter()
@@ -74,24 +68,6 @@ pub fn build_sequence_fx(s: &mut Session, w: u32, h: u32, layers: &[(ItemId, f64
             }
             if let Some(o) = v.effect_mut("opacity").and_then(|o| o.params.get_mut("opacity")) {
                 o.value = ParamValue::Float(opacity);
-            }
-            {
-                for (k, id) in per_layer.get(i).copied().unwrap_or(&[]).iter().enumerate() {
-                    let mut e = find_effect(id).unwrap_or_else(|| panic!("effect {id}")).instance();
-                    let set: &[(&str, f64)] = match *id {
-                        "sharpen" => &[("amount", 40.0)],
-                        "gaussian_blur" => &[("blurriness", 8.0)],
-                        "brightness_contrast" => &[("brightness", 10.0), ("contrast", 15.0)],
-                        "proc_amp" => &[("contrast", 110.0)],
-                        _ => &[],
-                    };
-                    for (name, val) in set {
-                        if let Some(p) = e.params.get_mut(*name) {
-                            p.value = ParamValue::Float(*val);
-                        }
-                    }
-                    v.effects.insert(k, e);
-                }
             }
             p.sequence_mut(seq).expect("seq").video_tracks[i].items.push(v);
         }
@@ -645,7 +621,7 @@ fn parse_args() -> Args {
             "--json" => a.json = it.next(),
             "--help" | "-h" => {
                 println!(
-                    "bench_playback [--scenario h264-1080,stack3,stack3-blend,stack3-fx,h264-2160,hevc-2160,vp9-2160,av1-2160,demo,after-preview,seek-storm] [--res full,half] [--cpu|--gpu] [--seconds 8] [--refresh 60] [--workers N] [--repeat N] [--json out.json]"
+                    "bench_playback [--scenario h264-1080,stack3,stack3-blend,h264-2160,hevc-2160,vp9-2160,av1-2160,demo,after-preview,seek-storm] [--res full,half] [--cpu|--gpu] [--seconds 8] [--refresh 60] [--workers N] [--repeat N] [--json out.json]"
                 );
                 std::process::exit(0);
             }
@@ -653,10 +629,8 @@ fn parse_args() -> Args {
         }
     }
     if a.scenarios.is_empty() {
-        a.scenarios = ["h264-1080", "stack3", "stack3-blend", "stack3-fx", "h264-2160", "hevc-2160", "demo", "after-preview", "seek-storm"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        a.scenarios =
+            ["h264-1080", "stack3", "stack3-blend", "h264-2160", "hevc-2160", "demo", "after-preview", "seek-storm"].iter().map(|s| s.to_string()).collect();
     }
     a
 }
@@ -667,9 +641,9 @@ pub fn scenario_session(name: &str) -> Option<(Session, ItemId)> {
     let seq = match name {
         "h264-1080" | "seek-storm" => {
             let a = import(&mut s, &fixture("a1080.mp4")?);
-            build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], &[], 20.0)
+            build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], 20.0)
         }
-        "stack3" | "stack3-blend" | "stack3-fx" => {
+        "stack3" | "stack3-blend" => {
             let (a, b, c) = (fixture("a1080.mp4")?, fixture("b1080.mp4")?, fixture("c1080.mp4")?);
             let (a, b, c) = (import(&mut s, &a), import(&mut s, &b), import(&mut s, &c));
             let seq = build_sequence(
@@ -677,7 +651,6 @@ pub fn scenario_session(name: &str) -> Option<(Session, ItemId)> {
                 1920,
                 1080,
                 &[(a, 100.0, None, 0.0, 100.0), (b, 60.0, Some((700.0, 420.0)), 0.0, 70.0), (c, 40.0, Some((1450.0, 760.0)), 12.0, 85.0)],
-                &[],
                 20.0,
             );
             if name == "stack3-blend" {
@@ -696,51 +669,27 @@ pub fn scenario_session(name: &str) -> Option<(Session, ItemId)> {
                 })
                 .ok()?;
             }
-            if name == "stack3-fx" {
-                // V2: Brightness & Contrast + Gaussian Blur; V3: Tint
-                s.edit("effects", |p, _| {
-                    let q = p.sequence_mut(seq).expect("seq");
-                    let fx: [(usize, &str, &[(&str, f64)]); 3] = [
-                        (1, "brightness_contrast", &[("brightness", 12.0), ("contrast", 25.0)]),
-                        (1, "gaussian_blur", &[("blurriness", 8.0)]),
-                        (2, "tint", &[("amount", 70.0)]),
-                    ];
-                    for (track, id, params) in fx {
-                        for it in &mut q.video_tracks[track].items {
-                            let mut e = find_effect(id).expect("effect").instance();
-                            for (k, v) in params {
-                                if let Some(x) = e.params.get_mut(*k) {
-                                    x.value = ParamValue::Float(*v);
-                                }
-                            }
-                            it.effects.push(e);
-                        }
-                    }
-                    Ok(())
-                })
-                .ok()?;
-            }
             seq
         }
         "h264-2160" | "seek-storm-2160" => {
             let a = import(&mut s, &fixture("a2160.mp4")?);
-            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], &[], 10.0)
+            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], 10.0)
         }
         "hevc-2160" | "seek-storm-hevc-2160" => {
             let a = import(&mut s, &fixture("hevc2160.mp4")?);
-            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], &[], 10.0)
+            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], 10.0)
         }
         "vp9-2160" => {
             let a = import(&mut s, &fixture("vp92160.webm")?);
-            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], &[], 10.0)
+            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], 10.0)
         }
         "av1-2160" => {
             let a = import(&mut s, &fixture("av12160.mp4")?);
-            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], &[], 10.0)
+            build_sequence(&mut s, 3840, 2160, &[(a, 100.0, None, 0.0, 100.0)], 10.0)
         }
         "after-preview" => {
             let a = import(&mut s, &fixture("a1080.mp4")?);
-            let seq = build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], &["sharpen", "levels", "tint"], 20.0);
+            let seq = build_sequence(&mut s, 1920, 1080, &[(a, 100.0, None, 0.0, 100.0)], 20.0);
             s.edit("marks", |p, _| {
                 let q = p.sequence_mut(seq).expect("seq");
                 q.mark_in = Some(Tick::ZERO);
@@ -809,7 +758,7 @@ pub fn cli_main() {
                         reports.push(r);
                     }
                     "after-preview" => {
-                        // Live play (effects rendered per frame), render previews, then play twice.
+                        // Live composition, render previews, then play twice.
                         reports.push(bench.play(&s, seq, &mut display, *scale, Tick::ZERO, &tag("live")));
                         let t0 = Instant::now();
                         s.execute("sequence.renderEffectsInToOut", json!({"wait": true})).expect("render previews");

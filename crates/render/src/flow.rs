@@ -27,7 +27,42 @@
 use rayon::prelude::*;
 
 use crate::image::Image;
-use crate::motion_analysis::Gray;
+/// A single-channel f32 image (0..1, display-referred luma).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Gray {
+    pub w: usize,
+    pub h: usize,
+    pub px: Vec<f32>,
+}
+
+impl Gray {
+    #[inline]
+    fn at(&self, x: i32, y: i32) -> f32 {
+        let x = x.clamp(0, self.w as i32 - 1) as usize;
+        let y = y.clamp(0, self.h as i32 - 1) as usize;
+        self.px.get(y * self.w + x).copied().unwrap_or(0.0)
+    }
+    /// 5-tap binomial blur then 2× decimation.
+    pub(crate) fn down(&self) -> Gray {
+        let k = [1.0, 4.0, 6.0, 4.0, 1.0].map(|v: f32| v / 16.0);
+        let (w, h) = (self.w, self.h);
+        let mut tmp = vec![0.0f32; w * h];
+        tmp.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
+            for (x, o) in row.iter_mut().enumerate() {
+                *o = (0..5).map(|i| k[i] * self.at(x as i32 + i as i32 - 2, y as i32)).sum();
+            }
+        });
+        let t = Gray { w, h, px: tmp };
+        let (nw, nh) = (w.div_ceil(2).max(1), h.div_ceil(2).max(1));
+        let mut px = vec![0.0f32; nw * nh];
+        px.par_chunks_mut(nw).enumerate().for_each(|(y, row)| {
+            for (x, o) in row.iter_mut().enumerate() {
+                *o = (0..5).map(|i| k[i] * t.at(2 * x as i32, 2 * y as i32 + i as i32 - 2)).sum();
+            }
+        });
+        Gray { w: nw, h: nh, px }
+    }
+}
 
 /// Widest luma image the flow is estimated on (larger frames are box-reduced to it first).
 pub const WORK_W: usize = 640;

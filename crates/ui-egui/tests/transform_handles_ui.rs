@@ -1,5 +1,5 @@
 //! On-screen transform handles on the Program monitor (#639), driven headless through the control
-//! channel: selecting Motion (or the Transform effect) in Effect Controls shows a box with handles
+//! channel: selecting Motion in Effect Controls shows a box with handles
 //! and the anchor point; dragging moves, scales, rotates and moves the anchor point, one undo
 //! step per drag, keying the playhead when the stopwatch is on. Clicking an effect header selects
 //! it and only its arrow twirls it; double-clicking a clip's picture selects its Motion.
@@ -301,80 +301,6 @@ fn a_drag_keys_the_playhead_and_headers_select_while_arrows_twirl() {
     d.click("effectControls.effect.opacity");
     assert_eq!(d.selected_effect(), json!({"clip": clip, "effect": "opacity", "instance": 0}));
     assert!(d.find("program.transform.box").is_none());
-}
-
-#[test]
-fn transform_effect_handles_and_double_click_selection() {
-    let mut d = Driver::demo();
-    let (clip, _) = d.first_clip();
-    d.exec("effects.apply", json!({"clips": [clip], "effect": "transform"}));
-    d.exec("effects.setParam", json!({"clip": clip, "effect": "transform", "param": "scale_height", "value": 50.0}));
-    d.frames(2);
-    // fold the fixed effects so the Transform header is on screen
-    for fx in ["motion", "opacity", "time_remap"] {
-        d.click(&format!("effectControls.effect.{fx}.twirl"));
-    }
-    d.click("effectControls.effect.transform");
-    assert_eq!(d.selected_effect(), json!({"clip": clip, "effect": "transform", "instance": 0}));
-    for id in HANDLES {
-        d.rect(id);
-    }
-    d.shot("transform-effect-selected");
-    let motion = d.point(clip, "motion", "position");
-    let p0 = d.point(clip, "transform", "position");
-    let b = d.rect("program.transform.box");
-    d.drag_from((b[0] + b[2] * 0.3, b[1] + b[3] * 0.3), 40.0, 0.0);
-    let p1 = d.point(clip, "transform", "position");
-    assert!(p1.0 > p0.0 + 20.0 && (p1.1 - p0.1).abs() < 1e-6, "{p0:?} → {p1:?}");
-    assert_eq!(d.point(clip, "motion", "position"), motion, "Motion is left alone");
-    d.drag("program.transform.handle.2", 30.0, 30.0);
-    assert!(d.num(clip, "transform", "scale_height") > 55.0);
-    d.drag("program.transform.rotate.1", 0.0, 60.0);
-    assert!(d.num(clip, "transform", "rotation") > 5.0);
-    d.exec("effects.setParam", json!({"clip": clip, "effect": "transform", "param": "rotation", "value": 0.0}));
-    d.exec("effects.setParam", json!({"clip": clip, "effect": "transform", "param": "uniform_scale", "value": false}));
-    d.exec("effects.setParam", json!({"clip": clip, "effect": "transform", "param": "scale_width", "value": 50.0}));
-    d.exec("effects.setParam", json!({"clip": clip, "effect": "transform", "param": "scale_height", "value": 50.0}));
-    d.frames(2);
-    d.drag("program.transform.handle.7", -30.0, 0.0);
-    assert!(d.num(clip, "transform", "scale_width") > 55.0);
-    assert_eq!(d.num(clip, "transform", "scale_height"), 50.0);
-    let corners: Vec<(f64, f64)> = (0..4).map(|n| d.center(&format!("program.transform.handle.{n}"))).collect();
-    d.drag("program.transform.anchor", -25.0, 15.0);
-    for (n, c) in corners.iter().enumerate() {
-        assert!(near(d.center(&format!("program.transform.handle.{n}")), *c), "corner {n} stays put");
-    }
-
-    // double-clicking a picture selects its clip's Motion: the overlay on V2, then V1 under it
-    let seq = d.exec("sequence.inspect", json!({}));
-    let overlay = seq["video"][1]["items"][0]["clip"].as_u64().unwrap();
-    let start = seq["video"][1]["items"][0]["start"].as_i64().unwrap();
-    d.exec("playhead.set", json!({"time": start + waltcut_time::TICKS_PER_SECOND}));
-    d.frames(3);
-    let pic = d.rect("program.picture");
-    d.ok("ui.click", json!({"x": pic[0] + pic[2] * 0.8, "y": pic[1] + pic[3] * 0.76, "count": 2}));
-    d.frames(3);
-    assert_eq!(d.selected_effect(), json!({"clip": overlay, "effect": "motion", "instance": 0}));
-    let sel = d.exec("state.inspect", json!({}))["selection"].clone();
-    assert!(sel.as_array().unwrap().contains(&json!(overlay)), "{sel}");
-    d.rect("program.transform.anchor");
-    d.shot("transform-double-click-overlay");
-    // half a second later, or egui counts the next clicks as a triple click
-    d.frames(30);
-    d.ok("ui.click", json!({"x": pic[0] + pic[2] * 0.2, "y": pic[1] + pic[3] * 0.2, "count": 2}));
-    d.frames(3);
-    let under = d.exec("sequence.inspect", json!({}))["video"][0]["items"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|it| {
-            let (s, l) = (it["start"].as_i64().unwrap(), it["duration"].as_i64().unwrap());
-            (s..s + l).contains(&(start + waltcut_time::TICKS_PER_SECOND))
-        })
-        .unwrap()["clip"]
-        .as_u64()
-        .unwrap();
-    assert_eq!(d.selected_effect(), json!({"clip": under, "effect": "motion", "instance": 0}));
 }
 
 /// Only the left button takes hold of the box: a middle or right drag leaves the picture alone.

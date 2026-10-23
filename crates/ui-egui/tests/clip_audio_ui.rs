@@ -129,7 +129,7 @@ fn effect_controls_show_the_audio_of_a_video_clip() {
     d.rect("effectControls.effect.panner");
 
     // the audio rows edit the audio clip
-    for fx in ["motion", "opacity", "time_remap"] {
+    for fx in ["motion", "opacity"] {
         d.click(&format!("effectControls.effect.{fx}.twirl"));
     }
     d.click("effectControls.volume.level.stopwatch");
@@ -151,7 +151,7 @@ fn effect_controls_show_audio_fx_on_a_linked_pair() {
     d.exec("timeline.select", json!({"clips": [pair.video]}));
     d.exec("effects.apply", json!({"clips": [pair.video], "effect": "parametric_eq"}));
     assert_eq!(d.item(pair.audio).effects.last().map(|e| e.effect.as_str()), Some("parametric_eq"));
-    for fx in ["motion", "opacity", "time_remap", "volume", "channel_volume", "panner"] {
+    for fx in ["motion", "opacity", "volume", "channel_volume", "panner"] {
         d.click(&format!("effectControls.effect.{fx}"));
     }
     d.rect("effectControls.effect.parametric_eq");

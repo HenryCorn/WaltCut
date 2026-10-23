@@ -149,8 +149,6 @@ impl ExportRenderer {
                 timing::add_frame();
                 Some(Image { w: w as usize, h: h as usize, px })
             }
-            // Transitions: the export path leaves them to the CPU reference renderer.
-            FramePlan::Composite { .. } => None,
         }
     }
 }

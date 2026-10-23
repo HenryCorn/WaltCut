@@ -2,8 +2,8 @@
 //!
 //! [`render_sequence`] turns (project, sequence, time, scale) into a premultiplied linear-light
 //! image. Tracks composite bottom (V1) to top. Per item: fetch the source frame at the mapped media
-//! time (already reduced for low-resolution playback), run standard effects, then the fixed effects
-//! (Motion → Opacity/blend), then composite. Transitions combine outgoing/incoming layers.
+//! time (already reduced for low-resolution playback), apply intrinsic Motion and Opacity/blend,
+//! then composite. Drawing and graphic clips retain their own rasterisation.
 //!
 //! The same code renders monitors, thumbnails and exports, and is the oracle for the GPU path.
 
@@ -11,23 +11,19 @@
 
 pub mod audio;
 pub mod audio_fx;
+pub mod audio_transition;
 pub mod blend;
 pub mod colorman;
 pub mod drawing;
-pub mod effects;
 pub mod flow;
-pub mod gpufx;
 pub mod graphic_clip;
 pub mod graphics;
 pub mod image;
 pub mod mixer;
-mod motion_analysis;
 pub mod offline;
 pub mod plan;
 pub mod preview;
 pub mod remix;
-pub mod transitions;
-pub mod vfx;
 
 use std::sync::Arc;
 
@@ -35,7 +31,7 @@ use waltcut_frame::{PixelData, VideoFrame, pool};
 use waltcut_geom::{Affine, Vec2};
 use waltcut_media::{FrameRequest, SharedSource};
 use waltcut_project::{ItemId, ItemKind, ParamValue, Project, Sequence, TrackItem};
-use waltcut_time::{Tick, TimeDisplay, format_time};
+use waltcut_time::Tick;
 
 pub use blend::Blend;
 pub use image::Image;
@@ -60,8 +56,6 @@ pub const MAX_NEST_DEPTH: u32 = 8;
 pub struct RenderOptions {
     /// Output scale relative to the sequence frame size (1.0 = full, 0.5 = ½ resolution…).
     pub scale: f32,
-    /// Skip standard effects (fast scrubbing / "Toggle Effects" off).
-    pub effects: bool,
     /// Nesting depth guard (see [`MAX_NEST_DEPTH`]).
     pub depth: u32,
     /// Return the image in the sequence's working space (HDR exports, scopes) instead of
@@ -71,7 +65,7 @@ pub struct RenderOptions {
 
 impl Default for RenderOptions {
     fn default() -> Self {
-        Self { scale: 1.0, effects: true, depth: 0, working_output: false }
+        Self { scale: 1.0, depth: 0, working_output: false }
     }
 }
 
@@ -164,7 +158,6 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
     if opts.depth > MAX_NEST_DEPTH {
         return canvas.into_image();
     }
-    let tc = format_time(t, seq.settings.frame_rate, seq.settings.drop_frame, TimeDisplay::Timecode, seq.settings.sample_rate as i64);
     for (ti, track) in seq.video_tracks.iter().enumerate() {
         // A cancelled frame job (playback moved on) stops here; its result is discarded.
         if waltcut_media::cancel::cancelled() {
@@ -173,36 +166,11 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
         if only.is_some_and(|o| o != ti) || (!track.enabled && only.is_none()) {
             continue;
         }
-        // transition covering t?
-        if let Some(tr) = track.transitions.iter().find(|tr| tr.range().contains(t)) {
-            let a = tr.from.and_then(|id| track.item(id)).filter(|i| i.enabled);
-            let b = tr.to.and_then(|id| track.item(id)).filter(|i| i.enabled);
-            let layer = |i: &TrackItem| item_layer(project, seq, i, t, opts, sources, &tc).map(|(img, op, bl)| (with_opacity(img, op), bl));
-            let la = a.and_then(layer);
-            let lb = b.and_then(layer);
-            // A fade from or to nothing keeps the visible layer's blend mode.
-            let bl = match (&la, &lb) {
-                (Some((_, x)), None) | (None, Some((_, x))) => *x,
-                _ => Blend::Normal,
-            };
-            let la = la.map(|l| l.0).unwrap_or_else(|| Image::new(w, h));
-            let lb = lb.map(|l| l.0).unwrap_or_else(|| Image::new(w, h));
-            let p = tr.progress(t) as f32;
-            // Reverse plays the transition backwards (e.g. an iris closing on the outgoing clip)
-            // while still going from A to B.
-            let mixed = if tr.reverse {
-                transitions::apply_scaled(&tr.effect, &lb, &la, 1.0 - p, opts.scale)
-            } else {
-                transitions::apply_scaled(&tr.effect, &la, &lb, p, opts.scale)
-            };
-            blend::composite(canvas.get(), &mixed, 1.0, bl);
-            continue;
-        }
         let Some(item) = track.item_at(t) else { continue };
         if !item.enabled {
             continue;
         }
-        match item_layer_ex(project, seq, item, t, opts, sources, &tc, true) {
+        match item_layer_ex(project, seq, item, t, opts, sources, true) {
             Some(Layer::Full { image, opacity, blend: bl, opaque }) => {
                 if canvas.is_empty() && opaque && opacity == 1.0 && bl == Blend::Normal && (image.w, image.h) == (w, h) {
                     // mixing an opaque layer over transparent black gives the layer itself
@@ -224,11 +192,6 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
         colorman::to_display(&mut canvas, &seq.settings.color);
     }
     canvas
-}
-
-fn with_opacity(mut img: Image, op: f32) -> Image {
-    img.scale_alpha(op);
-    img
 }
 
 pub(crate) fn opacity_blend(item: &TrackItem, mt: Tick) -> (f32, Blend) {
@@ -317,10 +280,9 @@ pub(crate) fn item_layer(
     t: Tick,
     opts: RenderOptions,
     sources: &dyn SourceProvider,
-    tc: &str,
 ) -> Option<(Image, f32, Blend)> {
     let (w, h) = output_size(seq, opts.scale);
-    item_layer_ex(project, seq, item, t, opts, sources, tc, false).map(|l| l.into_full(w, h))
+    item_layer_ex(project, seq, item, t, opts, sources, false).map(|l| l.into_full(w, h))
 }
 
 /// Whether a placement matrix leaves the layer exactly where it is.
@@ -341,7 +303,6 @@ pub(crate) fn item_layer_ex(
     t: Tick,
     opts: RenderOptions,
     sources: &dyn SourceProvider,
-    tc: &str,
     allow_region: bool,
 ) -> Option<Layer> {
     let (w, h) = output_size(seq, opts.scale);
@@ -354,7 +315,7 @@ pub(crate) fn item_layer_ex(
     let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
     let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
     let pi = project.item(item.item)?;
-    if matches!(pi.kind, ItemKind::Graphic { .. }) && !(opts.effects && item.has_standard_effects()) {
+    if matches!(pi.kind, ItemKind::Graphic { .. }) {
         // vectors straight to the output: no resampling, crisp at any Motion scale
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
         let mut canvas = Image::new(w, h);
@@ -362,9 +323,7 @@ pub(crate) fn item_layer_ex(
         let (op, bl) = opacity_blend(item, mt);
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
-    if let ItemKind::Drawing(d) = &pi.kind
-        && !(opts.effects && item.has_standard_effects())
-    {
+    if let ItemKind::Drawing(d) = &pi.kind {
         // strokes straight to the output, like graphics
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
         let mut canvas = Image::new(w, h);
@@ -375,7 +334,7 @@ pub(crate) fn item_layer_ex(
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
     // plain media: nothing but the frame itself reaches the output
-    let plain_media = matches!(pi.kind, ItemKind::Media(_) | ItemKind::Subclip { .. }) && !(opts.effects && item.has_standard_effects());
+    let plain_media = matches!(pi.kind, ItemKind::Media(_) | ItemKind::Subclip { .. });
     let mut fetched = None;
     if allow_region && plain_media {
         let (src, frame, n) = media_frame(item, t, sources, want, src_size)?;
@@ -393,31 +352,13 @@ pub(crate) fn item_layer_ex(
         // anything else takes the general path below, with the frame already fetched
         fetched = Some((src, frame, n));
     }
-    let mut layer = match fetched {
+    let layer = match fetched {
         Some((src, frame, n)) => media_image(project, seq, item, t, &src, &frame, n, want),
         None => base_layer(project, seq, item, t, opts, sources, want)?,
     };
     let px_scale = layer.w as f32 / src_size.0.max(1) as f32;
     // layer px → source px → sequence px → output px
     let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion).then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
-    if opts.effects {
-        let env = vfx::ItemEnv { project, seq, item, t, opts, sources, want, layer_size: (layer.w, layer.h), layer_to_output: m, tc };
-        let cx = effects::FxCtx {
-            t: mt,
-            px_scale,
-            seconds: (t - item.start).seconds(),
-            timecode: tc,
-            clip_name: &item.name,
-            env: Some(&env),
-            frame_rate: seq.settings.frame_rate.as_f64(),
-        };
-        for e in item.effects.iter().filter(|e| e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)) {
-            if waltcut_media::cancel::cancelled() {
-                return None;
-            }
-            effects::apply(&mut layer, e, &cx);
-        }
-    }
     let placed = if layer.w == w && layer.h == h && identity_placement(&m) { layer } else { layer.transformed(w, h, &m) };
     let (op, bl) = opacity_blend(item, mt);
     Some(Layer::Full { image: placed, opacity: op, blend: bl, opaque: false })
@@ -500,11 +441,11 @@ pub(crate) fn base_layer(
             media_image(project, seq, item, t, &src, &frame, n, want)
         }
         ItemKind::Sequence(nested) => {
-            let sub = RenderOptions { scale: want, effects: opts.effects, depth: opts.depth + 1, working_output: true };
+            let sub = RenderOptions { scale: want, depth: opts.depth + 1, working_output: true };
             render_seq(project, nested, ft, sub, sources)
         }
         ItemKind::Graphic { .. } => {
-            // standard effects work on the graphic at source resolution, then Motion places it
+            // Rasterise the graphic layers at source resolution, then Motion places the picture.
             let (gw, gh) = (((src_size.0 as f32 * want).ceil() as usize).max(1), ((src_size.1 as f32 * want).ceil() as usize).max(1));
             let mut img = Image::new(gw, gh);
             graphic_clip::render_graphic(item, mt, src_size, &Affine::scale(want as f64, want as f64), &mut img);
@@ -533,8 +474,7 @@ pub fn render_clip(
 ) -> Option<Image> {
     let seq = project.sequence(seq_id)?;
     let (_, item) = seq.find_item(clip)?;
-    let tc = format_time(t, seq.settings.frame_rate, seq.settings.drop_frame, TimeDisplay::Timecode, seq.settings.sample_rate as i64);
-    item_layer(project, seq, item, t, opts, sources, &tc).map(|(img, _, _)| img)
+    item_layer(project, seq, item, t, opts, sources).map(|(img, _, _)| img)
 }
 
 /// Frame Blending / Optical Flow on a speed-changed clip: the later source frame to mix in and

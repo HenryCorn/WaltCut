@@ -657,9 +657,6 @@ impl Default for MemoryPrefs {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct TimelinePrefs {
-    pub video_transition_duration: f64,
-    /// `frames` | `seconds`.
-    pub video_transition_unit: String,
     pub audio_transition_duration: f64,
     pub audio_transition_unit: String,
     pub still_image_duration: f64,
@@ -689,8 +686,6 @@ pub struct TimelinePrefs {
 impl Default for TimelinePrefs {
     fn default() -> Self {
         Self {
-            video_transition_duration: 30.0,
-            video_transition_unit: "frames".into(),
             audio_transition_duration: 1.0,
             audio_transition_unit: "seconds".into(),
             still_image_duration: 5.0,
@@ -724,10 +719,6 @@ impl TimelinePrefs {
     /// "Still Image Default Duration" at a sequence rate (whole frames, at least one).
     pub fn still_duration(&self, rate: FrameRate) -> Tick {
         duration_in(self.still_image_duration, &self.still_image_unit, rate)
-    }
-    /// "Video Transition Default Duration".
-    pub fn video_transition_duration(&self, rate: FrameRate) -> Tick {
-        duration_in(self.video_transition_duration, &self.video_transition_unit, rate)
     }
     /// "Audio Transition Default Duration".
     pub fn audio_transition_duration(&self, rate: FrameRate) -> Tick {
@@ -1200,7 +1191,6 @@ static CATEGORIES: &[Category] = &[
         id: "timeline",
         title: "Timeline",
         rows: &[
-            f("timeline.videoTransitionDuration", "Video Transition Default Duration", Kind::Duration { unit_key: "timeline.videoTransitionUnit" }, true),
             f("timeline.audioTransitionDuration", "Audio Transition Default Duration", Kind::Duration { unit_key: "timeline.audioTransitionUnit" }, true),
             f("timeline.stillImageDuration", "Still Image Default Duration", Kind::Duration { unit_key: "timeline.stillImageUnit" }, true),
             f("timeline.autoScroll", "Timeline Playback Auto-Scrolling", Kind::Choice(AUTO_SCROLL), true),

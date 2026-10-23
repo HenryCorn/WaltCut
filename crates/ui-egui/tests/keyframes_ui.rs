@@ -236,18 +236,6 @@ fn effect_controls_reset_button_keeps_keyframes() {
     assert_eq!(value, 100.0);
 }
 
-/// Crop is not on a clip until it is used: its diamond applies the effect, then adds the keyframe.
-#[test]
-fn properties_diamond_applies_crop_first() {
-    let (mut d, clip) = Driver::demo();
-    d.seek(1.0);
-    d.click("properties.crop.left.addKeyframe");
-    let s = &d.harness.state().session;
-    let it = s.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1;
-    assert_eq!(it.effect("crop").expect("crop applied").param("left").unwrap().keyframes.len(), 1);
-    d.rect("properties.crop.left.nextKeyframe");
-}
-
 /// The Effect Controls time ruler: a click moves the playhead there, the playhead's handle drags,
 /// and there is no playhead while it is off the clip.
 #[test]
@@ -365,7 +353,7 @@ fn effect_controls_divider_and_scrolling_anywhere() {
     assert!(d.rect("effectControls.effect.motion")[2] >= 259.0, "the effect list stays wide enough for its values");
 
     // enough effects to scroll; the wheel over the keyframe area scrolls the rows
-    for fx in ["gaussian_blur", "transform", "crop", "tint"] {
+    for fx in ["amplify", "parametric_eq", "studio_reverb", "hard_limiter"] {
         d.exec("effects.apply", json!({"clips": [clip.id], "effect": fx}));
     }
     let before = d.rect("effectControls.motion.scale.stopwatch");
@@ -597,22 +585,15 @@ fn opacity_keyframes_move_together_without_crossing_parameters() {
 }
 
 /// #962: graph points need the same interpolation menu as lane diamonds, including either
-/// coordinate of Transform Position. Opening a menu never changes the value or creates an undo.
+/// coordinate of Motion Position. Opening a menu never changes the value or creates an undo.
 #[test]
 fn graph_keyframes_offer_interpolation_and_clear_in_one_undo_step() {
     for (effect, param, values, component) in [
         ("motion", "scale", [json!(40.0), json!(80.0)], ""),
         ("motion", "position", [json!([400.0, 300.0]), json!([800.0, 500.0])], ".x"),
-        ("transform", "position", [json!([400.0, 300.0]), json!([800.0, 500.0])], ".x"),
-        ("transform", "position", [json!([400.0, 300.0]), json!([800.0, 500.0])], ".y"),
+        ("motion", "position", [json!([400.0, 300.0]), json!([800.0, 500.0])], ".y"),
     ] {
         let (mut d, clip) = Driver::demo();
-        if effect == "transform" {
-            d.exec("effects.apply", json!({"clips": [clip.id], "effect": effect}));
-            for intrinsic in ["motion", "opacity", "time_remap"] {
-                d.click(&format!("effectControls.effect.{intrinsic}.twirl"));
-            }
-        }
         for (seconds, value) in [0.5, 2.5].into_iter().zip(values) {
             d.seek(seconds);
             d.exec("effects.addKeyframe", json!({"clip": clip.id, "effect": effect, "param": param}));
@@ -634,7 +615,7 @@ fn graph_keyframes_offer_interpolation_and_clear_in_one_undo_step() {
             d.right_click(&target);
             assert_eq!(d.parameter(&clip, effect, param), before, "opening the graph menu cannot edit {effect}.{param}{component}");
             assert_eq!(d.undo_len(), undo);
-            if key == "easeIn" && effect == "transform" {
+            if key == "easeIn" && effect == "motion" {
                 d.shot(&format!("graph-menu-{effect}-{param}{component}"));
             }
             d.click(&format!("effectControls.keyframeMenu.{key}"));
@@ -659,23 +640,4 @@ fn graph_keyframes_offer_interpolation_and_clear_in_one_undo_step() {
         d.exec("edit.undo", json!({}));
         assert_eq!(d.parameter(&clip, effect, param), before);
     }
-}
-
-/// #2328: a line separates the fixed effects (Motion, Opacity, Time Remapping) from the effects
-/// added from the library; without added effects there is none.
-#[test]
-fn a_line_separates_added_effects_from_the_fixed_ones() {
-    let (mut d, clip) = Driver::demo();
-    assert!(d.find("effectControls.addedEffects.video").is_none(), "only fixed effects: no line");
-    d.exec("effects.apply", json!({"clips": [clip.id], "effect": "gaussian_blur"}));
-    d.exec("effects.apply", json!({"clips": [clip.id], "effect": "tint"}));
-    let line = d.rect("effectControls.addedEffects.video");
-    let opacity = d.rect("effectControls.effect.opacity");
-    let blur = d.rect("effectControls.effect.gaussian_blur");
-    let tint = d.rect("effectControls.effect.tint");
-    assert!(
-        opacity[1] < line[1] && (line[1] + line[3] / 2.0 - blur[1]).abs() <= 0.5,
-        "on the edge between the fixed and the added effects: {opacity:?} {line:?} {blur:?}"
-    );
-    assert!(tint[1] > blur[1], "one line, above all the added effects");
 }

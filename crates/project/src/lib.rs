@@ -17,7 +17,6 @@ pub mod graphic;
 pub mod graphic_design;
 pub mod keyframe;
 pub mod mixer;
-pub mod vtransition;
 
 use std::collections::BTreeMap;
 
@@ -811,6 +810,9 @@ impl Track {
     /// Only the value bounds that keep timeline arithmetic from overflowing (no structural rules
     /// such as overlap or positive duration); what a loaded project must satisfy.
     pub fn check_bounds(&self) -> Result<(), String> {
+        if self.kind == TrackKind::Video && !self.transitions.is_empty() {
+            return Err(format!("{}: video transitions are not supported", self.name));
+        }
         for item in &self.items {
             if !bounded_time_range(item.start, item.duration) {
                 return Err(format!("{}: item {:?} is outside supported time bounds", self.name, item.id));
@@ -1102,7 +1104,6 @@ pub struct ProjectSettings {
     /// Kept for file compatibility; the editor uses Settings ▸ Timeline (user preferences) for
     /// still and transition default durations, as Premiere does.
     pub default_still_duration: Tick,
-    pub default_transition_duration_frames: i64,
     pub default_audio_transition_duration: Tick,
     /// Project Settings ▸ General ▸ Action and Title Safe Areas: (horizontal, vertical) percent.
     #[serde(default = "title_safe_default")]
@@ -1149,7 +1150,6 @@ impl Default for ProjectSettings {
             video_display: waltcut_time::TimeDisplay::Timecode,
             audio_display_samples: true,
             default_still_duration: Tick(5 * TICKS_PER_SECOND),
-            default_transition_duration_frames: 24,
             default_audio_transition_duration: Tick(TICKS_PER_SECOND),
             title_safe: title_safe_default(),
             action_safe: action_safe_default(),
@@ -1550,14 +1550,6 @@ fn resolve_auto_points_sized(e: &mut EffectInstance, frame: (u32, u32), source: 
     for (k, p) in e.params.iter_mut() {
         if let ParamValue::Vec2(v) = &mut p.value {
             let Some((w, h)) = (if k == "anchor" { source } else { Some(frame) }) else { continue };
-            if let Some((fx, fy)) = effect::auto_point(&e.effect, k) {
-                if v.x.is_nan() {
-                    v.x = w as f64 * fx;
-                }
-                if v.y.is_nan() {
-                    v.y = h as f64 * fy;
-                }
-            }
             if v.x.is_nan() {
                 v.x = w as f64 / 2.0;
             }

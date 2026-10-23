@@ -1,6 +1,5 @@
-//! Effect Controls: the selected clip's effects (fixed Motion/Opacity/Time Remapping first, as in
-//! Premiere, then standard effects), generated from parameter schemas, with stopwatches and a
-//! keyframe lane on the right.
+//! Effect Controls: intrinsic Motion/Opacity, graphic and retained audio parameters, generated
+//! from parameter schemas, with stopwatches and a keyframe lane on the right.
 
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
 use serde_json::{Value, json};
@@ -182,7 +181,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             let heading = if *kind == TrackKind::Video { tl!("Video") } else { tl!("Audio") };
             bui.painter().text(pos2(hr.min.x + 8.0, hr.center().y), Align2::LEFT_CENTER, heading, Tokens::semibold(11.5), t.text_dim);
             let mt_now = it.source_time_at(ph.clamp(it.start, (it.end() - Tick(1)).max(it.start)));
-            // Premiere lists the fixed effects (Motion, Opacity, Time Remapping / Volume…) first.
+            // Premiere lists the fixed effects (Motion, Opacity / Volume…) first.
             let mut order: Vec<usize> = (0..it.effects.len()).collect();
             order.sort_by_key(|i| !it.effects[*i].def().is_some_and(|d| d.intrinsic));
             let mut after_fixed = false;
@@ -782,85 +781,55 @@ pub fn properties_panel(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         bui.set_max_width((bui.available_width() - 14.0).max(1.0));
         let eff_idx = |id: &str| it.effects.iter().position(|e| e.effect == id);
         let val = |eid: &str, p: &str| it.effect(eid).and_then(|e| e.param(p)).map(|p| p.value_at(mt));
-        if kind == TrackKind::Video {
-            if section(bui, app, "Transform", eff_idx("motion").map(|i| (i, clip.0)), &mut actions) {
-                for (label, p, unit, speed, range) in [
-                    (tl!("Position"), "position", "", 1.0, (-100_000.0, 100_000.0)),
-                    (tl!("Anchor point"), "anchor", "", 1.0, (-100_000.0, 100_000.0)),
-                    (tl!("Scale"), "scale", " %", 0.5, (0.0, 10000.0)),
-                    (tl!("Rotation"), "rotation", " °", 0.5, (-36000.0, 36000.0)),
-                ] {
-                    let r = row(bui, label);
-                    let mut vui = bui.new_child(
-                        egui::UiBuilder::new()
-                            .max_rect(Rect::from_min_max(pos2(r.min.x + 150.0, r.min.y + 4.0), pos2(r.max.x - PROPS_VALUE_R, r.max.y - 4.0)))
-                            .layout(egui::Layout::left_to_right(egui::Align::Center)),
-                    );
-                    match val("motion", p) {
-                        Some(ParamValue::Vec2(v)) => {
-                            let (_, nx) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp", p, "x", clip.0)), v.x, speed, range, 0, " X", &t);
-                            vui.add_space(10.0);
-                            let (_, ny) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp", p, "y", clip.0)), v.y, speed, range, 0, " Y", &t);
-                            if nx.is_some() || ny.is_some() {
-                                actions.push((
-                                    "effects.setParam".into(),
-                                    json!({"clip": clip.0, "effect": "motion", "param": p, "value": [nx.unwrap_or(v.x), ny.unwrap_or(v.y)]}),
-                                ));
-                            }
-                        }
-                        Some(ParamValue::Float(v)) => {
-                            let (_, nv) = crate::widgets::hot_number(
-                                &mut vui,
-                                egui::Id::new(("pp", p, clip.0)),
-                                v,
-                                speed,
-                                range,
-                                if p == "scale" { 0 } else { 1 },
-                                unit,
-                                &t,
-                            );
-                            if let Some(nv) = nv {
-                                actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "motion", "param": p, "value": nv})));
-                            }
-                        }
-                        _ => {}
-                    }
-                    properties_nav(app, bui, r, clip, &it, mt, "motion", p, &mut actions);
-                }
-                let r = row(bui, tl!("Opacity"));
+        if kind == TrackKind::Video && section(bui, app, "Transform", eff_idx("motion").map(|i| (i, clip.0)), &mut actions) {
+            for (label, p, unit, speed, range) in [
+                ("Position", "position", "", 1.0, (-100_000.0, 100_000.0)),
+                ("Anchor point", "anchor", "", 1.0, (-100_000.0, 100_000.0)),
+                ("Scale", "scale", " %", 0.5, (0.0, 10000.0)),
+                ("Rotation", "rotation", " °", 0.5, (-36000.0, 36000.0)),
+            ] {
+                let r = row(bui, label);
                 let mut vui = bui.new_child(
                     egui::UiBuilder::new()
                         .max_rect(Rect::from_min_max(pos2(r.min.x + 150.0, r.min.y + 4.0), pos2(r.max.x - PROPS_VALUE_R, r.max.y - 4.0)))
                         .layout(egui::Layout::left_to_right(egui::Align::Center)),
                 );
-                if let Some(ParamValue::Float(v)) = val("opacity", "opacity") {
-                    let (_, nv) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp-op", clip.0)), v, 0.5, (0.0, 100.0), 0, " %", &t);
-                    if let Some(nv) = nv {
-                        actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "opacity", "param": "opacity", "value": nv})));
-                    }
-                }
-                properties_nav(app, bui, r, clip, &it, mt, "opacity", "opacity", &mut actions);
-            }
-            let crop = eff_idx("crop");
-            if section(bui, app, "Crop", crop.map(|i| (i, clip.0)), &mut actions) {
-                for (label, p) in [(tl!("Left"), "left"), (tl!("Top"), "top"), (tl!("Right"), "right"), (tl!("Bottom"), "bottom")] {
-                    let r = row(bui, label);
-                    let mut vui = bui.new_child(
-                        egui::UiBuilder::new()
-                            .max_rect(Rect::from_min_max(pos2(r.min.x + 150.0, r.min.y + 4.0), pos2(r.max.x - PROPS_VALUE_R, r.max.y - 4.0)))
-                            .layout(egui::Layout::left_to_right(egui::Align::Center)),
-                    );
-                    let v = val("crop", p).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    let (_, nv) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp-crop", p, clip.0)), v, 0.2, (0.0, 100.0), 1, " %", &t);
-                    if let Some(nv) = nv {
-                        if crop.is_none() {
-                            actions.push(("effects.apply".into(), json!({"clips": [clip.0], "effect": "crop"})));
+                match val("motion", p) {
+                    Some(ParamValue::Vec2(v)) => {
+                        let (_, nx) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp", p, "x", clip.0)), v.x, speed, range, 0, " X", &t);
+                        vui.add_space(10.0);
+                        let (_, ny) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp", p, "y", clip.0)), v.y, speed, range, 0, " Y", &t);
+                        if nx.is_some() || ny.is_some() {
+                            actions.push((
+                                "effects.setParam".into(),
+                                json!({"clip": clip.0, "effect": "motion", "param": p, "value": [nx.unwrap_or(v.x), ny.unwrap_or(v.y)]}),
+                            ));
                         }
-                        actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "crop", "param": p, "value": nv})));
                     }
-                    properties_nav(app, bui, r, clip, &it, mt, "crop", p, &mut actions);
+                    Some(ParamValue::Float(v)) => {
+                        let (_, nv) =
+                            crate::widgets::hot_number(&mut vui, egui::Id::new(("pp", p, clip.0)), v, speed, range, if p == "scale" { 0 } else { 1 }, unit, &t);
+                        if let Some(nv) = nv {
+                            actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "motion", "param": p, "value": nv})));
+                        }
+                    }
+                    _ => {}
+                }
+                properties_nav(app, bui, r, clip, &it, mt, "motion", p, &mut actions);
+            }
+            let r = row(bui, "Opacity");
+            let mut vui = bui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(Rect::from_min_max(pos2(r.min.x + 150.0, r.min.y + 4.0), pos2(r.max.x - PROPS_VALUE_R, r.max.y - 4.0)))
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            );
+            if let Some(ParamValue::Float(v)) = val("opacity", "opacity") {
+                let (_, nv) = crate::widgets::hot_number(&mut vui, egui::Id::new(("pp-op", clip.0)), v, 0.5, (0.0, 100.0), 0, " %", &t);
+                if let Some(nv) = nv {
+                    actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": "opacity", "param": "opacity", "value": nv})));
                 }
             }
+            properties_nav(app, bui, r, clip, &it, mt, "opacity", "opacity", &mut actions);
         }
         if let Some((clip, it, _)) = clips.iter().find(|c| c.2 == TrackKind::Audio)
             && section(bui, app, "Audio", it.effects.iter().position(|e| e.effect == "volume").map(|i| (i, clip.0)), &mut actions)

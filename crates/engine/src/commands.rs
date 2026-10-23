@@ -1970,15 +1970,6 @@ fn build() -> Vec<CommandSpec> {
             Ok(Value::Null)
         }),
         cmd!(
-            "sequence.applyVideoTransition",
-            "Apply Video Transition",
-            ["Sequence"],
-            Some("Cmd+D"),
-            r#"{"clip":id?,"effect":"cross_dissolve|Cross Dissolve|…"?,"frames":i64?,"edge":"in"|"out"?,"params":{param:value}?,"reverse":bool?}"#,
-            has_seq,
-            |s, p| apply_transition(s, p, TrackKind::Video)
-        ),
-        cmd!(
             "sequence.applyAudioTransition",
             "Apply Audio Transition",
             ["Sequence"],
@@ -2800,16 +2791,19 @@ fn build() -> Vec<CommandSpec> {
             Ok(Value::Null)
         }),
         // ================= Effects =================
-        cmd!("effects.apply", "Apply Effect", [], None, r#"{"clips":[id]?,"effect":"gaussian_blur|Gaussian Blur|…"}"#, has_seq, |s, p| {
+        cmd!("effects.apply", "Apply Effect", [], None, r#"{"clips":[id]?,"effect":"amplify|Amplify|…"}"#, has_seq, |s, p| {
             let name = str_p(p, "effect").ok_or_else(|| bad("effects.apply", "need `effect`"))?;
             let def = resolve_effect_name(s, p, name).ok_or_else(|| bad("effects.apply", format!("unknown effect `{name}`")))?;
             if waltcut_project::graphic::is_layer_id(def.id) {
                 return Err(bad("effects.apply", "graphic layers are added with graphics.newText / graphics.newShape"));
             }
-            if matches!(def.kind, waltcut_project::EffectKind::VideoTransition | waltcut_project::EffectKind::AudioTransition) {
+            if matches!(def.kind, waltcut_project::EffectKind::AudioTransition) {
                 let mut q = p.clone();
                 q["effect"] = json!(def.id);
-                return apply_transition(s, &q, if def.kind == waltcut_project::EffectKind::VideoTransition { TrackKind::Video } else { TrackKind::Audio });
+                return apply_transition(s, &q, TrackKind::Audio);
+            }
+            if def.intrinsic {
+                return Err(bad("effects.apply", "intrinsic parameters are edited with effects.setParam"));
             }
             let clips = clips_p(s, p);
             if clips.is_empty() {
@@ -2943,33 +2937,18 @@ fn build() -> Vec<CommandSpec> {
                     {
                         e.params.insert(pid.clone(), waltcut_project::Param::new(d.default.clone()));
                     }
-                    let (keyframes, v) = {
+                    let keyframes = {
                         let prm = e.param_mut(&pid).ok_or_else(|| bad("effects.setParam", format!("no param `{pid}`")))?;
                         let v = json_to_param(&prm.value, &val).ok_or_else(|| bad("effects.setParam", "value has the wrong type"))?;
-                        let keyframes = if keyframe {
+                        if keyframe {
                             // the stopwatch and the value in one step
                             prm.put_keyframe(mt, v.clone());
                             prm.keyframes.len()
                         } else {
                             prm.set_at(mt, v.clone());
                             prm.keyframes.len()
-                        };
-                        (keyframes, v)
-                    };
-                    if e.effect == "ultra_key"
-                        && pid == "setting"
-                        && let ParamValue::Choice(setting) = v
-                        && let Some(rows) = waltcut_project::effect::ultra_key_setting(setting)
-                    {
-                        for (id, value) in rows {
-                            if let Some(p) = e.param_mut(id) {
-                                p.value = ParamValue::Float(*value);
-                                p.keyframes.clear();
-                            } else {
-                                e.params.insert((*id).to_string(), waltcut_project::Param::new(ParamValue::Float(*value)));
-                            }
                         }
-                    }
+                    };
                     Ok(keyframes)
                 })?;
                 // 0 keyframes: the value is static (`time` was not used)
@@ -3273,7 +3252,7 @@ fn build() -> Vec<CommandSpec> {
         query!(
             "effects.list",
             "List Effects",
-            r#"{"kind":"Video"|"Audio"|"VideoTransition"|"AudioTransition"?,"folder":"Video Transitions/Wipe"?,"detail":bool?}"#,
+            r#"{"kind":"Video"|"Audio"|"AudioTransition"?,"folder":"Audio Effects/Filter and EQ"?,"detail":bool?}"#,
             |_, p| Ok(list_effects(p))
         ),
         query!("history.list", "List History", "{}", |s, _| Ok(
@@ -4058,21 +4037,22 @@ fn apply_transition(s: &mut Session, p: &Value, kind: TrackKind) -> Result<Value
 /// Uses the same `effect`, `clip`, `edge`, `frames` and settings as transition application,
 /// so a drag preview shows the exact range that release will commit.
 pub fn preview_transition(s: &Session, p: &Value, kind: TrackKind) -> Result<(TrackId, Transition)> {
-    let eff_id = str_p(p, "effect")
-        .map(str::to_string)
-        .unwrap_or_else(|| if kind == TrackKind::Video { s.state.default_video_transition.clone() } else { s.state.default_audio_transition.clone() });
-    let ekind = if kind == TrackKind::Video { waltcut_project::EffectKind::VideoTransition } else { waltcut_project::EffectKind::AudioTransition };
-    let def = waltcut_project::vtransition::find_transition(&eff_id, ekind).ok_or_else(|| bad("transition", format!("unknown transition `{eff_id}`")))?;
+    if kind != TrackKind::Audio {
+        return Err(bad("transition", "transitions require an audio track"));
+    }
+    let eff_id = str_p(p, "effect").unwrap_or(&s.state.default_audio_transition);
+    let def = waltcut_project::effect::find_effect_by_name(eff_id)
+        .filter(|d| d.kind == waltcut_project::EffectKind::AudioTransition)
+        .ok_or_else(|| bad("transition", format!("unknown audio transition `{eff_id}`")))?;
     let mut instance = def.instance();
     if let Some(params) = p.get("params") {
         set_transition_params(&mut instance, params, "transition")?;
     }
     let reverse = p.get("reverse").and_then(Value::as_bool).unwrap_or(false);
     let rate = s.sequence_rate();
-    // Settings ▸ Timeline ▸ Video / Audio Transition Default Duration
+    // Settings ▸ Timeline ▸ Audio Transition Default Duration
     let dur = match p.get("frames").and_then(Value::as_i64) {
         Some(frames) => rate.tick_of(frames),
-        None if kind == TrackKind::Video => s.prefs.timeline.video_transition_duration(rate),
         None => s.prefs.timeline.audio_transition_duration(rate),
     };
     let t = s.playhead();

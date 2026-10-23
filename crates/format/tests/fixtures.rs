@@ -28,7 +28,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
     let clip = &seq.video_tracks[0].items[0];
     assert_eq!(clip.id, ClipId(29));
     assert_eq!(clip.source_in, Tick(243_675_432_000));
-    assert_eq!(clip.effects.len(), 3);
+    assert_eq!(clip.effects.len(), 2);
     seq.check().unwrap();
     // saved again it is the same document: nothing added, nothing lost (the writer's name aside)
     let again = encode(p, true);
