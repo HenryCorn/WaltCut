@@ -13,7 +13,7 @@ pub(crate) fn ffmpeg() -> Option<&'static str> {
 
 fn fixture_dir() -> PathBuf {
     // The source includes all recipe arguments and inline inputs; edits invalidate old media.
-    waltcut_testkit::fixtures::recipe_dir("codecs", include_str!("tests.rs"))
+    waltcut_testkit::fixtures::recipe_dir("codecs", concat!(include_str!("tests.rs"), include_str!("avi_tests.rs")))
 }
 
 fn fixture(name: &str, args: &[&str]) -> Option<Arc<[u8]>> {
@@ -261,11 +261,13 @@ fn matroska_reordered_video_without_default_duration_keeps_its_rate() {
     }
 }
 
-/// Path of a fixture under `target/fixtures/codecs/`, generated with ffmpeg when missing
+/// Path of a recipe-keyed fixture, generated with ffmpeg when missing
 /// (`None` when ffmpeg or the encoder is unavailable).
 pub(crate) fn fixture_path(name: &str, args: &[&str]) -> Option<PathBuf> {
     fixture(name, args)?;
-    Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs").join(name))
+    let path = fixture_dir().join(name);
+    assert!(path.is_file(), "generated fixture path must identify the written file: {}", path.display());
+    Some(path)
 }
 
 /// ffmpeg's decode of `src` as raw planar video (the oracle).
@@ -288,7 +290,7 @@ pub(crate) fn yuv_bytes(f: &waltcut_frame::VideoFrame) -> Vec<u8> {
 /// Random access into a VP9 file: frames requested out of order (seeks back and forth across key
 /// frames, then sequential playback) are sample-exact against ffmpeg's decode.
 fn check_vp9_seeks(name: &str, container: &str, pix_fmt: &str, extra: &[&str], frames: usize) {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs");
+    let dir = fixture_dir();
     let log = dir.join(format!("{name}.passlog")).to_string_lossy().into_owned();
     let mut args = vec!["-f", "lavfi", "-i", "testsrc2=s=352x288:r=25,noise=alls=8:allf=t", "-frames:v"];
     let n = frames.to_string();
@@ -553,7 +555,7 @@ fn mkv_vp9_rgb() {
 /// interleaved f32 at 48 kHz: the reference for our Opus path.
 fn opus_reference(name: &str) -> Option<Vec<f32>> {
     let ff = ffmpeg()?;
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs");
+    let dir = fixture_dir();
     let out = dir.join(format!("{name}.ref.f32"));
     let st = Command::new(ff)
         .args(["-y", "-v", "error", "-c:a", "libopus", "-i"])
