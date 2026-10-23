@@ -227,6 +227,12 @@ fn erase_while_held_ends_on_focus_loss_tool_change_and_command_and_draws_nothing
     assert_eq!(d.brush()["erase_held"], "Command");
     d.draw(0.3);
     assert_eq!(d.strokes(), vec![Brush::Eraser]);
+    // regression: a window driven over the control channel is never focused, and that must not
+    // end a hold (only the loss of focus does)
+    d.harness.input_mut().focused = false;
+    d.frames(3);
+    assert_eq!(d.brush()["erase_held"], "Command");
+    d.harness.input_mut().focused = true;
     d.command("drawing.eraseTemporarily", json!({"active": false})).expect("off");
     assert_eq!(d.brush()["erase_held"], "Off");
     assert!(d.command("drawing.eraseTemporarily", json!({"active": "yes"})).is_err());

@@ -116,7 +116,8 @@ pub fn release_stale_erase(app: &mut WaltCutApp, ctx: &egui::Context) {
     if app.ui.brush.erase_held == EraseHold::Off {
         return;
     }
-    let focus_lost = ctx.input(|i| !i.focused || i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false))));
+    // the loss itself, not the state: a window driven over the control channel is never focused
+    let focus_lost = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false))));
     let key_up = app.ui.brush.erase_held == EraseHold::Key
         && !app.bindings.iter().any(|(_, k, id, _)| id == "drawing.eraseTemporarily" && ctx.input(|i| i.key_down(*k)));
     if app.ui.tool != Tool::Brush || focus_lost || key_up {
