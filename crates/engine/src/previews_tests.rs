@@ -89,7 +89,7 @@ fn render_turns_green_edit_invalidates_and_undo_restores() {
         Default::default(),
         &s.media.provider(s.project.clone(), s.services.clone()),
     );
-    let live = live.over_black_rgba8();
+    let live = live.to_rgba8();
     let prev = f.to_rgba8();
     let diff = live.iter().zip(&prev).map(|(a, b)| (*a as i32 - *b as i32).abs()).max().unwrap();
     assert!(diff <= 4, "preview differs from live render by {diff}");
@@ -180,7 +180,7 @@ fn render_in_to_out_renders_only_the_marked_frames() {
             Default::default(),
             &s.media.provider(s.project.clone(), s.services.clone()),
         )
-        .over_black_rgba8()
+        .to_rgba8()
     };
     let prev = s.previews.frame(&s.media, &s.project, seq, 9, 1.0).expect("frame 9 has a preview").to_rgba8();
     assert!(max_diff(&live(&s, 9), &live(&s, 3)) > 16, "the test needs frames that differ");
