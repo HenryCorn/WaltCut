@@ -140,13 +140,6 @@ pub enum Drag {
         /// As in [`Drag::Trim`].
         from: Tick,
     },
-    /// Remix tool: drag a music clip's Out edge; on release `clip.remix` re-plans it to the new duration.
-    Remix {
-        clip: ClipId,
-        delta: Tick,
-        /// As in [`Drag::Trim`].
-        from: Tick,
-    },
     /// A transition dragged by an end (`edge`: its duration) or its middle (slides it over the
     /// cut); `start` / `duration` are where it is shown now, committed on release (#224).
     Transition {
@@ -1841,11 +1834,6 @@ fn preview_drag(app: &FilmcraftApp, seq: &Sequence, out: &mut HashMap<ClipId, (T
                 }
             }
         }
-        Drag::Remix { clip, delta, .. } => {
-            if let Some((_, it)) = seq.find_item(*clip) {
-                out.insert(*clip, (it.start, it.duration + *delta, None));
-            }
-        }
         Drag::Trim { clip, edge, delta, .. } => {
             for c in waltcut_engine::commands::with_links(&app.session, &[*clip]) {
                 if let Some((_, it)) = seq.find_item(c) {
@@ -1934,7 +1922,7 @@ fn marquee_clips(seq: &Sequence, layout: &Layout, r: Rect) -> Vec<ClipId> {
 fn drag_is_locked(session: &waltcut_engine::Session, seq: &Sequence, drag: &Drag) -> bool {
     let clips = match drag {
         Drag::Move { clips, track_delta, .. } => return move_is_locked(seq, clips, *track_delta),
-        Drag::Trim { clip, .. } | Drag::Stretch { clip, .. } | Drag::Remix { clip, .. } | Drag::Slip { clip, .. } | Drag::Slide { clip, .. } => vec![*clip],
+        Drag::Trim { clip, .. } | Drag::Stretch { clip, .. } | Drag::Slip { clip, .. } | Drag::Slide { clip, .. } => vec![*clip],
         Drag::Roll { left, right, .. } => vec![*left, *right],
         Drag::Transition { id, .. } => return seq.all_tracks().any(|t| t.locked && t.transitions.iter().any(|tr| tr.id == *id)),
         _ => return false,
@@ -2390,7 +2378,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 EdgeKind::Ripple => Drag::Trim { clip, edge, mode: waltcut_edit::TrimMode::Ripple, delta: Tick::ZERO, from: t },
                 EdgeKind::Roll { left, right } => Drag::Roll { left, right, delta: Tick::ZERO, from: t },
                 EdgeKind::Stretch => Drag::Stretch { clip, edge, delta: Tick::ZERO, from: t },
-                EdgeKind::Remix => Drag::Remix { clip, delta: Tick::ZERO, from: t },
             }),
             (_, Grab::Volume { clip, .. }) if resp.drag_started() => super::timeline_volume::start(seq, layout, clip, p).map(Drag::Volume),
             (_, Grab::Volume { clip, .. }) => {
@@ -2558,10 +2545,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 let delta = waltcut_engine::commands::trim_delta(&app.session, clip, edge, mode, target - base).unwrap_or(target - base);
                 Drag::Trim { clip, edge, mode, delta, from }
             }),
-            Drag::Remix { clip, from, .. } => seq.find_item(clip).map(|(_, it)| {
-                let target = rate.snap_nearest(it.end() + (t_here - from)).max(it.start + rate.frame_duration());
-                Drag::Remix { clip, delta: target - it.end(), from }
-            }),
             Drag::Stretch { clip, edge, from, .. } => seq.find_item(clip).map(|(_, it)| {
                 let base = if edge == waltcut_edit::Edge::In { it.start } else { it.end() };
                 let target = snap(app, seq, layout, rate.snap_nearest(base + (t_here - from)), &[clip]);
@@ -2649,10 +2632,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     json!({"clip": clip.0, "edge": if edge == waltcut_edit::Edge::In {"in"} else {"out"}, "mode": if mode == waltcut_edit::TrimMode::Ripple {"ripple"} else {"regular"}, "delta": delta.0}),
                 )),
                 Drag::Stretch { clip, edge, delta, .. } if delta != Tick::ZERO => Some(app.session.execute("timeline.rateStretch", json!({"clip": clip.0, "edge": if edge == waltcut_edit::Edge::In {"in"} else {"out"}, "delta": delta.0}))),
-                Drag::Remix { clip, delta, .. } if delta != Tick::ZERO => {
-                    let d = seq.find_item(clip).map(|(_, it)| it.duration + delta).unwrap_or(Tick::ZERO);
-                    Some(app.session.execute("clip.remix", json!({"clip": clip.0, "duration": d.0})))
-                }
                 Drag::Roll { left, right, delta, .. } if delta != Tick::ZERO => Some(app.session.execute("timeline.roll", json!({"left": left.0, "right": right.0, "delta": delta.0}))),
                 Drag::Slip { clip, delta } if delta != Tick::ZERO => Some(app.session.execute("timeline.slip", json!({"clip": clip.0, "delta": delta.0}))),
                 Drag::Slide { clip, delta } if delta != Tick::ZERO => Some(app.session.execute("timeline.slide", json!({"clip": clip.0, "delta": delta.0}))),

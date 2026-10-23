@@ -36,7 +36,6 @@ pub mod previews;
 pub mod project_panel;
 pub mod project_tools;
 pub mod relink;
-pub mod remix;
 pub mod sequence_extras;
 pub mod sequence_tools;
 pub mod settings;
@@ -1147,8 +1146,6 @@ mod project_panel_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod relink_tests;
-#[cfg(test)]
-mod remix_tests;
 #[cfg(test)]
 mod ripple_delete_tests;
 #[cfg(test)]

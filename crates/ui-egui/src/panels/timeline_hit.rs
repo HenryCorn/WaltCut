@@ -195,8 +195,6 @@ pub enum EdgeKind {
     Roll { left: ClipId, right: ClipId },
     /// Rate Stretch: the clip's speed changes to fill its new length.
     Stretch,
-    /// Remix: a music clip is re-planned to its new length (Out edges only).
-    Remix,
 }
 
 impl EdgeKind {
@@ -207,7 +205,6 @@ impl EdgeKind {
             EdgeKind::Ripple => "ripple",
             EdgeKind::Roll { .. } => "roll",
             EdgeKind::Stretch => "rateStretch",
-            EdgeKind::Remix => "remix",
         }
     }
 }
@@ -269,7 +266,6 @@ pub fn grab_at(seq: &Sequence, layout: &Layout, pos: Pos2, tool: Tool, mods: Mod
         Tool::Ripple => EdgeKind::Ripple,
         Tool::Rolling => roll(seq, track, clip, edge),
         Tool::RateStretch => EdgeKind::Stretch,
-        Tool::Remix if edge == Edge::Out => EdgeKind::Remix,
         _ => return Grab::Other(h),
     };
     Grab::Edge { track, clip, edge, kind }
@@ -516,9 +512,6 @@ mod tests {
         assert_eq!(g(Tool::Rolling, 303.0), edge_grab(tr, 2, Edge::In, ROLL_AB));
         assert_eq!(g(Tool::Rolling, 102.0), edge_grab(tr, 1, Edge::In, EdgeKind::Trim));
         assert_eq!(g(Tool::RateStretch, 297.0), edge_grab(tr, 1, Edge::Out, EdgeKind::Stretch));
-        assert_eq!(g(Tool::Remix, 297.0), edge_grab(tr, 1, Edge::Out, EdgeKind::Remix));
-        // Remix has Out edges only
-        assert_eq!(g(Tool::Remix, 303.0), Grab::Other(edge_hit(tr, 2, Edge::In)));
         for tool in [Tool::Razor, Tool::Slip, Tool::Slide, Tool::Hand, Tool::Zoom, Tool::TrackSelectForward] {
             assert_eq!(g(tool, 297.0), Grab::Other(edge_hit(tr, 1, Edge::Out)), "{tool:?}");
         }
@@ -526,10 +519,7 @@ mod tests {
 
     #[test]
     fn edge_kind_names_for_the_control_channel() {
-        assert_eq!(
-            [EdgeKind::Trim, EdgeKind::Ripple, ROLL_AB, EdgeKind::Stretch, EdgeKind::Remix].map(EdgeKind::name),
-            ["trim", "ripple", "roll", "rateStretch", "remix"]
-        );
+        assert_eq!([EdgeKind::Trim, EdgeKind::Ripple, ROLL_AB, EdgeKind::Stretch].map(EdgeKind::name), ["trim", "ripple", "roll", "rateStretch"]);
     }
 
     #[test]

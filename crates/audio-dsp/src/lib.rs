@@ -27,7 +27,6 @@ pub mod effects;
 pub mod fft;
 pub mod loudness;
 pub mod oversample;
-pub mod remix;
 pub mod resample;
 mod smooth;
 

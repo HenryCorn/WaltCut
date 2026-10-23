@@ -14,6 +14,20 @@ fn invalid_preview_scales_are_rejected_without_allocating() {
 use serde_json::json;
 
 #[test]
+fn music_retiming_commands_are_absent_and_do_not_edit() {
+    let mut s = demo();
+    let before = s.project.clone();
+    let undo = s.history.undo.len();
+    for id in ["clip.remix", "clip.remix.enable", "clip.remix.properties", "clip.remix.revert"] {
+        assert!(commands::find(id).is_none(), "{id}");
+        assert!(matches!(s.execute(id, json!({"clip": u64::MAX, "duration": -1})), Err(EngineError::UnknownCommand(_))));
+    }
+    assert!(!commands::command_specs().iter().any(|c| c.id.starts_with("clip.remix")));
+    assert!(Arc::ptr_eq(&before, &s.project));
+    assert_eq!(s.history.undo.len(), undo);
+}
+
+#[test]
 fn mask_commands_are_absent_and_unknown_targets_do_not_edit() {
     let mut s = demo();
     let before = s.project.clone();

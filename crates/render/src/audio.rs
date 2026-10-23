@@ -147,12 +147,8 @@ pub(crate) fn track_input_at(
 
 /// `item` lengthened to cover `[t0, t1)` with its media timing unchanged: the part before its in
 /// point and after its out point plays the source's handles (silent where the source has none).
-/// Remixed clips have no linear media to extend and stay as they are.
 fn with_handles(item: &TrackItem, t0: Tick, t1: Tick) -> TrackItem {
     let mut ext = item.clone();
-    if crate::remix::is_remixed(item) {
-        return ext;
-    }
     let head = (item.start - t0).max(Tick::ZERO);
     let tail = (t1 - item.end()).max(Tick::ZERO);
     ext.start = item.start - head;
@@ -380,10 +376,7 @@ fn raw_channels(item: &TrackItem, src: SourceAudio, x0: i64, len: usize, sr: u32
     let off = (a0 - x0) as usize;
     let speed = item.speed.abs().max(1e-6);
     let src_start_ticks = item.source_time_at(Tick::from_units(a0, sr as i64));
-    let remixed = crate::remix::read(item, &|m0, len| src(m0, len), a0 - item_s0, n, sr);
-    let buf = if remixed.is_some() {
-        remixed
-    } else if (speed - 1.0).abs() < 1e-9 && !item.reverse {
+    let buf = if (speed - 1.0).abs() < 1e-9 && !item.reverse {
         src(src_start_ticks.to_units_floor(sr as i64), n)
     } else {
         // varispeed: read a longer span and resample linearly
