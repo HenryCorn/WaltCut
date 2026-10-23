@@ -115,7 +115,7 @@ impl Display {
     }
 
     /// Show the exact frame, or the nearest earlier cached one; returns whether it was exact.
-    fn refresh(&mut self, server: &FrameServer, key: FrameKey) -> bool {
+    pub fn refresh(&mut self, server: &FrameServer, key: FrameKey) -> bool {
         let (c0, t0) = (thread_cpu_time().unwrap_or_default(), Instant::now());
         let exact;
         let mut presented = false;
