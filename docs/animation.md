@@ -13,7 +13,10 @@ hold a pose for several frames or place a new cel on every frame.
    mode, and onion-skin controls.
 3. Move the playhead to another drawing frame. Choose **New Cel** for a blank pose or **Duplicate**
    to copy the held pose, then draw the changes. With **Draw on held cel**, strokes instead extend
-   the cel already visible on that frame.
+   the cel already visible on that frame. A cel holds from its start frame up to (but not including)
+   the next cel start. The Timeline shows these exposures in the drawing clip; drag a start marker
+   to retime its pose, or drag an exposure end to adjust the hold. Empty cels are explicit blank
+   poses; clearing a cel keeps its start, while deleting it lets an earlier pose hold again.
 4. Enable **Onion skin** to show the neighbouring cels: the previous cel in red and the next in
    green.
 5. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
@@ -125,7 +128,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

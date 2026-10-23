@@ -131,8 +131,9 @@ cmd("drawing.addStroke", {"clip": drawing, "frame": 4, "stroke": {"brush": "Pen"
 cmd("drawing.newCel", {"clip": drawing, "frame": 8, "copy": True})
 cmd("drawing.addStroke", {"clip": drawing, "frame": 10, "cel": "hold", "stroke": {"brush": "Pen", "color": "#1d3557", "size": 6.0, "points": [[100, 30, 0.5], [110, 34, 0.5]]}})
 between = cmd("drawing.tween", {"clip": drawing, "frame": 0, "step": 2})
+cmd("drawing.retimeCel", {"clip": drawing, "from": 4, "to": 5})
 cels = {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]}
-check(0 in cels and 4 in cels and 8 in cels and between["cels"] == [2], f"cels at frames {sorted(cels)} and an in-between at {between['cels']}")
+check(0 in cels and 2 in cels and 5 in cels and 8 in cels and 4 not in cels and between["cels"] == [2], f"retimed cels at frames {sorted(cels)} and an in-between at {between['cels']}")
 state = call("ui.inspect")["result"]["ui"]["brush"]
 check(state["onion"] is True, "onion skin is on")
 call("ui.set", {"tool": "Brush"}, quiet=True)

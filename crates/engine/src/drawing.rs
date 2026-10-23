@@ -67,6 +67,93 @@ fn edit_drawing<R>(s: &mut Session, cmd: &str, label: &str, id: ItemId, f: impl 
     })
 }
 
+/// Inclusive drawing-frame bounds visible through this clip's current source-time mapping.
+fn drawing_frame_bounds(s: &Session, cmd: &str, clip: ClipId, d: &Drawing) -> Result<(i64, i64)> {
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, it) = seq.find_item(clip).ok_or_else(|| bad(cmd, "no such clip"))?;
+    if it.duration <= Tick::ZERO {
+        return Err(bad(cmd, "the drawing clip has no visible frames"));
+    }
+    let first = d.frame_at(it.source_time_at(it.start));
+    let last = d.frame_at(it.source_time_at(it.end() - Tick(1)));
+    Ok((first.min(last), first.max(last)))
+}
+
+fn editable_frame_bounds(s: &Session, cmd: &str, clip: ClipId, d: &Drawing) -> Result<(i64, i64)> {
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (track, it) = seq.find_item(clip).ok_or_else(|| bad(cmd, "no such clip"))?;
+    if seq.track(track).is_some_and(|t| t.locked) {
+        return Err(bad(cmd, "the drawing is on a locked track"));
+    }
+    if it.frame_hold.is_some() {
+        return Err(bad(cmd, "cannot retime cels in a frame-held drawing clip"));
+    }
+    drawing_frame_bounds(s, cmd, clip, d)
+}
+
+fn retime_cel(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "drawing.retimeCel";
+    let (clip, id, _) = target(s, ID, p)?;
+    let from = p.get("from").and_then(Value::as_i64).ok_or_else(|| bad(ID, "need integer `from` frame"))?;
+    let to = p.get("to").and_then(Value::as_i64).ok_or_else(|| bad(ID, "need integer `to` frame"))?;
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
+    let (first, last) = editable_frame_bounds(s, ID, clip, d)?;
+    if from < first || from > last || to < first || to > last {
+        return Err(bad(ID, format!("cel frames must be within the drawing clip's visible range {first}..={last}")));
+    }
+    if d.cel_on(from).is_none() {
+        return Err(bad(ID, format!("no cel starts on frame {from}")));
+    }
+    if from == to {
+        return Ok(json!({"clip": clip.0, "cel": from, "frame": to}));
+    }
+    edit_drawing(s, ID, "Retime Cel", id, |d| d.retime_cel(from, to).map_err(|e| bad(ID, e)))?;
+    Ok(json!({"clip": clip.0, "cel": from, "frame": to}))
+}
+
+fn set_hold(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "drawing.setHold";
+    let (clip, id, _) = target(s, ID, p)?;
+    let frame = p.get("frame").and_then(Value::as_i64).ok_or_else(|| bad(ID, "need integer `frame`"))?;
+    let end_frame = p.get("endFrame").and_then(Value::as_i64).ok_or_else(|| bad(ID, "need integer exclusive `endFrame`"))?;
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
+    let (first, last) = editable_frame_bounds(s, ID, clip, d)?;
+    if frame < first || frame > last {
+        return Err(bad(ID, format!("cel frame must be within the drawing clip's visible range {first}..={last}")));
+    }
+    let clip_end = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;
+    let cel_index = d.cel_on(frame).ok_or_else(|| bad(ID, format!("no cel starts on frame {frame}")))?;
+    let current_end = d.exposure_end(frame, clip_end).ok_or_else(|| bad(ID, "no cel starts on that frame"))?;
+    if end_frame <= frame || end_frame > clip_end {
+        return Err(bad(ID, format!("hold end must be after frame {frame} and no later than {clip_end}")));
+    }
+    if end_frame == current_end {
+        return Ok(json!({"clip": clip.0, "cel": frame, "endFrame": end_frame, "blank": false}));
+    }
+    if end_frame > last {
+        return Err(bad(ID, format!("hold end must be after frame {frame} and within the drawing clip's visible range {first}..={last}")));
+    }
+    let next = d.cels.get(cel_index + 1).map(|c| c.frame);
+    let next_next = d.cels.get(cel_index + 2).map(|c| c.frame);
+    if let Some(next_next) = next_next
+        && end_frame >= next_next
+    {
+        return Err(bad(ID, "changing this hold would cross the following cel"));
+    }
+    let blank = next.is_none();
+    edit_drawing(s, ID, "Set Cel Hold", id, |d| {
+        if let Some(next) = next {
+            d.retime_cel(next, end_frame).map_err(|e| bad(ID, e))?;
+        } else {
+            d.ensure_cel(end_frame, false).map_err(|e| bad(ID, e))?;
+        }
+        Ok(())
+    })?;
+    Ok(json!({"clip": clip.0, "cel": frame, "endFrame": end_frame, "blank": blank}))
+}
+
 /// Parse a stroke: `{brush?, color?: [r,g,b,a] | "#rrggbb", size?, points: [[x, y, pressure?], …]}`
 /// (points may also be `{x, y, p?}` objects).
 pub fn parse_stroke(cmd: &str, v: &Value) -> Result<Stroke> {
@@ -257,6 +344,9 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
         .iter()
         .map(|c| if full { json!({"frame": c.frame, "strokes": c.strokes}) } else { json!({"frame": c.frame, "strokes": c.strokes.len()}) })
         .collect();
+    let (_, last) = drawing_frame_bounds(s, ID, clip, d)?;
+    let clip_end = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;
+    let exposures: Vec<Value> = d.cels.iter().map(|c| json!({"frame": c.frame, "endFrame": d.exposure_end(c.frame, clip_end)})).collect();
     Ok(json!({
         "clip": clip.0,
         "width": d.width,
@@ -264,6 +354,7 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
         "frame": frame,
         "shown": d.cel_at(frame).map(|c| c.frame),
         "cels": cels,
+        "exposures": exposures,
     }))
 }
 
@@ -286,6 +377,8 @@ pub fn commands() -> Vec<CommandSpec> {
         spec("drawing.addStroke", "Draw Stroke", &[], STROKE, has_drawing, add_stroke),
         spec("drawing.setStrokes", "Set Drawing", &[], r#"{"clip":id?,"frame":int?,"strokes":[stroke,...]}"#, has_drawing, set_strokes),
         spec("drawing.newCel", "New Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?,"copy":bool?}"#, has_drawing, new_cel),
+        spec("drawing.retimeCel", "Retime Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"from":int,"to":int}"#, has_drawing, retime_cel),
+        spec("drawing.setHold", "Set Cel Hold", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int,"endFrame":int}"#, has_drawing, set_hold),
         spec("drawing.clearCel", "Clear Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, clear_cel),
         spec("drawing.deleteCel", "Delete Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, delete_cel),
         spec(

@@ -183,6 +183,29 @@ impl Drawing {
         self.cels.binary_search_by_key(&f, |c| c.frame).ok()
     }
 
+    /// Exclusive end of the exposure starting at `f`, if a cel starts there.
+    pub fn exposure_end(&self, f: i64, drawing_end: i64) -> Option<i64> {
+        self.cel_on(f).map(|i| self.cels.get(i + 1).map_or(drawing_end, |c| c.frame))
+    }
+
+    /// Move the cel starting at `from` to `to`, preserving its strokes.
+    pub fn retime_cel(&mut self, from: i64, to: i64) -> Result<(), String> {
+        if to < 0 {
+            return Err("cel frame must not be negative".into());
+        }
+        let i = self.cel_on(from).ok_or_else(|| format!("no cel starts on frame {from}"))?;
+        if from == to {
+            return Ok(());
+        }
+        if self.cel_on(to).is_some() {
+            return Err(format!("frame {to} already starts a cel"));
+        }
+        let cel = self.cels.get_mut(i).ok_or_else(|| "no such cel".to_string())?;
+        cel.frame = to;
+        self.cels.sort_by_key(|c| c.frame);
+        Ok(())
+    }
+
     /// The cel starting on frame `f`, created (empty, or as a copy of the cel shown there when
     /// `copy_held`) if there is none. Returns its index.
     pub fn ensure_cel(&mut self, f: i64, copy_held: bool) -> Result<usize, String> {
@@ -315,6 +338,49 @@ mod tests {
         let j = d.ensure_cel(5, true).unwrap();
         assert_eq!(d.cels[j].strokes.len(), 1);
         assert_eq!(d.ensure_cel(5, true).unwrap(), j);
+    }
+
+    #[test]
+    fn retiming_preserves_content_and_recalculates_exposure() {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        let first = d.ensure_cel(2, false).unwrap();
+        d.cels[first].strokes.push(line(0.0, 10.0, 3));
+        d.ensure_cel(6, false).unwrap();
+        assert_eq!(d.exposure_end(2, 12), Some(6));
+
+        d.retime_cel(6, 8).unwrap();
+
+        assert_eq!(d.cels.iter().map(|c| c.frame).collect::<Vec<_>>(), vec![2, 8]);
+        assert_eq!(d.exposure_end(2, 12), Some(8));
+        assert_eq!(d.cel_at(8).map(|c| c.frame), Some(8));
+        assert_eq!(d.cels.first().map(|c| c.strokes.len()), Some(1));
+    }
+
+    #[test]
+    fn retiming_rejects_missing_colliding_and_negative_frames_without_mutation() {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        d.ensure_cel(2, false).unwrap();
+        d.ensure_cel(6, false).unwrap();
+        let before = d.clone();
+        for (from, to) in [(5, 8), (2, 6), (2, -1)] {
+            assert!(d.retime_cel(from, to).is_err());
+            assert_eq!(d, before);
+        }
+    }
+
+    #[test]
+    fn retimed_frames_round_trip_at_fractional_rates() {
+        let mut drawing = Drawing::new(100, 100, FrameRate::new(24_000, 1_001));
+        drawing.ensure_cel(3, false).unwrap();
+        drawing.ensure_cel(9, false).unwrap();
+        drawing.retime_cel(9, 11).unwrap();
+
+        let bytes = serde_json::to_vec(&drawing).unwrap();
+        let loaded: Drawing = serde_json::from_slice(&bytes).unwrap();
+
+        assert_eq!(loaded, drawing);
+        assert_eq!(loaded.exposure_end(3, 24), Some(11));
+        assert_eq!(loaded.rate, FrameRate::new(24_000, 1_001));
     }
 
     #[test]

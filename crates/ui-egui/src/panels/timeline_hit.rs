@@ -184,6 +184,19 @@ impl EdgeKind {
 /// is there.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Grab {
+    /// A drawing cel's start marker.
+    CelStart {
+        track: TrackId,
+        clip: ClipId,
+        frame: i64,
+    },
+    /// The end of a drawing cel's held exposure.
+    CelEnd {
+        track: TrackId,
+        clip: ClipId,
+        frame: i64,
+        end_frame: i64,
+    },
     Edge {
         track: TrackId,
         clip: ClipId,
@@ -206,6 +219,7 @@ impl Grab {
     /// What is under the pointer, whatever the tool does with it.
     pub fn hit(self) -> Hit {
         match self {
+            Grab::CelStart { track, clip, .. } | Grab::CelEnd { track, clip, .. } => Hit::Clip { track, clip, edge: None },
             Grab::Edge { track, clip, edge, .. } => Hit::Clip { track, clip, edge: Some(edge) },
             Grab::Volume { track, clip } => Hit::Clip { track, clip, edge: None },
             Grab::Other(h) => h,

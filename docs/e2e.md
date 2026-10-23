@@ -19,7 +19,7 @@ own preferences and recovery files.
 | Import | an MP4, a WAV and a 6-frame PNG sequence | no import errors, 6 frames in the sequence |
 | Timeline | sequence from the clip, place the image sequence and audio, trim, razor split | three clips on V1 |
 | Drawing | `drawing.new`, then Pen, Pencil, Marker and Eraser strokes | – (screenshots) |
-| Cels | new, duplicate and held cels, `drawing.tween`, onion skin | cels at frames 0, 2, 4, 8; onion skin on |
+| Cels | new, duplicate and held cels, `drawing.tween`, retime frame 4 to 5, onion skin | cels at frames 0, 2, 5, 8; onion skin on |
 | Preview | play, stop, three frame steps | the playhead moved three frames |
 | Export | MP4 (H.264), MOV (ProRes 4444), PNG sequence | each decodes; the MOV has alpha; one PNG per frame |
 
