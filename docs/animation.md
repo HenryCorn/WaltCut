@@ -45,6 +45,19 @@ used to position or fade a drawing.
   the pen) and the status bar says so. The pen queue holds 4 096 samples between frames; if it
   overflows the oldest moves are dropped (never the stroke's first and last samples) and the loss
   is counted.
+- **What you see is what is drawn.** The live stroke, the stroke between pen-up and the arrival of
+  the new frame, and the onion skins are rasterised by the same CPU code as the Program monitor
+  and export (`waltcut_render::drawing`) with the same placement, so Pen, Pencil, Marker and
+  Eraser have the same coverage and compositing before pen-up, after it and in export (tests
+  compare them pixel for pixel, including under Motion scale, position and rotation). An
+  overlapping translucent stroke (Marker) has no darker joints. Onion skins are the neighbouring
+  cel *as drawn*: areas you erased stay empty. The one difference is the display blend of
+  partially covered pixels (antialiased edges, Marker, Pencil): the preview is blended by the UI in
+  gamma space and the engine in linear light, at most 20/255 apart on a 60 % Marker over mid grey
+  (opaque pixels are identical). While you erase, the preview shows the erased footprint as a
+  translucent white (the coverage the eraser will remove) rather than the picture beneath, which
+  only the engine knows. A stroke stays visible after pen-up until the engine's frame containing it
+  is on screen. The preview ignores the clip's opacity and blend mode.
 - **Cancel.** Escape, or the window losing focus, abandons the stroke being drawn; nothing is
   committed and the status bar says so.
 - **Diagnostics.** `ui.inspect` reports `ui.brush.pen`: the input source (`Pointer`, `Pen`, or
