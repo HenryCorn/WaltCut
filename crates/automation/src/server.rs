@@ -907,8 +907,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn export_progress_and_cancel() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
+            .ancestors()
+            .nth(2)
+            .unwrap()
             .join("target")
             .join(format!("filmcraft-mcp-progress-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

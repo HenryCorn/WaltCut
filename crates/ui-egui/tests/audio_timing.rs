@@ -22,8 +22,13 @@ struct Fixture(PathBuf);
 
 impl Fixture {
     fn new() -> Self {
-        let dir =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join("audio-timing-tests").join(std::process::id().to_string());
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .unwrap()
+            .join("target")
+            .join("audio-timing-tests")
+            .join(std::process::id().to_string());
         std::fs::create_dir_all(&dir).unwrap();
         Self(dir)
     }

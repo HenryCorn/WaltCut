@@ -141,8 +141,9 @@ fn run_keep_going_reports_failures() {
 
 fn export_project(name: &str) -> (std::path::PathBuf, String) {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
+        .ancestors()
+        .nth(2)
+        .unwrap()
         .join("target")
         .join("export-tests")
         .join(format!("cli-{name}-{}", std::process::id()));
@@ -259,7 +260,9 @@ fn removed_delivery_options_formats_commands_and_hostile_ranges_fail_without_out
     let ids: Vec<_> = commands.as_array().unwrap().iter().map(|item| item["id"].as_str().unwrap()).collect();
     assert_eq!(ids, ["export.quick"]);
     assert_eq!(std::fs::read(&project).unwrap(), before);
-    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "only the unchanged project remains");
+    let left: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(Result::ok).map(|e| e.file_name()).collect();
+    // opening the project makes its preview cache folder; no export wrote anything
+    assert!(left.iter().all(|name| name == "p.fcproj" || name == "FilmCraft Previews"), "only the unchanged project remains: {left:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -316,7 +319,8 @@ fn closed_stdout_still_runs_the_script_and_saves() {
 /// Invalid time and removed scaling are usage errors, not silently ignored delivery arguments.
 #[test]
 fn render_rejects_bad_numbers() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join(format!("fc-cli-render-nan-{}", std::process::id()));
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(2).unwrap().join("target").join(format!("fc-cli-render-nan-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let still = dir.join("s.png").to_str().unwrap().to_string();
@@ -345,7 +349,7 @@ fn render_rejects_bad_numbers() {
 /// placeholder frames; then it still warns.
 #[test]
 fn export_with_missing_media_fails_unless_allowed() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("target").join(format!("fc-cli-1054-{}", std::process::id()));
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(2).unwrap().join("target").join(format!("fc-cli-1054-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = |n: &str| dir.join(n).to_str().unwrap().to_string();

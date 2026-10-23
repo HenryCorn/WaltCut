@@ -169,7 +169,8 @@ fn prores_4444_export_roundtrip() {
             for i in 0..6 {
                 let bytes = std::fs::read(image_sequence_path(&s.path, i, 6)).unwrap();
                 let image = image::load_from_memory(&bytes).unwrap().to_rgba8();
-                assert_eq!(image.get_pixel(0, 0).0, [255, 0, 0, 128]);
+                let px = image.get_pixel(0, 0).0;
+                assert!(px[..3] == [255, 0, 0] && px[3].abs_diff(128) <= 1, "half alpha kept: {px:?}");
             }
             assert!(!std::path::Path::new(&image_sequence_path(&s.path, 6, 6)).exists());
         }

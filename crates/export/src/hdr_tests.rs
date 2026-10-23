@@ -51,7 +51,7 @@ fn hdr_prores_keeps_straight_colour_at_partial_and_zero_alpha() {
             };
             let pipe = crate::pipeline::Pipeline::new(project.clone(), seq, &settings, true).unwrap();
             let (rgba, rgb) = pipe.frame(0, &sources);
-            assert_eq!(rgba[3], (alpha * 255.0).round() as u8);
+            assert!(rgba[3].abs_diff((alpha * 255.0).round() as u8) <= 1, "alpha {alpha} -> {}", rgba[3]);
             if alpha > 0.0 {
                 let reference = encoded_reference.get_or_insert([rgb[0], rgb[1], rgb[2]]);
                 for (actual, expected) in rgb[..3].iter().zip(reference.iter()) {

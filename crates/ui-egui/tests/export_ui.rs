@@ -37,8 +37,9 @@ struct Driver {
 impl Driver {
     fn new(name: &str) -> Self {
         let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
+            .ancestors()
+            .nth(2)
+            .unwrap()
             .join("target")
             .join("export-tests")
             .join(format!("ui-{name}-{}", std::process::id()));
