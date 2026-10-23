@@ -1,7 +1,6 @@
 # waltcut-export
 
 The bounded media delivery pipeline for WaltCut's drawing/animation workflow.
-**#25 IMPLEMENTATION DRAFTED — native macOS acceptance pending.**
 
 ## Outputs
 
@@ -74,10 +73,7 @@ overwrite/source protection and worker shutdown. `ui-egui/tests/audio_timing.rs`
 stack** for mono/stereo timing, clip gain, Volume/keyframes and track mute; it is not a model-only
 substitute.
 
-The Windows development host can cross-typecheck macOS targets and run standalone argument/
-filesystem regressions, not native product media/UI tests. **Native retained-import fixture
-decoding, every output round trip/frame-count/alpha check, actual callback/MOV samples, real
-iPhone HEVC Main10 HLG MOV + AAC manual acceptance, full CI and the control-channel
-animation-flow screenshot remain pending.** No real iPhone file has been checked.
-See [testing](../../docs/testing.md#25-native-acceptance-still-required); this draft is not
-complete, accepted or merged and does not close issues or end the feature freeze.
+These tests run natively on macOS in CI. Retained-import fixture decoding, each output's round trip
+(frame count, alpha) and the actual playback-callback and written-MOV samples are exercised there.
+A control-channel run through import, the timeline, drawing and all three exports also passed.
+A real iPhone HEVC Main10 HLG MOV + AAC file has not been checked by hand.

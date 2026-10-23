@@ -5,9 +5,9 @@ Small, dependency-free, safe Rust helpers for live playback at layer **L1**. The
 also uses `PitchShifter` with the private STFT/FFT implementation to preserve pitch. These are
 low-level playback helpers shared by two live paths, not an export effects system.
 
-## Reduction status (#23)
+## Scope
 
-**DRAFT IMPLEMENTATION — native macOS acceptance pending.** Export loudness measurement,
+Export loudness measurement,
 normalisation and true-peak limiting, channel-layout conversion, source-monitor multichannel
 mixdown, and their DSP modules have been deleted. The soundtrack is stereo: multichannel sources
 use the selected first mono/stereo pair (default first two channels), without a surround mix or
