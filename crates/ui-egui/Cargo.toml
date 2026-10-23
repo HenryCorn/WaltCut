@@ -36,7 +36,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 rustix = { version = "1", default-features = false, features = ["std", "time"] }
 
 [dev-dependencies]
-pollster = "0.4"
+pollster = "1.0"
 waltcut-codecs = { workspace = true }
 waltcut-isobmff = { workspace = true }
 # the bench registers OS hardware decoders as the desktop app does (dev-dependency only: ui-egui

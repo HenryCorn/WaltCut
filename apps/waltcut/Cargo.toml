@@ -50,4 +50,4 @@ winit = { version = "0.30", default-features = false }
 [dev-dependencies]
 glob = "0.3"
 # graphics.rs: enumerate the real adapters in a test.
-pollster = "0.4"
+pollster = "1.0"
