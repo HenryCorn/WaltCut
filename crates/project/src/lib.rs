@@ -16,7 +16,6 @@ pub mod find;
 pub mod graphic;
 pub mod graphic_design;
 pub mod keyframe;
-pub mod mask;
 pub mod mixer;
 pub mod vtransition;
 
@@ -32,7 +31,6 @@ pub use essential::{AudioType, EssentialSound};
 pub use find::{FindOp, FindQuery, FindRow, SearchBin};
 pub use graphic_design::{CharStyle, GraphicMeta, LayerExtra, Pin, PinTarget, Roll, RollMode, SourceGraphic, StyleRun};
 pub use keyframe::{Interpolation, Keyframe, Param, ParamValue};
-pub use mask::{Mask, MaskMode, MaskPath, MaskVertex, TrackMethod};
 pub use mixer::{AutomationMode, InputMap, MixerStrip, TrackSend};
 
 macro_rules! id_type {
@@ -662,10 +660,6 @@ impl TrackItem {
         self.effects.iter_mut().find(|e| e.effect == id)
     }
     /// Standard (non-intrinsic) effects applied, for the fx badge.
-    /// The Opacity effect has masks (the layer is cut out before Motion).
-    pub fn has_opacity_masks(&self) -> bool {
-        self.effect("opacity").is_some_and(|e| e.enabled && e.masks.iter().any(|m| m.mode != mask::MaskMode::None))
-    }
     pub fn has_standard_effects(&self) -> bool {
         self.effects.iter().any(|e| e.def().is_some_and(|d| !d.intrinsic) && !graphic::is_layer(e))
     }
@@ -677,7 +671,6 @@ impl TrackItem {
         self.effects.iter().any(|e| {
             e.def().is_some_and(|d| d.intrinsic)
                 && (e.is_animated()
-                    || !e.masks.is_empty()
                     || e.def().is_some_and(|d| d.params.iter().any(|p| e.params.get(p.id).is_some_and(|v| !param_eq_default(&v.value, &p.default)))))
         })
     }
@@ -1798,13 +1791,19 @@ mod tests {
         for bad in [r#"{"Vec2":{"x":"a","y":0}}"#, r#"{"Vec2":{"x":0}}"#, r#"{"Vec2":null}"#, r#"{"Float":null}"#] {
             assert!(serde_json::from_str::<ParamValue>(bad).is_err(), "{bad}");
         }
-        // only point parameters: a `null` coordinate in a mask vertex (or any other point) is damage
         assert!(serde_json::from_str::<Vec2>(r#"{"x":null,"y":0}"#).is_err());
-        let mut path = serde_json::to_value(MaskPath::ellipse(Vec2::new(100.0, 100.0), Vec2::new(50.0, 40.0))).unwrap();
-        assert!(serde_json::from_value::<MaskPath>(path.clone()).is_ok());
-        path["vertices"][0]["p"]["x"] = serde_json::Value::Null;
-        assert!(serde_json::from_value::<MaskPath>(path.clone()).is_err());
-        assert!(serde_json::from_value::<ParamValue>(serde_json::json!({ "Path": path })).is_err());
+    }
+
+    #[test]
+    fn effect_instances_reject_removed_fields_instead_of_changing_compositing() {
+        let effect = find_effect("opacity").unwrap().instance();
+        let mut value = serde_json::to_value(&effect).unwrap();
+        assert!(value.get("masks").is_none());
+        assert_eq!(serde_json::from_value::<EffectInstance>(value.clone()).unwrap(), effect);
+        value["masks"] = serde_json::json!([{"path": {"vertices": [], "closed": true}}]);
+        let error = serde_json::from_value::<EffectInstance>(value).unwrap_err().to_string();
+        assert!(error.contains("unknown field `masks`"), "{error}");
+        assert!(serde_json::from_str::<ParamValue>(r#"{"Path":{"vertices":[],"closed":true}}"#).is_err());
     }
 
     #[test]

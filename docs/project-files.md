@@ -310,17 +310,19 @@ write the same JSON format:
 
 ```json
 {"format": "filmcraft.effect-presets", "version": 1, "presets": [
-  {"name": "My Vignette", "description": "", "keyframes": "AnchorToIn",
+  {"name": "My Fade", "description": "", "keyframes": "AnchorToIn",
    "source_duration": 2540160000000, "source_size": [1920, 1080],
-   "effects": [ /* EffectInstance, exactly as in .fcproj: effect, enabled, params, masks */ ]}
+   "effects": [ /* EffectInstance, exactly as in .fcproj: effect, enabled, params */ ]}
 ]}
 ```
 
 Keyframe times are relative to the in point of the clip the preset was saved from
 (`source_duration` is that clip's media length in ticks). Applying re-times them: `Scale` stretches
 them over the target clip, `AnchorToIn` / `AnchorToOut` keep their distance from the target's in /
-out point. Point parameters, mask paths, feather and expansion are scaled by the target / source
+out point. Point parameters are scaled by the target / source
 frame-size ratio. Intrinsic effects (Motion, Opacity…) replace the clip's own instance; other
 effects are added. Applying is one undo step; saving, renaming, deleting and importing change the
 library, not the project, and are not undoable. Files with another `format`, a newer `version` or
-unknown effect ids are refused.
+unknown effect ids are refused. Effect instances reject unknown fields, including removed mask
+data, rather than silently changing their appearance. Mask-dependent built-in presets (Soft
+Vignette and Spotlight) are removed; other presets remain until the later #24 catalogue slice.

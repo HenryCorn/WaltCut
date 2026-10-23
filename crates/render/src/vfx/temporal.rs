@@ -2,7 +2,7 @@
 //!
 //! Warp Stabilizer is a 2-D (similarity / translation) stabilizer: on first use it analyses the
 //! clip — every frame decoded small, Shi–Tomasi features tracked frame to frame with pyramidal
-//! Lucas–Kanade and a RANSAC similarity fit (the mask tracker in [`crate::track`]) — and caches
+//! Lucas–Kanade and a RANSAC similarity fit ([`crate::motion_analysis`]) — and caches
 //! the per-frame steps in memory. Rendering smooths the accumulated camera path with a Gaussian
 //! (Smoothness) or holds it fixed (No Motion), warps each frame onto the smoothed path and frames
 //! the result (crop / auto-scale / synthesise edges). Perspective and Subspace Warp use the
@@ -11,11 +11,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::motion_analysis::MotionModel;
 use rayon::prelude::*;
-use waltcut_project::{EffectInstance, TrackMethod};
+use waltcut_project::EffectInstance;
 
 use super::*;
-use crate::track::{Gray, Prepared, track_step};
+use crate::motion_analysis::{Gray, Prepared, track_step};
 
 /// Posterize Time: the clip shows a new frame only at the effect's frame rate.
 pub fn posterize_time(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
@@ -242,7 +243,7 @@ pub fn clear_stabilizer_cache() {
 }
 
 /// Analyse (or fetch the cached analysis of) the clip `env` describes.
-pub fn stabilizer_path(env: &dyn FxEnv, now: f64, method: TrackMethod, detailed: bool) -> Option<Arc<StabilizerPath>> {
+pub(crate) fn stabilizer_path(env: &dyn FxEnv, now: f64, method: MotionModel, detailed: bool) -> Option<Arc<StabilizerPath>> {
     let key = env.clip_key() ^ (method as u64).wrapping_mul(0x9E37) ^ (detailed as u64).wrapping_mul(0x51_7CC1);
     if let Some(p) = path_cache().lock().ok().and_then(|c| c.get(&key).cloned()) {
         return Some(p);
@@ -270,7 +271,7 @@ pub fn stabilizer_path(env: &dyn FxEnv, now: f64, method: TrackMethod, detailed:
     let steps: Vec<Affine> = (0..n.saturating_sub(1))
         .into_par_iter()
         .map(|k| match (&frames[k], &frames[k + 1]) {
-            (Some(a), Some(b)) if a.base().w == b.base().w => track_step(a, b, &region, method).map(|s| s.transform).unwrap_or(Affine::IDENTITY),
+            (Some(a), Some(b)) if a.base().w == b.base().w => track_step(a, b, &region, method).unwrap_or(Affine::IDENTITY),
             _ => Affine::IDENTITY,
         })
         .collect();
@@ -382,7 +383,7 @@ pub(crate) fn cover_scale(corr: &Affine, w: f64, h: f64, max: f64) -> f64 {
 /// Warp Stabilizer: see the module docs.
 pub fn warp_stabilizer(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
     let Some(env) = cx.env else { return };
-    let method = if chv(e, "method") == 0 { TrackMethod::Position } else { TrackMethod::PositionScaleRotation };
+    let method = if chv(e, "method") == 0 { MotionModel::Position } else { MotionModel::PositionScaleRotation };
     let Some(path) = stabilizer_path(env, cx.seconds, method, bv(e, "detailed")) else { return };
     let n = path.steps.len() + 1;
     let k = ((cx.seconds * path.fps).round().max(0.0) as usize).min(n - 1);

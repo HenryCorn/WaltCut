@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn clip_clamping_does_not_extend_the_screen_space_snap_threshold() {
-        let key = KeyframeRef { clip: 1, effect: 0, param: "scale".into(), mask: None, time: Tick::ZERO };
+        let key = KeyframeRef { clip: 1, effect: 0, param: "scale".into(), time: Tick::ZERO };
         let other = KeyframeRef { param: "rotation".into(), time: Tick::from_seconds_f64(0.95), ..key.clone() };
         let points = [
             Point {

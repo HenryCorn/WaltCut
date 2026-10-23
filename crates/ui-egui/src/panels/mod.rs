@@ -18,7 +18,6 @@ pub mod graphic_design;
 pub mod graphics;
 pub mod import_mode;
 pub mod keyboard;
-pub mod masks;
 pub mod media_dialogs;
 pub mod menu_dialogs;
 pub mod metadata;

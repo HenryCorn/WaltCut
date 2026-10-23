@@ -403,19 +403,15 @@ pub struct Eyedropper {
     pub clip: u64,
     pub effect: usize,
     pub param: String,
-    pub mask: Option<usize>,
 }
 
-/// A keyframe selected in the Effect Controls keyframe lane: clip, effect index, parameter (of an
-/// effect mask when `mask` is set) and the keyframe's media time. The panel drops references that
-/// no longer match a keyframe (deleted, moved, another clip selected).
+/// A keyframe selected in the Effect Controls lane: clip, effect index, parameter and media time.
+/// The panel drops references that no longer match a keyframe.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyframeRef {
     pub clip: u64,
     pub effect: usize,
     pub param: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mask: Option<usize>,
     pub time: waltcut_time::Tick,
 }
 
@@ -526,9 +522,6 @@ pub struct UiState {
     /// Open colour dialog (Interpret Footage ▸ Color Management, Sequence ▸ Color Management).
     #[serde(default)]
     pub color_dialog: Option<ColorDialog>,
-    /// Free-draw (pen) mask being placed on the Program monitor (Effect Controls ▸ pen icon).
-    #[serde(default)]
-    pub mask_pen: Option<MaskPenDraft>,
     /// Effect presets: the preset being renamed / the Save Preset dialog (open when Some).
     #[serde(default)]
     pub save_preset: Option<SavePresetDraft>,
@@ -580,14 +573,6 @@ pub struct ClipDialogDraft {
     pub info: serde_json::Value,
     #[serde(default)]
     pub error: String,
-}
-
-/// A pen mask in progress: vertices placed so far, in clip pixels (`[x, y, tangent x, tangent y]`).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct MaskPenDraft {
-    pub clip: u64,
-    pub effect: usize,
-    pub points: Vec<[f64; 4]>,
 }
 
 /// Save Preset dialog (Effect Controls ▸ right-click an effect ▸ Save Preset…).
@@ -851,7 +836,6 @@ impl Default for UiState {
             link_media: None,
             make_offline: None,
             color_dialog: None,
-            mask_pen: None,
             save_preset: None,
             audio_fx_editors: Vec::new(),
             guide_dialog: None,

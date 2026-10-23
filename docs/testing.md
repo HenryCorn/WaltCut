@@ -9,6 +9,15 @@ cargo xtask fixtures                            # pre-generate the ffmpeg fixtur
 FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
 ```
 
+The stacked #24 masks/tracking draft adds negative command-registry and removed-data rejection
+tests, Motion/Opacity/blend editing regressions for media/drawing/text/shape clips, and whole-layer
+animated-opacity compositing coverage. Effect Controls retains ordinary parameter, graph and
+opacity-group keyframe tests. On the Windows authoring host, macOS-target workspace Clippy
+typechecks these tests; it does not execute them. Native `cargo xtask ci`, GPU/UI test execution,
+and the control-channel drawing/cel/preview/export flow with screenshots remain required on
+macOS before merge. Native `cargo test -p xtask --quiet` (6 tests) and
+`cargo test -p waltcut-text --lib --quiet` (41 tests, retained artwork coverage) passed locally.
+
 ## 1. Kinds of tests
 
 | Kind | Where | Examples |

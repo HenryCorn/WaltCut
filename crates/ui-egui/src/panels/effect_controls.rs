@@ -56,10 +56,7 @@ fn graph_drag_offset(ui: &egui::Ui, response: &egui::Response, previous: egui::V
 /// Whether `k` names a keyframe of the clip `it` (its effect, parameter and media time).
 fn keyframe_exists(it: &TrackItem, k: &KeyframeRef) -> bool {
     let Some(e) = it.effects.get(k.effect) else { return false };
-    let param = match k.mask {
-        Some(m) => e.masks.get(m).and_then(|m| m.param(&k.param)),
-        None => e.params.get(&k.param),
-    };
+    let param = e.params.get(&k.param);
     param.is_some_and(|p| p.keyframes.iter().any(|kf| kf.time == k.time))
 }
 
@@ -72,14 +69,9 @@ pub(crate) fn select_all_keyframes(app: &mut FilmcraftApp) -> bool {
     let mut keys = Vec::new();
     for (clip, it, _) in selected_clips(app) {
         for (effect, e) in it.effects.iter().enumerate() {
-            let key = |param: &str, mask, time| KeyframeRef { clip: clip.0, effect, param: param.to_string(), mask, time };
+            let key = |param: &str, time| KeyframeRef { clip: clip.0, effect, param: param.to_string(), time };
             for (param, p) in &e.params {
-                keys.extend(p.keyframes.iter().map(|kf| key(param, None, kf.time)));
-            }
-            for (m, mask) in e.masks.iter().enumerate() {
-                for param in waltcut_project::mask::MASK_PARAMS {
-                    keys.extend(mask.param(param).into_iter().flat_map(|p| &p.keyframes).map(|kf| key(param, Some(m), kf.time)));
-                }
+                keys.extend(p.keyframes.iter().map(|kf| key(param, kf.time)));
             }
         }
     }
@@ -279,17 +271,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     custom_setup_row(app, bui, body, &lane, clip, idx, &e.effect);
                 }
                 for pd in &def.params {
-                    param_row(app, bui, body, clip, idx, e, None, pd, mt_now, &mut actions, &lane, &lx, it, &mut keys);
+                    param_row(app, bui, body, clip, idx, e, pd, mt_now, &mut actions, &lane, &lx, it, &mut keys);
                     if app.ui.expanded_fx.contains(&graph_key(clip, idx, pd.id))
                         && let Some(param) = e.params.get(pd.id)
                         && param.is_animated()
                         && graphable(&param.value)
                     {
-                        graph_rows(app, bui, body, clip, idx, None, pd, param, &lane, it, &mut actions);
+                        graph_rows(app, bui, body, clip, idx, pd, param, &lane, it, &mut actions);
                     }
-                }
-                if crate::panels::masks::maskable(e) {
-                    crate::panels::masks::effect_rows(app, bui, body, clip, idx, e, mt_now, &mut actions, &lane, &lx, it, &mut keys);
                 }
             }
         }
@@ -524,7 +513,6 @@ pub(crate) fn param_row(
     clip: ClipId,
     idx: usize,
     e: &EffectInstance,
-    mask: Option<usize>,
     pd: &waltcut_project::ParamDef,
     mt: Tick,
     actions: &mut Vec<(String, Value)>,
@@ -535,24 +523,9 @@ pub(crate) fn param_row(
 ) {
     let _ = lx;
     let t = app.tokens;
-    let param = match mask {
-        Some(k) => e.masks.get(k).and_then(|m| m.param(pd.id)),
-        None => e.params.get(pd.id),
-    };
-    let Some(param) = param else { return };
-    // mask parameters: automation ids / widget ids get a `m<k>.` prefix, commands a `mask` field
-    let pkey: String = match mask {
-        Some(k) => format!("mask{k}.{}", pd.id),
-        None => pd.id.to_string(),
-    };
-    let pkey = pkey.as_str();
-    let with_mask = |mut v: Value| -> Value {
-        if let Some(k) = mask {
-            v["mask"] = json!(k);
-        }
-        v
-    };
-    let (r, row) = ui.allocate_exact_size(vec2(body.width(), ROW_H), if mask.is_none() { Sense::click() } else { Sense::hover() });
+    let Some(param) = e.params.get(pd.id) else { return };
+    let pkey = pd.id;
+    let (r, row) = ui.allocate_exact_size(vec2(body.width(), ROW_H), Sense::click());
     row_line(ui, r, lane, &t);
     // clicking one of an effect's properties selects the effect, as clicking its header does
     if row.clicked() {
@@ -580,7 +553,7 @@ pub(crate) fn param_row(
         let resp = ui.interact(sw, egui::Id::new(("sw", clip.0, idx, pkey)), Sense::click()).on_hover_text(tl!("Toggle animation"));
         icons::paint(ui.painter(), sw, Icon::Stopwatch, if param.is_animated() { t.accent } else { t.text_dim });
         if resp.clicked() {
-            actions.push(("effects.toggleAnimation".into(), with_mask(json!({"clip": clip.0, "effect": idx, "param": pd.id}))));
+            actions.push(("effects.toggleAnimation".into(), json!({"clip": clip.0, "effect": idx, "param": pd.id})));
         }
         app.auto.add(&format!("effectControls.{}.{}.stopwatch", e.effect, pkey), sw, "Toggle animation");
     }
@@ -642,16 +615,13 @@ pub(crate) fn param_row(
                 set = Some(json!([rgba.r(), rgba.g(), rgba.b(), rgba.a()]));
             }
             // Eyedropper: arm it, then click a pixel in the Program monitor (Esc cancels)
-            let target = crate::state::Eyedropper { clip: clip.0, effect: idx, param: pd.id.to_string(), mask };
+            let target = crate::state::Eyedropper { clip: clip.0, effect: idx, param: pd.id.to_string() };
             let armed = app.ui.eyedropper.as_ref() == Some(&target);
             let drop = icons::button(&mut vui, Icon::Eyedropper, 18.0, armed, &t, tl!("Eyedropper (pick a color from the Program monitor)"));
             app.auto.add(&format!("effectControls.{}.{}.eyedropper", e.effect, pkey), drop.rect, "Eyedropper");
             if drop.clicked() {
                 app.ui.eyedropper = if armed { None } else { Some(target) };
             }
-        }
-        (ParamKind::Path, _) => {
-            crate::panels::masks::path_value(app, &mut vui, clip, idx, mask, actions);
         }
         (ParamKind::Text, ParamValue::Text(s)) if !pd.id.ends_with("_lut") => {
             // edited in a buffer; committed (one undo step) when the field loses focus
@@ -674,7 +644,7 @@ pub(crate) fn param_row(
         }
     }
     if let Some(v) = set {
-        actions.push(("effects.setParam".into(), with_mask(json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": v}))));
+        actions.push(("effects.setParam".into(), json!({"clip": clip.0, "effect": idx, "param": pd.id, "value": v})));
     }
     // keyframe navigator ◀ ◆ ▶ (when animated)
     let eff_json = json!(idx);
@@ -682,19 +652,17 @@ pub(crate) fn param_row(
         let at = pos2(r.max.x - 42.0, r.center().y);
         let auto = format!("effectControls.{}.{}", e.effect, pkey);
         if keyframe_nav(app, ui, at, Some(param), mt, it, egui::Id::new(("knav", clip.0, idx, pkey)), &auto, "Add/Remove Keyframe", actions) {
-            actions.push(("effects.addKeyframe".into(), with_mask(json!({"clip": clip.0, "effect": eff_json, "param": pd.id}))));
+            actions.push(("effects.addKeyframe".into(), json!({"clip": clip.0, "effect": eff_json, "param": pd.id})));
         }
     }
     // reset to the default, under the effect's own reset button (an animated parameter keeps its
     // keyframes and gets one at the playhead)
-    if mask.is_none() {
-        let rr = Rect::from_center_size(pos2(r.max.x - 14.0, r.center().y), vec2(12.0, 12.0));
-        let rresp = ui.interact(rr, egui::Id::new(("param-reset", clip.0, idx, pkey)), Sense::click()).on_hover_text(tl!("Reset Parameter"));
-        icons::paint(ui.painter(), rr, Icon::Reset, if rresp.hovered() { t.text } else { t.text_dim });
-        app.auto.add(&format!("effectControls.{}.{}.reset", e.effect, pkey), rr, "Reset Parameter");
-        if rresp.clicked() {
-            actions.push(("effects.resetParam".into(), json!({"clip": clip.0, "effect": eff_json, "param": pd.id})));
-        }
+    let rr = Rect::from_center_size(pos2(r.max.x - 14.0, r.center().y), vec2(12.0, 12.0));
+    let rresp = ui.interact(rr, egui::Id::new(("param-reset", clip.0, idx, pkey)), Sense::click()).on_hover_text(tl!("Reset Parameter"));
+    icons::paint(ui.painter(), rr, Icon::Reset, if rresp.hovered() { t.text } else { t.text_dim });
+    app.auto.add(&format!("effectControls.{}.{}.reset", e.effect, pkey), rr, "Reset Parameter");
+    if rresp.clicked() {
+        actions.push(("effects.resetParam".into(), json!({"clip": clip.0, "effect": eff_json, "param": pd.id})));
     }
     // keyframes in the lane: draggable diamonds; right-click for interpolation
     if param.is_animated() {
@@ -709,7 +677,7 @@ pub(crate) fn param_row(
             let id = egui::Id::new(("kf", clip.0, idx, pkey, k.time.0));
             let original = Rect::from_center_size(pos2(lane.min.x + f * lane.width(), y), vec2(15.0, 15.0));
             let resp = ui.interact(original.expand(2.0), id, Sense::click_and_drag());
-            let reference = KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), mask, time: k.time };
+            let reference = KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), time: k.time };
             let kr = keys.key(app, ui, reference.clone(), it, *lane, original, &resp, k.interp);
             app.auto.add(&format!("effectControls.{}.{}.keyframe.{}", e.effect, pkey, k.time.0), kr, "keyframe");
             let selected = app.ui.keyframe_selection.contains(&reference);
@@ -719,18 +687,15 @@ pub(crate) fn param_row(
                 actions.push(("playhead.set".into(), json!({"time": tl.0})));
             }
             resp.context_menu(|ui| {
-                keyframe_menu(app, ui, KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), mask, time: k.time }, actions);
+                keyframe_menu(app, ui, KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), time: k.time }, actions);
             });
         }
     }
 }
 
-/// Shared by the lane diamonds and graph points: commands use media time and preserve the mask.
+/// Shared by the lane diamonds and graph points: commands use media time.
 fn keyframe_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, target: KeyframeRef, actions: &mut Vec<(String, Value)>) {
-    let mut params = json!({"clip": target.clip, "effect": target.effect, "param": target.param, "mediaTime": target.time.0});
-    if let Some(mask) = target.mask {
-        params["mask"] = json!(mask);
-    }
+    let params = json!({"clip": target.clip, "effect": target.effect, "param": target.param, "mediaTime": target.time.0});
     ui.label(egui::RichText::new(tl!("Temporal Interpolation")).color(app.tokens.text_dim));
     for (label, key) in [
         (tl!("Linear"), "linear"),
@@ -1006,19 +971,12 @@ pub(crate) fn graph_rows(
     body: Rect,
     clip: ClipId,
     idx: usize,
-    mask: Option<usize>,
     pd: &waltcut_project::ParamDef,
     param: &waltcut_project::Param,
     lane: &Rect,
     it: &TrackItem,
     actions: &mut Vec<(String, Value)>,
 ) {
-    let with_mask = |mut v: Value| -> Value {
-        if let Some(k) = mask {
-            v["mask"] = json!(k);
-        }
-        v
-    };
     let t = app.tokens;
     let (vr, _) = ui.allocate_exact_size(vec2(body.width(), 110.0), Sense::hover());
     let (velr, _) = ui.allocate_exact_size(vec2(body.width(), 64.0), Sense::hover());
@@ -1049,7 +1007,7 @@ pub(crate) fn graph_rows(
     }
     // While the graph stays open its range only widens: refitted to the keyframes, a keyframe
     // dragged off the top or bottom edge was drawn back on that edge, the curve unchanged (#1918)
-    let range_id = egui::Id::new(("kfg-range", clip.0, idx, mask, pd.id));
+    let range_id = egui::Id::new(("kfg-range", clip.0, idx, pd.id));
     let frame = ui.ctx().cumulative_frame_nr();
     if let Some((a, b, seen)) = ui.data(|d| d.get_temp::<(f64, f64, u64)>(range_id))
         && frame.saturating_sub(seen) <= 1
@@ -1120,14 +1078,14 @@ pub(crate) fn graph_rows(
             if !v.is_finite() {
                 continue;
             }
-            let id = egui::Id::new(("kfg", clip.0, idx, mask, pd.id, k.time.0));
+            let id = egui::Id::new(("kfg", clip.0, idx, pd.id, k.time.0));
             let id = if ci == 0 { id } else { id.with(ci) };
             let dy: f32 = ui.data(|d| d.get_temp(id)).unwrap_or(0.0);
             let c = pos2(x_of(f), y_of(v) + dy);
             let r = Rect::from_center_size(c, vec2(10.0, 10.0));
             let resp = ui.interact(r.expand(2.0), id, Sense::click_and_drag());
             resp.context_menu(|ui| {
-                keyframe_menu(app, ui, KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), mask, time: k.time }, actions);
+                keyframe_menu(app, ui, KeyframeRef { clip: clip.0, effect: idx, param: pd.id.to_string(), time: k.time }, actions);
             });
             let auto_id = match (comps.len(), ci) {
                 (1, _) => format!("effectControls.{}.graph.keyframe.{}", pd.id, k.time.0),
@@ -1159,10 +1117,7 @@ pub(crate) fn graph_rows(
                     ui.data_mut(|d| d.remove::<f32>(hid));
                     let ni = ((infl * seg + hdx * side) / seg.max(1.0)).clamp(0.01, 1.0);
                     let key = if side > 0.0 { "outInfluence" } else { "inInfluence" };
-                    actions.push((
-                        "effects.setKeyframe".into(),
-                        with_mask(json!({"clip": clip.0, "effect": idx, "param": pd.id, "mediaTime": k.time.0, key: ni})),
-                    ));
+                    actions.push(("effects.setKeyframe".into(), json!({"clip": clip.0, "effect": idx, "param": pd.id, "mediaTime": k.time.0, key: ni})));
                 }
             }
             p.circle_filled(c, 4.5, if resp.dragged_by(egui::PointerButton::Primary) { t.hot_text } else { t.plot_handle });
@@ -1187,10 +1142,7 @@ pub(crate) fn graph_rows(
                     }
                     json!(moved)
                 };
-                actions.push((
-                    "effects.setKeyframe".into(),
-                    with_mask(json!({"clip": clip.0, "effect": idx, "param": pd.id, "mediaTime": k.time.0, "value": value})),
-                ));
+                actions.push(("effects.setKeyframe".into(), json!({"clip": clip.0, "effect": idx, "param": pd.id, "mediaTime": k.time.0, "value": value})));
             }
         }
     }
@@ -1456,7 +1408,7 @@ mod graph_drag_tests {
                 let body = Rect::from_min_size(pos2(8.0, 8.0), vec2(320.0, 200.0));
                 let lane = Rect::from_min_max(pos2(360.0, 8.0), pos2(760.0, 220.0));
                 let mut actions = Vec::new();
-                graph_rows(&mut self.app, ui, body, self.clip, index, None, pd, &effect.params[self.param], &lane, &it, &mut actions);
+                graph_rows(&mut self.app, ui, body, self.clip, index, pd, &effect.params[self.param], &lane, &it, &mut actions);
                 run(&mut self.app, ui.ctx(), actions);
             });
             out.textures_delta.clear();

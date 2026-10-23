@@ -1,4 +1,4 @@
-//! Atomic movement of keys across effect/mask parameters; the common timeline delta keeps
+//! Atomic movement of keys across effect parameters; the common timeline delta keeps
 //! relative timing intact, including at the clip boundaries. Selection itself is a UI concern.
 use std::collections::{BTreeMap, HashSet};
 
@@ -18,21 +18,15 @@ struct Key {
     clip: u64,
     effect: usize,
     param: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    mask: Option<usize>,
     time: Tick,
 }
 
-type Lane = (u64, usize, Option<usize>, String);
+type Lane = (u64, usize, String);
 
 fn param_mut<'a>(sequence: &'a mut Sequence, lane: &Lane) -> Result<&'a mut Param> {
     let (_, it) = sequence.find_item_mut(ClipId(lane.0)).ok_or_else(|| bad(COMMAND, "clip does not exist"))?;
     let effect = it.effects.get_mut(lane.1).ok_or_else(|| bad(COMMAND, "effect does not exist"))?;
-    match lane.2 {
-        Some(mask) => effect.masks.get_mut(mask).and_then(|m| m.param_mut(&lane.3)),
-        None => effect.params.get_mut(&lane.3),
-    }
-    .ok_or_else(|| bad(COMMAND, "parameter does not exist"))
+    effect.params.get_mut(&lane.2).ok_or_else(|| bad(COMMAND, "parameter does not exist"))
 }
 
 fn direction(it: &TrackItem) -> f64 {
@@ -57,11 +51,7 @@ pub(crate) fn move_many(s: &mut Session, p: &Value) -> Result<Value> {
         }
         let (_, it) = q.find_item(ClipId(key.clip)).ok_or_else(|| bad(COMMAND, "clip does not exist"))?;
         let effect = it.effects.get(key.effect).ok_or_else(|| bad(COMMAND, "effect does not exist"))?;
-        let param = match key.mask {
-            Some(mask) => effect.masks.get(mask).and_then(|m| m.param(&key.param)),
-            None => effect.params.get(&key.param),
-        }
-        .ok_or_else(|| bad(COMMAND, "parameter does not exist"))?;
+        let param = effect.params.get(&key.param).ok_or_else(|| bad(COMMAND, "parameter does not exist"))?;
         let k = param.keyframes.iter().find(|k| k.time == key.time).ok_or_else(|| bad(COMMAND, "keyframe does not exist"))?;
         let speed = direction(it);
         if !speed.is_finite() || speed == 0.0 || it.duration < frame {
@@ -90,7 +80,7 @@ pub(crate) fn move_many(s: &mut Session, p: &Value) -> Result<Value> {
         let from = key.time;
         k.time += Tick((delta as f64 * speed).round() as i64);
         key.time = k.time;
-        lanes.entry((key.clip, key.effect, key.mask, key.param.clone())).or_default().push((from, k));
+        lanes.entry((key.clip, key.effect, key.param.clone())).or_default().push((from, k));
     }
     s.edit_sequence("Move Keyframes", |sequence, _, _| {
         for (lane, moved) in lanes {
@@ -188,6 +178,7 @@ mod tests {
             json!({"keyframes":[],"delta":100}),
             json!({"keyframes":vec![keys[0].clone();MAX_KEYS+1],"delta":100}),
             json!({"keyframes":[{"clip":keys[0]["clip"],"effect":u64::MAX,"param":"scale","time":0}],"delta":i64::MIN}),
+            json!({"keyframes":[{"clip":keys[0]["clip"],"effect":keys[0]["effect"],"param":"scale","time":keys[0]["time"],"mask":0}],"delta":100}),
             json!({"keyframes":keys,"delta":"fast"}),
         ] {
             assert!(s.execute(COMMAND, request).is_err());

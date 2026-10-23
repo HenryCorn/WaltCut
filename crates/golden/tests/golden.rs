@@ -15,8 +15,8 @@ use waltcut_geom::Vec2;
 use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{DemoScene, Generator, MediaSource, SharedSource};
 use waltcut_project::{
-    ClipId, EffectInstance, ItemId, ItemKind, Label, Mask, MaskMode, MaskPath, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackItem,
-    TrackKind, Transition, TransitionId, find_effect,
+    ClipId, EffectInstance, ItemId, ItemKind, Label, MediaClip, MediaRef, ParamValue, Project, SequenceSettings, TrackItem, TrackKind, Transition,
+    TransitionId, find_effect,
 };
 use waltcut_render::{RenderOptions, SourceMap, render_sequence};
 use waltcut_testkit::golden::{Rgba8, Tolerance, assert_golden, diff};
@@ -130,14 +130,6 @@ impl Builder {
             reverse: false,
         };
         self.p.sequence_mut(self.seq).unwrap().video_tracks[track].transitions.push(tr);
-    }
-
-    /// Add a mask to the clip's effect `effect` (feather/expansion in clip pixels).
-    fn mask(&mut self, id: ClipId, effect: &str, path: MaskPath, feather: f64, f: impl FnOnce(&mut Mask)) {
-        let mut m = Mask::new("Mask", path);
-        m.feather.value = fl(feather);
-        f(&mut m);
-        self.clip(id).effect_mut(effect).unwrap_or_else(|| panic!("no effect {effect}")).masks.push(m);
     }
 
     fn at(self, frame: i64) -> Scene {
@@ -411,58 +403,6 @@ fn hdr_tone_map() -> Scene {
     b.at(12)
 }
 
-/// Gaussian Blur limited to a feathered ellipse mask (media is 640×360 clip pixels).
-fn mask_blur() -> Scene {
-    let mut b = Builder::new(1);
-    let bars = b.media(Generator::BarsAndTone);
-    let c = b.place(0, bars, 0, 48);
-    b.effect(c, "gaussian_blur", &[("blurriness", fl(14.0))]);
-    b.mask(c, "gaussian_blur", MaskPath::ellipse(Vec2::new(320.0, 170.0), Vec2::new(210.0, 120.0)), 60.0, |_| {});
-    b.at(12)
-}
-
-/// Black & White inside a hard 4-point polygon (expanded by 12 px) minus a feathered pen (Bézier)
-/// mask: mask modes, expansion and smooth vertices.
-fn mask_color() -> Scene {
-    let mut b = Builder::new(1);
-    let bg = b.demo(DemoScene::OceanSunset);
-    let c = b.place(0, bg, 0, 48);
-    b.effect(c, "black_white", &[]);
-    let quad = MaskPath::polygon(&[Vec2::new(60.0, 40.0), Vec2::new(560.0, 70.0), Vec2::new(600.0, 320.0), Vec2::new(90.0, 300.0)]);
-    b.mask(c, "black_white", quad, 0.0, |m| m.expansion.value = fl(12.0));
-    let mut pen = MaskPath::polygon(&[Vec2::new(250.0, 110.0), Vec2::new(420.0, 160.0), Vec2::new(300.0, 270.0)]);
-    pen.vertices[0] = waltcut_project::MaskVertex::smooth(Vec2::new(250.0, 110.0), Vec2::new(60.0, -30.0));
-    pen.vertices[2] = waltcut_project::MaskVertex::smooth(Vec2::new(300.0, 270.0), Vec2::new(-80.0, -10.0));
-    b.mask(c, "black_white", pen, 16.0, |m| m.mode = MaskMode::Subtract);
-    b.at(12)
-}
-
-/// Mosaic outside an ellipse (inverted mask), 80 % mask opacity.
-fn mask_inverted() -> Scene {
-    let mut b = Builder::new(1);
-    let bg = b.demo(DemoScene::Aurora);
-    let c = b.place(0, bg, 0, 48);
-    b.effect(c, "mosaic", &[("horizontal", fl(24.0)), ("vertical", fl(14.0))]);
-    b.mask(c, "mosaic", MaskPath::ellipse(Vec2::new(300.0, 180.0), Vec2::new(150.0, 110.0)), 8.0, |m| {
-        m.inverted = true;
-        m.opacity.value = fl(80.0);
-    });
-    b.at(12)
-}
-
-/// Opacity mask: a feathered ellipse cut out of a rotated, scaled top layer over a background
-/// (the mask is in clip space, so it follows Motion).
-fn mask_opacity() -> Scene {
-    let mut b = Builder::new(2);
-    let bg = b.demo(DemoScene::OceanSunset);
-    let fg = b.demo(DemoScene::CityNight);
-    b.place(0, bg, 0, 48);
-    let top = b.place(1, fg, 0, 48);
-    b.fixed(top, "motion", &[("scale", fl(70.0)), ("rotation", fl(-10.0)), ("position", pt(170.0, 95.0))]);
-    b.mask(top, "opacity", MaskPath::ellipse(Vec2::new(320.0, 180.0), Vec2::new(250.0, 140.0)), 90.0, |_| {});
-    b.at(12)
-}
-
 /// M5.11 Distort: Corner Pin (a demo picture pinned into a quad) over Turbulent-Displaced bars.
 fn vfx_distort() -> Scene {
     let mut b = Builder::new(2);
@@ -560,10 +500,6 @@ fn scenes() -> Vec<(&'static str, &'static str, fn() -> Scene)> {
         ("graphic_rich_text", "Per-character text styles and a box pinned around the text", graphic_rich_text),
         ("log_to_rec709", "Colour management: S-Log3/S-Gamut3.Cine footage to Rec. 709 (tone mapped)", log_to_rec709),
         ("hdr_tone_map", "Colour management: Rec. 2100 PQ footage tone mapped into a Rec. 709 sequence", hdr_tone_map),
-        ("mask_blur", "Masks: Gaussian Blur inside a feathered ellipse mask", mask_blur),
-        ("mask_color", "Masks: Black & White inside an expanded polygon minus a feathered Bezier mask", mask_color),
-        ("mask_inverted", "Masks: Mosaic outside an inverted ellipse mask at 80% opacity", mask_inverted),
-        ("mask_opacity", "Masks: feathered ellipse opacity mask on a rotated top layer", mask_opacity),
         ("vfx_distort", "Corner Pin over Turbulent Displace", vfx_distort),
         ("vfx_ultra_key", "Ultra Key on colour bars over footage", vfx_ultra_key),
         ("vfx_glows", "Wonder Glow and Glint", vfx_glows),
@@ -625,10 +561,6 @@ goldens!(
     graphic_rich_text,
     log_to_rec709,
     hdr_tone_map,
-    mask_blur,
-    mask_color,
-    mask_inverted,
-    mask_opacity,
     vfx_distort,
     vfx_ultra_key,
     vfx_glows,

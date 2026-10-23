@@ -65,6 +65,37 @@ fn composites_tracks_and_opacity() {
 }
 
 #[test]
+fn animated_opacity_composites_whole_media_layers_with_effects_on_or_off() {
+    let (mut p, red, ocean, seq, map) = setup();
+    place(&mut p, seq, 0, ocean, 0, 72);
+    let top = place(&mut p, seq, 1, red, 0, 72);
+    let rate = FrameRate::FPS_24;
+    let it = p.sequence_mut(seq).unwrap().find_item_mut(top).unwrap().1;
+    let opacity = it.effect_mut("opacity").unwrap().param_mut("opacity").unwrap();
+    opacity.put_keyframe(rate.tick_of(0), ParamValue::Float(0.0));
+    opacity.put_keyframe(rate.tick_of(48), ParamValue::Float(100.0));
+    for effects in [false, true] {
+        for frame in [0, 12, 24, 36, 48] {
+            let t = rate.tick_of(frame);
+            let opts = RenderOptions { effects, ..Default::default() };
+            let img = render_sequence(&p, seq, t, opts, &map);
+            let mut bottom = p.clone();
+            bottom.sequence_mut(seq).unwrap().video_tracks[1].items.clear();
+            let background = render_sequence(&bottom, seq, t, opts, &map);
+            let alpha = frame as f32 / 48.0;
+            for (x, y) in [(0, 0), (160, 90), (319, 179)] {
+                let bg = background.get(x, y);
+                let expected = [alpha + bg[0] * (1.0 - alpha), bg[1] * (1.0 - alpha), bg[2] * (1.0 - alpha), 1.0];
+                let actual = img.get(x, y);
+                for (a, e) in actual.into_iter().zip(expected) {
+                    assert!((a - e).abs() < 1e-5, "frame {frame}, effects {effects}: {actual:?} != {expected:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn half_resolution_matches_full_downsampled() {
     let (mut p, _red, ocean, seq, map) = setup();
     place(&mut p, seq, 0, ocean, 0, 48);

@@ -2887,9 +2887,10 @@ fn build() -> Vec<CommandSpec> {
             "Set Effect Parameter",
             [],
             None,
-            r##"{"clip":id,"effect":"motion"|index,"param":str,"mask":n?,"value":num|[x,y]|"#rrggbb"|bool|path|"option name" (a choice takes its index or its name),"time":ticks? (where the keyframe goes when the parameter is animated, kept there even outside the clip; default: the playhead, pinned to the clip; a parameter that is not animated gets a new static value whatever the time),"keyframe":bool? (true: write a keyframe at `time` and animate the parameter),"merge":bool|key?,"begin":bool?}"##,
+            r##"{"clip":id,"effect":"motion"|index,"param":str,"value":num|[x,y]|"#rrggbb"|bool|"option name" (a choice takes its index or its name),"time":ticks? (where the keyframe goes when the parameter is animated, kept there even outside the clip; default: the playhead, pinned to the clip; a parameter that is not animated gets a new static value whatever the time),"keyframe":bool? (true: write a keyframe at `time` and animate the parameter),"merge":bool|key?,"begin":bool?}"##,
             has_seq,
             |s, p| {
+                parameter_keys(p, "effects.setParam")?;
                 let c = clip_p(p, "clip").ok_or_else(|| bad("effects.setParam", "need `clip`"))?;
                 let pid = str_p(p, "param").ok_or_else(|| bad("effects.setParam", "need `param`"))?.to_string();
                 let val = p.get("value").cloned().ok_or_else(|| bad("effects.setParam", "need `value`"))?;
@@ -2899,12 +2900,11 @@ fn build() -> Vec<CommandSpec> {
                 // the end, so a ramp across a cut keeps its slope (#1055); the playhead is pinned to the clip
                 let at = time_p(s, p, "");
                 let ph = s.playhead();
-                let pq = p.clone();
                 // `merge`: a drag of one parameter is one undo step (#201), and a key makes one of a
                 // drag that changes several (the Program monitor's handles); `begin` starts a new one
                 let merge = match p.get("merge") {
                     Some(Value::String(key)) => Some(format!("setParam:{}:{key}", c.0)),
-                    _ => bool_p(p, "merge").unwrap_or(false).then(|| format!("setParam:{}:{eff}:{pid}:{}", c.0, p.get("mask").unwrap_or(&Value::Null))),
+                    _ => bool_p(p, "merge").unwrap_or(false).then(|| format!("setParam:{}:{eff}:{pid}", c.0)),
                 };
                 if bool_p(p, "begin").unwrap_or(false) {
                     s.history.merge_key = None;
@@ -2918,8 +2918,8 @@ fn build() -> Vec<CommandSpec> {
                         _ => None,
                     }
                     .ok_or_else(|| bad("effects.setParam", "no such effect on clip"))?;
-                    // the parameter's definition (a mask's own parameters have none)
-                    let def = if pq.get("mask").is_none_or(Value::is_null) { e.def().and_then(|d| d.param(&pid)) } else { None };
+                    // the parameter's definition
+                    let def = e.def().and_then(|d| d.param(&pid));
                     // a choice takes its option name as well as its index, as transition parameters do
                     let val = match (def.map(|d| &d.kind), &val) {
                         (Some(waltcut_project::ParamKind::Choice(opts)), Value::String(name)) => {
@@ -2944,7 +2944,7 @@ fn build() -> Vec<CommandSpec> {
                         e.params.insert(pid.clone(), waltcut_project::Param::new(d.default.clone()));
                     }
                     let (keyframes, v) = {
-                        let prm = crate::masks::target_param(e, &pq, &pid).ok_or_else(|| bad("effects.setParam", format!("no param `{pid}`")))?;
+                        let prm = e.param_mut(&pid).ok_or_else(|| bad("effects.setParam", format!("no param `{pid}`")))?;
                         let v = json_to_param(&prm.value, &val).ok_or_else(|| bad("effects.setParam", "value has the wrong type"))?;
                         let keyframes = if keyframe {
                             // the stopwatch and the value in one step
@@ -2976,7 +2976,8 @@ fn build() -> Vec<CommandSpec> {
                 Ok(json!({"keyframes": keyframes}))
             }
         ),
-        cmd!("effects.toggleAnimation", "Toggle Animation", [], None, r#"{"clip":id,"effect":str|index,"param":str,"mask":n?}"#, has_seq, |s, p| {
+        cmd!("effects.toggleAnimation", "Toggle Animation", [], None, r#"{"clip":id,"effect":str|index,"param":str}"#, has_seq, |s, p| {
+            parameter_keys(p, "effects.toggleAnimation")?;
             let c = clip_p(p, "clip").ok_or_else(|| bad("effects.toggleAnimation", "need `clip`"))?;
             let pid = str_p(p, "param").ok_or_else(|| bad("effects.toggleAnimation", "need `param`"))?.to_string();
             let eff = p.get("effect").cloned().unwrap_or(json!("motion"));
@@ -2992,13 +2993,12 @@ fn build() -> Vec<CommandSpec> {
                 .ok_or_else(|| bad("effects.toggleAnimation", "no such effect"))?;
                 // a parameter an older instance lacks (added to the effect later) starts from its
                 // default, as the UI shows it, without touching an existing one
-                if p.get("mask").is_none_or(Value::is_null)
-                    && !e.params.contains_key(&pid)
+                if !e.params.contains_key(&pid)
                     && let Some(d) = e.def().and_then(|d| d.param(&pid))
                 {
                     e.params.insert(pid.clone(), waltcut_project::Param::new(d.default.clone()));
                 }
-                crate::masks::target_param(e, p, &pid).ok_or_else(|| bad("effects.toggleAnimation", "no such param"))?.toggle_animation(mt);
+                e.param_mut(&pid).ok_or_else(|| bad("effects.toggleAnimation", "no such param"))?.toggle_animation(mt);
                 Ok(())
             })?;
             Ok(Value::Null)
@@ -3052,15 +3052,9 @@ fn build() -> Vec<CommandSpec> {
             })?;
             Ok(Value::Null)
         }),
-        cmd!(
-            "effects.addKeyframe",
-            "Add/Remove Keyframe",
-            [],
-            None,
-            r#"{"clip":id,"effect":str|index,"param":str,"mask":n?,"time":ticks?}"#,
-            has_seq,
-            |s, p| { keyframe_op(s, p, "add") }
-        ),
+        cmd!("effects.addKeyframe", "Add/Remove Keyframe", [], None, r#"{"clip":id,"effect":str|index,"param":str,"time":ticks?}"#, has_seq, |s, p| {
+            keyframe_op(s, p, "add")
+        }),
         cmd!("effects.deleteKeyframe", "Delete Keyframe", [], None, r#"{"clip":id,"effect":str|index,"param":str,"mediaTime":ticks}"#, has_seq, |s, p| {
             keyframe_op(s, p, "delete")
         }),
@@ -3078,7 +3072,7 @@ fn build() -> Vec<CommandSpec> {
             "Move Keyframes",
             [],
             None,
-            r#"{"keyframes":[{"clip":id,"effect":index,"param":str,"mask":n?,"time":mediaTicks}],"delta":timelineTicks}"#,
+            r#"{"keyframes":[{"clip":id,"effect":index,"param":str,"time":mediaTicks}],"delta":timelineTicks}"#,
             has_seq,
             crate::keyframe_move::move_many
         ),
@@ -3297,7 +3291,6 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::graphic_design::commands());
     v.extend(crate::shortcuts::commands());
     v.extend(crate::relink::commands());
-    v.extend(crate::masks::commands());
     v.extend(crate::presets::commands());
     v.extend(crate::export_tools::commands());
     v.extend(crate::panels::commands());
@@ -3318,7 +3311,7 @@ fn build() -> Vec<CommandSpec> {
 /// Put `e`'s parameters (all of them, or only `only`) back to their defaults, as Premiere's reset
 /// buttons do: a parameter that is not animated gets its default as its static value, and an
 /// animated one keeps its keyframes and gets the default as a keyframe at media time `mt`.
-/// Masks are left alone. Returns whether any parameter was reset.
+/// Returns whether any parameter was reset.
 fn reset_params(e: &mut waltcut_project::EffectInstance, only: Option<&str>, frame: (u32, u32), mt: Tick) -> bool {
     let Some(d) = e.def() else { return false };
     let mut fresh = d.instance();
@@ -3339,7 +3332,34 @@ fn reset_params(e: &mut waltcut_project::EffectInstance, only: Option<&str>, fra
     any
 }
 
+fn parameter_keys(p: &Value, command: &str) -> Result<()> {
+    let params = p.as_object().ok_or_else(|| bad(command, "parameters must be an object"))?;
+    const KEYS: &[&str] = &[
+        "clip",
+        "effect",
+        "param",
+        "value",
+        "time",
+        "frame",
+        "seconds",
+        "timecode",
+        "keyframe",
+        "merge",
+        "begin",
+        "mediaTime",
+        "to",
+        "interpolation",
+        "inInfluence",
+        "outInfluence",
+    ];
+    if let Some(key) = params.keys().find(|key| !KEYS.contains(&key.as_str())) {
+        return Err(bad(command, format!("unknown parameter `{key}`")));
+    }
+    Ok(())
+}
+
 fn keyframe_op(s: &mut Session, p: &Value, op: &str) -> Result<Value> {
+    parameter_keys(p, "keyframe")?;
     let c = clip_p(p, "clip").ok_or_else(|| bad("keyframe", "need `clip`"))?;
     let pid = str_p(p, "param").ok_or_else(|| bad("keyframe", "need `param`"))?.to_string();
     let eff = p.get("effect").cloned().unwrap_or(json!("motion"));
@@ -3355,7 +3375,7 @@ fn keyframe_op(s: &mut Session, p: &Value, op: &str) -> Result<Value> {
         _ => "Keyframe Interpolation",
     };
     // a keyframe dragged on the timeline is one undo step, like a dragged value
-    let merge = bool_p(p, "merge").unwrap_or(false).then(|| format!("keyframe:{op}:{}:{eff}:{pid}:{}", c.0, p.get("mask").unwrap_or(&Value::Null)));
+    let merge = bool_p(p, "merge").unwrap_or(false).then(|| format!("keyframe:{op}:{}:{eff}:{pid}", c.0));
     if bool_p(p, "begin").unwrap_or(false) {
         s.history.merge_key = None;
     }
@@ -3368,7 +3388,7 @@ fn keyframe_op(s: &mut Session, p: &Value, op: &str) -> Result<Value> {
             _ => None,
         }
         .ok_or_else(|| bad("keyframe", "no such effect"))?;
-        let prm = crate::masks::target_param(e, p, &pid).ok_or_else(|| bad("keyframe", "no such param"))?;
+        let prm = e.param_mut(&pid).ok_or_else(|| bad("keyframe", "no such param"))?;
         match op {
             "add" => {
                 // toggle: remove if a keyframe sits at the playhead, else add
@@ -3487,7 +3507,6 @@ pub(crate) fn json_to_param(template: &ParamValue, v: &Value) -> Option<ParamVal
         ParamValue::Bool(_) => ParamValue::Bool(v.as_bool()?),
         ParamValue::Choice(_) => ParamValue::Choice(v.as_u64()? as u32),
         ParamValue::Text(_) => ParamValue::Text(v.as_str()?.to_string()),
-        ParamValue::Path(_) => ParamValue::Path(crate::masks::path_from_json(v)?),
         ParamValue::Curve(_) => {
             ParamValue::Curve(v.as_array()?.iter().filter_map(|p| Some([p.get(0)?.as_f64()? as f32, p.get(1)?.as_f64()? as f32])).collect())
         }
@@ -3773,7 +3792,6 @@ fn param_info(p: &waltcut_project::ParamDef) -> Value {
         K::Angle => "angle",
         K::Text => "text",
         K::Curve { .. } => "curve",
-        K::Path => "path",
     };
     j["type"] = json!(ty);
     j
@@ -3817,7 +3835,7 @@ fn transition_ids_p(v: &Value) -> Option<Vec<TransitionId>> {
 }
 
 /// `effects.select`: the effect selected in Effect Controls (`effect`: index, or the id of the
-/// clip's first effect of that kind). It replaces the mask selection.
+/// clip's first effect of that kind).
 fn select_effect(s: &mut Session, p: &Value) -> Result<Value> {
     const CMD: &str = "effects.select";
     if bool_p(p, "none") == Some(true) {
@@ -3834,7 +3852,6 @@ fn select_effect(s: &mut Session, p: &Value) -> Result<Value> {
     }
     .ok_or_else(|| bad(CMD, "no such effect on clip"))?;
     s.state.selected_effect = crate::EffectSel::of(clip, &it.effects, effect);
-    s.state.selected_mask = None;
     Ok(Value::Null)
 }
 
@@ -4143,7 +4160,7 @@ pub fn inspect_sequence(s: &Session, id: ItemId, q: &waltcut_project::Sequence) 
                 "startFrame": rate.frame_at(i.start), "durationFrames": rate.frame_at(i.duration), "sourceIn": i.source_in.0, "speed": i.speed, "reverse": i.reverse,
                 "end": i.end().0, "endFrame": rate.frame_at(i.end()), "sourceOut": i.source_out().0, "gainDb": i.gain_db,
                 "enabled": i.enabled, "link": i.link, "label": i.label.name(),
-                "effects": i.effects.iter().map(|e| json!({"effect": e.effect, "enabled": e.enabled, "masks": e.masks.len(), "params": e.params.iter().map(|(k, p)| (k.clone(), json!({"value": format!("{:?}", p.value), "keyframes": p.keyframes.len()}))).collect::<serde_json::Map<_, _>>()})).collect::<Vec<_>>(),
+                "effects": i.effects.iter().map(|e| json!({"effect": e.effect, "enabled": e.enabled, "params": e.params.iter().map(|(k, p)| (k.clone(), json!({"value": format!("{:?}", p.value), "keyframes": p.keyframes.len()}))).collect::<serde_json::Map<_, _>>()})).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "transitions": t.transitions.iter().map(|x| json!({"id": x.id.0, "effect": x.effect.effect, "start": x.start.0, "duration": x.duration.0, "from": x.from.map(|c| c.0), "to": x.to.map(|c| c.0), "reverse": x.reverse, "align": waltcut_edit::transitions::bounds(t, x).map(|b| waltcut_edit::transitions::alignment(x, b.1, rate.frame_duration()).id()), "params": x.effect.params.iter().map(|(k, v)| (k.clone(), serde_json::to_value(&v.value).unwrap_or_default())).collect::<serde_json::Map<_, _>>()})).collect::<Vec<_>>(),
         })

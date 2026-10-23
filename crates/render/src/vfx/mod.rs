@@ -33,7 +33,7 @@ use crate::effects::FxCtx;
 use crate::image::Image;
 use crate::{RenderOptions, SourceProvider};
 
-pub use temporal::{StabilizerPath, clear_stabilizer_cache, stabilizer_path};
+pub use temporal::{StabilizerPath, clear_stabilizer_cache};
 
 /// What an effect may know about the clip beyond its own pixels.
 pub trait FxEnv: Sync {
@@ -109,7 +109,7 @@ impl FxEnv for ItemEnv<'_> {
                 break;
             }
             if e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e) && !is_temporal(&e.effect) {
-                crate::mask::apply_effect(&mut img, e, &cx);
+                crate::effects::apply(&mut img, e, &cx);
             }
         }
         Some(img)

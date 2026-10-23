@@ -195,7 +195,7 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
             if let Some(q) = s("effectsSearch") {
                 app.ui.effects_search = q.to_string();
             }
-            // Effect Controls keyframe selection (`[{clip, effect, param, mask?, time}]`), replaced;
+            // Effect Controls keyframe selection (`[{clip, effect, param, time}]`), replaced;
             // references to missing keyframes are dropped by the panel
             if let Some(v) = p.get("keyframeSelection") {
                 match serde_json::from_value(v.clone()) {

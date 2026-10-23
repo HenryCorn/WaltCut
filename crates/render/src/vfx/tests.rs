@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use waltcut_project::{EffectKind, Interpolation, Keyframe, Param, ParamKind, find_effect};
 
+use super::temporal::stabilizer_path;
 use super::*;
 
 fn cx() -> FxCtx<'static> {
@@ -1035,7 +1036,7 @@ fn warp_stabilizer_removes_camera_jitter() {
     crate::effects::apply(&mut st, &e, &FxCtx { seconds: 9.0 / 24.0, env: Some(&env), ..cx() });
     assert!(st.px.as_chunks::<4>().0.iter().all(|p| p[3] > 0.99), "auto-scale leaves no border");
     // the path cache is reused
-    assert!(stabilizer_path(&env, 0.0, waltcut_project::TrackMethod::Position, false).is_some());
+    assert!(stabilizer_path(&env, 0.0, crate::motion_analysis::MotionModel::Position, false).is_some());
 }
 
 #[test]

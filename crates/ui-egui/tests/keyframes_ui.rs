@@ -439,7 +439,6 @@ fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<waltcut_
                 clip: clip.id,
                 effect: it.effects.iter().position(|e| e.effect == "motion").unwrap(),
                 param: (*param).into(),
-                mask: None,
                 time: it.source_time_at(Tick(time)),
             }
         })
@@ -448,8 +447,7 @@ fn lane_keys(d: &mut Driver, clip: &Clip, specs: &[(&str, f64)]) -> Vec<waltcut_
 
 fn key_id(d: &Driver, key: &waltcut_ui_egui::state::KeyframeRef) -> String {
     let it = d.harness.state().session.active_sequence().unwrap().find_item(ClipId(key.clip)).unwrap().1;
-    let mask = key.mask.map_or_else(String::new, |m| format!("mask{m}."));
-    format!("effectControls.{}.{mask}{}.keyframe.{}", it.effects[key.effect].effect, key.param, key.time.0)
+    format!("effectControls.{}.{}.keyframe.{}", it.effects[key.effect].effect, key.param, key.time.0)
 }
 
 fn center(rect: [f64; 4]) -> egui::Pos2 {
@@ -571,38 +569,31 @@ fn escape_cancels_a_group_preview_without_editing_the_project() {
 }
 
 #[test]
-fn effect_and_mask_keyframes_move_together_without_crossing_parameters() {
+fn opacity_keyframes_move_together_without_crossing_parameters() {
     let (mut d, clip) = Driver::demo();
-    d.click("effectControls.effect.motion");
-    d.exec("masks.add", json!({"clip":clip.id,"effect":"opacity","shape":"ellipse"}));
     let mut keys = Vec::new();
-    for (mask, seconds) in [(None, 1.0), (Some(0), 1.5)] {
+    for seconds in [1.0, 1.5] {
         let time = Tick(d.seek(seconds));
-        let mut p = json!({"clip":clip.id,"effect":"opacity","param":"opacity"});
-        if let Some(m) = mask {
-            p["mask"] = json!(m);
-        }
-        d.exec("effects.addKeyframe", p);
+        d.exec("effects.addKeyframe", json!({"clip":clip.id,"effect":"opacity","param":"opacity"}));
         let it = d.harness.state().session.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1;
         keys.push(waltcut_ui_egui::state::KeyframeRef {
             clip: clip.id,
             effect: it.effects.iter().position(|e| e.effect == "opacity").unwrap(),
             param: "opacity".into(),
-            mask,
             time: it.source_time_at(time),
         });
     }
     select_keys(&mut d, &keys);
     let from = center(d.rect(&key_id(&d, &keys[0])));
     let lane = d.rect("effectControls.lane");
-    d.gesture(from, from + egui::vec2(lane[2] as f32 * 0.1, 0.0), egui::Modifiers::NONE, Some("keyframes-mask-group"));
+    d.gesture(from, from + egui::vec2(lane[2] as f32 * 0.1, 0.0), egui::Modifiers::NONE, Some("keyframes-opacity-group"));
     let selected = &d.harness.state().ui.keyframe_selection;
     assert_eq!(selected.len(), 2);
     let delta = selected[0].time - keys[0].time;
     assert!(delta > Tick::ZERO);
     assert_eq!(selected[1].time - keys[1].time, delta);
     let it = d.harness.state().session.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1;
-    assert!(it.effects[keys[0].effect].masks[0].feather.keyframes.is_empty());
+    assert!(!it.effect("motion").unwrap().is_animated());
 }
 
 /// #962: graph points need the same interpolation menu as lane diamonds, including either
@@ -667,46 +658,6 @@ fn graph_keyframes_offer_interpolation_and_clear_in_one_undo_step() {
         assert_eq!(d.undo_len(), undo + 1);
         d.exec("edit.undo", json!({}));
         assert_eq!(d.parameter(&clip, effect, param), before);
-    }
-}
-
-#[test]
-fn mask_keyframe_menus_preserve_the_effect_and_other_masks() {
-    let (mut d, clip) = Driver::demo();
-    d.ok("ui.panel.show", json!({"panel": "Effects"}));
-    d.ok("ui.panel.show", json!({"panel": "Effect Controls"}));
-    for intrinsic in ["motion", "time_remap"] {
-        d.click(&format!("effectControls.effect.{intrinsic}.twirl"));
-    }
-    for mask in 0..2 {
-        d.exec("masks.add", json!({"clip": clip.id, "effect": "opacity", "shape": "ellipse"}));
-        for (seconds, value) in [(0.5, 20.0), (2.5, 60.0)] {
-            d.seek(seconds);
-            d.exec("effects.addKeyframe", json!({"clip": clip.id, "effect": "opacity", "mask": mask, "param": "feather"}));
-            d.exec("effects.setParam", json!({"clip": clip.id, "effect": "opacity", "mask": mask, "param": "feather", "value": value}));
-        }
-    }
-    let effect = |d: &Driver| d.harness.state().session.active_sequence().unwrap().find_item(ClipId(clip.id)).unwrap().1.effect("opacity").unwrap().clone();
-    let before = effect(&d);
-    let time = before.masks[0].param("feather").unwrap().keyframes[0].time.0;
-    let undo = d.undo_len();
-    for (target, key, interpolation) in [
-        (format!("effectControls.opacity.mask0.feather.keyframe.{time}"), "easeOut", Interpolation::EaseOut),
-        (format!("effectControls.feather.graph.keyframe.{time}"), "easeIn", Interpolation::EaseIn),
-    ] {
-        if key == "easeIn" {
-            d.click("effectControls.opacity.mask0.feather.graphs");
-        }
-        d.right_click(&target);
-        assert_eq!(effect(&d), before, "opening the menu cannot change any mask");
-        assert_eq!(d.undo_len(), undo);
-        d.click(&format!("effectControls.keyframeMenu.{key}"));
-        let mut expected = before.clone();
-        expected.masks[0].param_mut("feather").unwrap().keyframes[0].interp = interpolation;
-        assert_eq!(effect(&d), expected, "only the first mask's first feather keyframe changes");
-        assert_eq!(d.undo_len(), undo + 1);
-        d.exec("edit.undo", json!({}));
-        assert_eq!(effect(&d), before);
     }
 }
 

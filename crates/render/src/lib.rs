@@ -20,13 +20,12 @@ pub mod gpufx;
 pub mod graphic_clip;
 pub mod graphics;
 pub mod image;
-pub mod mask;
 pub mod mixer;
+mod motion_analysis;
 pub mod offline;
 pub mod plan;
 pub mod preview;
 pub mod remix;
-pub mod track;
 pub mod transitions;
 pub mod vfx;
 
@@ -330,7 +329,7 @@ fn identity_placement(m: &Affine) -> bool {
 }
 
 /// [`item_layer`], which may also hand back only the non-transparent rectangle of a layer
-/// (`allow_region`): for a clip of plain media (no effects, no masks, no speed blending, no colour
+/// (`allow_region`): for a clip of plain media (no effects, no speed blending, no colour
 /// management, placed as it is) whose frame carries an alpha plane, only the part where alpha is not
 /// zero is converted and mixed, the rest of the layer being transparent anyway; and a frame
 /// without alpha is known to be opaque.
@@ -355,7 +354,7 @@ pub(crate) fn item_layer_ex(
     let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
     let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
     let pi = project.item(item.item)?;
-    if matches!(pi.kind, ItemKind::Graphic { .. }) && !(item.has_opacity_masks() || opts.effects && item.has_standard_effects()) {
+    if matches!(pi.kind, ItemKind::Graphic { .. }) && !(opts.effects && item.has_standard_effects()) {
         // vectors straight to the output: no resampling, crisp at any Motion scale
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
         let mut canvas = Image::new(w, h);
@@ -364,7 +363,7 @@ pub(crate) fn item_layer_ex(
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
     if let ItemKind::Drawing(d) = &pi.kind
-        && !(item.has_opacity_masks() || opts.effects && item.has_standard_effects())
+        && !(opts.effects && item.has_standard_effects())
     {
         // strokes straight to the output, like graphics
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
@@ -376,9 +375,7 @@ pub(crate) fn item_layer_ex(
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
     // plain media: nothing but the frame itself reaches the output
-    let plain_media = matches!(pi.kind, ItemKind::Media(_) | ItemKind::Subclip { .. })
-        && !(opts.effects && item.has_standard_effects())
-        && !item.effect("opacity").is_some_and(|e| e.enabled && !e.masks.is_empty());
+    let plain_media = matches!(pi.kind, ItemKind::Media(_) | ItemKind::Subclip { .. }) && !(opts.effects && item.has_standard_effects());
     let mut fetched = None;
     if allow_region && plain_media {
         let (src, frame, n) = media_frame(item, t, sources, want, src_size)?;
@@ -418,10 +415,9 @@ pub(crate) fn item_layer_ex(
             if waltcut_media::cancel::cancelled() {
                 return None;
             }
-            mask::apply_effect(&mut layer, e, &cx);
+            effects::apply(&mut layer, e, &cx);
         }
     }
-    mask::apply_opacity_masks(&mut layer, item, mt, px_scale);
     let placed = if layer.w == w && layer.h == h && identity_placement(&m) { layer } else { layer.transformed(w, h, &m) };
     let (op, bl) = opacity_blend(item, mt);
     Some(Layer::Full { image: placed, opacity: op, blend: bl, opaque: false })

@@ -27,7 +27,7 @@
 use rayon::prelude::*;
 
 use crate::image::Image;
-use crate::track::Gray;
+use crate::motion_analysis::Gray;
 
 /// Widest luma image the flow is estimated on (larger frames are box-reduced to it first).
 pub const WORK_W: usize = 640;
