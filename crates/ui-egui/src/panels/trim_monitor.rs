@@ -285,16 +285,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     // ---- trim buttons
     let n = info["largeTrimOffset"].as_i64().unwrap_or(5);
     let bar = Rect::from_min_size(pos2(rect.min.x, row.max.y + 6.0), vec2(rect.width(), 28.0));
-    let buttons: [(&str, String, &str, f32); 6] = [
-        ("trimMonitor.playAround", String::new(), tl!("Play Around Edit (Space loops, Shift+K once)"), 30.0),
-        ("trimMonitor.backwardMany", format!("−{n}"), tl!("Trim Backward Many"), 40.0),
-        ("trimMonitor.backward", "−1".into(), tl!("Trim Backward"), 40.0),
-        ("trimMonitor.applyTransition", tl!("Apply Default Transitions").into(), tl!("Apply Default Transitions to Selection (Shift+D)"), 176.0),
-        ("trimMonitor.forward", "+1".into(), tl!("Trim Forward"), 40.0),
-        ("trimMonitor.forwardMany", format!("+{n}"), tl!("Trim Forward Many"), 40.0),
+    let buttons: [(&str, String, &str, f32); 5] = [
+        ("trimMonitor.playAround", String::new(), "Play Around Edit (Space loops, Shift+K once)", 30.0),
+        ("trimMonitor.backwardMany", format!("−{n}"), "Trim Backward Many", 40.0),
+        ("trimMonitor.backward", "−1".into(), "Trim Backward", 40.0),
+        ("trimMonitor.forward", "+1".into(), "Trim Forward", 40.0),
+        ("trimMonitor.forwardMany", format!("+{n}"), "Trim Forward Many", 40.0),
     ];
-    let buttons: Vec<_> =
-        buttons.into_iter().filter(|b| b.0 != "trimMonitor.applyTransition" || app.session.is_enabled("trim.applyDefaultTransition")).collect();
     let total: f32 = buttons.iter().map(|b| b.3 + 4.0).sum();
     let mut x = bar.center().x - total / 2.0;
     let ctx = ui.ctx().clone();
@@ -323,7 +320,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 "trimMonitor.backward" => app.session.execute("trim.backward", json!({})),
                 "trimMonitor.forward" => app.session.execute("trim.forward", json!({})),
                 "trimMonitor.forwardMany" => app.session.execute("trim.forwardMany", json!({})),
-                _ => app.session.execute("trim.applyDefaultTransition", json!({})),
+                _ => continue,
             };
             if let Err(e) = res {
                 app.ui.status = e.to_string();

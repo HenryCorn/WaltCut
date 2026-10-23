@@ -10,8 +10,6 @@
 use waltcut_project::{ClipId, Sequence, Track, TrackId, TrackItem};
 use waltcut_time::{Tick, TimeRange};
 
-use crate::remove_orphan_transitions;
-
 /// Media-time slack when comparing the pieces of a cut (speed changes round each piece's source
 /// range to whole ticks).
 const MEDIA_SLACK: i64 = 2;
@@ -57,7 +55,7 @@ pub fn through_edits(seq: &Sequence) -> Vec<ThroughEdit> {
 
 /// Join through edits on unlocked tracks. With `only` non-empty, just the edits whose left or right
 /// piece is listed. The left piece absorbs the right one (keeping its own effects and attributes);
-/// a transition sitting on the cut is removed. Returns the number of edits joined.
+/// returns the number of edits joined.
 pub fn join_through_edits(seq: &mut Sequence, only: &[ClipId]) -> usize {
     join_through_edits_where(seq, |a, b| only.is_empty() || only.contains(&a) || only.contains(&b))
 }
@@ -76,7 +74,6 @@ pub fn join_through_edits_where(seq: &mut Sequence, wanted: impl Fn(ClipId, Clip
                 i += 1;
                 continue;
             }
-            let (aid, bid) = (a.id, b.id);
             let (dur, b_source_in) = (b.duration, b.source_in);
             let left = &mut tr.items[i];
             left.duration += dur;
@@ -85,18 +82,8 @@ pub fn join_through_edits_where(seq: &mut Sequence, wanted: impl Fn(ClipId, Clip
                 left.source_in = b_source_in;
             }
             tr.items.remove(i + 1);
-            tr.transitions.retain(|t| !(t.from == Some(aid) && t.to == Some(bid)));
-            for t in &mut tr.transitions {
-                if t.from == Some(bid) {
-                    t.from = Some(aid);
-                }
-                if t.to == Some(bid) {
-                    t.to = Some(aid);
-                }
-            }
             n += 1;
         }
-        remove_orphan_transitions(tr);
     }
     n
 }

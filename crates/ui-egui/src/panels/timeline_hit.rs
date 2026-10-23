@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 
 use egui::{Modifiers, Pos2, Rect, pos2, vec2};
 use waltcut_edit::Edge;
-use waltcut_project::{ClipId, Sequence, Track, TrackId, TransitionId};
+use waltcut_project::{ClipId, Sequence, Track, TrackId};
 use waltcut_time::Tick;
 
 use super::timeline::Layout;
@@ -51,21 +51,8 @@ pub(crate) fn edge_geometry(seq: &Sequence, layout: &Layout, track: TrackId, cli
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Hit {
     Ruler,
-    Clip {
-        track: TrackId,
-        clip: ClipId,
-        edge: Option<Edge>,
-    },
-    /// A transition; `edge` is its start (`In`) or end (`Out`) when the press is on one of its
-    /// ends (dragging it changes the duration), `None` on its middle (dragging slides it).
-    Transition {
-        track: TrackId,
-        id: TransitionId,
-        edge: Option<Edge>,
-    },
-    Empty {
-        track: TrackId,
-    },
+    Clip { track: TrackId, clip: ClipId, edge: Option<Edge> },
+    Empty { track: TrackId },
     None,
 }
 
@@ -105,22 +92,6 @@ pub fn hit(seq: &Sequence, layout: &Layout, pos: Pos2) -> Hit {
     }
     let Some(row) = layout.row_at(pos.y) else { return Hit::None };
     let Some(tr) = seq.track(row.track) else { return Hit::None };
-    for trn in &tr.transitions {
-        let x0 = layout.x_of(trn.start);
-        let x1 = layout.x_of(trn.end());
-        if pos.x >= x0 && pos.x <= x1 && pos.y > row.rect.min.y + 17.0 {
-            // the ends are edge zones, narrower on a short transition so its middle stays grabbable
-            let zone = EDGE_PX.min((x1 - x0) / 3.0);
-            let edge = if pos.x - x0 <= zone {
-                Some(Edge::In)
-            } else if x1 - pos.x <= zone {
-                Some(Edge::Out)
-            } else {
-                None
-            };
-            return Hit::Transition { track: row.track, id: trn.id, edge };
-        }
-    }
     if let Some((clip, edge)) = edge_at(tr, layout, pos.x) {
         return Hit::Clip { track: row.track, clip, edge: Some(edge) };
     }
@@ -225,7 +196,7 @@ pub enum Grab {
         track: TrackId,
         clip: ClipId,
     },
-    /// Not an edge this tool trims: a clip body, a transition, an empty track, the ruler or
+    /// Not an edge this tool trims: a clip body, an empty track, the ruler or
     /// nothing. A clip's `edge` may still be set, for tools that do something else there (Razor,
     /// Slip…).
     Other(Hit),
@@ -295,7 +266,7 @@ mod tests {
 
     use crate::panels::timeline::Row;
 
-    /// The row's top. Points are hit-tested 10 px below it, above where transitions are hit.
+    /// The row's top. Points are hit-tested 10 px below it.
     const TOP: f32 = 100.0;
 
     /// A clip on screen from `x0` to `x1` px (the layout is 100 px per second).
@@ -344,7 +315,7 @@ mod tests {
         let layout = Layout {
             content: row,
             ruler: Rect::from_min_max(pos2(0.0, 0.0), pos2(2000.0, 40.0)),
-            rows: vec![Row { track, kind: TrackKind::Video, index: 0, rect: row, lane: false }],
+            rows: vec![Row { track, kind: TrackKind::Video, index: 0, rect: row }],
             pps: 100.0,
             scroll: 0.0,
             split_y: TOP + 60.0,

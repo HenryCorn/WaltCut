@@ -9,7 +9,6 @@
       "video_display": "Timecode",
       "audio_display_samples": true,
       "default_still_duration": 1270080000000,
-      "default_audio_transition_duration": 254016000000,
       "title_safe": [
         20.0,
         20.0
@@ -131,7 +130,6 @@
               "sample_rate": 48000,
               "drop_frame": false,
               "preset": "HD 1080p 23.976",
-              "audio_master": "Stereo",
               "preview_codec": "ProRes 422",
               "max_bit_depth": false,
               "max_render_quality": false,
@@ -232,22 +230,11 @@
                     "scale_to_frame": false
                   }
                 ],
-                "transitions": [],
                 "locked": false,
                 "sync_lock": true,
                 "enabled": true,
                 "muted": false,
-                "solo": false,
-                "channels": "Stereo",
-                "volume_db": 0.0,
-                "pan": 0.0,
-                "effects": [],
-                "mixer": {
-                  "mode": "Read",
-                  "output": null,
-                  "solo_safe": false,
-                  "input_map": "Stereo"
-                }
+                "channels": "Stereo"
               }
             ],
             "audio_tracks": [
@@ -285,38 +272,6 @@
                             }
                           }
                         }
-                      },
-                      {
-                        "effect": "channel_volume",
-                        "enabled": true,
-                        "params": {
-                          "bypass": {
-                            "value": {
-                              "Bool": false
-                            }
-                          },
-                          "left": {
-                            "value": {
-                              "Float": 0.0
-                            }
-                          },
-                          "right": {
-                            "value": {
-                              "Float": 0.0
-                            }
-                          }
-                        }
-                      },
-                      {
-                        "effect": "panner",
-                        "enabled": true,
-                        "params": {
-                          "balance": {
-                            "value": {
-                              "Float": 0.0
-                            }
-                          }
-                        }
                       }
                     ],
                     "markers": [],
@@ -325,22 +280,11 @@
                     "scale_to_frame": false
                   }
                 ],
-                "transitions": [],
                 "locked": false,
                 "sync_lock": true,
                 "enabled": true,
                 "muted": false,
-                "solo": false,
-                "channels": "Stereo",
-                "volume_db": 0.0,
-                "pan": 0.0,
-                "effects": [],
-                "mixer": {
-                  "mode": "Read",
-                  "output": null,
-                  "solo_safe": false,
-                  "input_map": "Stereo"
-                }
+                "channels": "Stereo"
               }
             ],
             "markers": [
@@ -357,16 +301,7 @@
             "mark_in": null,
             "mark_out": null,
             "work_area": null,
-            "start_timecode": 0,
-            "master_volume_db": 0.0,
-            "master_effects": [],
-            "master_mixer": {
-              "mode": "Read",
-              "output": null,
-              "solo_safe": false,
-              "input_map": "Stereo"
-            },
-            "submix_tracks": []
+            "start_timecode": 0
           }
         },
         "metadata": {},

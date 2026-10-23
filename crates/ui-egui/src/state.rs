@@ -205,10 +205,6 @@ pub struct TimelineView {
     /// fits again, unless the zoom was changed in between.
     #[serde(skip)]
     pub fit_empty: Option<f64>,
-    /// Audio tracks showing track keyframes instead of clip keyframes: track id → lane
-    /// (`volume`, `pan`, `mute`, `send.<i>.level`, `fx.<slot>.<param>`).
-    #[serde(default)]
-    pub track_lanes: std::collections::BTreeMap<u64, String>,
 }
 
 impl TimelineView {
@@ -238,7 +234,6 @@ impl Default for TimelineView {
             fit_pending: true,
             seen_playhead: None,
             fit_empty: None,
-            track_lanes: Default::default(),
         }
     }
 }
@@ -475,12 +470,6 @@ pub struct UiState {
     /// Settings dialog (open when Some): page and the values being edited.
     #[serde(default)]
     pub settings: Option<crate::panels::settings::SettingsDraft>,
-    /// Audio Track Mixer: effects and sends section expanded.
-    #[serde(default)]
-    pub mixer_fx_open: bool,
-    /// Audio Track Mixer ▸ Show/Hide Tracks: strip ids (audio tracks, submixes) not shown.
-    #[serde(default)]
-    pub mixer_hidden: Vec<u64>,
     /// Audio Gain dialog draft (mode, dB values).
     #[serde(default)]
     pub audio_gain: AudioGainDraft,
@@ -493,9 +482,6 @@ pub struct UiState {
     /// Sequence Settings dialog draft.
     #[serde(default)]
     pub sequence_settings: SequenceSettingsDraft,
-    /// Set Transition Duration dialog draft (double-click a transition).
-    #[serde(default)]
-    pub transition_duration: TransitionDurationDraft,
     /// On-monitor text editing (Type tool / double-click on a text layer).
     #[serde(default)]
     pub gfx_edit: Option<GfxEdit>,
@@ -514,9 +500,6 @@ pub struct UiState {
     /// Effect presets: the preset being renamed / the Save Preset dialog (open when Some).
     #[serde(default)]
     pub save_preset: Option<SavePresetDraft>,
-    /// Open Clip / Track Fx Editor windows (graphical audio-effect editors).
-    #[serde(default)]
-    pub audio_fx_editors: Vec<crate::panels::audio_fx_editor::FxTarget>,
     /// Open guide dialog (Add Guide / Save Guides as Template / Manage Guides).
     #[serde(default)]
     pub guide_dialog: Option<GuideDialog>,
@@ -635,19 +618,15 @@ pub enum ColorDialog {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AudioGainDraft {
-    /// "set" | "adjust" | "normalizeMax" | "normalizeAll"
+    /// "set" | "adjust"
     pub mode: String,
     pub set_db: f64,
     pub adjust_db: f64,
-    pub max_peak_db: f64,
-    pub all_peaks_db: f64,
 }
 
-/// The Add Tracks dialog (Sequence ▸ Add Tracks…): for video, audio and audio submix tracks, how
-/// many to add and where (`*_after`: how many tracks of the kind come before the new ones; 0 is
-/// "Before First Track"), and the type of the audio and submix tracks (`standard` / `stereo`,
-/// `5.1`, `adaptive`, `mono`). Premiere's defaults: one video track and one audio track after the
-/// last ones, no submix track.
+/// The Add Tracks dialog (Sequence ▸ Add Tracks…): for video and audio tracks, how many to add
+/// and where (`*_after`: how many tracks of the kind come before the new ones; 0 is
+/// "Before First Track"), and whether audio tracks are stereo or mono.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AddTracksDraft {
@@ -656,33 +635,21 @@ pub struct AddTracksDraft {
     pub audio: u32,
     pub audio_after: usize,
     pub audio_type: String,
-    pub submix: u32,
-    pub submix_after: usize,
-    pub submix_type: String,
 }
 
 impl Default for AddTracksDraft {
     fn default() -> Self {
-        Self { video: 1, video_after: 0, audio: 1, audio_after: 0, audio_type: "standard".into(), submix: 0, submix_after: 0, submix_type: "stereo".into() }
+        Self { video: 1, video_after: 0, audio: 1, audio_after: 0, audio_type: "stereo".into() }
     }
-}
-
-/// The Set Transition Duration dialog (double-click a transition in the Timeline): which
-/// transition, and its duration in frames.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct TransitionDurationDraft {
-    pub transition: u64,
-    pub frames: i64,
 }
 
 /// The Sequence Settings dialog (Sequence ▸ Sequence Settings…), filled from the active sequence
 /// when it opens (`panels::sequence_settings::open`). `tab`: `general`, `color` or `vr`; the
-/// timebase is `fps_num`/`fps_den`; `mix`: `Stereo`, `Mono`, `5.1` or `Adaptive`; `working_space`:
+/// timebase is `fps_num`/`fps_den`; `working_space`:
 /// a [`waltcut_color::WorkingSpace`] id. `scale_motion` is "Scale motion effects proportionally
 /// when changing frame size", on by default as in Premiere.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SequenceSettingsDraft {
     pub tab: String,
     /// The sequence's name (its Project panel item); a blank name keeps the current one.
@@ -698,7 +665,6 @@ pub struct SequenceSettingsDraft {
     pub height: u32,
     pub scale_motion: bool,
     pub drop_frame: bool,
-    pub mix: String,
     pub sample_rate: u32,
     pub max_render_quality: bool,
     pub working_space: String,
@@ -720,7 +686,6 @@ impl Default for SequenceSettingsDraft {
             height: 1080,
             scale_motion: true,
             drop_frame: false,
-            mix: "Stereo".into(),
             sample_rate: 48_000,
             max_render_quality: false,
             working_space: "rec709".into(),
@@ -797,7 +762,7 @@ impl Default for UiState {
             project_search: String::new(),
             effects_search: String::new(),
             expanded_bins: vec![],
-            expanded_fx: vec!["Audio Effects".into()],
+            expanded_fx: Vec::new(),
             collapsed_fx: vec![],
             effect_controls_split: 0.0,
             show_menu_bar: true,
@@ -810,21 +775,17 @@ impl Default for UiState {
             keyframe_selection: Vec::new(),
             export: Default::default(),
             play_after_render: true,
-            mixer_fx_open: false,
-            mixer_hidden: Vec::new(),
             settings: None,
             audio_gain: AudioGainDraft::default(),
             add_tracks: AddTracksDraft::default(),
             delete_tracks: DeleteTracksDraft::default(),
             sequence_settings: SequenceSettingsDraft::default(),
-            transition_duration: TransitionDurationDraft::default(),
             gfx_edit: None,
             pen_points: vec![],
             link_media: None,
             make_offline: None,
             color_dialog: None,
             save_preset: None,
-            audio_fx_editors: Vec::new(),
             guide_dialog: None,
             text_props_dialog: None,
             workspace_dialog: None,

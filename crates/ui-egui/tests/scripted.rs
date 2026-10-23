@@ -501,14 +501,10 @@ fn effects_panel_omits_removed_video_catalogue() {
     d.ok("ui.panel.show", json!({"panel": "Effects"}));
     d.frames(3);
     let folders = d.element_ids("effects.folder.");
-    assert!(folders.iter().all(|f| !f.contains("Video Effects") && !f.contains("Video Transitions")));
-    for removed in ["gaussian", "dissolve", "crop", "legacy"] {
+    assert!(folders.iter().all(|f| f == "effects.folder.Presets"));
+    for removed in ["gaussian", "dissolve", "crop", "legacy", "denoise", "constant power"] {
         d.ok("ui.set", json!({"effectsSearch": removed}));
         d.frames(3);
         assert!(d.element_ids("effects.item.").is_empty(), "{removed}");
     }
-    d.ok("ui.set", json!({"effectsSearch": "denoise"}));
-    d.frames(3);
-    let noise = d.ok("ui.elements", json!({"prefix": "effects.folder.Audio Effects/Noise Reduction/Restoration"}));
-    assert_eq!(noise[0]["label"], json!("Noise Reduction/Restoration"));
 }

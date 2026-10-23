@@ -31,14 +31,15 @@ macOS before merge. Native `cargo test -p xtask --quiet` (6 tests) and
 | Keyframe navigator and Effect Controls ruler | `crates/engine/src/tests.rs` (`add_keyframe_toggles_the_keyframe_at_the_playhead`), `crates/ui-egui/tests/keyframes_ui.rs`, `lane_tests` in `crates/ui-egui/src/panels/effect_controls.rs` | `effects.addKeyframe` adds a keyframe at the playhead or removes the one there (the value falls back to the remaining keyframes; undo, redo, parameters that name nothing); headless: the Properties diamond turns animation on, adds and removes the keyframe at the playhead (Scale 50 % → 100 % again), its ◀ ▶ arrows and Effect Controls' step between keyframes, Crop is applied before its first keyframe; a click on the Effect Controls time ruler and a drag of the playhead's handle move the playhead, and no playhead is drawn off the clip; ruler labels are sequence timecode, and clip times, frame rates and panel widths at their limits don't panic (`FILMCRAFT_UI_SHOTS=<dir>` writes `keyframes-*.png`) |
 | Golden images | `crates/golden/tests/golden.rs` | CPU renders vs committed PNGs; GPU vs CPU on the same scenes (§3) |
 | Engine / command | `crates/engine/src/tests.rs` | run commands on the demo project, assert the sequence, undo/redo, disabled cases |
-| Render | `crates/render/src/tests.rs` | compositing, opacity, Motion, cross dissolve midpoint, ½-res vs full, GPU plan vs reference, audio mix, audio-effect continuity |
+| Render | `crates/render/src/tests.rs` | compositing, opacity, Motion, ½-res vs full, GPU plan vs reference, retained mono/stereo audio mix |
 | Project panel (M12.7) | `crates/engine/src/project_panel_tests.rs`, `crates/ui-egui/tests/project_panel_ui.rs` | view settings and their preference round trip; Metadata Display columns (custom fields, Freeform keys hidden), numeric vs text sorting, view presets (save / save as / restore / rename / delete, ten slots, persisted in `preferences.json`); Freeform moves keeping offsets, snapping, Align to Grid, Clip Size, stacks, arrangements, Reset (each one undo step, saved in the project); bin rename / nesting; the Media Browser against a fake filesystem (folders first, hidden and unsupported files left out, file-type filter, back / forward / up, recent directories, Favorites, import of a selection or a folder, Open in Source Monitor, ingest, probe columns). Headless: List view (sort by header, drag a column wider, inline rename), Icon view (hover scrub + I / O set the clip's In / Out, Shift+] / [), Freeform (drag a card, stack from the card menu, options dialog), panel menu, Metadata Display dialog, view presets, bins in place / tab / window, footer buttons, Media Browser navigation, Favorites, import, Shift+O, Edit Columns…, thumbnails, drag to the Timeline (`FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` writes `project-*.png`, `media-browser-*.png`) |
 | Menu long tail (M3.11) | `crates/engine/src/{sequence_extras,project_tools}_tests.rs`, `crates/project/src/find.rs`, `crates/ui-egui/tests/menus_ui.rs` | Normalize Mix Track to a target peak; Simplify Sequence; Find / Find Next and search bins; Automate to Sequence (overlap, transitions, insert, unnumbered markers); Project Settings and scratch disks; menu order and shortcuts against the documented order; the dialogs by automation id |
 | Mixer | `crates/render/src/mixer_tests.rs`, `crates/engine/src/mixer_tests.rs` | sample-exact fader gain and pan laws, automation at block boundaries (bit-identical however requests are cut), solo/mute/solo-safe, sends and submix routing, latency-compensation alignment, render-vs-playback identity, Touch ramp-back, recorder modes (Latch/Touch/Write), thinning, Audio Gain, transition curves; `perf_24_tracks_3_effects_realtime_factor` prints the realtime factor |
 | 5.1 / multichannel | `crates/audio-dsp/src/channels.rs`, `crates/render/src/mixer_tests.rs`, `crates/export/src/surround_tests.rs`, `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | BS.775 downmix / upmix coefficients exact, mixdown types; 5.1 panner point gains equal-power (Σg² = 1 over a 21×21 grid × 3 centre settings), speaker positions exact, 5.1 through the default puck bit-exact identity; graph: stereo/mono tracks into a 5.1 Mix (L/R, C, rear right, room centre −6 dB each, LFE = mean), 5.1 track through a 5.1 Mix and folded into stereo, a 5.1 submix, `pan51` automation block-invariant, six-channel meters; export: 6-ch WAV (`WAVE_FORMAT_EXTENSIBLE`, mask 0x3F) and ProRes MOV (6 × 24-bit PCM) decoded by ffmpeg **sample-exact**, ffprobe `channels` 6 / `channel_layout` 5.1; AAC 5.1 in MP4: every decoded channel's own tone ≥ 30 dB above the others' (no swapped channels), stereo export of a 5.1 Mix = BS.775 within 2·10⁻⁶; `sequence.settings {mix}`, `file.newSequence {mix, trackType}`, panner lanes, Write pass records the puck; UI: puck drag (one undo step), Center / LFE, six meter bars |
 | Audio Clip Mixer automation, Track Mixer view | `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | Touch: a 201-point fader ramp thins to ≤ 6 clip keyframes, values within 0.1 dB, live override while held, values outside the gesture unchanged, one undo step; Latch holds until stop; Write records volume and pan from the start; a gesture across two clips writes both; Read commits once without a pass; UI: Clip Mixer mode dropdown, a recorded fader drag writes clip keyframes; Show/Hide Tracks, Meter Input(s) Only, transport record button |
 | Removed capture (#23 draft) | `crates/engine/src/audio_reduction_tests.rs`, existing `paste_media_tests.rs` and scratch-folder tests | recording commands reject hostile parameters without project/preference mutation; pasted images retain trusted scratch-folder selection. Cross-typechecked; execution pending macOS. |
-| Retained timing audio (#23 draft) | `crates/ui-egui/tests/audio_timing.rs` | synthetic stereo WAV import and placement with source In and timeline offset; existing production playback callback hears unity, half-volume, mute, unmute and restored gain across live edits and irregular block boundaries; a real float WAV export of a nonzero-start range is decoded and checked sample by sample, including exact duration and silence outside the clip; removed tool rejected. Cross-typechecked on Windows, **execution pending on macOS**, not claimed passing. |
+| Removed audio processing (#23 draft) | `engine/src/audio_reduction_tests.rs`, `project/src/effect.rs`, `format/tests/fixtures.rs` (under `crates/`) | Removed effect/transition commands and IDs, insert flags, project transition data, unused sequence Mix parameters and multichannel source maps reject malformed/hostile requests without project/history/state mutation. Current golden project contains only retained fields; pre-reduction fixtures still prove explicit refusal. Native execution pending. |
+| Retained timing audio (#23 draft) | `crates/ui-egui/tests/audio_timing.rs` | generated mono/stereo WAV import, source In and timeline offset; actual live callback plus decoded written float WAV samples checked for Audio Gain, mute/unmute, additive intrinsic Volume, bypass/disable, selected mono channel, silence floor and sample-accurate keyframes across irregular blocks; exact export duration and silence outside the clip. Cross-target typechecked; **native macOS execution pending**, not claimed passing. |
 | Oracle | `crates/*/tests/*oracle*.rs`, `conformance.rs` | compare with ffmpeg/ffprobe (§2) |
 | Robustness / fuzz | `*/tests/robustness.rs`, `*/tests/fuzz.rs` | seeded mutation and truncation of real and synthetic files; nothing may panic |
 | Program monitor while dragging | `crates/ui-egui/tests/perf_ui.rs` | headless: a parameter changed on every UI pass (a value dragged in Effect Controls or Properties) and a backward scrub leave the Program monitor's picture at most one step behind (it shows the frame asked for the pass before while the frame due renders; it used to freeze until the mouse rested); a frame still rendering is kept when the same frame is asked for at a newer revision, so frames slower than a refresh (CPU effects) are shown too; `perf.stats` reports the picture's frame and revision against the playhead and the project |
@@ -148,8 +149,8 @@ Each codec README has the full fixture matrix and the measured results.
   sRGB levels; `Tolerance::RENDER`). On failure the actual frame and a ×8 difference image go to
   `<workspace>/target/golden-failures/`. `scenes_are_distinct` guards against blank or duplicate
   scenes. Removed video effects/transitions have no retained goldens, contact sheets or fixtures.
-  Negative registry/command/persistence tests reject their IDs. Audio crossfades remain tested
-  through the mixer and shared transition editing until #23.
+  Negative registry/command/persistence tests reject their IDs. The narrower #23 draft also removes
+  audio crossfades and their tests; negative audio registry/command/persistence tests remain.
 - **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
   References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
@@ -177,20 +178,18 @@ next frame by the app's own `raw_input_hook`, so clicks by automation id work he
 | `demo_project_opens_headless_and_registers_widgets` | active sequence, > 50 registered widgets, panel and tool ids, 6 clips on V1 (`sequence.inspect`) |
 | `razor_then_undo_through_the_control_channel` | `timeline.razor` adds a clip, the timeline can locate it on screen, `edit.undo` via `ui.menu.invoke`, redo |
 | `insert_from_source_ripples_the_sequence` | `source.open` + marks + `source.insert` lengthens the sequence |
-| `effects_panel_omits_removed_video_catalogue` | Video catalogue folders and entries are absent; retained audio folders still work |
+| `effects_panel_omits_removed_video_catalogue` | Video and audio catalogue/transition folders and entries are absent; only retained presets remain |
 | `playback_toggle_and_stop` | `playback.toggle` / `ui.playback stop` and `ui.inspect` playback state |
 | `clicking_a_tool_button_by_automation_id` | `ui.click {id: "tools.Razor"}` changes the tool (real egui input path) |
 | `unknown_methods_and_commands_fail_cleanly` | errors come back as `{"ok": false}` |
 
-`crates/ui-egui/tests/mixer_ui.rs` drives the Audio Track Mixer, Audio Clip Mixer, timeline track
-keyframes and the Audio Gain dialog by automation id and with multi-frame pointer drags (press, move
-over several frames, release). With `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` it also renders the window
-offscreen through wgpu (`Harness::render`) and writes `mixer-*.png`; this works without a visible
-window (for example on a locked screen, where `ui.screenshot` cannot capture).
+The mixer UI tests were deleted with the mixer/automation slice; they no longer describe shipped
+panels or current coverage. The Audio Gain dialog remains, while its normalization options were
+removed. No mixer visual acceptance is claimed.
 `crates/ui-egui/tests/clip_audio_ui.rs` covers the audio of video clips (#223): the linked audio's
-Volume, Channel Volume and Panner in Effect Controls and Properties, and the Volume line on audio
-clips in the Timeline (a drag is one undo step, Pen-tool keyframes, keyframe drags, a click or
-right-click on the line still reaches the clip; `FILMCRAFT_UI_SHOTS=<dir>` writes `volume-*.png`).
+Volume in Effect Controls/Properties and absent channel-volume/panner rows. The timeline line
+edits independent static Audio Gain without changing Volume keyframes; drag/undo, click and
+right-click remain covered (`FILMCRAFT_UI_SHOTS=<dir>` writes `volume-*.png`).
 
 The Essential Sound slice of #23 deletes its feature-only engine/UI/ducking tests along with the
 implementation. `engine::audio_reduction_tests` now checks that every removed command rejects
@@ -199,13 +198,16 @@ undo/redo or jobs; removed preferences reject writes. Project tests check absent
 rejection of removed clip/effect fields. The scripted UI test checks the absent panel, commands
 and automation ids without project or layout edits.
 
-Retained general audio-effect tests and `crates/ui-egui/tests/audio_timing.rs` remain: the latter
-compares production playback callback samples and float WAV exports with generated stereo input,
-including timing, gain and live track mute/unmute. Platform-independent `audio-dsp` tests can run
+The narrower orphan-processing slice removes audio-effect/transition tests and fixture generation
+with their implementations, not the shared Motion/Opacity/graphic keyframe tests.
+`crates/ui-egui/tests/audio_timing.rs` compares production callback samples and float WAV exports
+with generated mono/stereo input, including timing, source In, gain, live mute/unmute,
+additive keyframed Volume, bypass/disable and channel selection. Platform-independent DSP tests run
 on Windows; engine/media/UI tests require macOS and are only cross-typechecked here with
 `cargo clippy --workspace --all-targets --target aarch64-apple-darwin --quiet -- -D warnings`.
 Native `cargo xtask ci`, actual sample-test execution and the animation-flow control-channel
-screenshot are still pending. This stacked #23 draft is not complete or merged.
+screenshot are still pending. Status: **DRAFT IMPLEMENTATION — native macOS acceptance pending**.
+This stacked #23 draft is not complete, accepted or merged.
 
 `crates/ui-egui/tests/export_ui.rs` drives Export mode: the settings column and Summary, editing a
 setting turning the preset into Custom, the Preset Manager (search, favourite star, save, apply,

@@ -8,8 +8,7 @@
 //!   Saving with `keyframes: "none"` stores every parameter as its value at the playhead.
 //! - **Geometry.** Point parameters are in clip pixels; they are scaled by the
 //!   target / source frame-size ratio so a preset made on 4K media lands in the same place on HD.
-//! - **Intrinsic effects** (Motion, Opacity) replace the target clip's own instance;
-//!   standard effects are added before the intrinsic ones (render order), like `effects.apply`.
+//! - **Intrinsic effects** (Motion, Opacity, Volume) replace the target clip's own instance.
 //! - **Library.** Built-in presets are authored in code ([`builtin_presets`]); user presets persist
 //!   in `<data dir>/effect-presets.json`. Preset files (export/import) are JSON:
 //!   `{"format": "filmcraft.effect-presets", "version": 1, "presets": [EffectPreset…]}`.

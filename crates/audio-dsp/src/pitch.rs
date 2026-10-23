@@ -1,4 +1,4 @@
-//! Pitch shifter: phase vocoder with peak-region shifting and identity phase locking.
+//! Playback shuttle pitch correction: phase vocoder with peak-region shifting and identity phase locking.
 //!
 //! Every STFT frame (8× overlap) is analysed for spectral peaks; each peak's region of influence
 //! (down to the magnitude minima between peaks) is moved as a block so that the peak lands on

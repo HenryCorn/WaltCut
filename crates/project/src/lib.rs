@@ -2,7 +2,7 @@
 //!
 //! A [`Project`] owns a tree of bins and a flat map of [`ProjectItem`]s (media clips, sequences,
 //! synthetic items). A [`Sequence`] has video and audio [`Track`]s holding [`TrackItem`]s (clip
-//! instances) and [`Transition`]s. Everything is plain serde data; the engine wraps the project in an
+//! instances). Everything is plain serde data; the engine wraps the project in an
 //! `Arc` and edits copy-on-write, so undo snapshots and background readers are free.
 //!
 //! Time: timeline positions are sequence ticks; `source_in` is media time.
@@ -15,7 +15,6 @@ pub mod find;
 pub mod graphic;
 pub mod graphic_design;
 pub mod keyframe;
-pub mod mixer;
 
 use std::collections::BTreeMap;
 
@@ -28,7 +27,6 @@ pub use effect::{EffectDef, EffectInstance, EffectKind, ParamDef, ParamKind, eff
 pub use find::{FindOp, FindQuery, FindRow, SearchBin};
 pub use graphic_design::{CharStyle, GraphicMeta, LayerExtra, Pin, PinTarget, Roll, RollMode, SourceGraphic, StyleRun};
 pub use keyframe::{Interpolation, Keyframe, Param, ParamValue};
-pub use mixer::{AutomationMode, InputMap, MixerStrip, TrackSend};
 
 macro_rules! id_type {
     ($name:ident) => {
@@ -41,7 +39,6 @@ id_type!(ItemId);
 id_type!(BinId);
 id_type!(TrackId);
 id_type!(ClipId);
-id_type!(TransitionId);
 id_type!(MarkerId);
 
 /// Premiere-style label colours (names from the Label menu; values are our own).
@@ -169,10 +166,31 @@ pub struct Interpretation {
 
 /// Modify ▸ Audio Channels: the clip channel format and, per audio clip, the source channels it
 /// plays (0-based). A mono clip has one channel (played on both sides); a stereo clip two.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct AudioChannelMap {
     pub format: AudioChannels,
     pub clips: Vec<Vec<u16>>,
+}
+
+impl<'de> Deserialize<'de> for AudioChannelMap {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Data {
+            format: AudioChannels,
+            clips: Vec<Vec<u16>>,
+        }
+        let data = Data::deserialize(deserializer)?;
+        let width = match data.format {
+            AudioChannels::Mono => 1,
+            AudioChannels::Stereo => 2,
+            _ => return Err(serde::de::Error::custom("source mapping supports only mono/stereo clips")),
+        };
+        if data.clips.is_empty() || data.clips.len() > 64 || data.clips.iter().any(|channels| channels.is_empty() || channels.len() > width) {
+            return Err(serde::de::Error::custom("source mapping needs 1–64 mono/stereo source pairs"));
+        }
+        Ok(Self { format: data.format, clips: data.clips })
+    }
 }
 
 impl AudioChannelMap {
@@ -546,7 +564,7 @@ pub struct TrackItem {
     pub field_options: Option<FieldOptions>,
     /// Audio clips: the source channels this clip plays (0-based; one = mono on both sides, two =
     /// left/right). Empty = the first two channels (mono sources on both sides).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "deserialize_source_channels")]
     pub source_channels: Vec<u16>,
     /// Audio stream within the media container (0 = the primary stream).
     #[serde(default, skip_serializing_if = "is_zero_stream")]
@@ -555,6 +573,14 @@ pub struct TrackItem {
     /// ([`GraphicMeta`]). Schema v12.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graphic: Option<Box<GraphicMeta>>,
+}
+
+fn deserialize_source_channels<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<u16>, D::Error> {
+    let channels = Vec::<u16>::deserialize(deserializer)?;
+    if channels.len() > 2 {
+        return Err(serde::de::Error::custom("audio clips support only a mono/stereo source pair"));
+    }
+    Ok(channels)
 }
 
 /// Time interpolation for speed-changed clips (Clip ▸ Video Options ▸ Time Interpolation).
@@ -654,10 +680,6 @@ impl TrackItem {
     pub fn effect_mut(&mut self, id: &str) -> Option<&mut EffectInstance> {
         self.effects.iter_mut().find(|e| e.effect == id)
     }
-    /// Standard (non-intrinsic) effects applied, for the fx badge.
-    pub fn has_standard_effects(&self) -> bool {
-        self.effects.iter().any(|e| e.def().is_some_and(|d| !d.intrinsic) && !graphic::is_layer(e))
-    }
     /// The graphic layers (text / shape) of a graphic clip, in paint order (first = back).
     pub fn graphic_layers(&self) -> impl Iterator<Item = &EffectInstance> {
         self.effects.iter().filter(|e| graphic::is_layer(e))
@@ -678,70 +700,20 @@ fn param_eq_default(v: &ParamValue, d: &ParamValue) -> bool {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TransitionAlign {
-    #[default]
-    CenterAtCut,
-    StartAtCut,
-    EndAtCut,
-}
-
-/// A transition on a track. `at` is the cut point (or clip edge for single-sided transitions).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Transition {
-    pub id: TransitionId,
-    pub effect: EffectInstance,
-    /// Timeline range covered by the transition.
-    pub start: Tick,
-    pub duration: Tick,
-    /// Outgoing clip (left) and incoming clip (right); one may be None (fade from/to nothing).
-    pub from: Option<ClipId>,
-    pub to: Option<ClipId>,
-    pub align: TransitionAlign,
-    #[serde(default)]
-    pub reverse: bool,
-}
-
-impl Transition {
-    pub fn end(&self) -> Tick {
-        self.start + self.duration
-    }
-    pub fn range(&self) -> TimeRange {
-        TimeRange::new(self.start, self.duration)
-    }
-    /// Progress 0..1 at timeline `t`.
-    pub fn progress(&self, t: Tick) -> f64 {
-        if self.duration.0 <= 0 {
-            return 1.0;
-        }
-        (((t - self.start).0 as f64) / self.duration.0 as f64).clamp(0.0, 1.0)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Track {
     pub id: TrackId,
     pub kind: TrackKind,
     pub name: String,
     pub items: Vec<TrackItem>,
-    pub transitions: Vec<Transition>,
     pub locked: bool,
     pub sync_lock: bool,
     /// Video: eye (output) toggle. Audio: not muted.
     pub enabled: bool,
     pub muted: bool,
-    pub solo: bool,
     /// Audio track channel format.
     pub channels: AudioChannels,
-    /// Audio track volume (dB) and pan (-100..100) for the Track Mixer.
-    pub volume_db: f64,
-    pub pan: f64,
-    /// Track-level audio effects (mixer inserts, slots 1–5; `EffectInstance::post_fader` picks the side).
-    #[serde(default)]
-    pub effects: Vec<EffectInstance>,
-    /// Audio Track Mixer state: automation mode and lanes, sends, output.
-    #[serde(default)]
-    pub mixer: MixerStrip,
     /// Colour label tinting the track's header and lane background (`None` = no colour).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<Label>,
@@ -749,24 +721,7 @@ pub struct Track {
 
 impl Track {
     pub fn new(id: TrackId, kind: TrackKind, name: String) -> Self {
-        Self {
-            id,
-            kind,
-            name,
-            items: Vec::new(),
-            transitions: Vec::new(),
-            locked: false,
-            sync_lock: true,
-            enabled: true,
-            muted: false,
-            solo: false,
-            channels: AudioChannels::Stereo,
-            volume_db: 0.0,
-            pan: 0.0,
-            effects: Vec::new(),
-            mixer: MixerStrip::default(),
-            label: None,
-        }
+        Self { id, kind, name, items: Vec::new(), locked: false, sync_lock: true, enabled: true, muted: false, channels: AudioChannels::Stereo, label: None }
     }
     pub fn end(&self) -> Tick {
         self.items.iter().map(|i| i.end()).max().unwrap_or(Tick::ZERO)
@@ -785,7 +740,6 @@ impl Track {
     }
     pub fn sort(&mut self) {
         self.items.sort_by_key(|i| i.start);
-        self.transitions.sort_by_key(|t| t.start);
     }
     /// Invariant check: items do not overlap.
     pub fn check(&self) -> Result<(), String> {
@@ -806,17 +760,12 @@ impl Track {
     /// Only the value bounds that keep timeline arithmetic from overflowing (no structural rules
     /// such as overlap or positive duration); what a loaded project must satisfy.
     pub fn check_bounds(&self) -> Result<(), String> {
-        if self.kind == TrackKind::Video && !self.transitions.is_empty() {
-            return Err(format!("{}: video transitions are not supported", self.name));
-        }
         for item in &self.items {
+            if item.source_channels.len() > 2 {
+                return Err(format!("{}: item {:?} needs a mono/stereo source pair", self.name, item.id));
+            }
             if !bounded_time_range(item.start, item.duration) {
                 return Err(format!("{}: item {:?} is outside supported time bounds", self.name, item.id));
-            }
-        }
-        for transition in &self.transitions {
-            if !bounded_time_range(transition.start, transition.duration) {
-                return Err(format!("{}: transition {:?} is outside supported time bounds", self.name, transition.id));
             }
         }
         Ok(())
@@ -833,7 +782,6 @@ pub struct SequenceSettings {
     pub drop_frame: bool,
     /// Editing mode / preset name shown in the settings dialog.
     pub preset: String,
-    pub audio_master: AudioChannels,
     /// Preview file codec name.
     pub preview_codec: String,
     pub max_bit_depth: bool,
@@ -860,7 +808,6 @@ impl Default for SequenceSettings {
             sample_rate: 48_000,
             drop_frame: false,
             preset: "HD 1080p 23.976".into(),
-            audio_master: AudioChannels::Stereo,
             preview_codec: "ProRes 422".into(),
             max_bit_depth: false,
             max_render_quality: false,
@@ -962,19 +909,6 @@ pub struct Sequence {
     pub work_area: Option<TimeRange>,
     /// Timecode of the first frame (frames), "Start Time" in Sequence settings.
     pub start_timecode: i64,
-    /// Master audio volume (dB).
-    #[serde(default)]
-    pub master_volume_db: f64,
-    /// Mix track inserts (`EffectInstance::post_fader` picks the side).
-    #[serde(default)]
-    pub master_effects: Vec<EffectInstance>,
-    /// Mix track automation (`volume` lane) and mode.
-    #[serde(default)]
-    pub master_mixer: MixerStrip,
-    /// Audio submix tracks (no clips); tracks and sends route into them, they route to the Mix
-    /// or to a submix after them.
-    #[serde(default)]
-    pub submix_tracks: Vec<Track>,
     /// Split In/Out points (Markers ▸ Mark Split): per-channel overrides of `mark_in`/`mark_out`.
     #[serde(default, skip_serializing_if = "SplitMarks::is_empty")]
     pub split: SplitMarks,
@@ -1097,10 +1031,8 @@ pub struct ProjectSettings {
     pub renderer: String,
     pub video_display: waltcut_time::TimeDisplay,
     pub audio_display_samples: bool,
-    /// Kept for file compatibility; the editor uses Settings ▸ Timeline (user preferences) for
-    /// still and transition default durations, as Premiere does.
+    /// The editor uses Settings ▸ Timeline (user preferences) for the still default duration.
     pub default_still_duration: Tick,
-    pub default_audio_transition_duration: Tick,
     /// Project Settings ▸ General ▸ Action and Title Safe Areas: (horizontal, vertical) percent.
     #[serde(default = "title_safe_default")]
     pub title_safe: (f64, f64),
@@ -1146,7 +1078,6 @@ impl Default for ProjectSettings {
             video_display: waltcut_time::TimeDisplay::Timecode,
             audio_display_samples: true,
             default_still_duration: Tick(5 * TICKS_PER_SECOND),
-            default_audio_transition_duration: Tick(TICKS_PER_SECOND),
             title_safe: title_safe_default(),
             action_safe: action_safe_default(),
             capture_format: capture_format_default(),
@@ -1415,10 +1346,6 @@ impl Project {
             mark_out: None,
             work_area: None,
             start_timecode: 0,
-            master_volume_db: 0.0,
-            master_effects: Vec::new(),
-            master_mixer: MixerStrip::default(),
-            submix_tracks: Vec::new(),
             split: SplitMarks::default(),
         };
         for i in 0..v {
@@ -1691,6 +1618,28 @@ fn has_auto_point(e: &EffectInstance) -> bool {
 mod tests {
     use super::*;
     use waltcut_media::{DemoScene, MediaSource};
+
+    #[test]
+    fn source_channel_maps_accept_only_bounded_mono_stereo_pairs() {
+        for value in [serde_json::json!({"format": "Mono", "clips": [[1], [0]]}), serde_json::json!({"format": "Stereo", "clips": [[1, 0], [2]]})] {
+            let map: AudioChannelMap = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(map).unwrap(), value);
+        }
+        for value in [
+            serde_json::json!({"format": "Surround51", "clips": [[0, 1]]}),
+            serde_json::json!({"format": "Adaptive", "clips": [[0, 1]]}),
+            serde_json::json!({"format": "Mono", "clips": [[0, 1]]}),
+            serde_json::json!({"format": "Stereo", "clips": [[0, 1, 2]]}),
+            serde_json::json!({"format": "Stereo", "clips": []}),
+            serde_json::json!({"format": "Mono", "clips": [[]]}),
+            serde_json::json!({"format": "Mono", "clips": vec![vec![0]; 65]}),
+            serde_json::json!({"format": "Stereo", "clips": [[0, -1]]}),
+            serde_json::json!({"format": "Stereo", "clips": [[0, 65536]]}),
+            serde_json::json!({"format": "Stereo", "clips": [[0, 1]], "pan": 0}),
+        ] {
+            assert!(serde_json::from_value::<AudioChannelMap>(value.clone()).is_err(), "{value}");
+        }
+    }
 
     fn demo_project() -> (Project, ItemId, ItemId) {
         let mut p = Project::new("Test");

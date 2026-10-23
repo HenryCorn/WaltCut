@@ -44,11 +44,8 @@ fn sequence_and_markers_menu_order_matches_premiere() {
         "sequence.matchFrame",
         "sequence.addEdit",
         "trim.edit",
-        "sequence.applyAudioTransition",
-        "trim.applyDefaultTransition",
         "sequence.lift",
         "sequence.showThroughEdits",
-        "sequence.normalizeMixTrack",
         "sequence.makeSubsequence",
         "sequence.simplify",
         "sequence.addTracks",
@@ -56,54 +53,8 @@ fn sequence_and_markers_menu_order_matches_premiere() {
     for w in order.windows(2) {
         assert!(pos(&seq, w[0]) < pos(&seq, w[1]), "{} before {}: {seq:?}", w[0], w[1]);
     }
-    assert_eq!(pos(&seq, "trim.applyDefaultTransition"), pos(&seq, "sequence.applyAudioTransition") + 1);
-    let spec = crate::commands::find("trim.applyDefaultTransition").unwrap();
-    assert_eq!(spec.label, "Apply Default Transitions to Selection");
-    assert_eq!(Session::default().shortcuts.primary("trim.applyDefaultTransition").as_deref(), Some("Shift+D"));
-    assert_eq!(crate::commands::find("sequence.normalizeMixTrack").unwrap().label, "Normalize Mix Track…");
     let markers = menu_ids(&["Markers"]);
     assert_eq!(pos(&markers, "markers.addFlashCue"), pos(&markers, "markers.addChapter") + 1);
-}
-
-#[test]
-fn apply_default_transitions_to_selected_clips() {
-    let mut s = demo();
-    let q = s.active_sequence().unwrap();
-    // Shot 3's audio has no existing transition at either edge.
-    let c = q.audio_tracks[0].items[2].clone();
-    let before_v = q.video_tracks[0].transitions.len();
-    let before_a = q.audio_tracks[0].transitions.len();
-    assert!(s.execute("trim.applyDefaultTransition", json!({})).is_err(), "nothing selected");
-    s.execute("timeline.select", json!({"clips": [c.id.0]})).unwrap();
-    assert!(s.is_enabled("trim.applyDefaultTransition"));
-    let n_undo = s.history.undo.len();
-    s.execute("trim.applyDefaultTransition", json!({})).unwrap();
-    assert_eq!(s.history.undo.len(), n_undo + 1, "one undo step");
-    let q = s.active_sequence().unwrap();
-    assert_eq!(q.video_tracks[0].transitions.len(), before_v);
-    // Selected audio gets transitions at its free edges; linked video stays untouched.
-    assert!(q.audio_tracks[0].transitions.len() > before_a);
-    s.execute("edit.undo", json!({})).unwrap();
-    assert_eq!(s.active_sequence().unwrap().video_tracks[0].transitions.len(), before_v);
-}
-
-#[test]
-fn normalize_mix_track_hits_the_target_peak() {
-    let mut s = demo();
-    let before = crate::sequence_extras::mix_peak_db(&s).unwrap();
-    assert!(before.is_finite());
-    let r = s.execute("sequence.normalizeMixTrack", json!({"db": -3.0})).unwrap();
-    let after = crate::sequence_extras::mix_peak_db(&s).unwrap();
-    assert!((after + 3.0).abs() < 0.05, "peak {after} dB ({r})");
-    assert!((r["peakBeforeDb"].as_f64().unwrap() - before).abs() < 1e-9);
-    assert!((s.active_sequence().unwrap().master_volume_db - r["masterVolumeDb"].as_f64().unwrap()).abs() < 1e-9);
-    assert_eq!(s.history.undo.last().unwrap().0, "Normalize Mix Track");
-    s.execute("edit.undo", json!({})).unwrap();
-    assert_eq!(s.active_sequence().unwrap().master_volume_db, 0.0);
-    assert!(s.execute("sequence.normalizeMixTrack", json!({"db": 40.0})).is_err());
-    // no audio: disabled
-    s.execute("file.newSequence", json!({"name": "Empty"})).unwrap();
-    assert!(!s.is_enabled("sequence.normalizeMixTrack"));
 }
 
 #[test]
@@ -171,9 +122,6 @@ fn simplify_moves_clips_down_where_they_fit() {
     assert!(a.video_tracks[1].item(ov.id).is_some());
     let under: Vec<_> = q.video_tracks[0].items.iter().filter(|i| i.range().overlaps(&ov.range())).map(|i| i.id).collect();
     waltcut_edit::delete_items(&mut q, &under);
-    for t in &mut q.video_tracks {
-        t.transitions.clear();
-    }
     let r = crate::sequence_extras::simplify_sequence(&s.project, &mut q, &o);
     assert_eq!(r["movedClips"], 1);
     assert!(q.video_tracks[0].item(ov.id).is_some() && q.video_tracks[1].items.is_empty());

@@ -216,20 +216,3 @@ fn escape_puts_a_thumbnail_size_slider_back() {
     d.drag(from, to, false);
     assert_ne!(size(&d), start, "without Escape the same drag resizes");
 }
-
-#[test]
-fn escape_cancels_dragging_an_effect_onto_a_clip() {
-    let mut d = Driver::demo();
-    d.ok("ui.panel.show", json!({"panel": "Effects"}));
-    let effects = d.ok("ui.elements", json!({"prefix": "effects.item."}));
-    let id = effects.as_array().unwrap().iter().filter_map(|e| e["id"].as_str()).find(|i| i.matches('.').count() == 2).expect("an effect").to_string();
-    let from = centre(d.rect(&id));
-    let clip = d.harness.state().session.active_sequence().unwrap().video_tracks[0].items[0].id;
-    let to = centre(d.rect(&format!("timeline.clip.{}", clip.0)));
-    let (before, undo) = (d.project(), d.undo_len());
-    d.drag(from, to, true);
-    assert_eq!(d.project(), before, "no effect was applied");
-    assert_eq!(d.undo_len(), undo);
-    d.drag(from, to, false);
-    assert_ne!(d.project(), before, "without Escape the same drag applies {id}");
-}

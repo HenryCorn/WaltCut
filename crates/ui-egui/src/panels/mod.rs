@@ -2,7 +2,6 @@
 //! effects) is carried in egui temp data so the timeline/monitors can accept drops.
 
 pub mod ai;
-pub mod audio_fx_editor;
 pub mod clip_dialogs;
 pub mod color_dialogs;
 pub mod dialogs;
@@ -20,9 +19,7 @@ pub mod keyboard;
 pub mod media_dialogs;
 pub mod menu_dialogs;
 pub mod metadata;
-pub mod meters;
 pub mod misc;
-pub mod mixer;
 pub mod monitor;
 pub mod monitor_view;
 pub mod notes;
@@ -36,12 +33,10 @@ pub mod settings;
 pub mod shortcuts_dialog;
 pub mod timecode;
 pub mod timeline;
-pub mod timeline_automation;
 pub mod timeline_hit;
 pub mod timeline_volume;
 pub mod tools;
 pub mod transform_handles;
-pub mod transition_controls;
 pub mod trim_monitor;
 pub mod workspaces;
 
@@ -72,15 +67,12 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::Tools => tools::show(app, ui, rect),
         PanelKind::Effects => effects::show(app, ui, rect),
         PanelKind::EffectControls => effect_controls::show(app, ui, rect),
-        PanelKind::AudioMeters => meters::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),
         PanelKind::Properties => effect_controls::properties_panel(app, ui, rect),
         PanelKind::EssentialGraphics => graphics::properties(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
         PanelKind::Markers => misc::markers(app, ui, rect),
         PanelKind::Info => misc::info(app, ui, rect),
-        PanelKind::AudioTrackMixer => mixer::track_mixer(app, ui, rect),
-        PanelKind::AudioClipMixer => mixer::clip_mixer(app, ui, rect),
         PanelKind::Metadata => metadata::show(app, ui, rect),
         PanelKind::Timecode => timecode::show(app, ui, rect),
         PanelKind::Events => events::events(app, ui, rect),

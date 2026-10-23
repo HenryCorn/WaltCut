@@ -85,7 +85,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Paste Attributes…",
             &["Edit"],
             Some("Cmd+Alt+V"),
-            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true,"scaleTimes":bool=true}"#,
+            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true,"scaleTimes":bool=true}"#,
             can_paste_attributes,
             paste_attributes,
         ),
@@ -94,7 +94,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Remove Attributes…",
             &["Edit"],
             None,
-            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true,"channelVolume":bool=true,"panner":bool=true,"effects":bool|[effectId]=true}"#,
+            r#"{"clips":[id]?,"motion":bool=true,"opacity":bool=true,"volume":bool=true}"#,
             has_selection,
             remove_attributes,
         ),
@@ -142,7 +142,7 @@ pub(crate) fn commands() -> Vec<CommandSpec> {
             "Audio Channels…",
             &["Clip", "Modify"],
             Some("Shift+G"),
-            r#"{"items":[id]?,"format":"mono|stereo|5.1|adaptive","clips":[[channel]]?,"channels":[channel]?}"#,
+            r#"{"items":[id]?,"format":"mono|stereo","clips":[[channel]]?,"channels":[channel]? (zero-based mono/stereo source pair)}"#,
             has_audio_target,
             audio_channels,
         ),
@@ -610,7 +610,6 @@ fn sequence_from_clip(s: &mut Session, p: &Value) -> Result<Value> {
         ItemKind::Sequence(q) => q.settings.clone(),
         _ => media_root(&s.project, first).map(|(_, m, _)| crate::commands::default_seq_settings_for(m)).unwrap_or_default(),
     };
-    let channels = media_root(&s.project, first).and_then(|(_, m, _)| m.info.audio().map(|a| a.channels)).unwrap_or(2);
     let n_audio = media_root(&s.project, first)
         .map(|(_, m, _)| {
             crate::commands::audio_placement_specs(m.interpret.audio_channels.as_ref().map_or(&[], |a| a.clips.as_slice()), m.info.audio_streams.len()).len()
@@ -621,11 +620,6 @@ fn sequence_from_clip(s: &mut Session, p: &Value) -> Result<Value> {
     let bin = s.project.root.parent_of(first).filter(|b| *b != s.project.root.id);
     let seq = s.edit("New Sequence From Clip", |pr, st| {
         let id = pr.new_sequence(&name, settings, 1, n_audio.max(1), bin);
-        if channels == 1
-            && let Some(q) = pr.sequence_mut(id)
-        {
-            q.settings.audio_master = AudioChannels::Stereo;
-        }
         st.active_sequence = Some(id);
         if !st.open_sequences.contains(&id) {
             st.open_sequences.push(id);
@@ -963,36 +957,24 @@ fn consolidate_duplicates(s: &mut Session, _: &Value) -> Result<Value> {
 /// Which attributes a Paste / Remove Attributes call touches.
 struct AttrSel {
     intrinsic: Vec<&'static str>,
-    /// None = every standard effect; Some(ids) = those effects (Some(empty) = none).
-    effects: Option<Vec<String>>,
 }
 
-fn attr_sel(p: &Value) -> AttrSel {
+fn attr_sel(p: &Value, command: &str) -> Result<AttrSel> {
+    let keys: &[&str] =
+        if command == "edit.pasteAttributes" { &["clips", "motion", "opacity", "volume", "scaleTimes"] } else { &["clips", "motion", "opacity", "volume"] };
+    crate::commands::check_parameter_keys(p, command, keys)?;
     let on = |k: &str| bool_p(p, k).unwrap_or(true);
     let mut intrinsic = Vec::new();
-    for (k, id) in [("motion", "motion"), ("opacity", "opacity"), ("volume", "volume"), ("channelVolume", "channel_volume"), ("panner", "panner")] {
+    for (k, id) in [("motion", "motion"), ("opacity", "opacity"), ("volume", "volume")] {
         if on(k) {
             intrinsic.push(id);
         }
     }
-    let effects = match p.get("effects") {
-        Some(Value::Bool(false)) => Some(Vec::new()),
-        Some(Value::Array(a)) => Some(a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()),
-        _ => None,
-    };
-    AttrSel { intrinsic, effects }
-}
-
-fn is_standard(e: &waltcut_project::EffectInstance) -> bool {
-    e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)
-}
-
-fn wants_effect(sel: &AttrSel, e: &waltcut_project::EffectInstance) -> bool {
-    sel.effects.as_ref().is_none_or(|ids| ids.contains(&e.effect))
+    Ok(AttrSel { intrinsic })
 }
 
 fn paste_attributes(s: &mut Session, p: &Value) -> Result<Value> {
-    let sel = attr_sel(p);
+    let sel = attr_sel(p, "edit.pasteAttributes")?;
     let scale = bool_p(p, "scaleTimes").unwrap_or(true);
     let src_v = s.state.clipboard.iter().find(|c| c.0 == TrackKind::Video).map(|c| c.2.clone());
     let src_a = s.state.clipboard.iter().find(|c| c.0 == TrackKind::Audio).map(|c| c.2.clone());
@@ -1014,11 +996,6 @@ fn paste_attributes(s: &mut Session, p: &Value) -> Result<Value> {
                     None => dst.effects.push(e),
                 }
             }
-            for e in src.effects.iter().filter(|e| is_standard(e) && wants_effect(&sel, e)) {
-                let mut e = e.clone();
-                retime_effect(&mut e, src, &before, scale);
-                dst.effects.push(e);
-            }
             if *dst != before {
                 n += 1;
             }
@@ -1029,7 +1006,7 @@ fn paste_attributes(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn remove_attributes(s: &mut Session, p: &Value) -> Result<Value> {
-    let sel = attr_sel(p);
+    let sel = attr_sel(p, "edit.removeAttributes")?;
     let targets = with_links(s, &clips_p(s, p));
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let frame = (seq.settings.width, seq.settings.height);
@@ -1049,7 +1026,6 @@ fn remove_attributes(s: &mut Session, p: &Value) -> Result<Value> {
                     *slot = fresh;
                 }
             }
-            it.effects.retain(|e| !(is_standard(e) && wants_effect(&sel, e)));
             if *it != before {
                 n += 1;
             }
@@ -1181,25 +1157,54 @@ fn parse_format(f: &str) -> Option<AudioChannels> {
     match f.to_ascii_lowercase().as_str() {
         "mono" => Some(AudioChannels::Mono),
         "stereo" => Some(AudioChannels::Stereo),
-        "5.1" | "surround51" | "surround" => Some(AudioChannels::Surround51),
-        "adaptive" => Some(AudioChannels::Adaptive),
         _ => None,
     }
 }
 
 fn audio_channels(s: &mut Session, p: &Value) -> Result<Value> {
+    crate::commands::check_parameter_keys(p, "clip.audioChannels", &["items", "clips", "format", "channels"])?;
+    let format = match str_p(p, "format") {
+        Some(f) => Some(parse_format(f).ok_or_else(|| bad("clip.audioChannels", "format is mono or stereo"))?),
+        None => None,
+    };
     let items: Vec<ItemId> =
         items_p(s, p).into_iter().filter(|i| s.project.item(*i).and_then(|it| it.as_media()).is_some_and(|m| m.info.has_audio())).collect();
     if items.is_empty() || p.get("channels").is_some() {
+        if format.is_some() {
+            return Err(bad("clip.audioChannels", "format modifies Project panel items; timeline clips use channels"));
+        }
         // timeline audio clips: which source channels each plays
-        let clips = match p.get("clips").and_then(Value::as_array) {
-            Some(a) if a.iter().all(Value::is_u64) => a.iter().filter_map(|v| v.as_u64().map(ClipId)).collect(),
-            _ => selected_audio_clips(s),
+        let clips = match p.get("clips") {
+            Some(value) => value
+                .as_array()
+                .and_then(|a| a.iter().map(|v| v.as_u64().map(ClipId)).collect::<Option<Vec<_>>>())
+                .ok_or_else(|| bad("clip.audioChannels", "clips must be a list of audio clip ids"))?,
+            None => selected_audio_clips(s),
         };
-        let chans: Vec<u16> =
-            p.get("channels").and_then(Value::as_array).map(|a| a.iter().filter_map(|v| v.as_u64().map(|c| c as u16)).collect()).unwrap_or_default();
+        let chans = p
+            .get("channels")
+            .map(|v| {
+                v.as_array()
+                    .filter(|a| a.len() <= 2)
+                    .and_then(|a| a.iter().map(|v| v.as_u64().and_then(|n| u16::try_from(n).ok())).collect::<Option<Vec<_>>>())
+                    .ok_or_else(|| bad("clip.audioChannels", "channels must be a mono/stereo source pair"))
+            })
+            .transpose()?
+            .unwrap_or_default();
         if clips.is_empty() {
             return Err(bad("clip.audioChannels", "select a clip with audio"));
+        }
+        let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+        for c in &clips {
+            let (tid, it) = seq.find_item(*c).ok_or_else(|| bad("clip.audioChannels", "no such audio clip"))?;
+            let tr = seq.track(tid).ok_or(EngineError::NoSequence)?;
+            if tr.kind != TrackKind::Audio || tr.locked {
+                return Err(bad("clip.audioChannels", "select unlocked audio clips"));
+            }
+            let count = media_root(&s.project, it.item).and_then(|(_, m, _)| m.info.audio().map(|a| a.channels)).unwrap_or(2);
+            if chans.iter().any(|ch| u32::from(*ch) >= count) {
+                return Err(bad("clip.audioChannels", "source channel is outside the clip's channel count"));
+            }
         }
         s.edit_sequence("Modify Audio Channels", |q, _, _| {
             for c in &clips {
@@ -1211,24 +1216,40 @@ fn audio_channels(s: &mut Session, p: &Value) -> Result<Value> {
         })?;
         return Ok(json!({"clips": clips.iter().map(|c| c.0).collect::<Vec<_>>(), "channels": chans}));
     }
-    let format = match str_p(p, "format") {
-        Some(f) => Some(parse_format(f).ok_or_else(|| bad("clip.audioChannels", "format is mono, stereo, 5.1 or adaptive"))?),
-        None => None,
-    };
     let custom: Option<Vec<Vec<u16>>> = p
         .get("clips")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().map(|c| c.as_array().map(|x| x.iter().filter_map(|v| v.as_u64().map(|n| n as u16)).collect()).unwrap_or_default()).collect());
+        .map(|v| {
+            v.as_array()
+                .filter(|a| a.len() <= 64)
+                .and_then(|a| {
+                    a.iter()
+                        .map(|c| {
+                            c.as_array()
+                                .filter(|x| x.len() <= 2)
+                                .and_then(|x| x.iter().map(|v| v.as_u64().and_then(|n| u16::try_from(n).ok())).collect::<Option<Vec<_>>>())
+                        })
+                        .collect::<Option<Vec<_>>>()
+                })
+                .ok_or_else(|| bad("clip.audioChannels", "clips must contain source channel lists"))
+        })
+        .transpose()?;
     let mut out = Vec::new();
     let mut maps = Vec::new();
     for i in &items {
         let Some(m) = s.project.item(*i).and_then(|it| it.as_media()) else { continue };
-        let n = m.info.audio().map_or(2, |a| a.channels) as u16;
+        let n = u16::try_from(m.info.audio().map_or(2, |a| a.channels)).map_err(|_| bad("clip.audioChannels", "source channel count is too large"))?;
+        if n > 64 {
+            return Err(bad("clip.audioChannels", "at most 64 source channels can be mapped"));
+        }
         let fmt = format.unwrap_or_else(|| m.interpret.audio_channels.as_ref().map_or(AudioChannels::Stereo, |a| a.format));
+        if !matches!(fmt, AudioChannels::Mono | AudioChannels::Stereo) {
+            return Err(bad("clip.audioChannels", "only mono/stereo source mapping is supported"));
+        }
         let map = match &custom {
             Some(c) => {
-                if c.is_empty() || c.iter().any(|x| x.is_empty() || x.iter().any(|ch| *ch >= n)) {
-                    return Err(bad("clip.audioChannels", format!("each clip needs source channels between 0 and {}", n - 1)));
+                let width = if fmt == AudioChannels::Mono { 1 } else { 2 };
+                if c.is_empty() || c.iter().any(|x| x.is_empty() || x.len() > width || x.iter().any(|ch| *ch >= n)) {
+                    return Err(bad("clip.audioChannels", "each clip needs an in-range mono/stereo source pair"));
                 }
                 AudioChannelMap { format: fmt, clips: c.clone() }
             }

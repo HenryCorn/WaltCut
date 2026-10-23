@@ -23,6 +23,16 @@ Upstream attribution and licensing are recorded in [NOTICE](NOTICE) and the
 
 See [docs/animation.md](docs/animation.md) for the full workflow and current limitations.
 
+### Audio reduction draft (#23)
+
+**DRAFT IMPLEMENTATION — native macOS acceptance pending.** The uncommitted mixer and orphan
+audio-effects/transitions cuts retain synchronized mono/stereo playback/export, waveforms,
+scrubbing, clip Audio Gain and track mute. Intrinsic Volume remains audible, including keyframes:
+its level adds to Audio Gain in dB; disabling/bypassing Volume does not bypass Audio Gain.
+Advanced audio processing, transition commands and their catalogue/editors are deleted, not
+disabled behind controls. Active export loudness and output-channel/source-monitor conversion
+remain for a later slice. #23 is not complete, accepted or merged.
+
 ## Build from source
 
 This fork retains the upstream Cargo package names for now:

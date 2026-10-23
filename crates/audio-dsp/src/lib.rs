@@ -1,14 +1,12 @@
-//! Real-time audio DSP for FilmCraft (layer L1, dependency-free, `wasm32` clean).
+//! Playback resampling/pitch correction, output channel conversion and export loudness DSP.
 //!
 //! * [`loudness`] — ITU-R BS.1770-4 / EBU R128 loudness meter (momentary, short-term,
 //!   integrated, loudness range, sample peak, true peak) and the loudness-normalisation helper.
-//! * [`effects`] — clip/track audio effects behind the common [`AudioEffect`] trait, with a
-//!   registry ([`effects()`]) describing every effect's parameters (range, unit, default) so the
-//!   engine and UI can build controls generically.
+//! * [`PitchShifter`] — pitch-preserving shuttle playback.
+//! * [`Limiter`] — true-peak limiting for export loudness normalisation.
 //! * [`biquad`] — RBJ-cookbook biquads (TDF-II) with analytic magnitude response.
-//! * [`sync`] — offset between two recordings of one event (GCC-PHAT, sample-accurate).
 //! * [`resample`] — streaming, block-invariant rate conversion for playback on a device at another rate.
-//! * [`channels`] — channel layouts, ITU-R BS.775 up/downmix, 5.1 mixdown types, the 5.1 panner.
+//! * [`channels`] — channel layouts, ITU-R BS.775 output conversion and source-monitor mixdown.
 //!
 //! Conventions: audio is **planar f32** (`&mut [&mut [f32]]`, one slice per channel, all the same
 //! length). `process` never allocates; all buffers are sized at construction. Parameters may be
@@ -21,40 +19,28 @@
 
 pub mod biquad;
 pub mod channels;
-pub mod design;
-pub mod effects;
 pub mod fft;
+mod limiter;
 pub mod loudness;
 pub mod oversample;
+mod pitch;
 pub mod resample;
 mod smooth;
+mod stft;
 
-pub use effects::{Category, EffectInfo, create_effect, effect_info, effects};
+pub use limiter::Limiter;
 pub use loudness::{LoudnessMeter, normalize_gain_db};
+pub use pitch::PitchShifter;
 pub use smooth::Smoothed;
 
 /// Unit of a parameter value (for display and control construction).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Unit {
-    /// Unitless scalar.
-    None,
     Decibels,
-    Hertz,
     Milliseconds,
-    Seconds,
-    Percent,
-    /// Filter quality factor.
-    Q,
-    /// Compression ratio (`x:1`).
-    Ratio,
     Semitones,
-    Bpm,
-    /// Pan / balance position, −100 (left) … +100 (right).
-    Pan,
     /// Boolean toggle: 0 = off, 1 = on.
     Toggle,
-    /// Index into [`ParamSpec::choices`].
-    Choice,
 }
 
 /// Static description of one effect parameter.
@@ -70,28 +56,22 @@ pub struct ParamSpec {
     pub unit: Unit,
     /// Hint that the control should be logarithmic (frequencies, times).
     pub log_scale: bool,
-    /// Option labels when `unit == Unit::Choice` (value is the index).
-    pub choices: &'static [&'static str],
 }
 
 impl ParamSpec {
     /// A continuous (linear) parameter.
     pub const fn new(id: &'static str, name: &'static str, min: f32, max: f32, default: f32, unit: Unit) -> Self {
-        ParamSpec { id, name, min, max, default, unit, log_scale: false, choices: &[] }
+        ParamSpec { id, name, min, max, default, unit, log_scale: false }
     }
     /// A continuous parameter best shown on a logarithmic control.
     pub const fn log(id: &'static str, name: &'static str, min: f32, max: f32, default: f32, unit: Unit) -> Self {
-        ParamSpec { id, name, min, max, default, unit, log_scale: true, choices: &[] }
+        ParamSpec { id, name, min, max, default, unit, log_scale: true }
     }
     /// An on/off toggle.
     pub const fn toggle(id: &'static str, name: &'static str, default: bool) -> Self {
-        ParamSpec { id, name, min: 0.0, max: 1.0, default: if default { 1.0 } else { 0.0 }, unit: Unit::Toggle, log_scale: false, choices: &[] }
+        ParamSpec { id, name, min: 0.0, max: 1.0, default: if default { 1.0 } else { 0.0 }, unit: Unit::Toggle, log_scale: false }
     }
-    /// A discrete choice; the value is the index into `choices`.
-    pub const fn choice(id: &'static str, name: &'static str, choices: &'static [&'static str], default: usize) -> Self {
-        ParamSpec { id, name, min: 0.0, max: (choices.len() - 1) as f32, default: default as f32, unit: Unit::Choice, log_scale: false, choices }
-    }
-    /// Clamp (and for choices/toggles, round) a value into this parameter's domain.
+    /// Clamp (and for toggles, round) a value into this parameter's domain.
     /// NaN maps to the default.
     pub fn sanitize(&self, v: f32) -> f32 {
         if v.is_nan() {
@@ -99,7 +79,7 @@ impl ParamSpec {
         }
         let v = v.clamp(self.min, self.max);
         match self.unit {
-            Unit::Choice | Unit::Toggle => v.round(),
+            Unit::Toggle => v.round(),
             _ => v,
         }
     }
@@ -112,9 +92,9 @@ impl ParamSpec {
 /// effect was built for, the extra channels are passed through untouched (channel-generic effects
 /// such as gain process all of them).
 pub trait AudioEffect: Send {
-    /// Registry id (e.g. `"compressor"`).
+    /// Processor id.
     fn id(&self) -> &'static str;
-    /// Parameter descriptions (same as the registry entry's).
+    /// Parameter descriptions.
     fn params(&self) -> &'static [ParamSpec];
     /// Set a parameter by id; the value is clamped to its range. Returns `false` for unknown ids.
     /// Takes effect smoothly from the next processed sample.
@@ -130,16 +110,6 @@ pub trait AudioEffect: Send {
     /// Processing latency in samples (look-ahead / STFT delay) for delay compensation.
     fn latency(&self) -> usize {
         0
-    }
-    /// Analytic magnitude response (dB) at `freq` Hz for the current target settings, for
-    /// filter/EQ effects (drives the graphical EQ editors). `None` when not applicable.
-    fn response_db(&self, _freq: f64) -> Option<f64> {
-        None
-    }
-    /// Static input → output level curve (dB) of a dynamics effect for `band` (0 for
-    /// single-band processors), at the current settings. `None` when not applicable.
-    fn transfer_db(&self, _band: usize, _input_db: f32) -> Option<f32> {
-        None
     }
 }
 
@@ -178,9 +148,6 @@ impl ParamValues {
     }
     pub(crate) fn on(&self, id: &str) -> bool {
         self.v(id) >= 0.5
-    }
-    pub(crate) fn idx(&self, id: &str) -> usize {
-        self.v(id).max(0.0) as usize
     }
 }
 
@@ -225,12 +192,6 @@ pub fn gain_to_db(g: f32) -> f32 {
 #[inline(always)]
 pub(crate) fn flush(x: f64) -> f64 {
     if x.abs() < 1e-30 { 0.0 } else { x }
-}
-
-/// f32 variant of [`flush`] for f32 delay lines.
-#[inline(always)]
-pub(crate) fn flush32(x: f32) -> f32 {
-    if x.abs() < 1e-25 { 0.0 } else { x }
 }
 
 /// Common block length of planar channels.

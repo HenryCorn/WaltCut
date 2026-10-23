@@ -10,7 +10,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     crate::panels::menu_dialogs::show(app, ctx);
     crate::panels::graphic_design::replace_dialog(app, ctx);
     crate::panels::presets::save_dialog(app, ctx);
-    crate::panels::audio_fx_editor::show(app, ctx);
     crate::panels::monitor_view::dialogs(app, ctx);
     crate::panels::graphics::dialogs(app, ctx);
     crate::panels::workspaces::dialogs(app, ctx);
@@ -63,12 +62,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             }
             return;
         }
-        Dialog::TransitionDuration => {
-            if !crate::panels::transition_controls::duration_dialog(app, ctx) && app.dialog == Some(d) {
-                app.dialog = None;
-            }
-            return;
-        }
         Dialog::SequenceSettings => {
             if !crate::panels::sequence_settings::show(app, ctx) && app.dialog == Some(d) {
                 app.dialog = None;
@@ -82,23 +75,11 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     }
 }
 
-/// Clip ▸ Audio Gain…: Set Gain to / Adjust Gain by / Normalize Max Peak to / Normalize All Peaks to,
-/// with the selection's peak amplitude. Returns whether the dialog stays open.
+/// Clip ▸ Audio Gain…: set or adjust the selected clips' gain. Returns whether the dialog stays open.
 ///
-/// Automation ids: `audioGain.<set|adjust|normalizeMax|normalizeAll>` (radio buttons),
-/// `audioGain.<mode>.value` (dB fields), `audioGain.peak`, `audioGain.ok`, `audioGain.cancel`.
+/// Automation ids: `audioGain.<set|adjust>` (radio buttons), `audioGain.<mode>.value` (dB fields),
+/// `audioGain.ok`, `audioGain.cancel`.
 fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
-    let peak_id = egui::Id::new("audio-gain-peak");
-    let rev = app.session.revision;
-    let cached: Option<(u64, Option<f64>)> = ctx.data(|d| d.get_temp(peak_id));
-    let peak = match cached {
-        Some((r, p)) if r == rev => p,
-        _ => {
-            let p = app.session.execute("clip.audioPeak", serde_json::json!({})).ok().and_then(|v| v["peakDb"].as_f64());
-            ctx.data_mut(|d| d.insert_temp(peak_id, (rev, p)));
-            p
-        }
-    };
     let mut draft = app.ui.audio_gain.clone();
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("audio-gain-before-drag"), &mut draft);
     let mut keep = true;
@@ -113,12 +94,7 @@ fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
         .show(ctx, |ui| {
             ui.add_space(6.0);
             egui::Grid::new("audio-gain").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
-                let rows: [(&str, &str, &mut f64); 4] = [
-                    ("set", tl!("Set Gain to:"), &mut draft.set_db),
-                    ("adjust", tl!("Adjust Gain by:"), &mut draft.adjust_db),
-                    ("normalizeMax", tl!("Normalize Max Peak to:"), &mut draft.max_peak_db),
-                    ("normalizeAll", tl!("Normalize All Peaks to:"), &mut draft.all_peaks_db),
-                ];
+                let rows: [(&str, &str, &mut f64); 2] = [("set", "Set Gain to:", &mut draft.set_db), ("adjust", "Adjust Gain by:", &mut draft.adjust_db)];
                 for (id, label, v) in rows {
                     let r = ui.radio(draft.mode == id, label);
                     elems.push((format!("audioGain.{id}"), r.rect, label.to_string()));
@@ -130,10 +106,6 @@ fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
                     ui.end_row();
                 }
             });
-            ui.add_space(8.0);
-            let pk_text = tlf!("Peak Amplitude: {peak}", peak = peak.map(|p| format!("{p:.1} dB")).unwrap_or_else(|| "—".into()));
-            let pk = ui.label(&pk_text);
-            elems.push(("audioGain.peak".into(), pk.rect, pk_text));
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 let c = ui.button(tl!("Cancel"));
@@ -157,8 +129,6 @@ fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
     if apply {
         let db = match draft.mode.as_str() {
             "set" => draft.set_db,
-            "normalizeMax" => draft.max_peak_db,
-            "normalizeAll" => draft.all_peaks_db,
             _ => draft.adjust_db,
         };
         if let Err(e) = app.session.execute("clip.audioGain", serde_json::json!({"mode": draft.mode, "db": db})) {
@@ -171,28 +141,25 @@ fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
 }
 
 /// Sequence ▸ Add Tracks…, laid out as Premiere Pro's dialog: "Add video tracks" (Amount,
-/// Placement), "Add audio tracks" (Amount, Placement, Track type: Standard, 5.1, Adaptive, Mono)
-/// and "Add audio submix tracks" (Amount, Placement, Track type: Stereo, 5.1, Adaptive, Mono).
-/// Placement is "Before First Track" or after one of the tracks; the submix placement is off
-/// while the sequence has no submix track. Returns whether the dialog stays open.
+/// Placement) and "Add audio tracks" (Amount, Placement, Track type: Stereo or Mono).
+/// Placement is "Before First Track" or after one of the tracks. Returns whether the dialog stays open.
 ///
-/// Automation ids, with `<kind>` = `video`, `audio` or `submix`: `addTracks.<kind>.amount`,
+/// Automation ids, with `<kind>` = `video` or `audio`: `addTracks.<kind>.amount`,
 /// `addTracks.<kind>.placement` and, while its list is open, `addTracks.<kind>.placement.option.<n>`
-/// (n tracks before the new ones; 0 = Before First Track); `addTracks.<audio|submix>.type` and
-/// `addTracks.<audio|submix>.type.option.<standard|stereo|5.1|adaptive|mono>`; `addTracks.ok`,
+/// (n tracks before the new ones; 0 = Before First Track); `addTracks.audio.type` and
+/// `addTracks.audio.type.option.<stereo|mono>`; `addTracks.ok`,
 /// `addTracks.cancel`.
 fn add_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
     let Some(seq) = app.session.active_sequence() else { return false };
     let names = |tracks: &[waltcut_engine::project::Track]| tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
-    let (vnames, anames, snames) = (names(&seq.video_tracks), names(&seq.audio_tracks), names(&seq.submix_tracks));
+    let (vnames, anames) = (names(&seq.video_tracks), names(&seq.audio_tracks));
     let mut d = app.ui.add_tracks.clone();
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("add-tracks-before-drag"), &mut d);
     let mut keep = true;
     let mut apply = false;
     let mut elems: Vec<(String, egui::Rect, String)> = Vec::new();
-    let audio_types: [(&str, &str); 4] = [("standard", tl!("Standard")), ("5.1", "5.1"), ("adaptive", tl!("Adaptive")), ("mono", tl!("Mono"))];
-    let submix_types: [(&str, &str); 4] = [("stereo", tl!("Stereo")), ("5.1", "5.1"), ("adaptive", tl!("Adaptive")), ("mono", tl!("Mono"))];
-    egui::Window::new(tl!("Add Tracks"))
+    let audio_types: [(&str, &str); 2] = [("stereo", "Stereo"), ("mono", "Mono")];
+    egui::Window::new("Add Tracks")
         .id(egui::Id::new("Add Tracks"))
         .collapsible(false)
         .resizable(false)
@@ -213,10 +180,9 @@ fn add_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
             let label = |ui: &mut egui::Ui, text: &str| {
                 ui.allocate_ui_with_layout(egui::vec2(label_w, row_h), egui::Layout::right_to_left(egui::Align::Center), |ui| ui.label(text));
             };
-            let groups: [(&str, &str, &mut u32, &mut usize, &[String], Option<(&mut String, &[(&str, &str); 4])>); 3] = [
-                ("video", tl!("Add video tracks"), &mut d.video, &mut d.video_after, &vnames, None),
-                ("audio", tl!("Add audio tracks"), &mut d.audio, &mut d.audio_after, &anames, Some((&mut d.audio_type, &audio_types))),
-                ("submix", tl!("Add audio submix tracks"), &mut d.submix, &mut d.submix_after, &snames, Some((&mut d.submix_type, &submix_types))),
+            let groups: [(&str, &str, &mut u32, &mut usize, &[String], Option<(&mut String, &[(&str, &str); 2])>); 2] = [
+                ("video", "Add video tracks", &mut d.video, &mut d.video_after, &vnames, None),
+                ("audio", "Add audio tracks", &mut d.audio, &mut d.audio_after, &anames, Some((&mut d.audio_type, &audio_types))),
             ];
             for (kind, title, amount, after, tracks, track_type) in groups {
                 ui.add_space(4.0);
@@ -290,11 +256,10 @@ fn add_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
     }
     if apply {
         // nothing asked for: OK closes the dialog and changes nothing
-        if d.video > 0 || d.audio > 0 || d.submix > 0 {
+        if d.video > 0 || d.audio > 0 {
             let params = serde_json::json!({
                 "video": d.video, "videoAfter": d.video_after,
                 "audio": d.audio, "audioAfter": d.audio_after, "audioType": d.audio_type,
-                "submix": d.submix, "submixAfter": d.submix_after, "submixType": d.submix_type,
             });
             if let Err(e) = app.session.execute("sequence.addTracks", params) {
                 app.ui.status = e.to_string();

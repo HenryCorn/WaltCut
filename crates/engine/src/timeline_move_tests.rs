@@ -128,10 +128,8 @@ fn a_partner_whose_position_does_not_change_is_left_alone() {
     let (v_track, v) = q.video_tracks.iter().find_map(|t| t.items.iter().find(|i| i.link == a.link && a.link.is_some()).map(|i| (t.id, i.clone()))).unwrap();
     let (a_track, v2) = (q.audio_tracks[0].id, q.video_tracks[1].id);
     assert_ne!(v_track, v2);
-    s.execute("sequence.applyAudioTransition", json!({"clip": a.id.0})).unwrap();
     let sound = |s: &Session| s.active_sequence().unwrap().track(a_track).unwrap().clone();
     let before = sound(&s);
-    assert_eq!(before.transitions.len(), 1, "the sound clip has a crossfade");
     // picture to V2 at the same time, Linked Selection on
     let r = s.execute("timeline.move", json!({"moves": [{"clip": v.id.0, "track": v2.0, "time": v.start.0}]})).unwrap();
     assert_eq!(state(&s, v.id), (v2, v.start));

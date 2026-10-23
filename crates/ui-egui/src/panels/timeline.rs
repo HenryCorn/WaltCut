@@ -29,7 +29,6 @@ const TOP_H: f32 = 58.0; // timecode + toolbar (left) / ruler (right)
 const RULER_H: f32 = 44.0;
 const SCROLLBAR_H: f32 = 17.0;
 const DIVIDER_H: f32 = 5.0;
-const MASTER_H: f32 = 34.0;
 /// The selected gap between two clips (#648, #668).
 const GAP_FILL: Color32 = Color32::from_gray(224);
 const SNAP_PX: f32 = 9.0;
@@ -131,7 +130,7 @@ pub enum Drag {
         clip: ClipId,
         delta: Tick,
     },
-    /// An audio clip's Volume line (see [`super::timeline_volume`]).
+    /// An audio clip's static gain line (see [`super::timeline_volume`]).
     Volume(super::timeline_volume::LineDrag),
     Stretch {
         clip: ClipId,
@@ -140,16 +139,7 @@ pub enum Drag {
         /// As in [`Drag::Trim`].
         from: Tick,
     },
-    /// A transition dragged by an end (`edge`: its duration) or its middle (slides it over the
-    /// cut); `start` / `duration` are where it is shown now, committed on release (#224).
-    Transition {
-        id: waltcut_project::TransitionId,
-        edge: Option<waltcut_edit::Edge>,
-        /// As in [`Drag::Trim`].
-        from: Tick,
-        start: Tick,
-        duration: Tick,
-    },
+
     Pan {
         last: Pos2,
         start_scroll: f64,
@@ -180,8 +170,6 @@ pub struct Row {
     pub kind: TrackKind,
     pub index: usize,
     pub rect: Rect,
-    /// An audio track showing a track keyframe lane, which hides its clips' Volume lines.
-    pub lane: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -220,8 +208,8 @@ fn new_track_at(layout: &Layout, y: f32, vh: f32, ah: f32) -> Option<(TrackKind,
         (y >= tracks_top && y < top).then(|| (TrackKind::Video, band((top - vh).max(tracks_top), top)))
     } else {
         let bottom = layout.rows.iter().filter(|r| r.kind == TrackKind::Audio).map(|r| r.rect.max.y).fold(layout.split_y + DIVIDER_H, f32::max);
-        let mix = layout.content.max.y - MASTER_H;
-        (y >= bottom && y < mix).then(|| (TrackKind::Audio, band(bottom, (bottom + ah).min(mix))))
+        let limit = layout.content.max.y;
+        (y >= bottom && y < limit).then(|| (TrackKind::Audio, band(bottom, (bottom + ah).min(limit))))
     }
 }
 
@@ -414,7 +402,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let tracks_area = content;
     let split_y = tracks_area.min.y + (tracks_area.height() - DIVIDER_H) * app.ui.timeline.split;
     let video_area = Rect::from_min_max(pos2(rect.min.x, tracks_area.min.y), pos2(content.max.x, split_y));
-    let audio_area = Rect::from_min_max(pos2(rect.min.x, split_y + DIVIDER_H), pos2(content.max.x, tracks_area.max.y - MASTER_H));
+    let audio_area = Rect::from_min_max(pos2(rect.min.x, split_y + DIVIDER_H), pos2(content.max.x, tracks_area.max.y));
     let vh = app.ui.timeline.video_track_h;
     let ah = app.ui.timeline.audio_track_h;
     let mut rows = Vec::new();
@@ -422,7 +410,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let (video_tops, max_vs) = video_row_tops(video_area, nv, vh, &mut app.ui.timeline.v_scroll);
     for ((i, tr), top) in seq.video_tracks.iter().enumerate().zip(video_tops) {
         let rect = Rect::from_min_max(pos2(content.min.x, top), pos2(content.max.x, top + vh));
-        rows.push(Row { track: tr.id, kind: TrackKind::Video, index: i, rect, lane: false });
+        rows.push(Row { track: tr.id, kind: TrackKind::Video, index: i, rect });
     }
     let na = seq.audio_tracks.len();
     let max_as = (na as f32 * ah - audio_area.height()).max(0.0);
@@ -430,7 +418,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     for (i, tr) in seq.audio_tracks.iter().enumerate() {
         let top = audio_area.min.y + i as f32 * ah - app.ui.timeline.a_scroll;
         let rect = Rect::from_min_max(pos2(content.min.x, top), pos2(content.max.x, top + ah));
-        rows.push(Row { track: tr.id, kind: TrackKind::Audio, index: i, rect, lane: app.ui.timeline.track_lanes.contains_key(&tr.id.0) });
+        rows.push(Row { track: tr.id, kind: TrackKind::Audio, index: i, rect });
     }
     let layout = Layout { content, ruler, rows: rows.clone(), pps, scroll, split_y };
     app.tl.layout = Some(layout.clone());
@@ -488,7 +476,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             continue;
         }
         let p = painter.with_clip_rect(Rect::from_min_max(pos2(content.min.x, row.min.y), pos2(content.max.x, row.max.y)));
-        let volume_line = r.kind == TrackKind::Audio && !r.lane;
+        let volume_line = r.kind == TrackKind::Audio;
         // the selected gap (#648, #668): a light block across the empty time, as in Premiere Pro
         if let Some(g) = app.session.state.gap_selection.filter(|g| g.track == r.track) {
             let x0 = layout.x_of(g.range.start).max(content.min.x - 1.0);
@@ -563,40 +551,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
         // selected edit points (trim mode): red brackets for ripple, yellow for roll / regular trim
         super::trim_monitor::paint_edit_points(app, &p, seq, tr, r, &layout);
-        // transitions (one being dragged where the drag puts it; the selected ones outlined). A
-        // clip drag also shows where the drop will carry its transitions (those whose clips all
-        // move to one track by one offset): a plain move draws them on their destination track
-        // right away, a copy adds a ghost beside the copies while the originals stay at home.
-        for trn in &tr.transitions {
-            let carried = move_transition_preview(app, seq, trn);
-            // the transition's home span (a transition dragged by an end still takes over)
-            let (start, end) = match &app.tl.drag {
-                Some(Drag::Transition { id, start, duration, .. }) if *id == trn.id => (*start, *start + *duration),
-                _ => (trn.start, trn.end()),
-            };
-            // (start, end, is the copy's ghost)
-            let show: Vec<(Tick, Tick, bool)> = match (carried, copying) {
-                (Some((s, e, dest)), false) if dest == r.track => vec![(s, e, false)],
-                (Some((s, e, dest)), true) if dest == r.track => vec![(start, end, false), (s, e, true)],
-                (Some(_), false) => Vec::new(), // drawn on its destination row
-                _ => vec![(start, end, false)], // at home: not carried, or a copy's original
-            };
-            for (start, end, ghost) in show {
-                let x0 = layout.x_of(start);
-                let x1 = layout.x_of(end);
-                let tr_rect = Rect::from_min_max(pos2(x0, r.rect.min.y + 17.0), pos2(x1, r.rect.max.y - 1.0));
-                let selected = app.session.state.transition_selection.contains(&trn.id);
-                draw_transition(&p, tr_rect, trn, ghost || selected, &t);
-                let suffix = if ghost { ".copy" } else { "" };
-                app.auto.add(&format!("timeline.transition.{}{}", trn.id.0, suffix), tr_rect, &trn.effect.effect);
-                // its ends, for dragging the duration (the same zones as the hit test)
-                let zone = super::timeline_hit::EDGE_PX.min(tr_rect.width() / 3.0);
-                if !ghost {
-                    app.auto.add(&format!("timeline.transition.{}.in", trn.id.0), Rect::from_min_max(tr_rect.min, pos2(x0 + zone, tr_rect.max.y)), "start");
-                    app.auto.add(&format!("timeline.transition.{}.out", trn.id.0), Rect::from_min_max(pos2(x1 - zone, tr_rect.min.y), tr_rect.max), "end");
-                }
-            }
-        }
         if tr.locked {
             let color = Color32::from_rgba_unmultiplied(t.text.r(), t.text.g(), t.text.b(), 64);
             let mut x = content.min.x - row.height();
@@ -639,18 +593,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         let f = app.ui.timeline.split + div_resp.drag_delta().y / (tracks_area.height() - DIVIDER_H).max(1.0);
         app.ui.timeline.split = f.clamp(0.1, 0.9);
     }
-    // master track
-    let master = Rect::from_min_max(pos2(rect.min.x, tracks_area.max.y - MASTER_H), pos2(content.max.x, tracks_area.max.y));
-    painter.rect_filled(master, 0.0, t.tl_header_bg);
-    painter.text(pos2(rect.min.x + 44.0, master.center().y), Align2::LEFT_CENTER, tl!("Mix"), Tokens::ui(11.5), t.text);
-    painter.text(
-        pos2(rect.min.x + header_w - 12.0, master.center().y),
-        Align2::RIGHT_CENTER,
-        format!("{:.1}", seq.master_volume_db),
-        Tokens::ui(11.5),
-        t.hot_text,
-    );
-
     // ---- top block: timecode + toggles, ruler
     draw_top(app, ui, rect, seq, &layout, &t, seq_id);
 
@@ -702,9 +644,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 
     // ---- interaction
     interact(app, ui, seq, &layout, rect);
-    super::timeline_volume::interact(app, ui, seq, &layout, aclip);
-    // track keyframes (drawn and edited on top of the clips)
-    super::timeline_automation::show(app, ui, seq, &layout, aclip);
+    super::timeline_volume::interact(app, seq, &layout, aclip);
     let _ = (visible, TICKS_PER_SECOND);
 }
 
@@ -917,14 +857,13 @@ fn draw_clip(
         );
     }
     // fx badge right-aligned in the header (italic-ish "fx")
-    if (it.has_standard_effects() || it.has_modified_intrinsics()) && w > 40.0 {
-        let col = if it.has_standard_effects() { Color32::from_rgb(0xe8, 0xc5, 0x4a) } else { Color32::from_rgb(0x91, 0xa2, 0xac) };
+    if it.has_modified_intrinsics() && w > 40.0 {
         clip_p.text(
             pos2(body.max.x - 6.0, body.min.y + 8.5),
             Align2::RIGHT_CENTER,
             "fx",
             egui::FontId::new(11.0, egui::FontFamily::Name("semibold".into())),
-            col,
+            Color32::from_rgb(0x91, 0xa2, 0xac),
         );
     }
     // corner triangles where the clip reaches the media's first/last frame (no handles)
@@ -971,7 +910,7 @@ fn draw_waveform(app: &mut FilmcraftApp, p: &egui::Painter, body: Rect, it: &Tra
             v
         }
     };
-    let gain = waveform_display_gain(peak, it.gain_db);
+    let boost = waveform_display_gain(peak, 1.0);
     let dynamic = app.ui.extras.dynamic_waveforms;
     let mut mesh = egui::Mesh::default();
     let dur_px = body.width().max(1.0);
@@ -986,8 +925,7 @@ fn draw_waveform(app: &mut FilmcraftApp, p: &egui::Painter, body: Rect, it: &Tra
         for (a, b) in peaks.iter().skip(s0).take(s1 - s0) {
             m = m.max(a.abs()).max(b.abs());
         }
-        // as in Premiere, the waveform shows the clip's Volume
-        m *= super::timeline_volume::gain_at(it, t0);
+        let gain = boost * super::timeline_volume::gain_at(it, t0);
         // View ▸ Dynamic Audio Waveforms (default): logarithmic scale, −48 dB → 0, 0 dB → full;
         // off: linear amplitude
         let h = if dynamic {
@@ -1009,17 +947,17 @@ fn draw_waveform(app: &mut FilmcraftApp, p: &egui::Painter, body: Rect, it: &Tra
     }
 }
 
-/// Display gain for a clip's waveform: clip gain, plus normalisation of the source to full scale
+/// Display gain for a clip's waveform: combined clip gain, plus normalisation to full scale
 /// so quiet recordings stay readable, but by at most +12 dB, so a near-silent track (room tone at
 /// −50 dBFS, a silent film's empty audio stream) does not look like a loud one.
-fn waveform_display_gain(source_peak: f32, clip_gain_db: f64) -> f32 {
+fn waveform_display_gain(source_peak: f32, clip_gain: f32) -> f32 {
     const MAX_BOOST: f32 = 3.981_072; // +12 dB
     let boost = (1.0 / source_peak.max(1e-9)).min(MAX_BOOST);
-    waltcut_render::audio::db_to_gain(clip_gain_db) * boost
+    clip_gain * boost
 }
 
 /// A key that changes when the sound of sequence `item` does: its audio segments (clips,
-/// transitions, mixer state; see `waltcut_render::preview::audio_segments`) and its length.
+/// gain, Volume and mute; see `waltcut_render::preview::audio_segments`) and its length.
 fn sequence_audio_key(project: &waltcut_project::Project, item: ItemId) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -1146,7 +1084,7 @@ pub(crate) fn request_peaks(app: &mut FilmcraftApp, item: ItemId, stream: usize)
     None
 }
 
-/// 45° hatching over `r` (transitions, and the empty end of a nested sequence clip).
+/// 45° hatching over `r` (the empty end of a nested sequence clip).
 fn paint_hatch(p: &egui::Painter, r: Rect) {
     let cp = p.with_clip_rect(r.intersect(p.clip_rect()));
     let step = 4.0;
@@ -1154,39 +1092,6 @@ fn paint_hatch(p: &egui::Painter, r: Rect) {
     while x < r.max.x {
         cp.line_segment([pos2(x, r.max.y), pos2(x + r.height(), r.min.y)], Stroke::new(1.0, Color32::from_rgba_unmultiplied(0xd9, 0xd9, 0xd9, 110)));
         x += step;
-    }
-}
-
-fn draw_transition(p: &egui::Painter, r: Rect, trn: &waltcut_project::Transition, selected: bool, t: &Tokens) {
-    let cp = p.with_clip_rect(r.intersect(p.clip_rect()));
-    cp.rect_filled(r, 0.0, Color32::from_black_alpha(90));
-    paint_hatch(p, r);
-    let audio = matches!(trn.effect.def().map(|d| d.kind), Some(waltcut_project::EffectKind::AudioTransition));
-    if audio {
-        // crossing fade curves
-        let n = 16;
-        let a: Vec<Pos2> = (0..=n)
-            .map(|i| {
-                pos2(r.min.x + r.width() * i as f32 / n as f32, r.min.y + r.height() * (1.0 - ((i as f32 / n as f32) * std::f32::consts::FRAC_PI_2).sin()))
-            })
-            .collect();
-        let b: Vec<Pos2> = (0..=n)
-            .map(|i| {
-                pos2(r.min.x + r.width() * i as f32 / n as f32, r.min.y + r.height() * (1.0 - ((i as f32 / n as f32) * std::f32::consts::FRAC_PI_2).cos()))
-            })
-            .collect();
-        cp.add(egui::Shape::line(a, Stroke::new(1.0, Color32::WHITE)));
-        cp.add(egui::Shape::line(b, Stroke::new(1.0, Color32::WHITE)));
-    }
-    cp.rect_stroke(r, 0.0, Stroke::new(1.0, Color32::from_rgb(0xeb, 0xeb, 0xeb)), StrokeKind::Inside);
-    if selected {
-        cp.rect_stroke(r, 0.0, Stroke::new(2.0, t.accent), StrokeKind::Inside);
-    }
-    if r.width() > 34.0 && !audio {
-        let name = trn.effect.def().map(|d| d.name).unwrap_or(&trn.effect.effect);
-        let tr = Rect::from_min_size(r.min + vec2(2.0, 2.0), vec2((r.width() - 4.0).min(80.0), 13.0));
-        cp.rect_filled(tr, 0.0, Color32::from_black_alpha(170));
-        cp.text(pos2(tr.min.x + 3.0, tr.center().y), Align2::LEFT_CENTER, name, Tokens::ui(10.5), Color32::from_rgb(0xd9, 0xd9, 0xd9));
     }
 }
 
@@ -1334,22 +1239,6 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             if mresp.clicked() {
                 actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "muted": !tr.muted})));
             }
-            let s2 = Rect::from_center_size(pos2(hrect.min.x + x + 20.0, upper_y), vec2(14.0, 14.0));
-            let so = crate::widgets::letter_toggle(
-                ui,
-                s2.intersect(visible),
-                "S",
-                tr.solo,
-                Color32::from_rgb(0xf0, 0xf0, 0x4f),
-                t,
-                egui::Id::new(("solo", r.track.0)),
-            );
-            app.auto.add(&format!("timeline.track.{label}.solo"), s2, "Solo Track");
-            if so.clicked() {
-                actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "solo": !tr.solo})));
-            }
-            let kr = small(x + 42.0, upper_y);
-            super::timeline_automation::header_button(app, ui, seq, r, kr, visible, &label, t);
         }
         // 5. name on the lower line (or inline when short)
         if hrect.height() >= 40.0 {
@@ -1388,7 +1277,7 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
         }
     }
     // column separator
-    ui.painter().line_segment([pos2(rect.min.x + hw - 0.5, vclip.min.y), pos2(rect.min.x + hw - 0.5, aclip.max.y + MASTER_H)], Stroke::new(1.0, t.separator));
+    ui.painter().line_segment([pos2(rect.min.x + hw - 0.5, vclip.min.y), pos2(rect.min.x + hw - 0.5, aclip.max.y)], Stroke::new(1.0, t.separator));
     for (cmd, params) in actions {
         if let Err(e) = app.session.execute(&cmd, params) {
             app.ui.status = e.to_string();
@@ -1786,7 +1675,6 @@ pub fn hit_json(app: &FilmcraftApp, pos: Pos2, mods: egui::Modifiers) -> Value {
         Hit::Clip { track, clip, edge } => {
             json!({"hit": "clip", "track": track.0, "clip": clip.0, "edge": edge.map(|e| format!("{e:?}")), "kind": kind, "time": t.0})
         }
-        Hit::Transition { track, id, edge } => json!({"hit": "transition", "track": track.0, "transition": id.0, "edge": edge.map(|e| format!("{e:?}"))}),
         Hit::Empty { track } => json!({"hit": "empty", "track": track.0, "time": t.0}),
         Hit::None => json!({"hit": "none"}),
     }
@@ -1866,38 +1754,6 @@ fn preview_drag(app: &FilmcraftApp, seq: &Sequence, out: &mut HashMap<ClipId, (T
     }
 }
 
-/// The transition a clip drag will leave behind, by the same rule `edit::move_items` applies:
-/// the transition travels when every clip it sits on moves — to one track, by the same (clamped)
-/// offset — and is dropped when only some of its clips move (a partner that stays behind ends the
-/// move, as in Premiere), shifted by that offset. The preview draws carried ones where they land,
-/// so a dragged clip's transition follows it instead of lagging behind until the drop, and a cut
-/// transition does not ride along on a clip whose partner stays. Returns the transition's
-/// `(start, end, destination track)` when the drag carries it.
-fn move_transition_preview(app: &FilmcraftApp, seq: &Sequence, trn: &waltcut_project::Transition) -> Option<(Tick, Tick, TrackId)> {
-    let Some(Drag::Move { clips, offset, track_delta, .. }) = &app.tl.drag else { return None };
-    let endpoints: Vec<ClipId> = [trn.from, trn.to].into_iter().flatten().collect();
-    // where each clip it sits on that moves lands (the same track shift as the clip preview), and
-    // by how much: clamped like the drop clamps each clip's start
-    let lands: Vec<(TrackId, Tick)> = endpoints
-        .iter()
-        .filter_map(|c| {
-            if !clips.contains(c) {
-                return None;
-            }
-            let (tid, it) = seq.find_item(*c)?;
-            let dest = shift_track(seq, tid, *track_delta)?;
-            Some((dest, (it.start + *offset).max(Tick::ZERO) - it.start))
-        })
-        .collect();
-    // every clip it sits on must move to one track by one offset; one staying behind keeps the
-    // transition where it is (and the drop does not carry it either)
-    if lands.len() != endpoints.len() {
-        return None;
-    }
-    let &(dest, delta) = lands.first()?;
-    lands.iter().skip(1).all(|l| *l == (dest, delta)).then(|| (trn.start + delta, trn.end() + delta, dest))
-}
-
 /// The clips a marquee rectangle touches, on the tracks it crosses.
 fn marquee_clips(seq: &Sequence, layout: &Layout, r: Rect) -> Vec<ClipId> {
     let (a, b) = (layout.tick_at(r.min.x), layout.tick_at(r.max.x));
@@ -1916,7 +1772,6 @@ fn drag_is_locked(session: &waltcut_engine::Session, seq: &Sequence, drag: &Drag
         Drag::Move { clips, track_delta, .. } => return move_is_locked(seq, clips, *track_delta),
         Drag::Trim { clip, .. } | Drag::Stretch { clip, .. } | Drag::Slip { clip, .. } | Drag::Slide { clip, .. } => vec![*clip],
         Drag::Roll { left, right, .. } => vec![*left, *right],
-        Drag::Transition { id, .. } => return seq.all_tracks().any(|t| t.locked && t.transitions.iter().any(|tr| tr.id == *id)),
         _ => return false,
     };
     move_is_locked(seq, &waltcut_engine::commands::with_links(session, &clips), 0)
@@ -2002,8 +1857,7 @@ pub(crate) const CLIP_MENU: &[&[(&str, &str)]] = &[
 ];
 
 /// The cut right-clicked on a track (#219): the clip ending there and the clip starting there,
-/// either missing at the ends of a gap. Its menu offers the edit point's trim types, Apply Default
-/// Transitions and Join Through Edits, like Premiere's edit point menu.
+/// either missing at the ends of a gap. Its menu offers the edit point's trim types and Join Through Edits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct EditPointTarget {
     left: Option<ClipId>,
@@ -2032,7 +1886,7 @@ pub(crate) const EDIT_POINT_TYPES: &[(&str, &str, &str, waltcut_edit::Edge)] = &
 ];
 
 /// The edit point context menu (#219).
-fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::Ui, seq: &Sequence, target: EditPointTarget) {
+fn edit_point_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, target: EditPointTarget) {
     let selected = app.session.state.edit_points.first().copied();
     for &(label, id, kind, edge) in EDIT_POINT_TYPES {
         let clip = match edge {
@@ -2058,15 +1912,6 @@ fn edit_point_menu(app: &mut FilmcraftApp, ctx: &egui::Context, ui: &mut egui::U
         }
     }
     ui.separator();
-    let label = tl!("Apply Default Transitions");
-    let r = ui.add_enabled(app.session.is_enabled("trim.applyDefaultTransition"), egui::Button::new(label));
-    app.auto.add("timeline.editPointMenu.applyDefaultTransitions", r.rect, label);
-    if r.clicked() {
-        if let Err(e) = crate::menus::invoke(app, ctx, "trim.applyDefaultTransition", json!({})) {
-            app.ui.status = e;
-        }
-        ui.close();
-    }
     // only this cut (and its linked partners), and only when it is a through edit
     let through = waltcut_edit::through::through_edits(seq).iter().any(|e| Some(e.left) == target.left && Some(e.right) == target.right);
     let label = tl!("Join Through Edits");
@@ -2242,9 +2087,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         } else {
             match (tool, g) {
                 (_, Grab::Edge { .. }) => CursorIcon::ResizeColumn,
-                (Tool::Selection, Grab::Other(Hit::Transition { edge: Some(_), .. })) => CursorIcon::ResizeColumn,
-                (Tool::Selection, Grab::Other(Hit::Transition { edge: None, .. })) => CursorIcon::Grab,
-                (_, Grab::Volume { .. }) if tool == Tool::Pen || mods.command => CursorIcon::Crosshair,
                 (_, Grab::Volume { .. }) => CursorIcon::ResizeVertical,
                 (Tool::Razor, Grab::Other(Hit::Clip { .. })) => CursorIcon::Crosshair,
                 (Tool::Slip | Tool::Slide, Grab::Other(Hit::Clip { .. })) => CursorIcon::ResizeHorizontal,
@@ -2318,11 +2160,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 }
                 None
             }
-            // a transition over a cut counts as its track, as the clips under it do
-            (
-                Tool::TrackSelectForward | Tool::TrackSelectBackward,
-                Grab::Other(Hit::Clip { track, .. } | Hit::Transition { track, .. } | Hit::Empty { track }),
-            ) => {
+            (Tool::TrackSelectForward | Tool::TrackSelectBackward, Grab::Other(Hit::Clip { track, .. } | Hit::Empty { track })) => {
                 let fwd = tool == Tool::TrackSelectForward;
                 let ids: Vec<u64> = seq
                     .all_tracks()
@@ -2372,10 +2210,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 EdgeKind::Stretch => Drag::Stretch { clip, edge, delta: Tick::ZERO, from: t },
             }),
             (_, Grab::Volume { clip, .. }) if resp.drag_started() => super::timeline_volume::start(seq, layout, clip, p).map(Drag::Volume),
-            (_, Grab::Volume { clip, .. }) => {
-                super::timeline_volume::add_keyframe(app, seq, layout, clip, p.x);
-                None
-            }
+            (_, Grab::Volume { .. }) => None,
             (Tool::Slip, Grab::Other(Hit::Clip { clip, .. })) => Some(Drag::Slip { clip, delta: Tick::ZERO }),
             (Tool::Slide, Grab::Other(Hit::Clip { clip, .. })) => Some(Drag::Slide { clip, delta: Tick::ZERO }),
             (_, Grab::Other(Hit::Clip { clip, track, .. })) => {
@@ -2394,23 +2229,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     None
                 }
             }
-            // click a transition to select it (Shift adds / removes); drag an end to change its
-            // duration or its middle to slide it over the cut (#430, #224)
-            (Tool::Selection, Grab::Other(Hit::Transition { id, edge, .. })) => {
-                // a drag of a selected transition (Shift too) moves it rather than toggling it out first
-                if !(app.session.state.transition_selection.contains(&id) && resp.drag_started()) {
-                    let r = app.session.execute("timeline.select", json!({"transitions": [id.0], "toggle": mods.shift}));
-                    if let Err(e) = r {
-                        app.ui.status = e.to_string();
-                    }
-                }
-                let span = seq.all_tracks().find_map(|tr| tr.transitions.iter().find(|x| x.id == id)).map(|x| (x.start, x.duration));
-                match span {
-                    Some((start, duration)) if resp.drag_started() => Some(Drag::Transition { id, edge, from: t, start, duration }),
-                    _ => None,
-                }
-            }
-            (_, Grab::Other(Hit::Transition { .. })) => None,
             // empty space: an empty stretch of a track, or no track at all (below the tracks, between
             // the video and audio tracks, #683)
             (_, Grab::Other(hit @ (Hit::Empty { .. } | Hit::None))) if layout.content.contains(p) => {
@@ -2419,7 +2237,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 } else {
                     app.session.state.selection.clear();
                     app.session.state.edit_points.clear();
-                    app.session.state.transition_selection.clear();
                     // empty time between clips: select the gap, for Delete to close it (#648, #668)
                     let gap = match hit {
                         Hit::Empty { track } => app.session.execute("timeline.selectGap", json!({"track": track.0, "time": t.0})).is_ok(),
@@ -2555,14 +2372,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 let origin = ctx.input(|i| i.pointer.press_origin()).map(|o| layout.tick_at(o.x)).unwrap_or(t_here);
                 Some(Drag::Slide { clip, delta: rate.snap_nearest(t_here - origin) })
             }
-            Drag::Transition { id, edge, from, start, duration } => {
-                let delta = rate.snap_nearest(t_here - from);
-                let span = seq.all_tracks().find_map(|tr| {
-                    tr.transitions.iter().find(|x| x.id == id).and_then(|x| waltcut_edit::transitions::drag_span(tr, x, edge, delta, rate.frame_duration()))
-                });
-                let (start, duration) = span.unwrap_or((start, duration));
-                Some(Drag::Transition { id, edge, from, start, duration })
-            }
             Drag::Volume(v) => Some(Drag::Volume(super::timeline_volume::drag(app, ui, seq, layout, v, p.y))),
             Drag::Marquee { start, before, add, individual } => {
                 let r = Rect::from_two_pos(start, p);
@@ -2627,10 +2436,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 Drag::Roll { left, right, delta, .. } if delta != Tick::ZERO => Some(app.session.execute("timeline.roll", json!({"left": left.0, "right": right.0, "delta": delta.0}))),
                 Drag::Slip { clip, delta } if delta != Tick::ZERO => Some(app.session.execute("timeline.slip", json!({"clip": clip.0, "delta": delta.0}))),
                 Drag::Slide { clip, delta } if delta != Tick::ZERO => Some(app.session.execute("timeline.slide", json!({"clip": clip.0, "delta": delta.0}))),
-                Drag::Transition { id, start, duration, .. } => {
-                    let moved = seq.all_tracks().find_map(|tr| tr.transitions.iter().find(|x| x.id == id)).is_some_and(|x| (x.start, x.duration) != (start, duration));
-                    moved.then(|| app.session.execute("sequence.setTransition", json!({"transition": id.0, "start": start.0, "duration": duration.0})))
-                }
                 Drag::Marquee { start, before, add, individual } => {
                     app.session.state.selection = before;
                     // egui ends a drag on Escape: that cancels the box, as in the Project panel
@@ -2650,15 +2455,6 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         } else {
             app.tl.drag = None;
         }
-    }
-
-    // ---- double-click a transition: Set Transition Duration (Premiere)
-    if resp.double_clicked()
-        && tool == Tool::Selection
-        && let Some(p) = resp.interact_pointer_pos()
-        && let Hit::Transition { id, .. } = hit(seq, layout, p)
-    {
-        crate::panels::transition_controls::open_duration(app, id);
     }
 
     // ---- double-click a nested sequence clip: open it in its own Timeline tab
@@ -2752,7 +2548,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             return;
         }
         if let Some(target) = ctx.data(|d| d.get_temp::<Option<EditPointTarget>>(edit_point_menu_id)).flatten() {
-            edit_point_menu(app, &ctx, ui, seq, target);
+            edit_point_menu(app, ui, seq, target);
             return;
         }
         if ctx.data(|d| d.get_temp::<bool>(gap_menu_id)).unwrap_or(false) {
@@ -2891,41 +2687,13 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         && let Some(row) = layout.rows.iter().find(|r| r.track == tid)
     {
         {
-            let transition_kind = waltcut_project::find_effect(&effect).and_then(|d| match d.kind {
-                waltcut_project::EffectKind::AudioTransition => Some(TrackKind::Audio),
-                _ => None,
-            });
-            let edge = if p.x - layout.x_of(it.start) < layout.x_of(it.end()) - p.x { "in" } else { "out" };
-            let params = json!({"effect": effect, "clip": clip.0, "edge": edge});
-            if let Some(kind) = transition_kind {
-                if let Ok((_, tr)) = waltcut_engine::commands::preview_transition(&app.session, &params, kind) {
-                    let r = Rect::from_min_max(pos2(layout.x_of(tr.start), row.rect.min.y + 1.0), pos2(layout.x_of(tr.end()), row.rect.max.y - 1.0));
-                    let painter = ui.painter().with_clip_rect(layout.content);
-                    painter.rect_filled(r, 2.0, app.tokens.accent.gamma_multiply(0.35));
-                    paint_hatch(&painter, r.intersect(layout.content));
-                    painter.rect_stroke(r, 2.0, Stroke::new(2.0, app.tokens.accent), StrokeKind::Inside);
-                    let cut = if edge == "in" { it.start } else { it.end() };
-                    let x = layout.x_of(cut);
-                    painter.line_segment([pos2(x, r.top()), pos2(x, r.bottom())], Stroke::new(3.0, app.tokens.accent));
-                    // Keep the edge label readable even when the clip/transition is only a few pixels wide.
-                    let label = if edge == "in" { tl!("In") } else { tl!("Out") };
-                    let label_width = painter.layout_no_wrap(label.to_string(), Tokens::ui(11.0), app.tokens.accent).size().x + 8.0;
-                    let label_rect = Rect::from_center_size(pos2(p.x, row.rect.top() + 10.0), vec2(label_width, 15.0));
-                    painter.rect_filled(label_rect, 2.0, app.tokens.panel_bg);
-                    painter.text(label_rect.center(), Align2::CENTER_CENTER, label, Tokens::ui(11.0), app.tokens.accent);
-                    app.auto.add("timeline.transitionDropPreview", r.intersect(layout.content), edge);
-                }
-            } else {
-                let r = Rect::from_min_max(pos2(layout.x_of(it.start), row.rect.min.y), pos2(layout.x_of(it.end()), row.rect.max.y));
-                ui.painter().rect_stroke(r, 3.0, Stroke::new(2.0, app.tokens.accent), StrokeKind::Inside);
-            }
+            let r = Rect::from_min_max(pos2(layout.x_of(it.start), row.rect.min.y), pos2(layout.x_of(it.end()), row.rect.max.y));
+            ui.painter().rect_stroke(r, 3.0, Stroke::new(2.0, app.tokens.accent), StrokeKind::Inside);
             if ctx.input(|i| i.pointer.any_released()) {
                 let r = if let Some(name) = effect.strip_prefix("preset:") {
                     app.session.execute("presets.apply", json!({"preset": name, "clips": [clip.0]}))
-                } else if transition_kind.is_some() {
-                    app.session.execute("effects.apply", params)
                 } else {
-                    app.session.execute("effects.apply", json!({"effect": effect, "clips": [clip.0]}))
+                    Err(waltcut_engine::EngineError::Other("only retained presets can be dropped onto clips".into()))
                 };
                 if let Err(e) = r {
                     app.ui.status = e.to_string();
@@ -3120,15 +2888,15 @@ mod waveform_tests {
     #[test]
     fn normalisation_is_capped_for_near_silent_sources() {
         // a −14 dBFS recording is normalised to full scale (+12 dB cap reached: −2 dBFS)
-        assert!((db(0.2 * waveform_display_gain(0.2, 0.0)) - (-2.0)).abs() < 0.1);
+        assert!((db(0.2 * waveform_display_gain(0.2, 1.0)) - (-2.0)).abs() < 0.1);
         // a −3 dBFS recording is normalised exactly
-        assert!((db(0.708 * waveform_display_gain(0.708, 0.0))).abs() < 0.1);
+        assert!((db(0.708 * waveform_display_gain(0.708, 1.0))).abs() < 0.1);
         // a −52 dBFS "silent" stream stays near the floor of the −48 dB display range
-        assert!(db(0.0025 * waveform_display_gain(0.0025, 0.0)) < -39.0);
+        assert!(db(0.0025 * waveform_display_gain(0.0025, 1.0)) < -39.0);
         // digital silence does not blow up
-        assert!(waveform_display_gain(0.0, 0.0).is_finite());
+        assert!(waveform_display_gain(0.0, 1.0).is_finite());
         // clip gain still applies
-        assert!((db(waveform_display_gain(1.0, -6.0)) - (-6.0)).abs() < 0.1);
+        assert!((waveform_display_gain(1.0, 0.25) - 0.25).abs() < 1e-6);
     }
 }
 #[cfg(test)]
@@ -3203,19 +2971,18 @@ mod new_track_tests {
     use waltcut_project::{Project, SequenceSettings};
 
     /// #483: a drop above the top video track adds a video track, one below the last audio track an
-    /// audio track; over a track, between the areas or on the Mix row it adds none.
+    /// audio track; over a track or between the areas it adds none.
     #[test]
     fn empty_space_past_the_tracks_adds_a_track() {
         let mut p = Project::new("t");
         let id = p.new_sequence("s", SequenceSettings::default(), 1, 1, None);
         let seq = p.sequence(id).cloned().expect("sequence");
-        // video area 0..200 (V1 at 150..200), divider, audio area 205..466 (A1 at 205..255), Mix 466..500
+        // video area 0..200 (V1 at 150..200), divider, audio area 205..500 (A1 at 205..255)
         let row = |kind, track: &waltcut_project::Track, y0: f32| Row {
             track: track.id,
             kind,
             index: 0,
             rect: Rect::from_min_max(pos2(0.0, y0), pos2(800.0, y0 + 50.0)),
-            lane: false,
         };
         let layout = Layout {
             content: Rect::from_min_max(pos2(0.0, 0.0), pos2(800.0, 500.0)),
@@ -3228,7 +2995,7 @@ mod new_track_tests {
         let at = |y| new_track_at(&layout, y, 50.0, 50.0);
         assert_eq!(at(40.0), Some((TrackKind::Video, Rect::from_min_max(pos2(0.0, 100.0), pos2(800.0, 150.0)))));
         assert_eq!(at(300.0), Some((TrackKind::Audio, Rect::from_min_max(pos2(0.0, 255.0), pos2(800.0, 305.0)))));
-        for y in [160.0, 202.0, 230.0, 480.0] {
+        for y in [160.0, 202.0, 230.0] {
             assert_eq!(at(y), None, "y = {y}");
         }
     }
@@ -3249,13 +3016,7 @@ mod new_track_tests {
             .iter()
             .zip(&tops)
             .enumerate()
-            .map(|(index, (t, &y0))| Row {
-                track: t.id,
-                kind: TrackKind::Video,
-                index,
-                rect: Rect::from_min_max(pos2(0.0, y0), pos2(800.0, y0 + 50.0)),
-                lane: false,
-            })
+            .map(|(index, (t, &y0))| Row { track: t.id, kind: TrackKind::Video, index, rect: Rect::from_min_max(pos2(0.0, y0), pos2(800.0, y0 + 50.0)) })
             .collect();
         let layout = Layout {
             content: Rect::from_min_max(pos2(0.0, 0.0), pos2(800.0, 500.0)),

@@ -77,10 +77,10 @@ impl Driver {
         self.harness.state_mut()
     }
 
-    /// (video, audio, submix) track names of the active sequence, lowest first.
-    fn tracks(&mut self) -> [Vec<String>; 3] {
+    /// (video, audio) track names of the active sequence, lowest first.
+    fn tracks(&mut self) -> [Vec<String>; 2] {
         let q = self.app().session.active_sequence().unwrap();
-        [&q.video_tracks, &q.audio_tracks, &q.submix_tracks].map(|t| t.iter().map(|t| t.name.clone()).collect())
+        [&q.video_tracks, &q.audio_tracks].map(|t| t.iter().map(|t| t.name.clone()).collect())
     }
 
     fn label(&mut self, id: &str) -> String {
@@ -140,16 +140,14 @@ impl Driver {
 }
 
 /// Sequence ▸ Add Tracks… opens Premiere Pro's dialog instead of adding a video track at once:
-/// amounts, a placement and (for audio and submix tracks) a track type for each kind, with
-/// Premiere's defaults (one video and one audio track after the last ones, no submix track).
+/// amounts, a placement and stereo/mono audio track type.
 #[test]
 fn add_tracks_dialog_offers_amount_placement_and_type() {
     let mut d = Driver::demo();
     let before = d.tracks();
     assert_eq!(
         before,
-        [vec!["Video 1", "Video 2", "Video 3"], vec!["Audio 1", "Audio 2", "Audio 3"], vec![]]
-            .map(|v: Vec<&str>| v.into_iter().map(String::from).collect::<Vec<_>>())
+        [vec!["Video 1", "Video 2", "Video 3"], vec!["Audio 1", "Audio 2", "Audio 3"]].map(|v: Vec<&str>| v.into_iter().map(String::from).collect::<Vec<_>>())
     );
     let r = d.ok("ui.menu.invoke", json!({"id": "sequence.addTracks"}));
     assert_eq!(r["dialog"], "addTracks", "{r}");
@@ -162,9 +160,6 @@ fn add_tracks_dialog_offers_amount_placement_and_type() {
         "addTracks.audio.amount",
         "addTracks.audio.placement",
         "addTracks.audio.type",
-        "addTracks.submix.amount",
-        "addTracks.submix.placement",
-        "addTracks.submix.type",
         "addTracks.ok",
         "addTracks.cancel",
     ] {
@@ -177,18 +172,15 @@ fn add_tracks_dialog_offers_amount_placement_and_type() {
         ("addTracks.video.placement", "After Video 3"),
         ("addTracks.audio.amount", "1"),
         ("addTracks.audio.placement", "After Audio 3"),
-        ("addTracks.audio.type", "Standard"),
-        ("addTracks.submix.amount", "0"),
-        ("addTracks.submix.placement", "Before First Track"),
-        ("addTracks.submix.type", "Stereo"),
+        ("addTracks.audio.type", "Stereo"),
     ] {
         assert_eq!(d.label(id), shown, "{id}");
     }
     // OK with the defaults: one video and one audio track after the last ones
     d.click("addTracks.ok");
     assert!(d.ids("addTracks.").is_empty(), "dialog closed");
-    let [v, a, s] = d.tracks();
-    assert_eq!((v.len(), a.len(), s.len()), (4, 4, 0));
+    let [v, a] = d.tracks();
+    assert_eq!((v.len(), a.len()), (4, 4));
     assert_eq!((v[3].as_str(), a[3].as_str()), ("Video 4", "Audio 4"));
     assert_eq!(d.app().session.active_sequence().unwrap().audio_tracks[3].channels, waltcut_engine::project::AudioChannels::Stereo);
     // one undo step for the whole dialog
@@ -217,43 +209,26 @@ fn add_tracks_dialog_places_and_types_the_new_tracks() {
     d.click("addTracks.audio.placement.option.0");
     d.click("addTracks.audio.type");
     let types = d.ids("addTracks.audio.type.option.");
-    assert_eq!(types.len(), 4, "Standard, 5.1, Adaptive, Mono: {types:?}");
+    assert_eq!(types.len(), 2, "Stereo and Mono: {types:?}");
     d.click("addTracks.audio.type.option.mono");
-    // submix: 5.1 (the types are Stereo, 5.1, Adaptive, Mono)
-    d.click("addTracks.submix.type");
-    assert!(
-        d.ids("addTracks.submix.type.option.").iter().any(|i| i.ends_with(".stereo"))
-            && !d.ids("addTracks.submix.type.option.").iter().any(|i| i.ends_with(".standard"))
-    );
-    d.click("addTracks.submix.type.option.5.1");
-    // amounts (number fields): two video tracks, one audio, one submix
+    // amounts (number fields): two video tracks, one audio
     d.app().ui.add_tracks.video = 2;
-    d.app().ui.add_tracks.submix = 1;
     d.frames(2);
-    assert_eq!((d.label("addTracks.video.amount"), d.label("addTracks.submix.amount")), ("2".into(), "1".into()));
+    assert_eq!(d.label("addTracks.video.amount"), "2");
     d.click("addTracks.ok");
     assert!(d.ids("addTracks.").is_empty(), "dialog closed");
-    let [v, a, s] = d.tracks();
+    let [v, a] = d.tracks();
     assert_eq!(v, ["Video 1", "Video 2", "Video 3", "Video 4", "Video 5"]);
     assert_eq!(a, ["Audio 1", "Audio 2", "Audio 3", "Audio 4"]);
-    assert_eq!(s, ["Submix 1"]);
     let q = d.app().session.active_sequence().unwrap().clone();
     assert!(q.video_tracks[1].items.is_empty() && q.video_tracks[2].items.is_empty(), "the new tracks are after Video 1");
     assert_eq!(q.video_tracks[3].items[0].id, on_v2, "what was on Video 2 moved up to Video 4");
     use waltcut_engine::project::AudioChannels;
     assert_eq!((q.audio_tracks[0].channels, q.audio_tracks[0].items.len()), (AudioChannels::Mono, 0));
-    assert_eq!(q.submix_tracks[0].channels, AudioChannels::Surround51);
-
-    // with a submix track in the sequence its placement can be chosen too
+    // Cancel and Escape add nothing; neither does OK with every amount at 0
     d.ok("ui.menu.invoke", json!({"id": "sequence.addTracks"}));
     d.frames(3);
-    assert_eq!(d.label("addTracks.submix.placement"), "After Submix 1");
-    assert_eq!(
-        (d.label("addTracks.video.amount"), d.label("addTracks.audio.type")),
-        ("1".into(), "Standard".into()),
-        "the dialog starts from the defaults again"
-    );
-    // Cancel and Escape add nothing; neither does OK with every amount at 0
+    assert_eq!(d.label("addTracks.audio.type"), "Stereo", "the dialog starts from its defaults again");
     d.click("addTracks.cancel");
     assert!(d.ids("addTracks.").is_empty());
     d.ok("ui.menu.invoke", json!({"id": "sequence.addTracks"}));
@@ -268,7 +243,7 @@ fn add_tracks_dialog_places_and_types_the_new_tracks() {
     d.frames(2);
     d.click("addTracks.ok");
     assert!(d.ids("addTracks.").is_empty());
-    assert_eq!(d.tracks(), [v, a, s]);
+    assert_eq!(d.tracks(), [v, a]);
     assert!(d.app().ui.status.is_empty(), "{}", d.app().ui.status);
 }
 
@@ -522,14 +497,14 @@ fn sequence_settings_dialog_shows_the_sequence() {
         ("sequenceSettings.par", "Square Pixels (1.0)"),
         ("sequenceSettings.fields", "No Fields (Progressive Scan)"),
         ("sequenceSettings.videoDisplay", "23.976 fps Timecode"),
-        ("sequenceSettings.channelFormat", "Stereo"),
-        ("sequenceSettings.channels", "2"),
         ("sequenceSettings.sampleRate", "48000 Hz"),
         ("sequenceSettings.maxRenderQuality", "false"),
         ("sequenceSettings.linearColor", "true"),
     ] {
         assert_eq!(d.label(id), shown, "{id}");
     }
+    assert!(d.ids("sequenceSettings.channelFormat").is_empty());
+    assert!(d.ids("sequenceSettings.channels").is_empty());
     for id in ["sequenceSettings.tab.general", "sequenceSettings.tab.color", "sequenceSettings.tab.vr", "sequenceSettings.ok", "sequenceSettings.cancel"] {
         assert!(d.ids(id).iter().any(|i| i == id), "{id} missing");
     }

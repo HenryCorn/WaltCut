@@ -109,7 +109,7 @@ fn new_text_makes_a_graphic_clip_above_the_footage() {
     assert_eq!(it.name, "Hello");
     assert!(matches!(s.project.item(it.item).unwrap().kind, ItemKind::Graphic { .. }));
     assert_eq!(it.duration, q.settings.frame_rate.snap_nearest(Tick::from_seconds_f64(5.0)));
-    assert!(!it.has_standard_effects(), "layers are not fx");
+    assert!(!it.has_modified_intrinsics(), "layers do not modify Motion/Opacity");
     assert_eq!(s.state.selection, vec![clip]);
     let ls = layers(&s, clip);
     assert_eq!(ls.len(), 1);

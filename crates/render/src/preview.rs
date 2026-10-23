@@ -173,10 +173,8 @@ pub struct AudioSegment {
     pub hash: String,
 }
 
-/// Audio segments of sequence `seq_id`: cut at every audio clip and audio transition edge. The
-/// hash covers the mix-wide state (master volume/effects, every track's mute/solo/volume/pan/
-/// effects) and, per track, the clip or transition heard, relative to the segment start. Effect
-/// tails (delay, reverb) carried across a cut from the previous segment are not part of the hash.
+/// Audio segments of sequence `seq_id`, cut at clip boundaries. Hash the source, clip Volume
+/// automation and gain, plus track mute/enabled state, relative to the segment start.
 pub fn audio_segments(project: &Project, seq_id: ItemId) -> Vec<AudioSegment> {
     let Some(seq) = project.sequence(seq_id) else { return Vec::new() };
     let sr = seq.settings.sample_rate.max(1) as i64;
@@ -190,21 +188,14 @@ pub fn audio_segments(project: &Project, seq_id: ItemId) -> Vec<AudioSegment> {
             cuts.push(ceil(it.start));
             cuts.push(ceil(it.end()));
         }
-        for x in &tr.transitions {
-            cuts.push(ceil(x.start));
-            cuts.push(ceil(x.end()));
-        }
     }
     cuts.sort_unstable();
     cuts.dedup();
-    let any_solo = seq.audio_tracks.iter().any(|t| t.solo);
     let mut global = Fnv128::new();
-    global.json(&(HASH_VERSION, "audio", sr, seq.master_volume_db, &seq.master_effects, &seq.master_mixer, any_solo));
+    global.json(&(HASH_VERSION, "audio", sr));
     for (ti, tr) in seq.audio_tracks.iter().enumerate() {
-        global.json(&(ti, tr.muted, tr.solo, tr.volume_db, tr.pan, tr.channels, &tr.effects, &tr.mixer));
+        global.json(&(ti, tr.muted, tr.enabled, tr.channels));
     }
-    // submixes (routing, inserts, automation) affect every segment
-    global.json(&seq.submix_tracks);
     let mut out = Vec::new();
     for w in cuts.windows(2) {
         let (a, b) = (w[0], w[1]);
@@ -216,26 +207,10 @@ pub fn audio_segments(project: &Project, seq_id: ItemId) -> Vec<AudioSegment> {
         h.json(&(b - a));
         let mut heard = false;
         for (ti, tr) in seq.audio_tracks.iter().enumerate() {
-            if tr.muted || (any_solo && !tr.solo) {
+            if tr.muted || !tr.enabled {
                 continue;
             }
-            if let Some(x) = tr.transitions.iter().find(|x| x.range().contains(t)) {
-                let mut xc = x.clone();
-                xc.id = Default::default();
-                xc.start -= t;
-                xc.from = None;
-                xc.to = None;
-                h.json(&("transition", ti, &xc));
-                for side in [x.from, x.to] {
-                    match side.and_then(|id| tr.item(id)).filter(|i| i.enabled) {
-                        Some(it) => {
-                            hash_item(&mut h, project, it, t, TrackKind::Audio, 0);
-                            heard = true;
-                        }
-                        None => h.json(&"none"),
-                    }
-                }
-            } else if let Some(it) = tr.item_at(t).filter(|i| i.enabled) {
+            if let Some(it) = tr.item_at(t).filter(|i| i.enabled) {
                 h.json(&("item", ti));
                 hash_item(&mut h, project, it, t, TrackKind::Audio, 0);
                 heard = true;
@@ -294,16 +269,10 @@ fn hash_source(h: &mut Fnv128, project: &Project, id: ItemId, kind: TrackKind, d
             h.json(&("sequence", &s.settings));
             if kind == TrackKind::Audio {
                 // the nest's sound is the nested sequence's whole mix (see `audio_segments`)
-                h.json(&("mix", s.master_volume_db, &s.master_effects, &s.master_mixer, &s.submix_tracks));
                 for (ti, tr) in s.audio_tracks.iter().enumerate() {
-                    h.json(&("track", ti, tr.muted, tr.solo, tr.volume_db, tr.pan, tr.channels, &tr.effects, &tr.mixer, tr.items.len()));
+                    h.json(&("track", ti, tr.muted, tr.enabled, tr.channels, tr.items.len()));
                     for it in &tr.items {
                         hash_item(h, project, it, Tick::ZERO, kind, depth + 1);
-                    }
-                    for x in &tr.transitions {
-                        let mut xc = x.clone();
-                        xc.id = Default::default();
-                        h.json(&xc);
                     }
                 }
                 return;
@@ -384,7 +353,7 @@ fn estimate_cost(project: &Project, seq: &Sequence, layers: &[Layer]) -> f64 {
 /// A single clip that plays natively: untouched intrinsic effects, normal speed,
 /// source frame size and rate equal to the sequence's.
 fn native(project: &Project, seq: &Sequence, it: &TrackItem) -> bool {
-    if it.has_standard_effects() || it.has_modified_intrinsics() || (it.speed - 1.0).abs() > 1e-9 || it.reverse || it.frame_hold.is_some() {
+    if it.has_modified_intrinsics() || (it.speed - 1.0).abs() > 1e-9 || it.reverse || it.frame_hold.is_some() {
         return false;
     }
     match project.item(it.item).map(|p| &p.kind) {

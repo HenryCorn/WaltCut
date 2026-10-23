@@ -21,12 +21,9 @@ fn removed_video_catalogue_commands_and_ids_are_rejected() {
     }
     assert_eq!(s.project, before);
     let listing = s.execute("effects.list", json!({})).unwrap();
-    assert!(
-        listing
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|e| { !e["path"].as_str().unwrap().starts_with("Video Effects") && !e["path"].as_str().unwrap().starts_with("Video Transitions") })
+    assert_eq!(
+        listing.as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()).collect::<Vec<_>>(),
+        ["motion", "opacity", "volume", "graphic_text", "graphic_shape"]
     );
     assert!(s.execute("effects.list", json!({"kind": "VideoTransition"})).unwrap().as_array().unwrap().is_empty());
 }
@@ -43,7 +40,9 @@ fn removed_effect_preset_imports_fail_without_rewriting_the_source_or_library() 
         .join(format!("removed-video-presets-{}.json", std::process::id()));
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let preset = crate::presets::builtin_presets().into_iter().find(|p| p.name == "Fade In").unwrap();
-    for removed in ["gaussian_blur", "tint", "cross_dissolve"] {
+    for removed in
+        ["gaussian_blur", "tint", "cross_dissolve", "parametric_eq", "hard_limiter", "channel_volume", "panner", "constant_power", "exponential_fade"]
+    {
         let mut source = json!({"format": "filmcraft.effect-presets", "version": 1, "presets": [preset]});
         source["presets"][0]["effects"][0]["effect"] = json!(removed);
         let bytes = serde_json::to_vec(&source).unwrap();

@@ -279,28 +279,17 @@ impl Default for MediaPrefs {
     }
 }
 
-/// Preferences ▸ Audio (the mixer-automation part) and the Track Mixer panel-menu toggle.
+/// Preferences ▸ Audio.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AudioPrefs {
-    /// "Automatch Time" (s): how long Touch takes to return to the existing automation.
-    pub automatch_time: f64,
     /// "Large Volume Adjustment" (dB) for the Increase/Decrease Clip Volume Many commands.
     pub large_volume_adjustment: f64,
-    /// Automation Keyframe Optimization: "Linear keyframe thinning".
-    pub linear_keyframe_thinning: bool,
-    /// "Minimum time interval thinning".
-    pub minimum_time_interval_thinning: bool,
-    /// "Minimum time" (ms).
-    pub minimum_time_ms: u32,
-    /// Track Mixer ▸ "Switch to Touch after Write".
-    pub switch_to_touch_after_write: bool,
     /// "5.1 Mixdown Type": `front` | `frontRear` | `frontLfe` | `frontRearLfe`.
     pub mixdown_type: String,
     pub sum_to_mono_in_source: bool,
     pub scrub_audio: bool,
     pub maintain_pitch_shuttling: bool,
-    pub mute_input_during_recording: bool,
     pub generate_waveforms_on_import: bool,
     pub multithreaded_waveforms: bool,
     pub render_audio_with_video: bool,
@@ -311,17 +300,11 @@ pub struct AudioPrefs {
 impl Default for AudioPrefs {
     fn default() -> Self {
         Self {
-            automatch_time: 1.0,
             large_volume_adjustment: 6.0,
-            linear_keyframe_thinning: true,
-            minimum_time_interval_thinning: false,
-            minimum_time_ms: 20,
-            switch_to_touch_after_write: true,
             mixdown_type: "frontRear".into(),
             sum_to_mono_in_source: true,
             scrub_audio: true,
             maintain_pitch_shuttling: true,
-            mute_input_during_recording: false,
             generate_waveforms_on_import: true,
             multithreaded_waveforms: false,
             render_audio_with_video: false,
@@ -332,9 +315,7 @@ impl Default for AudioPrefs {
 
 impl AudioPrefs {
     fn clamp(&mut self) {
-        self.automatch_time = if self.automatch_time.is_finite() { self.automatch_time.clamp(0.0, 30.0) } else { 1.0 };
         self.large_volume_adjustment = if self.large_volume_adjustment.is_finite() { self.large_volume_adjustment.clamp(0.0, 96.0) } else { 6.0 };
-        self.minimum_time_ms = self.minimum_time_ms.clamp(1, 10_000);
     }
 }
 

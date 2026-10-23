@@ -252,7 +252,7 @@ fn targeting_toggles() {
 }
 
 fn level(s: &Session, id: u64) -> f64 {
-    clip(s, id).effect("volume").unwrap().params["level"].value.as_f64().unwrap()
+    clip(s, id).gain_db
 }
 
 #[test]

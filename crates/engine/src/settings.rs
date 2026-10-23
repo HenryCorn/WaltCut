@@ -657,8 +657,6 @@ impl Default for MemoryPrefs {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct TimelinePrefs {
-    pub audio_transition_duration: f64,
-    pub audio_transition_unit: String,
     pub still_image_duration: f64,
     pub still_image_unit: String,
     /// "Timeline Playback Auto-Scrolling": `noScroll` | `pageScroll` | `smoothScroll`.
@@ -686,8 +684,6 @@ pub struct TimelinePrefs {
 impl Default for TimelinePrefs {
     fn default() -> Self {
         Self {
-            audio_transition_duration: 1.0,
-            audio_transition_unit: "seconds".into(),
             still_image_duration: 5.0,
             still_image_unit: "seconds".into(),
             auto_scroll: "pageScroll".into(),
@@ -719,10 +715,6 @@ impl TimelinePrefs {
     /// "Still Image Default Duration" at a sequence rate (whole frames, at least one).
     pub fn still_duration(&self, rate: FrameRate) -> Tick {
         duration_in(self.still_image_duration, &self.still_image_unit, rate)
-    }
-    /// "Audio Transition Default Duration".
-    pub fn audio_transition_duration(&self, rate: FrameRate) -> Tick {
-        duration_in(self.audio_transition_duration, &self.audio_transition_unit, rate)
     }
 }
 
@@ -967,24 +959,14 @@ static CATEGORIES: &[Category] = &[
         id: "audio",
         title: "Audio",
         rows: &[
-            f("audio.automatchTime", "Automatch Time", float(0.0, 30.0, 3, "seconds"), true),
             f("audio.mixdownType", "5.1 Mixdown Type", Kind::Choice(MIXDOWN), true),
             f("audio.largeVolumeAdjustment", "Large Volume Adjustment", float(0.0, 96.0, 0, "dB"), true),
             b("audio.sumToMonoInSource", "Sum multichannel outputs to mono in Source Monitor", false),
             b("audio.scrubAudio", "Play audio while scrubbing in Source and Program Monitors", false),
             b("audio.maintainPitchShuttling", "Maintain pitch while shuttling", false),
-            b("audio.muteInputDuringRecording", "Mute input during timeline recording", false),
             b("audio.generateWaveformsOnImport", "Generate waveforms automatically during import", false),
             b("audio.multithreadedWaveforms", "Generate waveforms and conform audio using multithreading", false),
             b("audio.renderAudioWithVideo", "Render audio when rendering video", false),
-            Row::Group(
-                "Automation Keyframe Optimization",
-                &[
-                    b("audio.linearKeyframeThinning", "Linear keyframe thinning", true),
-                    b("audio.minimumTimeIntervalThinning", "Minimum time interval thinning", true),
-                    sub("audio.minimumTimeMs", "Minimum time", int(1.0, 10_000.0, "milliseconds"), "audio.minimumTimeIntervalThinning", true),
-                ],
-            ),
             Row::Group("Render Edit in Audition files to:", &[f("audio.editInAuditionLocation", "Location", Kind::Choice(AUDITION), false)]),
         ],
     },
@@ -1189,7 +1171,6 @@ static CATEGORIES: &[Category] = &[
         id: "timeline",
         title: "Timeline",
         rows: &[
-            f("timeline.audioTransitionDuration", "Audio Transition Default Duration", Kind::Duration { unit_key: "timeline.audioTransitionUnit" }, true),
             f("timeline.stillImageDuration", "Still Image Default Duration", Kind::Duration { unit_key: "timeline.stillImageUnit" }, true),
             f("timeline.autoScroll", "Timeline Playback Auto-Scrolling", Kind::Choice(AUTO_SCROLL), true),
             f("timeline.mouseScrolling", "Timeline Mouse Scrolling", Kind::Choice(MOUSE_SCROLL), true),

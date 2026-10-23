@@ -102,7 +102,7 @@ fn transform() -> Vec<ParamDef> {
 fn layer_def(id: &'static str, name: &'static str, mut params: Vec<ParamDef>) -> EffectDef {
     params.extend(appearance());
     params.extend(transform());
-    EffectDef { id, name, kind: EffectKind::Video, category: &[], params, intrinsic: false, accelerated: true, float32: true, yuv: false }
+    EffectDef { id, name, kind: EffectKind::Video, params, intrinsic: false, accelerated: true, float32: true, yuv: false }
 }
 
 /// Definitions of the two layer kinds (appended to the effect registry; not in the Effects panel).
@@ -398,7 +398,6 @@ fn layer_instance(id: &str) -> EffectInstance {
         effect: id.to_string(),
         enabled: true,
         params: Default::default(),
-        post_fader: false,
         layer: None,
     })
 }

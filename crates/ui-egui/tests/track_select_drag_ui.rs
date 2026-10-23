@@ -62,7 +62,7 @@ impl Driver {
     }
 }
 
-/// The middle of the second clip on V1 (its ends carry transitions), and that clip's start: the clips before it stay put.
+/// The middle of the second clip on V1, and that clip's start: the clips before it stay put.
 fn second_v1_clip(d: &mut Driver) -> (f64, f64, Tick) {
     let q = d.harness.state().session.active_sequence().unwrap().clone();
     let c = q.video_tracks[0].items.get(1).expect("a second clip on V1").clone();

@@ -81,29 +81,6 @@ fn builtin_and_legacy_workspace_shapes_roundtrip_and_save_floating() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-#[test]
-fn legacy_effects_workspace_drops_only_the_known_inactive_duplicate() {
-    let expected = dock::workspace("Effects");
-    let mut legacy = expected.clone();
-    fn duplicate(node: &mut DockNode) {
-        match node {
-            DockNode::Tabs { panels, active } if panels.as_slice() == [PanelKind::EssentialGraphics] => {
-                panels.insert(0, PanelKind::EffectControls);
-                *active = 1;
-            }
-            DockNode::Split { a, b, .. } => {
-                duplicate(a);
-                duplicate(b);
-            }
-            DockNode::Tabs { .. } => {}
-        }
-    }
-    duplicate(&mut legacy);
-    let prefs: dock::WorkspacePrefs =
-        serde_json::from_value(json!({"saved": [{"name": "Historical Effects", "layout": legacy}], "current": "Historical Effects"})).unwrap();
-    assert_eq!(dock::saved_docking(&prefs, "Historical Effects").root, expected);
-}
-
 fn step(h: &mut Harness<'_, FilmcraftApp>) {
     let ctx = h.ctx.clone();
     let mut input = std::mem::take(h.input_mut());

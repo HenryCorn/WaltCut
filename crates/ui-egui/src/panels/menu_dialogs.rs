@@ -62,7 +62,6 @@ fn meta(command: &str) -> Option<(&'static str, &'static str, &'static str)> {
         "clip.sourceSettings" => (tl!("Source Settings"), "sourceSettings", tl!("OK")),
         "clip.updateMetadata" => (tl!("Update Metadata"), "updateMetadata", tl!("OK")),
         "clip.automateToSequence" => (tl!("Automate To Sequence"), "automate", tl!("OK")),
-        "sequence.normalizeMixTrack" => (tl!("Normalize Mix Track"), "normalizeMix", tl!("OK")),
         "sequence.simplify" => (tl!("Simplify Sequence"), "simplify", tl!("Simplify")),
         "file.saveAsTemplate" => (tl!("Save as Template"), "saveTemplate", tl!("Save")),
         "markers.addFlashCue" => (tl!("Flash Cue Marker"), "flashCue", tl!("OK")),
@@ -84,7 +83,6 @@ fn dialog_command(id: &str) -> Option<&'static str> {
         "clip.sourceSettings" => "clip.sourceSettings",
         "clip.updateMetadata" => "clip.updateMetadata",
         "clip.automateToSequence" => "clip.automateToSequence",
-        "sequence.normalizeMixTrack" => "sequence.normalizeMixTrack",
         "sequence.simplify" => "sequence.simplify",
         "file.saveAsTemplate" => "file.saveAsTemplate",
         "markers.addFlashCue" => "markers.addFlashCue",
@@ -316,14 +314,13 @@ fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value
             (json!({}), json!({"count": n}))
         }
         "clip.automateToSequence" => (
-            json!({"ordering": "sort", "placement": "sequentially", "method": "insert", "overlapFrames": 30, "stillFrames": 150, "audioTransition": true, "ignoreAudio": false, "ignoreVideo": false}),
+            json!({"ordering": "sort", "placement": "sequentially", "method": "insert", "overlapFrames": 30, "stillFrames": 150, "ignoreAudio": false, "ignoreVideo": false}),
             json!({"sequence": s.active_sequence().map(|_| s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| i.name.clone()).unwrap_or_default())}),
         ),
-        "sequence.normalizeMixTrack" => (json!({"db": 0.0}), Value::Null),
         "sequence.simplify" => {
             let name = s.state.active_sequence.and_then(|q| s.project.item(q)).map(|i| tlf!("{name} (Simplified)", name = i.name)).unwrap_or_default();
             (
-                json!({"name": name, "removeDisabled": true, "removeEmptyTracks": true, "closeGaps": false, "moveClipsDown": false, "removeAudioEffects": false, "removeText": false, "keep": "both"}),
+                json!({"name": name, "removeDisabled": true, "removeEmptyTracks": true, "closeGaps": false, "moveClipsDown": false, "removeText": false, "keep": "both"}),
                 Value::Null,
             )
         }
@@ -657,20 +654,16 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 radios(ui, &mut elems, pre, p, "method", "Method:", &[("insert", "Insert Edit"), ("overwrite", "Overwrite Edit")]);
                 number(ui, &mut elems, pre, p, "overlapFrames", "Clip Overlap:", 0.0..=600.0, " frames");
                 number(ui, &mut elems, pre, p, "stillFrames", "Frames per Still:", 1.0..=100_000.0, " frames");
-                ui.label(RichText::new("Transitions").strong());
-                check(ui, &mut elems, pre, p, "audioTransition", "Apply Default Audio Transition");
                 ui.label(RichText::new("Ignore Options").strong());
                 check(ui, &mut elems, pre, p, "ignoreAudio", "Ignore Audio");
                 check(ui, &mut elems, pre, p, "ignoreVideo", "Ignore Video");
             }
-            "sequence.normalizeMixTrack" => number(ui, &mut elems, pre, p, "db", tl!("Normalize Mix Track to:"), -96.0..=24.0, " dB"),
             "sequence.simplify" => {
                 text(ui, &mut elems, pre, p, "name", "Sequence Name:", 240.0);
                 ui.label(RichText::new("Remove").strong());
                 check(ui, &mut elems, pre, p, "removeDisabled", "Disabled clips");
                 check(ui, &mut elems, pre, p, "removeEmptyTracks", "Empty tracks");
                 check(ui, &mut elems, pre, p, "closeGaps", "Gaps");
-                check(ui, &mut elems, pre, p, "removeAudioEffects", "Audio effects");
                 check(ui, &mut elems, pre, p, "removeText", "Text (graphics)");
                 ui.label(RichText::new("Clips").strong());
                 check(ui, &mut elems, pre, p, "moveClipsDown", "Move clips to the lowest track possible");

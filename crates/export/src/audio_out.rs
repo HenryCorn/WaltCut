@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use waltcut_audio_dsp::AudioEffect;
-use waltcut_audio_dsp::effects::Limiter;
+use waltcut_audio_dsp::Limiter;
 use waltcut_project::{ItemId, Project, Sequence};
 use waltcut_render::SourceProvider;
 use waltcut_time::TimeRange;

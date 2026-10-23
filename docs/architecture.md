@@ -61,11 +61,11 @@ and `filmcraft-cli`.
 | `frame` | L1 | `VideoFrame` (planar YUV / RGBA8 / linear RGBA f32, colour metadata), `AudioBuffer` |
 | `media` | L1 | `MediaSource` trait, probing/openers, frame cache, generators, stills, image sequences, WAV / Broadcast WAV |
 | `project` | L1 | document model, effect definitions, keyframes |
-| `audio-dsp` | L1 | loudness metering (BS.1770 / R128), audio effects, channel layouts (BS.775 up/downmix, 5.1 panner), streaming playback resampling; no dependencies |
+| `audio-dsp` | L1 | output-rate resampling and scrub/pitch; active export loudness/limiter and output/source-monitor channel conversion remain pending their later #23 cut |
 | `text` | L1 | text engine: font database (bundled OFL fonts + system fonts), shaping (harfrust), bidi, line breaking, paragraph layout, glyph/path rasteriser, strokes ([crates/text/README.md](../crates/text/README.md)) |
 | `edit` | L2 | pure edit algebra (insert, overwrite, razor, ripple, roll, slip, slide, rate stretch…) |
 | `codecs` | L2 | container + codec hub: MP4/MOV, MKV, MXF, Ogg and MPEG TS / PS / video elementary stream sources, GOP-aware seeking, decoder registry, audio decoding |
-| `render` | L3 | sequence evaluation, CPU compositor, video effects (`effects`, `vfx`; effects needing other frames or tracks read them through `vfx::FxEnv`), transitions, audio mix |
+| `render` | L3 | sequence evaluation, CPU compositor, retained Motion/Opacity/blend, graphic layers/keyframes and minimal mono/stereo audio mix |
 | `gpu` | L3 | wgpu compositor (WGSL) |
 | `golden` | L3 | test-only: golden-image tests of the CPU renderer and GPU-vs-CPU agreement; empty library, dev-dependencies only |
 | `export` | L3 | render → encode → mux pipeline, progress/cancel |
@@ -126,12 +126,9 @@ Sequence
 ├─ video_tracks / audio_tracks: Vec<Track>
 ├─ markers, mark_in / mark_out
 Track
-├─ locked, sync lock, targeting, mute/solo/visibility
+├─ locked, sync lock, targeting, mute/visibility
 ├─ items: Vec<TrackItem>             sorted, never overlapping
-├─ transitions: Vec<Transition>
-└─ audio: volume_db, pan, effects (mixer inserts), mixer: MixerStrip
-     (automation mode + lanes, sends, output, solo safe, input map)
-Sequence (audio) ─ submix_tracks: Vec<Track>, master_volume_db / master_effects / master_mixer
+└─ audio track state: channel layout, mute, enabled
 TrackItem (a clip instance)
 ├─ item: ItemId, start (timeline ticks), source_in (media ticks), duration, speed
 ├─ link group, label, enabled
@@ -338,17 +335,15 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   frames: shown when the exact picture was on screen while due, dropped otherwise (including frames
   passed over without a refresh, not while the window is hidden). `cargo xtask bench-playback`
   measures the whole path headlessly ([testing.md](testing.md) §5).
-  Sequence audio goes through the mixer graph (`render::mixer`, §5.1); clip audio effects run on
-  `audio-dsp` via `render::audio_fx`.
+  Sequence audio uses the minimal stereo renderer described in §5.1; output-rate resampling and
+  scrub/shuttle DSP remain.
 
-### 5.1 Audio mixer
+### 5.1 Retained soundtrack path (#23 draft)
 
 ```text
-clip: gain → clip effects → Volume / Channel Volume / Panner (clip keyframes, media time)
-      → audio transitions → summed per track                           render::audio::track_input
-track / submix strip:  input map, mono fold → pre-fader inserts → pre-fader sends → mute
-      → fader (volume) → meter → post-fader inserts → post-fader sends → pan / balance → output
-Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts → out    render::mixer
+decoded mono/stereo source pair → source-time mapping → Audio Gain + intrinsic Volume (dB)
+    → sum enabled clips on enabled/unmuted tracks → stereo soundtrack
+    → device-rate resampling / physical output mapping, or export output conversion
 ```
 
 - **Model** (`project::mixer`). Every audio track, submix and the Mix has a `MixerStrip`. Static
@@ -394,43 +389,21 @@ Mix:  bus sum → pre-fader inserts → fader → meter → post-fader inserts �
 - **Track Mixer view.** The panel menu (`mixer.menu`) has Show/Hide Tracks (`UiState::mixer_hidden`).
   Input capture, record arming and recording meters have been removed in the #23 draft train.
 
-### 5.1.1 Multichannel and 5.1
+`engine::previews` owns the typed live project snapshot consumed by a playing callback. Gain,
+Volume/keyframe, source-map and mute edits invalidate audio-preview hashes. Waveforms and
+scrub/shuttle retain the same gain semantics. Device-rate resampling and pitch correction are
+live DSP dependencies, not audio-effect catalogue entries.
 
-```text
-5.1 track (6 ch: L R C LFE Ls Rs) ─┐                         ┌─► 5.1 Mix ─► 6-ch export / 5.1 device
-stereo / mono track ──5.1 panner───┼─► 5.1 submix / 5.1 Mix ─┤
-5.1 strip ──BS.775 downmix─────────┴─► stereo bus            └─► stereo device: 5.1 Mixdown Type fold
-```
+### 5.1.1 Deferred active output processing
 
-- **Model.** `Track::channels` (Standard = Stereo, Mono, 5.1, Adaptive) and
-  `SequenceSettings::audio_master` (the Mix: Stereo, Mono, 5.1, Adaptive) existed already;
-  `file.newSequence {mix, trackType}` and `sequence.settings {mix}` set them, `mixer.setStrip
-  {channels}` / `mixer.addSubmix {channels}` per strip. The 5.1 panner is four lanes in
-  `MixerStrip::lanes` (`pan51.x`, `pan51.y` −100…100, `pan51.center` 0…100 %, `pan51.lfe` dB): a
-  lane without keyframes stores the static value, so no new project fields were needed and the
-  puck is automatable like any lane.
-- **Maths** (`audio_dsp::channels`). 5.1 order is L, R, C, LFE, Ls, Rs everywhere inside FilmCraft.
-  Downmix is ITU-R BS.775 (`Lo = L + k·C + k·Ls`, `Ro = R + k·C + k·Rs`, mono
-  `M = k·L + k·R + C + ½·Ls + ½·Rs`, `k = 1/√2`, LFE omitted); upmix puts mono on C and stereo on
-  L/R. The panner splits a point source front/rear and left/right with the sine/cosine
-  constant-power law and gives the centre speaker `center·(1 − |x|)` of the front power (Σg² = 1).
-  Stereo sources sit at the puck ± 1 in x; 5.1 sources keep their layout moved by the puck's offset
-  from front-centre (the default puck is the identity). LFE gets the source LFE (5.1) or the mean of
-  the source channels (mono/stereo, default −∞) times the LFE level.
-- **Graph.** Buses are 2 or 6 channels wide (`render::mixer::width_of`); inserts are built for the
-  strip's width; routes convert between widths (5.1 panner into 5.1 buses, BS.775 into stereo
-  buses); meters have one value per channel. `mix_graph` returns the Mix's width;
-  `audio::mix_sequence` always returns stereo, `mix_sequence_layout` any layout and mixdown. Clips
-  on 5.1 tracks play the source's first six channels (or the six picked with Modify ▸ Audio
-  Channels), mono/stereo sources upmixed; clip effects run on all six channels.
-- **Playback.** On a device with ≥ 6 output channels a 5.1 Mix plays as six channels; on a stereo
-  device it is folded with Preferences ▸ Audio ▸ 5.1 Mixdown Type (Front Only, Front + Rear
-  Surround = BS.775, Front + LFE, Front + Rear Surround + LFE; `PreviewStore::mix_layout`).
-- **Export.** Audio Channels Mono / Stereo / 5.1: WAV writes `WAVE_FORMAT_EXTENSIBLE` with channel
-  mask `0x3F`; QuickTime PCM (ProRes, DNxHR, MJPEG) adds a `chan` atom
-  (`kAudioChannelLayoutTag_MPEG_5_1_A`); AAC uses channel configuration 6 (our encoder already
-  supported 1–8 channels; the exporter reorders to AAC's C, L, R, Ls, Rs, LFE). A stereo export of a
-  5.1 Mix is the BS.775 downmix.
+Export loudness normalisation measures the soundtrack, applies gain and a true-peak limiter,
+remeasures, then writes the result. Output channel conversion remains real: a six-channel
+export puts the stereo soundtrack on L/R and silence on the other channels, and container writers
+emit the corresponding layout metadata. This is not surround mixing or a surround panner.
+The separate Source monitor still downmixes multichannel source media according to its mixdown
+preference. These export/source-monitor controls, shared layout types and their DSP utilities
+remain for a later #23 slice. The now-ignored sequence Mix selector/parameters and `audio_master`
+field are deleted.
 
 ### 5.2 Audio reduction boundary (#23, partial draft)
 
@@ -440,13 +413,18 @@ including the feature-only DSP ducking module and render-time mute branch. Track
 instances reject unknown fields, including removed Essential Sound metadata, rather than silently
 rendering a different sound. No legacy-project compatibility path is provided.
 
-General audio effects (including DeEsser, DeReverb, Enhance Speech and Stereo Width), loudness
-metering/normalisation and mixer automation still have independent callers and remain for the next
-slice. `render::audio::clip_signal` remains for retained effect-render tests; the feature-only mono
-measurement helper is gone. Mono/stereo channel mapping, clip gain/Volume, track mute, waveforms,
-scrubbing, playback resampling and export are unchanged. Native macOS execution of the retained
-`audio_timing` playback/export tests and visual acceptance remain pending; #23 is not complete or
-merged.
+The narrower orphan-processing cut removes advanced audio definitions, transition data and
+commands, catalogue/preset folders, graphical editors, channel-volume/panner controls, render FX
+and crossfade modules, and unreachable DSP processors. Removed IDs and old fields fail explicitly,
+including in preset imports; there is no compatibility shell. Only intrinsic Volume remains as
+an audio effect, alongside shared Motion/Opacity/keyframe/graphic data.
+
+`crates/ui-egui/tests/audio_timing.rs` compares actual callback samples and decoded float WAV
+samples for mono/stereo timing, source In, live gain/mute, additive Volume, bypass/disable,
+channel selection and keyframes across irregular blocks. Engine/project/format/UI tests cover
+removed commands/IDs/fields and hostile source maps. This is **DRAFT IMPLEMENTATION**:
+native macOS CI, actual sample-test execution and animation-flow visual acceptance remain
+pending. #23 is not complete, accepted or merged.
 
 ### 5.3 Clip compositing
 

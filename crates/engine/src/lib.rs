@@ -11,6 +11,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
 pub mod ai;
+pub mod audio;
 pub mod autosave;
 pub mod clip_ops;
 pub mod color;
@@ -26,7 +27,6 @@ mod keyframe_move;
 mod marker_export;
 pub mod media_pool;
 pub mod media_watch;
-pub mod mixer;
 pub mod panels;
 pub mod paste_media;
 pub mod perf;
@@ -260,20 +260,15 @@ pub struct EditorState {
     /// Timeline clipboard (serialized track items with their relative track index).
     #[serde(skip)]
     pub clipboard: Vec<(TrackKind, usize, waltcut_project::TrackItem)>,
-    pub default_audio_transition: String,
     /// Selected edit points (trim mode).
     #[serde(default)]
     pub edit_points: Vec<trim::EditPoint>,
     /// Trim Monitor Out/In shift counters for the selected edit point.
     #[serde(default)]
     pub trim_shift: trim::TrimShift,
-    /// Selected transitions (clicked in the Timeline): Effect Controls shows one, Delete removes
-    /// them. Selecting clips clears it and selecting transitions clears the clip selection.
-    #[serde(default)]
-    pub transition_selection: Vec<waltcut_project::TransitionId>,
     /// The selected gap (#648, #668): empty time on one track, clicked in the Timeline, from the
     /// end of a clip (or the sequence start) up to the next clip. Delete, Backspace and Ripple
-    /// Delete close it. Selecting clips, transitions or edit points clears it, and so does an edit
+    /// Delete close it. Selecting clips or edit points clears it, and so does an edit
     /// that changes the gap.
     #[serde(default)]
     pub gap_selection: Option<GapSelection>,
@@ -284,10 +279,6 @@ pub struct EditorState {
     /// Transform show their handles on the Program monitor.
     #[serde(default)]
     pub selected_effect: Option<EffectSel>,
-    /// Audio Clip Mixer automation mode per audio track (track id → mode; missing = Read):
-    /// Latch / Touch / Write record the clip Volume and Panner moves as clip keyframes.
-    #[serde(default)]
-    pub clip_mixer_modes: std::collections::BTreeMap<u64, waltcut_project::AutomationMode>,
     /// Sequence ▸ Selection Follows Playhead: moving the playhead selects the clips under it on
     /// targeted tracks.
     #[serde(default)]
@@ -352,8 +343,6 @@ pub struct Session {
     pub persistence: Option<autosave::Persistence>,
     /// Render preview files + render-bar segments (shared with the frontend's frame workers).
     pub previews: Arc<previews::PreviewStore>,
-    /// Audio Track Mixer automation pass in progress.
-    pub mixrec: mixer::Recorder,
     /// Dynamic (J/K/L) trimming and trim-mode loop playback in progress.
     pub trim_play: trim::TrimPlayback,
     /// Keyboard shortcuts (active bindings, presets; `shortcuts.*` commands).
@@ -423,7 +412,7 @@ impl Session {
             revision: 1,
             saved_revision: 1,
             path: None,
-            state: EditorState { snapping: true, linked_selection: true, default_audio_transition: "constant_power".into(), ..Default::default() },
+            state: EditorState { snapping: true, linked_selection: true, ..Default::default() },
             media: Arc::new(MediaPool::default()),
             services,
             events: Vec::new(),
@@ -434,7 +423,6 @@ impl Session {
             prefs_path: None,
             persistence: None,
             previews: Arc::new(previews::PreviewStore::temp()),
-            mixrec: Default::default(),
             trim_play: Default::default(),
             shortcuts: shortcuts::Shortcuts::new(),
             offline: Default::default(),
@@ -591,8 +579,8 @@ impl Session {
             self.log.push(panels::Level::Error, id, e.to_string());
         }
         self.sync_persistence();
-        // playback reads the newest snapshot (mixer moves, mutes… are heard while playing)
-        self.previews.live.publish_project(self.project.clone());
+        // Playback reads edits made while it is running from the latest immutable snapshot.
+        self.previews.audio_project.publish(self.project.clone());
         if r.is_ok() && spec.journal {
             self.journal.push((id.to_string(), params));
             if self.journal.len() > 10_000 {
@@ -1074,8 +1062,6 @@ mod ai_tests;
 #[cfg(test)]
 mod animated_image_tests;
 #[cfg(test)]
-mod audio_effects_tests;
-#[cfg(test)]
 mod audio_placement_tests;
 #[cfg(test)]
 mod audio_reduction_tests;
@@ -1113,10 +1099,6 @@ mod locked_clip_edits_tests;
 mod media_test_util;
 #[cfg(test)]
 mod media_watch_tests;
-#[cfg(test)]
-mod mixer_tests;
-#[cfg(test)]
-#[cfg(test)]
 #[cfg(test)]
 mod nest_editing_tests;
 #[cfg(test)]

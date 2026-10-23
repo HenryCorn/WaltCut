@@ -103,19 +103,6 @@ fn a_project_opened_with_a_cycle_can_still_be_edited_and_repaired() {
     refused(&mut s, "timeline.place", json!({"item": a.0, "seconds": 1.0}));
 }
 
-/// The first A1 transition that joins two clips: (transition, outgoing clip, incoming clip). Audio
-/// transitions are the only ones left, so one is applied when the demo has none.
-fn joining_transition(s: &mut Session) -> (waltcut_project::Transition, ClipId, ClipId) {
-    let joins = |s: &Session| s.active_sequence().unwrap().audio_tracks[0].transitions.iter().find(|t| t.from.is_some() && t.to.is_some()).cloned();
-    if joins(s).is_none() {
-        let second = s.active_sequence().unwrap().audio_tracks[0].items[1].id.0;
-        s.execute("sequence.applyAudioTransition", json!({"clip": second})).unwrap();
-    }
-    let t = joins(s).expect("a transition between two audio clips");
-    let (from, to) = (t.from.unwrap(), t.to.unwrap());
-    (t, from, to)
-}
-
 fn frame_at(s: &Session, t: Tick) -> waltcut_render::Image {
     let provider = s.media.provider(s.project.clone(), s.services.clone());
     let opts = waltcut_render::RenderOptions { scale: 0.25, ..Default::default() };
@@ -123,7 +110,7 @@ fn frame_at(s: &Session, t: Tick) -> waltcut_render::Image {
 }
 
 #[test]
-fn nest_keeps_transitions_track_names_and_channel_layouts() {
+fn nest_keeps_track_names_channel_layouts_and_picture() {
     let mut s = demo();
     let outer = s.state.active_sequence.unwrap();
     s.edit_sequence("setup", |q, _, _| {
@@ -133,51 +120,28 @@ fn nest_keeps_transitions_track_names_and_channel_layouts() {
         Ok(())
     })
     .unwrap();
-    let (trn, from, to) = joining_transition(&mut s);
-    let mid = trn.start + Tick(trn.duration.0 / 2);
+    let clips = &s.active_sequence().unwrap().video_tracks[0].items;
+    let (from, to) = (clips[0].id, clips[1].id);
+    let mid = clips[1].start + Tick(clips[1].duration.0 / 2);
     let before = frame_at(&s, mid);
-    let start = s.active_sequence().unwrap().find_item(from).unwrap().1.start;
-    let audio_transitions = s.active_sequence().unwrap().audio_tracks[0].transitions.len();
     s.execute("timeline.select", json!({"clips": [from.0, to.0]})).unwrap();
-    let linked: Vec<ClipId> = s.state.selection.clone();
     let nested = ItemId(s.execute("clip.nest", json!({"name": "Inner"})).unwrap()["sequence"].as_u64().unwrap());
 
     let q = s.project.sequence(nested).unwrap();
     q.check().unwrap();
-    // the transition came along, on the same track, at the same place relative to its clips
-    let inner = q.audio_tracks[0].transitions.iter().find(|t| t.id == trn.id).expect("the transition is inside the nest");
-    assert_eq!((inner.start, inner.duration, inner.from, inner.to), (trn.start - start, trn.duration, Some(from), Some(to)));
-    // every audio transition between the selected clips came along
-    let inner_audio =
-        q.audio_tracks[0].transitions.iter().filter(|t| t.from.is_some_and(|c| linked.contains(&c)) && t.to.is_some_and(|c| linked.contains(&c))).count();
-    let outer_q = s.project.sequence(outer).unwrap();
-    assert_eq!(outer_q.audio_tracks[0].transitions.len() + inner_audio, audio_transitions, "audio transitions moved, none lost");
     // tracks are laid out like the parent's
     assert_eq!(q.video_tracks[0].name, "Picture");
     assert_eq!(q.audio_tracks[0].name, "Dialogue");
     assert_eq!(q.audio_tracks[0].channels, waltcut_project::AudioChannels::Mono);
     // and there are only as many as the nested clips need (Premiere: V1 + A1 here, not the parent's three each)
     assert_eq!((q.video_tracks.len(), q.audio_tracks.len()), (1, 1));
-    // the parent no longer holds the transition, and shows the same picture through the nest
-    assert!(outer_q.audio_tracks[0].transitions.iter().all(|t| t.id != trn.id));
+    // The parent shows the same picture through the nest.
+    let outer_q = s.project.sequence(outer).unwrap();
     outer_q.check().unwrap();
     let after = frame_at(&s, mid);
     assert_eq!((before.w, before.h), (after.w, after.h));
     let worst = before.px.iter().zip(&after.px).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
-    assert!(worst < 0.01, "the frame inside the transition is unchanged by nesting (worst channel difference {worst})");
-}
-
-#[test]
-fn nest_leaves_transitions_to_clips_outside_the_selection_out() {
-    let mut s = demo();
-    let (trn, from, _to) = joining_transition(&mut s);
-    // only the outgoing clip is nested: the transition needs both, so it is not carried
-    s.execute("timeline.select", json!({"clips": [from.0]})).unwrap();
-    let nested = ItemId(s.execute("clip.nest", json!({"name": "Half"})).unwrap()["sequence"].as_u64().unwrap());
-    let q = s.project.sequence(nested).unwrap();
-    q.check().unwrap();
-    assert!(q.all_tracks().all(|t| t.transitions.iter().all(|t| t.id != trn.id)));
-    s.active_sequence().unwrap().check().unwrap();
+    assert!(worst < 0.01, "the nested frame is unchanged by nesting (worst channel difference {worst})");
 }
 
 /// Nest the 4th and 5th V1 clips (with their sound) as "Inner". Returns the nested sequence, the

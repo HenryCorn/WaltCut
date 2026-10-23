@@ -399,7 +399,6 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             app.ui.add_tracks = crate::state::AddTracksDraft {
                 video_after: count(|q| q.video_tracks.len()),
                 audio_after: count(|q| q.audio_tracks.len()),
-                submix_after: count(|q| q.submix_tracks.len()),
                 ..Default::default()
             };
             app.dialog = Some(crate::Dialog::AddTracks);

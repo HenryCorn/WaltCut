@@ -227,8 +227,7 @@ fn make_subsequence_from_in_out_and_from_selection() {
 /// Sequence ▸ Add Tracks…: where the new tracks go, what they are, and what the amounts may be.
 /// Premiere Pro 26.5.2: Placement is "Before First Track" or after one of the tracks (after the
 /// last by default); a track added after Video 1 is the new Video 2, and what was on Video 2 is
-/// then on Video 3; audio tracks are Standard, 5.1, Adaptive or Mono, submix tracks Stereo, 5.1,
-/// Adaptive or Mono.
+/// then on Video 3; audio tracks are Standard, Stereo or Mono.
 #[test]
 fn add_tracks_places_and_types_them() {
     let mut s = demo();
@@ -239,7 +238,7 @@ fn add_tracks_places_and_types_them() {
 
     // without a place: after the last track (and one video track when nothing is said, as before)
     let r = s.execute("sequence.addTracks", json!({})).unwrap();
-    assert_eq!((r["video"].as_array().unwrap().len(), r["audio"].as_array().unwrap().len(), r["submix"].as_array().unwrap().len()), (1, 0, 0));
+    assert_eq!((r["video"].as_array().unwrap().len(), r["audio"].as_array().unwrap().len()), (1, 0));
     assert_eq!(names(&s, TrackKind::Video), ["Video 1", "Video 2", "Video 3", "Video 4"]);
     assert_eq!(s.active_sequence().unwrap().video_tracks[3].id.0, r["video"][0].as_u64().unwrap());
     s.execute("edit.undo", json!({})).unwrap();
@@ -268,27 +267,11 @@ fn add_tracks_places_and_types_them() {
     assert_eq!(q.audio_tracks[0].channels, AudioChannels::Mono);
     assert_eq!(q.audio_tracks[1].id, before.audio_tracks[0].id);
     // a number counts the tracks before the new ones; "Standard" is a stereo track
-    for (ty, want) in [("standard", AudioChannels::Stereo), ("5.1", AudioChannels::Surround51), ("adaptive", AudioChannels::Adaptive)] {
+    for (ty, want) in [("standard", AudioChannels::Stereo), ("stereo", AudioChannels::Stereo), ("mono", AudioChannels::Mono)] {
         let r = s.execute("sequence.addTracks", json!({"video": 0, "audio": 1, "audioAfter": 2, "audioType": ty})).unwrap();
         let q = s.active_sequence().unwrap();
         assert_eq!((q.audio_tracks[2].id.0, q.audio_tracks[2].channels), (r["audio"][0].as_u64().unwrap(), want), "{ty}");
     }
-
-    // submix tracks: stereo unless said, placed among the submix tracks
-    assert!(before.submix_tracks.is_empty());
-    s.execute("sequence.addTracks", json!({"video": 0, "submix": 2})).unwrap();
-    s.execute("sequence.addTracks", json!({"video": 0, "submix": 1, "submixAfter": "S1", "submixType": "5.1"})).unwrap();
-    let q = s.active_sequence().unwrap();
-    assert_eq!(
-        q.submix_tracks.iter().map(|t| (t.name.as_str(), t.channels)).collect::<Vec<_>>(),
-        [("Submix 1", AudioChannels::Stereo), ("Submix 2", AudioChannels::Surround51), ("Submix 3", AudioChannels::Stereo)]
-    );
-    // all three kinds at once are one undo step
-    let before = s.active_sequence().unwrap().clone();
-    let r = s.execute("sequence.addTracks", json!({"video": 1, "audio": 1, "submix": 1})).unwrap();
-    assert_eq!((r["video"].as_array().unwrap().len(), r["audio"].as_array().unwrap().len(), r["submix"].as_array().unwrap().len()), (1, 1, 1));
-    s.execute("edit.undo", json!({})).unwrap();
-    assert_eq!(*s.active_sequence().unwrap(), before);
 }
 
 /// Amounts and places come from a dialog, a script or the control channel: a wrong one is an
@@ -309,6 +292,8 @@ fn add_tracks_refuses_what_it_cannot_do() {
         json!({"video": 1, "videoAfter": "top"}),
         json!({"video": 0, "audio": 1, "audioAfter": "V1"}),
         json!({"video": 0, "audio": 1, "audioType": "quad"}),
+        json!({"video": 0, "audio": 1, "audioType": "5.1"}),
+        json!({"video": 0, "audio": 1, "audioType": "adaptive"}),
         json!({"video": 0, "submix": 1, "submixAfter": "S1"}),
         json!({"video": 0, "submix": 1, "submixType": "standard-ish"}),
     ] {
