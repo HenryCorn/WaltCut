@@ -1,13 +1,13 @@
 //! Built-in keyboard shortcut tables (command id, keys, panel; "" = application-wide).
 //!
-//! Keys use FilmCraft's canonical notation (`Cmd` = ⌘ on macOS / Ctrl elsewhere, `Ctrl` = the
+//! Keys use WaltCut's canonical notation (`Cmd` = ⌘ on macOS / Ctrl elsewhere, `Ctrl` = the
 //! macOS Control key, `Alt` = ⌥ Option / Alt; `Backspace` = the Mac "delete" key, `Delete` = the
 //! forward-delete key).
 
 pub type Entry = (&'static str, &'static str, &'static str);
 
-/// FilmCraft additions to the per-command defaults: panel-specific shortcuts.
-pub const FILMCRAFT_PANEL: &[Entry] = &[
+/// WaltCut additions to the per-command defaults: panel-specific shortcuts.
+pub const WALTCUT_PANEL: &[Entry] = &[
     ("project.delete", "Backspace", "Project"),
     // the forward-delete key (Delete on Windows and Linux keyboards) clears timeline clips too;
     // application-wide it is Project ▸ Clear (#243)
@@ -177,7 +177,7 @@ pub const EXTRA_KEYS: &[Entry] = &[
     ("graphics.leadingDown", "Alt+Down", ""),
     ("graphics.leadingUp5", "Alt+Shift+Up", ""),
     ("graphics.leadingDown5", "Alt+Shift+Down", ""),
-    ("help.filmcraftHelp", "F1", ""),
+    ("help.waltcutHelp", "F1", ""),
     ("app.quit", "Cmd+Q", ""),
     ("clip.setPosterFrame", "Cmd+P", ""),
     ("clip.clearPosterFrame", "Alt+P", ""),

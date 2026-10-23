@@ -4,7 +4,7 @@
 
 use serde_json::{Value, json};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::dock::PanelKind;
 use crate::state::{Mode, Tool};
 
@@ -121,7 +121,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("help.reportIssue", "Report an Issue…", ["Help"], None),
     uic!("help.revealLogFiles", "Reveal Log Files…", ["Help"], None),
     uic!("help.systemCompatibilityReport", "System Compatibility Report…", ["Help"], None),
-    uic!("app.about", "About FilmCraft", ["Help"], None),
+    uic!("app.about", "About WaltCut", ["Help"], None),
     uic!("app.keyboardShortcuts", "Keyboard Shortcuts…", ["Edit"], Some("Cmd+Alt+K")),
     uic!("app.settings.general", "General…", ["Edit", "Preferences"], Some("Cmd+,")),
     uic!("app.settings.appearance", "Appearance…", ["Edit", "Preferences"], None),
@@ -145,7 +145,7 @@ pub fn panel_command_id(p: PanelKind) -> String {
 }
 
 /// Explicit monitor parameters override keyboard focus.
-pub fn targets_source(app: &FilmcraftApp, params: &Value) -> bool {
+pub fn targets_source(app: &WaltCutApp, params: &Value) -> bool {
     match params.get("monitor").and_then(Value::as_str) {
         Some("source") => true,
         Some(_) => false,
@@ -154,7 +154,7 @@ pub fn targets_source(app: &FilmcraftApp, params: &Value) -> bool {
 }
 
 /// Execute a UI or engine command by id.
-pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
+pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
     if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
     }
@@ -524,7 +524,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
 
 /// Snapshot OS files/image present at Copy/Cut. Many platforms keep a previous file list after
 /// `copy_text`, so Paste would otherwise import those files instead of the clips (#697).
-fn remember_stale_clipboard_media(app: &mut FilmcraftApp) {
+fn remember_stale_clipboard_media(app: &mut WaltCutApp) {
     app.stale_clipboard_media = app.hooks.clipboard_media.as_mut().and_then(|f| f()).as_ref().map(clipboard_media_key);
 }
 
@@ -546,7 +546,7 @@ fn clipboard_media_key(media: &crate::ClipboardMedia) -> String {
 /// system clipboard holds text (an empty clipboard sends no paste at all, #199). Put the copied
 /// clip names there, like other editors put their own data on the clipboard, so Ctrl+V pastes the
 /// clips right after a copy.
-fn put_clip_names_on_system_clipboard(app: &FilmcraftApp, ctx: &egui::Context) {
+fn put_clip_names_on_system_clipboard(app: &WaltCutApp, ctx: &egui::Context) {
     let names: Vec<&str> = app.session.state.clipboard.iter().map(|(_, _, c)| c.name.as_str()).collect();
     if names.is_empty() {
         return;
@@ -557,7 +557,7 @@ fn put_clip_names_on_system_clipboard(app: &FilmcraftApp, ctx: &egui::Context) {
 
 /// Paste the files or the image on the system clipboard: placed on the Timeline when it has focus,
 /// imported into the shown bin in the Project panel. None when the clipboard holds neither.
-fn paste_clipboard_media(app: &mut FilmcraftApp, insert: bool) -> Option<Result<Value, String>> {
+fn paste_clipboard_media(app: &mut WaltCutApp, insert: bool) -> Option<Result<Value, String>> {
     let media = (app.hooks.clipboard_media.as_mut()?)()?;
     if app.stale_clipboard_media.as_ref() == Some(&clipboard_media_key(&media)) {
         return None;
@@ -602,9 +602,9 @@ pub const MENUS: [&str; 9] = ["File", "Edit", "Clip", "Sequence", "Markers", "Gr
 /// Labels only the native macOS app menu shows, with no command in the menu tree behind them: the
 /// Settings submenu and the predefined Hide, Hide Others and Quit items. They are translated through
 /// the catalogs like menu labels (`apps/waltcut/src/native_menu.rs`).
-pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide FilmCraft", "Hide Others", "Quit FilmCraft"];
+pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide WaltCut", "Hide Others", "Quit WaltCut"];
 
-pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
+pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
     let mut v = menu_items_for(&app.session);
     for it in &mut v {
         it.label = crate::i18n::t(&it.label).to_string();
@@ -744,7 +744,7 @@ pub type KeyBinding = (egui::Modifiers, egui::Key, String, Option<String>);
 
 /// The active key bindings (from the engine's shortcut set), most specific first so Shift+I
 /// doesn't also fire I.
-pub fn bindings(app: &FilmcraftApp) -> Vec<KeyBinding> {
+pub fn bindings(app: &WaltCutApp) -> Vec<KeyBinding> {
     let mut v: Vec<KeyBinding> =
         app.session.shortcuts.bindings.iter().filter_map(|b| parse_shortcut(&b.keys).map(|(m, k)| (m, k, b.command.clone(), b.panel.clone()))).collect();
     // With Shift held, a punctuation key arrives as its shifted glyph (Shift+; is `:` on US layouts).
@@ -753,7 +753,7 @@ pub fn bindings(app: &FilmcraftApp) -> Vec<KeyBinding> {
     v.extend(shifted);
     // `+` is the `=` key with Shift on US layouts and its own key on others and the keypad: a chord
     // on `=` takes it too, unless something is bound to `+` itself. Otherwise Ctrl+Plus fell
-    // through to egui's interface zoom while Ctrl+- and Ctrl+0 were taken by FilmCraft
+    // through to egui's interface zoom while Ctrl+- and Ctrl+0 were taken by WaltCut
     // shortcuts, so the interface grew and could not shrink back (#2253).
     let plus: Vec<KeyBinding> = v
         .iter()
@@ -799,7 +799,7 @@ pub fn external_commands() -> Vec<waltcut_engine::shortcuts::CommandInfo> {
 }
 
 /// Draw the in-window menu bar.
-pub fn menu_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
+pub fn menu_bar(app: &mut WaltCutApp, ui: &mut egui::Ui) {
     let items = menu_items(app);
     // Draw Edit ▸ Label with the user's live palette, not the baked-in label colours.
     let labels = app.session.prefs.labels.clone();
@@ -916,7 +916,7 @@ fn menu_entry(ui: &mut egui::Ui, it: &MenuItem, auto: &mut crate::automation::Re
         b = b.shortcut_text(shortcut_text(s));
     }
     let mut r = ui.add_enabled(it.enabled, b);
-    // Help items say whether they open the web browser (and which address) or stay in FilmCraft
+    // Help items say whether they open the web browser (and which address) or stay in WaltCut
     if let Some(hint) = crate::links::menu_hint(&it.id) {
         r = r.on_hover_text(hint);
     }
@@ -1005,7 +1005,7 @@ mod tests {
     fn hovering_another_title_switches_the_open_menu() {
         use egui_kittest::{Harness, kittest::Queryable};
 
-        let app = FilmcraftApp::new(waltcut_engine::Session::default());
+        let app = WaltCutApp::new(waltcut_engine::Session::default());
         let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(|ui, app| menu_bar(app, ui), app);
         harness.run_steps(3);
         // Nothing open: hovering a title does not open it.

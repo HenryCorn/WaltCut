@@ -62,7 +62,7 @@ fn preferences_get_set_and_persist() {
 #[test]
 fn crash_recovery_end_to_end() {
     let d = temp_dir("recover");
-    let proj = d.join("film.fcproj").to_string_lossy().to_string();
+    let proj = d.join("film.waltcut").to_string_lossy().to_string();
     // Session A: saved project, then unsaved edits, then a crash.
     let mut a = demo();
     start(&mut a, &d);
@@ -101,7 +101,7 @@ fn crash_recovery_end_to_end() {
     c.execute("file.save", json!({})).unwrap();
     wait_for("journal cleared", || {
         c.poll_persistence();
-        !c.persistence.as_ref().unwrap().session_dir.join("snapshot.fcproj").exists()
+        !c.persistence.as_ref().unwrap().session_dir.join("snapshot.waltcut").exists()
     });
     let session_dir = c.persistence.as_ref().unwrap().session_dir.clone();
     c.shutdown();
@@ -138,7 +138,7 @@ fn quitting_with_unsaved_changes_keeps_them_for_next_launch() {
 #[test]
 fn auto_save_ring_rotates_and_can_save_the_project() {
     let d = temp_dir("ring");
-    let proj = d.join("ring.fcproj").to_string_lossy().to_string();
+    let proj = d.join("ring.waltcut").to_string_lossy().to_string();
     let mut s = demo();
     start(&mut s, &d);
     s.execute("prefs.set", json!({"values": {"autoSave.maxVersions": 2}})).unwrap();
@@ -185,16 +185,16 @@ fn scan_keeps_snapshot_when_session_metadata_is_unreadable() {
     let sess = root.join("123-1");
     std::fs::create_dir_all(&sess).unwrap();
     let snap = waltcut_format::encode(&waltcut_project::Project::default(), false);
-    std::fs::write(sess.join("snapshot.fcproj"), snap).unwrap();
+    std::fs::write(sess.join("snapshot.waltcut"), snap).unwrap();
     std::fs::write(sess.join("session.json"), b"not json {").unwrap();
     let found = autosave::scan_candidates(&d, None);
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].id, "123-1");
-    assert!(sess.join("snapshot.fcproj").is_file(), "snapshot must survive the scan");
+    assert!(sess.join("snapshot.waltcut").is_file(), "snapshot must survive the scan");
     std::fs::remove_file(sess.join("session.json")).unwrap();
     let found = autosave::scan_candidates(&d, None);
     assert_eq!(found.len(), 1, "missing metadata still lists the snapshot");
-    assert!(sess.join("snapshot.fcproj").is_file());
+    assert!(sess.join("snapshot.waltcut").is_file());
     let _ = std::fs::remove_dir_all(&d);
 }
 
@@ -210,11 +210,11 @@ fn recovery_ignores_snapshots_of_an_earlier_schema_and_keeps_them() {
     let earlier =
         String::from_utf8(bytes.clone()).unwrap().replacen(&format!("\"schema_version\":{}", waltcut_format::SCHEMA_VERSION), "\"schema_version\":15", 1);
     assert_ne!(earlier.as_bytes(), bytes.as_slice(), "the snapshot was rewritten as schema 15");
-    std::fs::write(old.join("snapshot.fcproj"), &earlier).unwrap();
-    std::fs::write(current.join("snapshot.fcproj"), &bytes).unwrap();
+    std::fs::write(old.join("snapshot.waltcut"), &earlier).unwrap();
+    std::fs::write(current.join("snapshot.waltcut"), &bytes).unwrap();
     let found = autosave::scan_candidates(&d, None);
     assert_eq!(found.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(), ["200-1"], "only the snapshot this build can open is offered");
-    assert_eq!(std::fs::read(old.join("snapshot.fcproj")).unwrap(), earlier.as_bytes(), "the earlier one is left as it was");
+    assert_eq!(std::fs::read(old.join("snapshot.waltcut")).unwrap(), earlier.as_bytes(), "the earlier one is left as it was");
     let _ = std::fs::remove_dir_all(&d);
 }
 
@@ -259,7 +259,7 @@ fn project_scratch_folders_outside_the_project_are_not_used() {
     let outside = d.join("elsewhere");
     let show = d.join("show");
     std::fs::create_dir_all(&show).unwrap();
-    let proj = show.join("cut.fcproj").to_string_lossy().to_string();
+    let proj = show.join("cut.waltcut").to_string_lossy().to_string();
     let mut a = demo();
     let named = outside.to_string_lossy().to_string();
     a.edit("scratch", |p, _| {
@@ -278,7 +278,7 @@ fn project_scratch_folders_outside_the_project_are_not_used() {
         s.drain_events().iter().any(|e| matches!(e, crate::Event::Toast { message, .. } if message.contains(&named))),
         "the user is told the folder is not used"
     );
-    assert_eq!(crate::project_tools::previews_dir(&s), Some(show.join("FilmCraft Previews").join("cut")));
+    assert_eq!(crate::project_tools::previews_dir(&s), Some(show.join("WaltCut Previews").join("cut")));
     s.execute("sequence.addEdit", json!({"seconds": 1.0})).unwrap();
     let r = s.execute("file.autoSaveNow", json!({})).unwrap();
     let written = std::path::PathBuf::from(r["path"].as_str().unwrap());
@@ -315,7 +315,7 @@ fn project_captured_folder_outside_the_project_is_not_used() {
     let d = temp_dir("scratch-captured");
     let show = d.join("show");
     std::fs::create_dir_all(&show).unwrap();
-    let proj = show.join("cut.fcproj").to_string_lossy().to_string();
+    let proj = show.join("cut.waltcut").to_string_lossy().to_string();
     let mut s = demo();
     s.execute("file.saveAs", json!({"path": proj})).unwrap();
     let mut named = vec![d.join("elsewhere").to_string_lossy().to_string(), r"\\192.0.2.1\share\cap".to_string(), "file://192.0.2.1/s/cap".to_string()];

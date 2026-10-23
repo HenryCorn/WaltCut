@@ -61,7 +61,7 @@ WaltCut is being reduced to the code this workflow needs (epic
 This section is the allowlist the reduction follows. Anything not listed here is removed from the
 repository, not hidden or put behind a flag. The decisions were made in
 [#17](https://github.com/HenryCorn/WaltCut/issues/17). Until the reduction is finished, the app
-still contains the inherited FilmCraft features.
+still contains the inherited WaltCut features.
 
 ### Workflows
 

@@ -34,7 +34,7 @@ use egui::RichText;
 use serde_json::{Value, json};
 use waltcut_project::{AudioChannelMap, AudioChannels, ItemKind, TrackKind};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::state::ClipDialogDraft;
 
 type Elems = Vec<(String, egui::Rect, String)>;
@@ -83,7 +83,7 @@ fn hold_on() -> [(&'static str, &'static str); 5] {
 }
 
 /// Menu / shortcut entry points without params open a dialog. Returns None for other ids.
-pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let empty = params.as_object().is_none_or(|m| m.is_empty());
     if !empty {
         return None;
@@ -108,7 +108,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
 /// A request to close the window (Quit, the title bar's close button, the OS): with unsaved
 /// changes it is cancelled and Save / Don't Save / Cancel is asked first, as in Premiere (#266).
 /// Returns whether the close must be cancelled.
-pub fn intercept_quit(app: &mut FilmcraftApp) -> bool {
+pub fn intercept_quit(app: &mut WaltCutApp) -> bool {
     if app.quit_confirmed || !app.session.is_dirty() {
         return false;
     }
@@ -119,7 +119,7 @@ pub fn intercept_quit(app: &mut FilmcraftApp) -> bool {
 }
 
 /// Initial parameters (and display info) of a command's dialog.
-fn defaults(app: &FilmcraftApp, id: &str) -> (Value, Value) {
+fn defaults(app: &WaltCutApp, id: &str) -> (Value, Value) {
     let s = &app.session;
     match id {
         "edit.pasteAttributes" | "edit.removeAttributes" => {
@@ -281,7 +281,7 @@ fn frames(ui: &mut egui::Ui, elems: &mut Elems, pre: &str, p: &mut Value, key: &
 }
 
 /// Draw the open dialog, if any.
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.clip_dialog.clone() else { return };
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("clip-dialog-before-drag"), &mut d);
     let Some((title, pre)) = meta(&d.command) else {

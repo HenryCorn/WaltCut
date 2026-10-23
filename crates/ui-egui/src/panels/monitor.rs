@@ -12,7 +12,7 @@ use serde_json::json;
 use waltcut_project::ItemKind;
 use waltcut_time::{Tick, TimeDisplay, format_time};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::frames::{FrameKey, Target};
 use crate::icons::{self, Icon};
 use crate::panels::monitor_view;
@@ -25,7 +25,7 @@ pub enum Which {
     Program,
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
     let t = app.tokens;
     let ctx = ui.ctx().clone();
     let stacked_controls = rect.width() < 540.0;
@@ -382,7 +382,7 @@ const ASKED_KEYS: usize = 64;
 /// is, and showing it keeps the picture one pass behind the mouse instead of frozen until the
 /// mouse rests. Playback has its own schedule and remembers nothing (what was on screen before
 /// Play is no stand-in for where it stopped).
-fn asked_before(app: &mut FilmcraftApp, prefix: &str, key: FrameKey, playing: bool) -> Vec<FrameKey> {
+fn asked_before(app: &mut WaltCutApp, prefix: &str, key: FrameKey, playing: bool) -> Vec<FrameKey> {
     let asked = app.monitor_asked.entry(prefix.to_string()).or_default();
     if playing {
         asked.clear();
@@ -402,7 +402,7 @@ fn asked_before(app: &mut FilmcraftApp, prefix: &str, key: FrameKey, playing: bo
 /// it, else the newest ready one of `asked` (see [`asked_before`]), with the display mode's
 /// channel mapping. Returns the texture and the frame it shows.
 fn cpu_texture(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ctx: &egui::Context,
     name: &str,
     key: FrameKey,
@@ -446,7 +446,7 @@ const EYEDROPPER_SCALE: f32 = 0.5;
 /// takes a crosshair and a click fills that parameter with the colour under the pointer. The colour is
 /// read from a render of the sequence at the playhead with the armed effect switched off (an Ultra Key
 /// has already removed the green it is asked to key); Esc disarms.
-fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, pic: Rect, target: Target, rate: waltcut_time::FrameRate, time: Tick) {
+fn eyedropper(app: &mut WaltCutApp, ui: &mut egui::Ui, resp: &egui::Response, pic: Rect, target: Target, rate: waltcut_time::FrameRate, time: Tick) {
     let Some(armed) = app.ui.eyedropper.clone() else { return };
     let ctx = ui.ctx().clone();
     let pending_id = egui::Id::new("eyedropper-pending");
@@ -555,7 +555,7 @@ fn ruler_shown(zoom: Option<[f64; 2]>, origin: Tick, end: Tick) -> (Tick, Tick) 
 /// does (Settings ▸ Timeline ▸ Timeline Playback Auto-Scrolling): with page scrolling, a playhead
 /// running off the right edge or jumping before the left one brings it back near the left edge;
 /// with smooth scrolling it stays in the middle once it gets there. The range keeps its width.
-fn follow_playhead(app: &mut FilmcraftApp, which: Which, origin: Tick, end: Tick, time: Tick) {
+fn follow_playhead(app: &mut WaltCutApp, which: Which, origin: Tick, end: Tick, time: Tick) {
     let playing = if which == Which::Program { app.playback.playing } else { app.source_playback.clock.playing };
     let mode = app.session.prefs.timeline.auto_scroll.as_str();
     let zoom = monitor_view::view(app, which).time_zoom;
@@ -580,7 +580,7 @@ fn follow_playhead(app: &mut FilmcraftApp, which: Which, origin: Tick, end: Tick
 /// The zoom scroll bar under the time ruler. Its thumb is the part of the clip or sequence
 /// (`origin..end`) the ruler shows: drag a handle at either end to zoom, the middle to scroll, or
 /// press beside the thumb to bring it there. A thumb filling the bar shows all of it.
-fn time_zoom_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, which: Which, origin: Tick, end: Tick, rate: waltcut_time::FrameRate) {
+fn time_zoom_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, bar: Rect, which: Which, origin: Tick, end: Tick, rate: waltcut_time::FrameRate) {
     let t = app.tokens;
     let prefix = if which == Which::Program { "program" } else { "source" };
     let len = end.0.saturating_sub(origin.0);
@@ -663,7 +663,7 @@ fn time_zoom_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, which: Wh
 
 #[allow(clippy::too_many_arguments)]
 fn mini_timeline(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     bar: Rect,
     which: Which,
@@ -818,7 +818,7 @@ fn set_transport_visible(hidden: &mut Vec<String>, command: &str, visible: bool)
 /// Width and height of a transport button.
 const TRANSPORT_BUTTON: f32 = 28.0;
 
-fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which) {
+fn transport(app: &mut WaltCutApp, ui: &mut egui::Ui, row: Rect, which: Which) {
     let t = app.tokens;
     let src = which == Which::Source;
     let buttons: Vec<(Icon, &str, &str)> = if src {
@@ -957,7 +957,7 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
     }
 }
 
-fn transport_button(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, prefix: &str, icon: Icon, command: &str, label: &str) -> bool {
+fn transport_button(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, prefix: &str, icon: Icon, command: &str, label: &str) -> bool {
     let t = app.tokens;
     let response = ui.interact(rect, egui::Id::new((prefix, command)), Sense::click()).on_hover_text(label);
     app.auto.add_response(&format!("{prefix}.transport.{command}"), &response, label);
@@ -970,7 +970,7 @@ fn transport_button(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, prefi
     response.clicked()
 }
 
-fn invoke_transport(app: &mut FilmcraftApp, ctx: &egui::Context, which: Which, command: &str) {
+fn invoke_transport(app: &mut WaltCutApp, ctx: &egui::Context, which: Which, command: &str) {
     let source = which == Which::Source;
     let result = match command {
         "src.markIn" => app.session.execute("markers.markIn", json!({"target": "source"})).map_err(|error| error.to_string()),
@@ -989,7 +989,7 @@ fn invoke_transport(app: &mut FilmcraftApp, ctx: &egui::Context, which: Which, c
 
 /// The Source panel menu's clips (#313): the recently opened clips, the shown one ticked, to
 /// switch between, then Close / Close All. Returns whether the menu is done.
-pub fn source_panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
+pub fn source_panel_menu(app: &mut WaltCutApp, ui: &mut egui::Ui) -> bool {
     let mut done = false;
     let current = app.session.state.source_item;
     let recent: Vec<(u64, String)> =
@@ -1021,7 +1021,7 @@ pub fn source_panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
     done
 }
 
-fn source_nav(app: &mut FilmcraftApp, cmd: &str) {
+fn source_nav(app: &mut WaltCutApp, cmd: &str) {
     let Some(item) = app.session.state.source_item else { return };
     let Some(v) = waltcut_engine::clip_ops::source_view(&app.session, item) else { return };
     let rate = v.rate;

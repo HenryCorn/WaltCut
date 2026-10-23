@@ -69,7 +69,7 @@ the memory traffic in prediction reads, in-loop filters and output) and as `u16`
 slice decoder and the filters are generic over the sample type (`picture::Sample`), monomorphised
 once per type.
 
-Draft mode (`Decoder::set_draft(true)`; FilmCraft enables it with Settings ▸ Playback ▸ Draft
+Draft mode (`Decoder::set_draft(true)`; WaltCut enables it with Settings ▸ Playback ▸ Draft
 decoding while the Program monitor plays at 1/2 or 1/4): sub-layer non-reference pictures
 (TRAIL_N, RASL_N, ...) of the highest temporal sub-layer — no later picture predicts from them,
 and TMVP reads only reference pictures — skip deblocking and SAO and are flagged

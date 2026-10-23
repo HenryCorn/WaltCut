@@ -1,9 +1,9 @@
-//! `.fcproj` project files.
+//! `.waltcut` project files.
 //!
 //! A project file is UTF-8 JSON with an explicit schema version:
 //!
 //! ```json
-//! { "format": "filmcraft.project", "schema_version": 16, "generator": "FilmCraft 0.10.0", "project": { … } }
+//! { "format": "waltcut.project", "schema_version": 16, "generator": "WaltCut 0.1.0", "project": { … } }
 //! ```
 //!
 //! - **One schema, no migrations.** [`SCHEMA_VERSION`] is the only version this build reads and
@@ -16,12 +16,12 @@
 //! - **Atomic saves.** [`atomic_write`] writes a temp file in the destination directory, fsyncs it,
 //!   renames it over the target and fsyncs the directory: a crash or power cut during a save leaves
 //!   either the old file or the new one, never a torn mix.
-//! - **Auto-save naming/rotation** lives in [`autosave`] (`<name>-YYYY-MM-DD_HH-MM-SS.fcproj` in an
+//! - **Auto-save naming/rotation** lives in [`autosave`] (`<name>-YYYY-MM-DD_HH-MM-SS.waltcut` in an
 //!   `Auto-Save` folder next to the project, oldest pruned beyond the version limit). Auto-saves of
 //!   another schema are neither listed nor pruned.
 //!
 //! Schema history:
-//! - **v1–v15**: FilmCraft and the first WaltCut builds, up to [`LEGACY_RELEASE`]. Not readable.
+//! - **v1–v15**: WaltCut and the first WaltCut builds, up to [`LEGACY_RELEASE`]. Not readable.
 //! - **v16**: the reduction baseline. The model is unchanged from v15; the bump makes every earlier
 //!   file fail with a clear message instead of loading into a model that is about to lose fields.
 
@@ -38,7 +38,11 @@ use waltcut_project::{Project, ProjectView};
 pub use atomic::atomic_write;
 
 /// The `format` tag written in every envelope.
-pub const FORMAT_ID: &str = "filmcraft.project";
+pub const FORMAT_ID: &str = "waltcut.project";
+
+/// The tag files carried before the product rename. They are still recognised as projects, so an
+/// older one gets the "written by an earlier build" message instead of "not a project".
+pub const LEGACY_FORMAT_ID: &str = "filmcraft.project";
 
 /// The schema version this build writes and reads. Nothing else is readable.
 pub const SCHEMA_VERSION: u32 = 16;
@@ -48,11 +52,9 @@ pub const LEGACY_RELEASE: &str = "v0.0.1-legacy";
 
 #[derive(Debug, thiserror::Error)]
 pub enum FormatError {
-    #[error("not a FilmCraft project: {0}")]
+    #[error("not a WaltCut project: {0}")]
     NotAProject(String),
-    #[error(
-        "this project was saved by a newer version of FilmCraft (project schema v{found}); this build reads up to v{supported}. Update FilmCraft to open it."
-    )]
+    #[error("this project was saved by a newer version of WaltCut (project schema v{found}); this build reads up to v{supported}. Update WaltCut to open it.")]
     TooNew { found: u32, supported: u32 },
     #[error(
         "this project was created by an earlier FilmCraft or WaltCut build (project schema v{found}); this build only opens schema v{supported}. Open it with the v0.0.1-legacy release (https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy). The file has not been changed."
@@ -79,7 +81,7 @@ pub struct Loaded {
 
 /// Writer identification stored in the envelope.
 pub fn generator() -> String {
-    format!("FilmCraft {}", env!("CARGO_PKG_VERSION"))
+    format!("WaltCut {}", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(Serialize)]
@@ -146,6 +148,7 @@ fn probe_version(p: &Probe) -> Result<u32, FormatError> {
     if let Some(v) = p.schema_version {
         if let Some(f) = &p.format
             && f != FORMAT_ID
+            && f != LEGACY_FORMAT_ID
         {
             return Err(FormatError::NotAProject(format!("format is `{f}`, expected `{FORMAT_ID}`")));
         }
@@ -415,7 +418,7 @@ mod tests {
         v["schema_version"] = Value::from(SCHEMA_VERSION + 1);
         let e = decode(&serde_json::to_vec(&v).unwrap()).unwrap_err();
         assert!(matches!(e, FormatError::TooNew { .. }));
-        assert!(e.to_string().contains("newer version of FilmCraft"), "{e}");
+        assert!(e.to_string().contains("newer version of WaltCut"), "{e}");
     }
 
     #[test]
@@ -557,9 +560,9 @@ mod tests {
         for junk in [&b""[..], b"{", b"[1]", br#"{"schema_version":"x"}"#, br#"{"schema_version":99999999999}"#] {
             assert_eq!(peek_schema(junk), None, "{}", String::from_utf8_lossy(junk));
         }
-        let d = std::env::temp_dir().join(format!("filmcraft-peek-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("waltcut-peek-{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
-        let (cur, old, none) = (d.join("cur.fcproj"), d.join("old.fcproj"), d.join("none.fcproj"));
+        let (cur, old, none) = (d.join("cur.waltcut"), d.join("old.waltcut"), d.join("none.waltcut"));
         std::fs::write(&cur, encode(&p, false)).unwrap();
         std::fs::write(&old, br#"{"format":"filmcraft.project","schema_version":15,"project":{}}"#).unwrap();
         assert!(is_current_file(&cur) && !is_current_file(&old) && !is_current_file(&none));

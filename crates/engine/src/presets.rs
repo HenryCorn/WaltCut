@@ -11,7 +11,7 @@
 //! - **Intrinsic effects** (Motion, Opacity, Volume) replace the target clip's own instance.
 //! - **Library.** Built-in presets are authored in code ([`builtin_presets`]); user presets persist
 //!   in `<data dir>/effect-presets.json`. Preset files (export/import) are JSON:
-//!   `{"format": "filmcraft.effect-presets", "version": 1, "presets": [EffectPreset…]}`.
+//!   `{"format": "waltcut.effect-presets", "version": 1, "presets": [EffectPreset…]}`.
 //!
 //! Commands: `presets.list`, `presets.save`, `presets.apply` (undoable), `presets.delete`,
 //! `presets.rename`, `presets.export`, `presets.import`.
@@ -27,7 +27,7 @@ use waltcut_time::{TICKS_PER_SECOND, Tick};
 use crate::commands::{CommandSpec, always, bad, clip_p, has_seq, str_p};
 use crate::{EngineError, Result, Session};
 
-pub const FILE_FORMAT: &str = "filmcraft.effect-presets";
+pub const FILE_FORMAT: &str = "waltcut.effect-presets";
 const LIBRARY_FILE: &str = "effect-presets.json";
 
 /// How a preset's keyframes are placed on the target clip.
@@ -164,7 +164,7 @@ fn preset(name: &str, description: &str, keyframes: KeyframeMode, secs: f64, eff
     }
 }
 
-/// Presets that ship with FilmCraft (original work: parameter values chosen by us).
+/// Presets that ship with WaltCut (original work: parameter values chosen by us).
 pub fn builtin_presets() -> Vec<EffectPreset> {
     let f = ParamValue::Float;
     let mut presets = Vec::new();

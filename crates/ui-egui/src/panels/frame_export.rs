@@ -1,7 +1,7 @@
 //! Monitor Export Frame settings, with captured target/time and a destination folder.
 use crate::native_dialogs::FileDialog;
 use crate::{
-    FilmcraftApp,
+    WaltCutApp,
     icons::{self, Icon},
 };
 use serde_json::{Value, json};
@@ -26,7 +26,7 @@ fn clean(name: &str) -> String {
     name.trim().chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect()
 }
 
-pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, params: &Value) -> Result<Value, String> {
+pub fn open(app: &mut WaltCutApp, ctx: &egui::Context, params: &Value) -> Result<Value, String> {
     let target = frame_export_target(&app.session, params).map_err(|e| e.to_string())?;
     let (rate, drop_frame) = if target.source {
         let view = waltcut_engine::clip_ops::source_view(&app.session, target.item).ok_or("Source clip is unavailable")?;
@@ -53,7 +53,7 @@ pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, params: &Value) -> Resu
     Ok(json!({"dialog":"exportFrame"}))
 }
 
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(Some(mut d)) = ctx.data(|m| m.get_temp::<Option<Draft>>(draft_id())) else { return };
     let mut close = false;
     let mut apply = false;

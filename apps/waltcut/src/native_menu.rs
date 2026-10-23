@@ -5,7 +5,7 @@ use std::sync::mpsc::{Receiver, channel};
 
 use muda::accelerator::Accelerator;
 use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::menus::{MENUS, MenuItem as Item, NATIVE_APP_MENU, menu_items};
 
 fn accel(s: &str) -> Option<Accelerator> {
@@ -22,15 +22,15 @@ fn accel(s: &str) -> Option<Accelerator> {
 /// Updates native item labels, key equivalents and enablement when the menu tree changes.
 pub type MenuUpdater = Box<dyn FnMut(&[Item])>;
 
-pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, MenuUpdater) {
+pub fn install(app: &WaltCutApp, ctx: egui::Context) -> (Receiver<String>, MenuUpdater) {
     let items = menu_items(app);
     // each native item with the menu entry it currently shows, so updates touch only what changed
     let mut native: Vec<(Item, MenuItem)> = Vec::new();
     let mut titles: Vec<(String, Submenu)> = Vec::new();
     let bar = Menu::new();
-    let app_menu = Submenu::new("FilmCraft", true);
+    let app_menu = Submenu::new("WaltCut", true);
     let [settings_label, hide_label, hide_others_label, quit_label] = NATIVE_APP_MENU;
-    // FilmCraft ▸ Settings ▸ <category> (Premiere's app-menu layout; General is Cmd+,)
+    // WaltCut ▸ Settings ▸ <category> (Premiere's app-menu layout; General is Cmd+,)
     let settings = Submenu::new(waltcut_ui_egui::i18n::t(settings_label), true);
     titles.push((settings_label.into(), settings.clone()));
     for it in items.iter().filter(|i| i.id.starts_with("app.settings.")) {
@@ -41,7 +41,7 @@ pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, Men
     }
     // About repeats a Help menu command: same label, updated with it
     let label = |id: &str, english: &str| items.iter().find(|i| i.id == id).map_or_else(|| english.to_string(), |i| i.label.clone());
-    let about = MenuItem::with_id("app.about", label("app.about", "About FilmCraft"), true, None);
+    let about = MenuItem::with_id("app.about", label("app.about", "About WaltCut"), true, None);
     if let Some(it) = items.iter().find(|i| i.id == "app.about") {
         // recorded as built (enabled, no shortcut), so the first update applies the real state
         native.push((Item { enabled: true, shortcut: None, ..it.clone() }, about.clone()));

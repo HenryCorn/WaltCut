@@ -14,7 +14,7 @@ use crate::previews::BarState;
 
 fn tmp(name: &str) -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    std::env::temp_dir().join(format!("filmcraft-previews-test-{name}-{}-{nanos}", std::process::id()))
+    std::env::temp_dir().join(format!("waltcut-previews-test-{name}-{}-{nanos}", std::process::id()))
 }
 
 /// A 64×36 24 fps sequence: V1 = matte with Tint (0..24) + plain matte (24..48), A1 = tone (0..48).
@@ -213,10 +213,10 @@ fn previews_survive_save_and_open() {
     job_ok(&s, &v);
     let folder = tmp("save-project");
     std::fs::create_dir_all(&folder).unwrap();
-    let path = folder.join("Film.fcproj").to_string_lossy().to_string();
+    let path = folder.join("Film.waltcut").to_string_lossy().to_string();
     s.execute("file.save", json!({"path": path})).unwrap();
     // the unsaved project's previews moved next to the project
-    assert_eq!(s.previews.dir().unwrap(), folder.join("FilmCraft Previews").join("Film"));
+    assert_eq!(s.previews.dir().unwrap(), folder.join("WaltCut Previews").join("Film"));
     assert_eq!(states(&s), vec!["green", "none"]);
     let mut t = Session::default();
     t.execute("file.open", json!({"path": path})).unwrap();

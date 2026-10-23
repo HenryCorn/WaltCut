@@ -27,11 +27,11 @@ pub fn start(port: u16, ctx: egui::Context) -> Receiver<ControlRequest> {
     let listener = match TcpListener::bind(("127.0.0.1", port)) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("filmcraft: control server failed to bind 127.0.0.1:{port}: {e}");
+            eprintln!("waltcut: control server failed to bind 127.0.0.1:{port}: {e}");
             return rx;
         }
     };
-    eprintln!("filmcraft: control server listening on 127.0.0.1:{port}");
+    eprintln!("waltcut: control server listening on 127.0.0.1:{port}");
     std::thread::spawn(move || accept_loop(listener, tx, ctx));
     rx
 }
@@ -54,7 +54,7 @@ fn accept_loop(listener: TcpListener, tx: Sender<ControlRequest>, ctx: egui::Con
             serve(stream, &tx, &ctx);
         });
         if let Err(e) = spawned {
-            eprintln!("filmcraft: control server could not start a connection thread: {e}");
+            eprintln!("waltcut: control server could not start a connection thread: {e}");
         }
     }
 }

@@ -3,12 +3,12 @@
 //! Without a logger every `log::warn!`/`log::error!` in the workspace (GPU compositor fallbacks,
 //! audio output problems, a panicked frame job or audio mixer, container warnings) vanished. A
 //! launch from a desktop menu has no terminal, so the file is what a bug report can attach:
-//! `<data dir>/Logs/filmcraft.log`, next to the crash logs (`--data-dir`, `FILMCRAFT_DATA_DIR` or
+//! `<data dir>/Logs/waltcut.log`, next to the crash logs (`--data-dir`, `WALTCUT_DATA_DIR` or
 //! `waltcut_engine::autosave::default_data_dir`; Help ▸ Reveal Log Files opens the folder). Each
-//! start moves the previous log to `filmcraft.1.log` (and that one to `.2`), so the log of a run
+//! start moves the previous log to `waltcut.1.log` (and that one to `.2`), so the log of a run
 //! that crashed survives the next launch.
 //!
-//! Levels: `info` for FilmCraft's own crates, `warn` for everything else (wgpu and naga are
+//! Levels: `info` for WaltCut's own crates, `warn` for everything else (wgpu and naga are
 //! chatty). `RUST_LOG` replaces that with env_logger-style directives: `debug`,
 //! `warn,waltcut_codecs=trace`, `wgpu_core=info`. A directive ending in `*` matches every target
 //! that starts with it (`waltcut*=debug`).
@@ -31,18 +31,18 @@ use std::time::SystemTime;
 use log::LevelFilter;
 
 /// The current log file's name inside the log directory.
-pub const LOG_FILE: &str = "filmcraft.log";
+pub const LOG_FILE: &str = "waltcut.log";
 /// The log directory inside the data directory (shared with the crash logs and Reveal Log Files).
 pub const LOG_DIR: &str = "Logs";
-/// How many previous logs are kept (`filmcraft.1.log` … `filmcraft.<KEEP>.log`).
+/// How many previous logs are kept (`waltcut.1.log` … `waltcut.<KEEP>.log`).
 pub const KEEP: usize = 2;
 /// The log file stops growing past this size (a runaway warning can't fill the disk).
 pub const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 /// Records kept in memory until the log file is attached.
 pub const MAX_PENDING: usize = 512;
 /// The built-in filter when `RUST_LOG` is unset or empty.
-/// The app's own target is the `filmcraft` binary; every library crate logs as `waltcut_*`.
-pub const DEFAULT_FILTER: &str = "warn,filmcraft*=info,waltcut*=info";
+/// The app's own target is the `waltcut` binary; every library crate logs as `waltcut_*`.
+pub const DEFAULT_FILTER: &str = "warn,waltcut*=info,waltcut*=info";
 
 /// Per-target level filter parsed from env_logger-style directives.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -124,7 +124,7 @@ fn civil_from_days(days: u64) -> (u64, u64, u64) {
 }
 
 fn numbered(dir: &Path, n: usize) -> PathBuf {
-    if n == 0 { dir.join(LOG_FILE) } else { dir.join(format!("filmcraft.{n}.log")) }
+    if n == 0 { dir.join(LOG_FILE) } else { dir.join(format!("waltcut.{n}.log")) }
 }
 
 /// Shift the previous logs up one (`.log` → `.1.log` → … → `.<KEEP>.log`, the oldest dropped)
@@ -298,7 +298,7 @@ mod tests {
 
     fn temp_dir(tag: &str) -> PathBuf {
         static N: AtomicUsize = AtomicUsize::new(0);
-        let d = std::env::temp_dir().join(format!("filmcraft-logging-{tag}-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        let d = std::env::temp_dir().join(format!("waltcut-logging-{tag}-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
         let _ = std::fs::remove_dir_all(&d);
         d
     }
@@ -312,10 +312,10 @@ mod tests {
     }
 
     #[test]
-    fn the_default_filter_shows_filmcraft_info_and_other_crates_warnings() {
+    fn the_default_filter_shows_waltcut_info_and_other_crates_warnings() {
         let f = Filter::parse(DEFAULT_FILTER);
-        assert_eq!(f.level_for("filmcraft"), LevelFilter::Info);
-        assert_eq!(f.level_for("filmcraft::audio"), LevelFilter::Info);
+        assert_eq!(f.level_for("waltcut"), LevelFilter::Info);
+        assert_eq!(f.level_for("waltcut::audio"), LevelFilter::Info);
         assert_eq!(f.level_for("waltcut_ui_egui::play_ahead"), LevelFilter::Info);
         assert_eq!(f.level_for("waltcut_codecs::mp4"), LevelFilter::Info);
         assert_eq!(f.level_for("wgpu_core::device"), LevelFilter::Warn);
@@ -352,13 +352,13 @@ mod tests {
             "=",
             "==",
             "=debug",
-            "filmcraft=",
+            "waltcut=",
             "nonsense=loud",
             "🦀=info",
             "*",
             "*=debug",
             "a=b=c",
-            "warn,,filmcraft=DEBUG",
+            "warn,,waltcut=DEBUG",
             " \t ",
             "\u{0}",
             "é*=trace",
@@ -366,12 +366,12 @@ mod tests {
         ];
         for spec in specs {
             let f = Filter::parse(spec);
-            for target in ["filmcraft", "", "🦀", "é", "a::b"] {
+            for target in ["waltcut", "", "🦀", "é", "a::b"] {
                 let _ = f.level_for(target);
             }
             let _ = f.max();
         }
-        assert_eq!(Filter::parse("warn,,filmcraft=DEBUG").level_for("filmcraft"), LevelFilter::Debug);
+        assert_eq!(Filter::parse("warn,,waltcut=DEBUG").level_for("waltcut"), LevelFilter::Debug);
         assert_eq!(Filter::parse("nonsense=loud").level_for("nonsense"), LevelFilter::Error);
         assert_eq!(Filter::parse("=debug").max(), LevelFilter::Error, "a directive without a name is skipped");
         assert_eq!(Filter::parse("*=debug").level_for("anything"), LevelFilter::Debug, "a lone `*` matches every target");
@@ -403,9 +403,9 @@ mod tests {
             std::fs::write(&path, format!("run {run}")).expect("write");
         }
         assert_eq!(read(&dir.join(LOG_FILE)), "run 4");
-        assert_eq!(read(&dir.join("filmcraft.1.log")), "run 3");
-        assert_eq!(read(&dir.join("filmcraft.2.log")), "run 2");
-        assert!(!dir.join("filmcraft.3.log").exists(), "only {KEEP} old logs are kept");
+        assert_eq!(read(&dir.join("waltcut.1.log")), "run 3");
+        assert_eq!(read(&dir.join("waltcut.2.log")), "run 2");
+        assert!(!dir.join("waltcut.3.log").exists(), "only {KEEP} old logs are kept");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -492,23 +492,23 @@ mod tests {
     fn the_logger_filters_records_and_writes_them_to_the_attached_file() {
         let dir = temp_dir("logger");
         let logger = AppLogger::new(Filter::parse(DEFAULT_FILTER), false);
-        record(&logger, log::Level::Info, "filmcraft", "FilmCraft starting");
+        record(&logger, log::Level::Info, "waltcut", "WaltCut starting");
         record(&logger, log::Level::Info, "wgpu_core::device", "too chatty");
         let path = logger.attach_dir(&dir).expect("attach");
         assert_eq!(path, dir.join(LOG_FILE));
         record(&logger, log::Level::Warn, "wgpu_hal::vulkan", "a real warning");
-        record(&logger, log::Level::Debug, "filmcraft", "below info");
+        record(&logger, log::Level::Debug, "waltcut", "below info");
         let text = read(&path);
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 2, "{text}");
-        assert!(lines.first().is_some_and(|l| l.contains(" INFO  [") && l.ends_with("filmcraft: FilmCraft starting")), "{text}");
+        assert!(lines.first().is_some_and(|l| l.contains(" INFO  [") && l.ends_with("waltcut: WaltCut starting")), "{text}");
         assert!(lines.get(1).is_some_and(|l| l.ends_with("wgpu_hal::vulkan: a real warning")), "{text}");
         assert!(logger.enabled(&log::Metadata::builder().level(log::Level::Info).target("waltcut_engine::autosave").build()));
         assert!(!logger.enabled(&log::Metadata::builder().level(log::Level::Info).target("naga").build()));
         // A second launch rotates: the first log becomes `.1`.
         let second = AppLogger::new(Filter::parse(DEFAULT_FILTER), false);
         assert_eq!(second.attach_dir(&dir).expect("attach again"), dir.join(LOG_FILE));
-        assert_eq!(read(&dir.join("filmcraft.1.log")), text);
+        assert_eq!(read(&dir.join("waltcut.1.log")), text);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -521,14 +521,14 @@ mod tests {
             for _ in 0..4 {
                 s.spawn(|| {
                     for _ in 0..100 {
-                        record(&logger, log::Level::Info, "filmcraft", "from a worker");
+                        record(&logger, log::Level::Info, "waltcut", "from a worker");
                     }
                 });
             }
         });
         let text = read(&path);
         assert_eq!(text.lines().count(), 400);
-        assert!(text.lines().all(|l| l.ends_with("filmcraft: from a worker")), "{text}");
+        assert!(text.lines().all(|l| l.ends_with("waltcut: from a worker")), "{text}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -556,7 +556,7 @@ mod tests {
             panic!("poison the sink");
         }));
         assert!(logger.sink.is_poisoned());
-        record(&logger, log::Level::Info, "filmcraft", "after the panic");
+        record(&logger, log::Level::Info, "waltcut", "after the panic");
         assert!(read(&path).contains("after the panic"));
         let _ = std::fs::remove_dir_all(&dir);
     }

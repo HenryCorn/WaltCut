@@ -6,7 +6,7 @@ cargo test -p waltcut-h264                    # one crate
 cargo test --release -p waltcut-hevc          # codec tests are much faster in release
 cargo xtask ci                                  # all gates (fmt, clippy, tests, layers, assets)
 cargo xtask fixtures                            # pre-generate the ffmpeg fixture matrix
-FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
+WALTCUT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
 ```
 
 The stacked #24 masks/tracking draft adds negative command-registry and removed-data rejection
@@ -26,13 +26,13 @@ macOS before merge. Native `cargo test -p xtask --quiet` (6 tests) and
 | Property (`proptest`) | `time`, `bitstream`, `edit`, `isobmff/tests/roundtrip.rs` | tick↔frame round trips for every rate, DF timecode, edit invariants (no overlaps, durations conserved), mux→demux round trips, interchange export→import |
 | Synthetic streams | `h264/src/synth_tests.rs`, `hevc/src/synth_tests.rs` | hand-built bitstreams for features the reference encoders don't emit; expected output known exactly |
 | Scripted UI | `crates/ui-egui/tests/scripted.rs` | headless app (egui_kittest) driven over the control channel: razor/undo, insert, apply effect, playback, click by automation id (§4) |
-| Monitor view / Graphics menu | `crates/ui-egui/tests/view_ui.rs`, `crates/engine/src/graphics_tests.rs` | View menu items and checkmarks, playback/paused resolution, channel / waveform display modes, magnification and Hand-tool panning, guides dragged from the rulers (move, lock, remove, Add Guide…, templates in the preferences), snapping a graphic to the frame centre and a guide; align to frame / as group / to selection, distribute (centres and gaps), arrange, select next/previous graphic and layer, reset parameters / duration, vertical text, New Layer from file (`FILMCRAFT_UI_SHOTS=<dir>` writes `view-*.png`) |
-| Settings | `crates/engine/src/settings_tests.rs`, `crates/ui-egui/tests/settings_ui.rs` | schema keys and defaults, persistence in the data directory, v1 → v2 migration and repair of bad values, validation, per-category reset; each wired setting (still / transition durations, step many, label defaults and colours, media scaling, timebase, recent projects, media cache policy, output mapping, smart quotes, auto-transcribe); the dialog: every category from its command and Cmd+,, edits by automation id, OK / Cancel / Escape / Reset…, theme, label names in Edit ▸ Label, tooltips, frame cache (`FILMCRAFT_UI_SHOTS=<dir>` writes `settings-*.png`) |
-| Keyframe navigator and Effect Controls ruler | `crates/engine/src/tests.rs` (`add_keyframe_toggles_the_keyframe_at_the_playhead`), `crates/ui-egui/tests/keyframes_ui.rs`, `lane_tests` in `crates/ui-egui/src/panels/effect_controls.rs` | `effects.addKeyframe` adds a keyframe at the playhead or removes the one there (the value falls back to the remaining keyframes; undo, redo, parameters that name nothing); headless: the Properties diamond turns animation on, adds and removes the keyframe at the playhead (Scale 50 % → 100 % again), its ◀ ▶ arrows and Effect Controls' step between keyframes, Crop is applied before its first keyframe; a click on the Effect Controls time ruler and a drag of the playhead's handle move the playhead, and no playhead is drawn off the clip; ruler labels are sequence timecode, and clip times, frame rates and panel widths at their limits don't panic (`FILMCRAFT_UI_SHOTS=<dir>` writes `keyframes-*.png`) |
+| Monitor view / Graphics menu | `crates/ui-egui/tests/view_ui.rs`, `crates/engine/src/graphics_tests.rs` | View menu items and checkmarks, playback/paused resolution, channel / waveform display modes, magnification and Hand-tool panning, guides dragged from the rulers (move, lock, remove, Add Guide…, templates in the preferences), snapping a graphic to the frame centre and a guide; align to frame / as group / to selection, distribute (centres and gaps), arrange, select next/previous graphic and layer, reset parameters / duration, vertical text, New Layer from file (`WALTCUT_UI_SHOTS=<dir>` writes `view-*.png`) |
+| Settings | `crates/engine/src/settings_tests.rs`, `crates/ui-egui/tests/settings_ui.rs` | schema keys and defaults, persistence in the data directory, v1 → v2 migration and repair of bad values, validation, per-category reset; each wired setting (still / transition durations, step many, label defaults and colours, media scaling, timebase, recent projects, media cache policy, output mapping, smart quotes, auto-transcribe); the dialog: every category from its command and Cmd+,, edits by automation id, OK / Cancel / Escape / Reset…, theme, label names in Edit ▸ Label, tooltips, frame cache (`WALTCUT_UI_SHOTS=<dir>` writes `settings-*.png`) |
+| Keyframe navigator and Effect Controls ruler | `crates/engine/src/tests.rs` (`add_keyframe_toggles_the_keyframe_at_the_playhead`), `crates/ui-egui/tests/keyframes_ui.rs`, `lane_tests` in `crates/ui-egui/src/panels/effect_controls.rs` | `effects.addKeyframe` adds a keyframe at the playhead or removes the one there (the value falls back to the remaining keyframes; undo, redo, parameters that name nothing); headless: the Properties diamond turns animation on, adds and removes the keyframe at the playhead (Scale 50 % → 100 % again), its ◀ ▶ arrows and Effect Controls' step between keyframes, Crop is applied before its first keyframe; a click on the Effect Controls time ruler and a drag of the playhead's handle move the playhead, and no playhead is drawn off the clip; ruler labels are sequence timecode, and clip times, frame rates and panel widths at their limits don't panic (`WALTCUT_UI_SHOTS=<dir>` writes `keyframes-*.png`) |
 | Golden images | `crates/golden/tests/golden.rs` | CPU renders vs committed PNGs; GPU vs CPU on the same scenes (§3) |
 | Engine / command | `crates/engine/src/tests.rs` | run commands on the demo project, assert the sequence, undo/redo, disabled cases |
 | Render | `crates/render/src/tests.rs` | compositing, opacity, Motion, ½-res vs full, GPU plan vs reference, retained mono/stereo audio mix |
-| Project panel (M12.7) | `crates/engine/src/project_panel_tests.rs`, `crates/ui-egui/tests/project_panel_ui.rs` | view settings and their preference round trip; Metadata Display columns (custom fields, Freeform keys hidden), numeric vs text sorting, view presets (save / save as / restore / rename / delete, ten slots, persisted in `preferences.json`); Freeform moves keeping offsets, snapping, Align to Grid, Clip Size, stacks, arrangements, Reset (each one undo step, saved in the project); bin rename / nesting; the Media Browser against a fake filesystem (folders first, hidden and unsupported files left out, file-type filter, back / forward / up, recent directories, Favorites, import of a selection or a folder, Open in Source Monitor, ingest, probe columns). Headless: List view (sort by header, drag a column wider, inline rename), Icon view (hover scrub + I / O set the clip's In / Out, Shift+] / [), Freeform (drag a card, stack from the card menu, options dialog), panel menu, Metadata Display dialog, view presets, bins in place / tab / window, footer buttons, Media Browser navigation, Favorites, import, Shift+O, Edit Columns…, thumbnails, drag to the Timeline (`FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` writes `project-*.png`, `media-browser-*.png`) |
+| Project panel (M12.7) | `crates/engine/src/project_panel_tests.rs`, `crates/ui-egui/tests/project_panel_ui.rs` | view settings and their preference round trip; Metadata Display columns (custom fields, Freeform keys hidden), numeric vs text sorting, view presets (save / save as / restore / rename / delete, ten slots, persisted in `preferences.json`); Freeform moves keeping offsets, snapping, Align to Grid, Clip Size, stacks, arrangements, Reset (each one undo step, saved in the project); bin rename / nesting; the Media Browser against a fake filesystem (folders first, hidden and unsupported files left out, file-type filter, back / forward / up, recent directories, Favorites, import of a selection or a folder, Open in Source Monitor, ingest, probe columns). Headless: List view (sort by header, drag a column wider, inline rename), Icon view (hover scrub + I / O set the clip's In / Out, Shift+] / [), Freeform (drag a card, stack from the card menu, options dialog), panel menu, Metadata Display dialog, view presets, bins in place / tab / window, footer buttons, Media Browser navigation, Favorites, import, Shift+O, Edit Columns…, thumbnails, drag to the Timeline (`WALTCUT_UI_SNAPSHOT_DIR=<dir>` writes `project-*.png`, `media-browser-*.png`) |
 | Menu long tail (M3.11) | `crates/engine/src/{sequence_extras,project_tools}_tests.rs`, `crates/project/src/find.rs`, `crates/ui-egui/tests/menus_ui.rs` | Normalize Mix Track to a target peak; Simplify Sequence; Find / Find Next and search bins; Automate to Sequence (overlap, transitions, insert, unnumbered markers); Project Settings and scratch disks; menu order and shortcuts against the documented order; the dialogs by automation id |
 | Mixer | `crates/render/src/mixer_tests.rs`, `crates/engine/src/mixer_tests.rs` | sample-exact fader gain and pan laws, automation at block boundaries (bit-identical however requests are cut), solo/mute/solo-safe, sends and submix routing, latency-compensation alignment, render-vs-playback identity, Touch ramp-back, recorder modes (Latch/Touch/Write), thinning, Audio Gain, transition curves; `perf_24_tracks_3_effects_realtime_factor` prints the realtime factor |
 | 5.1 / multichannel | `crates/audio-dsp/src/channels.rs`, `crates/render/src/mixer_tests.rs`, `crates/export/src/surround_tests.rs`, `crates/engine/src/mixer_tests.rs`, `crates/ui-egui/tests/audio51_ui.rs` | BS.775 downmix / upmix coefficients exact, mixdown types; 5.1 panner point gains equal-power (Σg² = 1 over a 21×21 grid × 3 centre settings), speaker positions exact, 5.1 through the default puck bit-exact identity; graph: stereo/mono tracks into a 5.1 Mix (L/R, C, rear right, room centre −6 dB each, LFE = mean), 5.1 track through a 5.1 Mix and folded into stereo, a 5.1 submix, `pan51` automation block-invariant, six-channel meters; export: 6-ch WAV (`WAVE_FORMAT_EXTENSIBLE`, mask 0x3F) and ProRes MOV (6 × 24-bit PCM) decoded by ffmpeg **sample-exact**, ffprobe `channels` 6 / `channel_layout` 5.1; AAC 5.1 in MP4: every decoded channel's own tone ≥ 30 dB above the others' (no swapped channels), stereo export of a 5.1 Mix = BS.775 within 2·10⁻⁶; `sequence.settings {mix}`, `file.newSequence {mix, trackType}`, panner lanes, Write pass records the puck; UI: puck drag (one undo step), Center / LFE, six meter bars |
@@ -53,15 +53,15 @@ ffmpeg and ffprobe are **external processes** used to generate fixtures and to c
 are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
 
 - The tools are found by `waltcut-testkit` (a dev-dependency-only crate, `crates/testkit`), in
-  this order: `FILMCRAFT_FFMPEG` / `FILMCRAFT_FFPROBE` (explicit paths; a wrong path is an error),
+  this order: `WALTCUT_FFMPEG` / `WALTCUT_FFPROBE` (explicit paths; a wrong path is an error),
   then every directory on `PATH` (`ffmpeg` and `ffmpeg.exe`), then well-known install directories
   (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `C:\ffmpeg\bin`, …).
 - If a tool is missing the test prints `SKIPPED (<test>): ffmpeg not found …` and passes. Set
-  **`FILMCRAFT_REQUIRE_ORACLES=1`** (CI) to make every such skip a failure. In new tests use
+  **`WALTCUT_REQUIRE_ORACLES=1`** (CI) to make every such skip a failure. In new tests use
   `let ff = waltcut_testkit::require_ffmpeg!();` (also `require_ffprobe!`, `require_oracles!`).
 - Fixtures are generated on first use into `<workspace>/target/fixtures/<crate>/`
   (`waltcut_testkit::fixtures_dir`; independent of `CARGO_TARGET_DIR`, so agents with private
-  target dirs share them; `FILMCRAFT_FIXTURES_DIR` overrides the root) and reused afterwards.
+  target dirs share them; `WALTCUT_FIXTURES_DIR` overrides the root) and reused afterwards.
   Generators write to a per-process/thread temporary name (`testkit::temp_path`) and rename it into
   place, so concurrent tests never see half-written files. Delete the directory to regenerate.
   Never commit media.
@@ -147,9 +147,9 @@ Each codec README has the full fixture matrix and the measured results.
   scenes. Removed video effects/transitions have no retained goldens, contact sheets or fixtures.
   Negative registry/command/persistence tests reject their IDs. The narrower #23 draft also removes
   audio crossfades and their tests; negative audio registry/command/persistence tests remain.
-- **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
+- **Blessing:** `WALTCUT_BLESS=1 cargo test -p waltcut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
-  References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
+  References are original work rendered by WaltCut, must stay under 50 KB (enforced on bless),
   and every one needs its sidecar and index row (`cargo xtask assets`). Look at a re-blessed PNG
   before committing it.
 - The same scenes run through `plan_frame` + `GpuCompositor` when a GPU adapter exists
@@ -162,7 +162,7 @@ Each codec README has the full fixture matrix and the measured results.
 
 ### Scripted UI tests (headless)
 
-`crates/ui-egui/tests/scripted.rs` runs the real `FilmcraftApp` under
+`crates/ui-egui/tests/scripted.rs` runs the real `WaltCutApp` under
 [`egui_kittest`](https://docs.rs/egui_kittest) (`build_eframe`): no window, no GPU, no OS event loop.
 A small `Driver` opens the demo project, sends requests through the same control channel agents use
 (`ControlRequest` → `control::handle`, exactly as the TCP server does) and steps egui frames until
@@ -185,7 +185,7 @@ removed. No mixer visual acceptance is claimed.
 `crates/ui-egui/tests/clip_audio_ui.rs` covers the audio of video clips (#223): the linked audio's
 Volume in Effect Controls/Properties and absent channel-volume/panner rows. The timeline line
 edits independent static Audio Gain without changing Volume keyframes; drag/undo, click and
-right-click remain covered (`FILMCRAFT_UI_SHOTS=<dir>` writes `volume-*.png`).
+right-click remain covered (`WALTCUT_UI_SHOTS=<dir>` writes `volume-*.png`).
 
 The Essential Sound slice of #23 deletes its feature-only engine/UI/ducking tests along with the
 implementation. `engine::audio_reduction_tests` now checks that every removed command rejects
@@ -212,7 +212,7 @@ Cancel widget. It checks absent queue/advanced UI, strict draft refusal without 
 written frame counts, Replace/Keep behavior and PNG conflicts. `export_menu_ui`, `frame_export_ui`
 and `native_dialogs_ui` retain menu routing, PNG/JPEG stills, full-resolution/captured-monitor frames,
 alpha/depth, explicit replacement and asynchronous destination picking/late-answer refusal.
-Optional snapshots use `FILMCRAFT_UI_SNAPSHOT_DIR`; these native tests and screenshots have **not**
+Optional snapshots use `WALTCUT_UI_SNAPSHOT_DIR`; these native tests and screenshots have **not**
 been executed on this Windows cross-check host.
 
 ### #25 native acceptance still required
@@ -253,7 +253,7 @@ Not covered headless: `ui.screenshot` (needs a real viewport), the wgpu monitor 
 runs the CPU texture path), audio output, and wall-clock playback advance (kittest frames do not
 advance real time). Playing sound is covered without a device: `play_ahead` tests drive the
 mixed-ahead ring with a wall-clock device (order, underruns stay in time, mixer panic, stop), and
-`cargo run --release -p waltcut-ui-egui --example bench_audio -- <project.fcproj>` plays a real
+`cargo run --release -p waltcut-ui-egui --example bench_audio -- <project.waltcut>` plays a real
 project's sequences through a simulated 48 kHz device and counts dropouts, mixing in the callback
 (`direct`, as before) against mixing ahead (`ahead`). Use `Driver` for new UI regressions: `d.exec(command, params)`,
 `d.ok(method, params)`, `d.frames(n)`.
@@ -269,7 +269,7 @@ cargo run --release -p waltcut -- --control 9876
 Then script it over the control channel or MCP: run commands, click by automation id,
 `ui.inspect` / `ui.elements` to assert state, and `ui.screenshot {"path": "…"}` to capture the window
 or a single panel (`{"panel": "Timeline"}`). Look at every screenshot. Examples are in
-[agents.md](agents.md). The headless path (`filmcraft-cli run script.jsonl`, MCP `--demo`) covers
+[agents.md](agents.md). The headless path (`waltcut-cli run script.jsonl`, MCP `--demo`) covers
 engine behaviour without a window.
 
 ## 5. Performance
@@ -293,7 +293,7 @@ wgpu render ms per frame), `export` (H.264 + AAC and ProRes) and `project` (save
 Options: `--sections decode,scrub`, `--only <substring>` (fixture or scenario), `--repeat N`,
 `--quick`, `--cpu`, `--hw auto|off` (Settings ▸ Playback ▸ Hardware decoding; default `auto`, as the app), `--label NAME` (output `target/bench/bench-<label>.{json,md}`),
 `--section NAME --json FILE` (one section in-process, e.g. under a profiler). Fixtures are made
-with ffmpeg in `target/fixtures/playback/` (or `$FILMCRAFT_FIXTURES/playback`). The suite's
+with ffmpeg in `target/fixtures/playback/` (or `$WALTCUT_FIXTURES/playback`). The suite's
 `playback` section plays `h264-1080`, `stack3` and `stack3-blend` at Full, `h264-2160` at Full, 1/2 and 1/4 and with
 draft decoding (Settings ▸ Playback ▸ Draft decoding) at 1/2 and 1/4, and `hevc-2160`, `vp9-2160`
 and `av1-2160` at Full, 1/2 and 1/2 draft; its `draft` column counts the frames decoded in draft
@@ -329,7 +329,7 @@ cargo xtask bench-playback --json target/bench-playback.json # machine-readable 
 
 Options: `--res full,half,quarter`, `--cpu` (CPU compositor + texture conversion instead of the
 GPU path), `--seconds`, `--refresh` (display Hz), `--workers`, `--repeat`, `--json <file>`.
-Fixtures are made with ffmpeg in `target/fixtures/playback/` (set `FILMCRAFT_FIXTURES` to share one
+Fixtures are made with ffmpeg in `target/fixtures/playback/` (set `WALTCUT_FIXTURES` to share one
 set between worktrees).
 
 Columns: **shown/drop** as counted in the app (a frame is shown when its exact picture was on

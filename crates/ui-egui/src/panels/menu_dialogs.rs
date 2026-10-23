@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use waltcut_project::{FindOp, find::COLUMNS};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::dock::PanelKind;
 use crate::native_dialogs::FileDialog;
 use crate::state::ClipDialogDraft;
@@ -92,25 +92,25 @@ fn dialog_command(id: &str) -> Option<&'static str> {
     })
 }
 
-fn enabled(app: &FilmcraftApp, id: &str) -> Result<(), String> {
+fn enabled(app: &WaltCutApp, id: &str) -> Result<(), String> {
     waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))
 }
 
 /// Checkmark state of this module's toggles in the menus.
-pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
+pub fn checked(app: &WaltCutApp, id: &str) -> Option<bool> {
     (id == "view.dynamicAudioWaveforms").then_some(app.ui.extras.dynamic_waveforms)
 }
 
 /// Project Settings ▸ General ▸ Renderer is "Software Only": the Program monitor composites on
 /// the CPU.
-pub fn software_renderer(app: &FilmcraftApp) -> bool {
+pub fn software_renderer(app: &WaltCutApp) -> bool {
     app.session.project.settings.renderer == waltcut_engine::project_tools::RENDERER_SOFTWARE
 }
 
 /// Hand a path to the operating system (open it in its default application, or reveal it in the
 /// file manager). The host hook does it on the desktop; otherwise the path is opened as a
 /// `file://` URL.
-pub fn open_path(app: &mut FilmcraftApp, ctx: &egui::Context, path: &str, reveal: bool) -> Result<(), String> {
+pub fn open_path(app: &mut WaltCutApp, ctx: &egui::Context, path: &str, reveal: bool) -> Result<(), String> {
     app.ui.extras.opened.push(path.to_string());
     if app.ui.extras.opened.len() > 50 {
         app.ui.extras.opened.remove(0);
@@ -126,12 +126,12 @@ pub fn open_path(app: &mut FilmcraftApp, ctx: &egui::Context, path: &str, reveal
 }
 
 /// Where Reveal Log Files points: `<data dir>/Logs` (the temp folder without a data directory).
-pub fn logs_dir(app: &FilmcraftApp) -> std::path::PathBuf {
-    app.session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.join("Logs")).unwrap_or_else(|| waltcut_engine::temp_dir().join("FilmCraft Logs"))
+pub fn logs_dir(app: &WaltCutApp) -> std::path::PathBuf {
+    app.session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.join("Logs")).unwrap_or_else(|| waltcut_engine::temp_dir().join("WaltCut Logs"))
 }
 
 /// Write this session's log (system report and the command journal) into [`logs_dir`].
-fn write_session_log(app: &FilmcraftApp) -> Result<std::path::PathBuf, String> {
+fn write_session_log(app: &WaltCutApp) -> Result<std::path::PathBuf, String> {
     let dir = logs_dir(app);
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let path = dir.join(format!("session-{}.log", std::process::id()));
@@ -144,7 +144,7 @@ fn write_session_log(app: &FilmcraftApp) -> Result<std::path::PathBuf, String> {
 }
 
 /// The engine's report plus the GPU adapter (wgpu) when the GPU compositor is on.
-pub fn system_report(app: &FilmcraftApp) -> Value {
+pub fn system_report(app: &WaltCutApp) -> Value {
     let mut r = waltcut_engine::project_tools::system_report();
     let gpu = app.gpu.as_ref().map(|g| {
         let i = g.render_state.adapter.get_info();
@@ -161,7 +161,7 @@ pub fn system_report(app: &FilmcraftApp) -> Value {
 }
 
 /// Menu / shortcut entry points. Returns None for ids this module doesn't handle.
-pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let empty = params.as_object().is_none_or(|m| m.is_empty());
     // UI commands
     match id {
@@ -206,7 +206,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
             if let Err(e) = enabled(app, id) {
                 return Some(Err(e));
             }
-            let (filter, ext, name) = (tl!("FilmCraft Project"), "fcproj", tlf!("{name} Selection.fcproj", name = app.session.project.name));
+            let (filter, ext, name) = (tl!("WaltCut Project"), "waltcut", tlf!("{name} Selection.waltcut", name = app.session.project.name));
             let mut p = params.clone();
             if !p.is_object() {
                 p = json!({});
@@ -251,7 +251,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
 }
 
 /// Initial parameters (and display info) of a dialog.
-fn defaults(app: &mut FilmcraftApp, cmd: &str, id: &str) -> Result<(Value, Value), String> {
+fn defaults(app: &mut WaltCutApp, cmd: &str, id: &str) -> Result<(Value, Value), String> {
     let s = &mut app.session;
     Ok(match cmd {
         "edit.find" => {
@@ -432,7 +432,7 @@ fn pairs(v: &[&str]) -> Vec<(String, String)> {
 }
 
 /// Draw the open dialog, if any.
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.extras.dialog.clone() else { return };
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("menu-dialog-before-drag"), &mut d);
     let Some((title, pre, ok_text)) = meta(&d.command) else {
@@ -770,7 +770,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 }
 
 /// Run the dialog's command(s). `Ok(Some(text))` keeps the dialog open with a message (Find).
-fn run(app: &mut FilmcraftApp, d: &ClipDialogDraft) -> Result<Option<String>, String> {
+fn run(app: &mut WaltCutApp, d: &ClipDialogDraft) -> Result<Option<String>, String> {
     let s = &mut app.session;
     let p = &d.params;
     match d.command.as_str() {
@@ -815,11 +815,11 @@ fn run(app: &mut FilmcraftApp, d: &ClipDialogDraft) -> Result<Option<String>, St
 /// Search bins in the Project panel's list view: one row per search bin (`project.searchBin.<id>`),
 /// expanded to its live matches. Right-click: Delete.
 pub fn search_bin_rows(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     row: &mut usize,
     actions: &mut Vec<(String, Value)>,
-    draw_items: &mut dyn FnMut(&mut FilmcraftApp, &mut egui::Ui, &waltcut_project::Bin, &mut usize, &mut Vec<(String, Value)>),
+    draw_items: &mut dyn FnMut(&mut WaltCutApp, &mut egui::Ui, &waltcut_project::Bin, &mut usize, &mut Vec<(String, Value)>),
 ) {
     let t = app.tokens;
     for sb in app.session.project.search_bins.clone() {

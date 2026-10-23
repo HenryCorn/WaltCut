@@ -11,7 +11,7 @@
 //!
 //! The folder:
 //!
-//! * saved project `/path/Film.fcproj` → `/path/FilmCraft Previews/Film/`;
+//! * saved project `/path/Film.waltcut` → `/path/WaltCut Previews/Film/`;
 //! * unsaved project → a per-process folder in the system temp dir; its files move into the
 //!   project's folder on the first save.
 //!
@@ -563,7 +563,7 @@ fn is_hash(s: &str) -> bool {
 }
 
 fn default_temp_dir() -> Option<PathBuf> {
-    Some(untitled_dir(&crate::temp_dir().join("FilmCraft Previews")))
+    Some(untitled_dir(&crate::temp_dir().join("WaltCut Previews")))
 }
 
 /// A fresh per-process folder for an unsaved project's previews under `root`.
@@ -576,7 +576,7 @@ fn untitled_dir(root: &Path) -> PathBuf {
 pub fn dir_for_project(project_path: &str) -> PathBuf {
     let p = Path::new(project_path);
     let stem = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
-    p.parent().unwrap_or(Path::new(".")).join("FilmCraft Previews").join(stem)
+    p.parent().unwrap_or(Path::new(".")).join("WaltCut Previews").join(stem)
 }
 
 // ---------------------------------------------------------------- commands
@@ -704,7 +704,7 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
     if wait {
         run();
     } else {
-        std::thread::Builder::new().name("filmcraft-render-previews".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
+        std::thread::Builder::new().name("waltcut-render-previews".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
     }
     Ok(json!({"job": id, "segments": nseg, "frames": frames}))
 }
@@ -783,7 +783,7 @@ pub fn render_audio(s: &mut Session, p: &Value) -> Result<Value> {
     if p.get("wait").and_then(Value::as_bool).unwrap_or(false) {
         run();
     } else {
-        std::thread::Builder::new().name("filmcraft-render-audio".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
+        std::thread::Builder::new().name("waltcut-render-audio".into()).spawn(run).map_err(|e| EngineError::Other(e.to_string()))?;
     }
     Ok(json!({"job": id, "segments": nseg, "samples": total}))
 }

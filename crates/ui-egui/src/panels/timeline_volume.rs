@@ -6,7 +6,7 @@ use waltcut_project::{ClipId, Sequence, TrackItem, TrackKind};
 
 use super::timeline::{Layout, Row};
 use super::timeline_hit::EDGE_PX;
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 
 const MIN_DB: f64 = -96.0;
 const MAX_DB: f64 = 96.0;
@@ -79,7 +79,7 @@ pub fn start(seq: &Sequence, layout: &Layout, clip: ClipId, at: Pos2) -> Option<
     Some(LineDrag { clip, from: item.gain_db, y: at.y, last: None })
 }
 
-pub fn drag(app: &mut FilmcraftApp, ui: &egui::Ui, seq: &Sequence, layout: &Layout, mut drag: LineDrag, y: f32) -> LineDrag {
+pub fn drag(app: &mut WaltCutApp, ui: &egui::Ui, seq: &Sequence, layout: &Layout, mut drag: LineDrag, y: f32) -> LineDrag {
     let Some((row, item)) = find(seq, layout, drag.clip) else { return drag };
     let height = band(body(layout, row, item)).height().max(1.0);
     let db = pos_to_db(db_to_pos(drag.from) + (drag.y - y) / height);
@@ -96,7 +96,7 @@ pub fn drag(app: &mut FilmcraftApp, ui: &egui::Ui, seq: &Sequence, layout: &Layo
     drag
 }
 
-pub fn interact(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, area: Rect) {
+pub fn interact(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, area: Rect) {
     for row in layout.rows.iter().filter(|row| row.kind == TrackKind::Audio) {
         let Some(track) = seq.track(row.track).filter(|track| !track.locked) else { continue };
         for item in &track.items {

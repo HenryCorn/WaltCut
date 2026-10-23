@@ -40,7 +40,7 @@ pub mod workspaces;
 use egui::{Align2, Color32, Rect};
 use waltcut_project::ItemId;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::dock::PanelKind;
 use crate::theme::Tokens;
 
@@ -54,7 +54,7 @@ pub fn eta_suffix(job: &serde_json::Value) -> String {
     job["etaSeconds"].as_f64().and_then(|s| std::time::Duration::try_from_secs_f64(s).ok()).map(left_text).unwrap_or_default()
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect) {
     match p {
         PanelKind::Program if !app.session.state.edit_points.is_empty() => trim_monitor::show(app, ui, rect),
         PanelKind::Program => monitor::show(app, ui, rect, monitor::Which::Program),
@@ -87,7 +87,7 @@ enum DragPayload {
 }
 
 fn payload_id() -> egui::Id {
-    egui::Id::new("filmcraft-drag-payload")
+    egui::Id::new("waltcut-drag-payload")
 }
 
 pub fn start_drag_source(ui: &egui::Ui, source: source_drag::SourceDrag) {
@@ -129,7 +129,7 @@ pub fn dragged_project_item(ui: &egui::Ui) -> Option<ItemId> {
 }
 /// The items a drag from the Project panel carries: the whole selection when the dragged item is
 /// one of several selected, otherwise just the dragged item.
-pub fn dragged_selection(app: &FilmcraftApp, item: ItemId) -> Vec<ItemId> {
+pub fn dragged_selection(app: &WaltCutApp, item: ItemId) -> Vec<ItemId> {
     let sel = &app.session.state.project_selection;
     // the selection can hold bins beside items (one id space): only items can be placed
     if sel.len() > 1 && sel.contains(&item) { sel.iter().copied().filter(|i| app.session.project.item(*i).is_some()).collect() } else { vec![item] }
@@ -145,7 +145,7 @@ pub fn clear_drag(ui: &egui::Ui) {
 }
 
 fn cancelled_id() -> egui::Id {
-    egui::Id::new("filmcraft-drag-cancelled")
+    egui::Id::new("waltcut-drag-cancelled")
 }
 
 /// Abandon the drag in progress (Escape, #580): nothing is dropped, and nothing restarts it until
@@ -161,7 +161,7 @@ pub fn drag_cancelled(ui: &egui::Ui) -> bool {
 }
 
 /// Draw the drag ghost near the pointer and clear the payload after release. Escape cancels it.
-pub fn drag_ghost(app: &FilmcraftApp, ui: &egui::Ui) {
+pub fn drag_ghost(app: &WaltCutApp, ui: &egui::Ui) {
     if !ui.ctx().input(|i| i.pointer.any_down()) {
         ui.ctx().data_mut(|d| d.remove::<bool>(cancelled_id()));
     }
@@ -217,7 +217,7 @@ pub fn drag_ghost(app: &FilmcraftApp, ui: &egui::Ui) {
 }
 
 /// The panel "≡" menu.
-pub fn panel_menu_popup(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
+pub fn panel_menu_popup(app: &mut WaltCutApp, ui: &mut egui::Ui) {
     drag_ghost(app, ui);
     // bins opened in new windows (Project panel)
     project::floating(app, ui.ctx());

@@ -8,19 +8,19 @@ use std::sync::mpsc::{Sender, channel};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 use waltcut_ui_egui::graphics_notice::GraphicsNotice;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
 impl Driver {
     fn new(notice: Option<GraphicsNotice>) -> Self {
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(Session::default()).with_control(rx);
+        let mut app = WaltCutApp::new(Session::default()).with_control(rx);
         app.graphics_notice = notice;
         let harness = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000).build_eframe(move |_cc| app);
         let mut d = Driver { harness, tx };
@@ -61,7 +61,7 @@ impl Driver {
         assert_eq!(v["ok"], json!(true), "{id}: {v}");
         self.frames(3);
     }
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 }

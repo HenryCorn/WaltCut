@@ -22,6 +22,6 @@ mod tests {
 
     #[test]
     fn native_filters_receive_only_literal_extensions() {
-        assert_eq!(extensions(&["mp4", "mov", "fcproj"]), ["mp4", "mov", "fcproj"]);
+        assert_eq!(extensions(&["mp4", "mov", "waltcut"]), ["mp4", "mov", "waltcut"]);
     }
 }

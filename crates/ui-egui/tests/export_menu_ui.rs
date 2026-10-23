@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 use waltcut_ui_egui::state::Mode;
 
@@ -16,7 +16,7 @@ use waltcut_ui_egui::state::Mode;
 type Asked = Arc<Mutex<Vec<(String, Vec<String>, String)>>>;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -24,13 +24,13 @@ impl Driver {
     /// `save_to: None` is a cancelled save panel.
     fn new(session: Session, save_to: Option<std::path::PathBuf>, asked: Asked) -> Self {
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(session).with_control(rx);
+        let mut app = WaltCutApp::new(session).with_control(rx);
         app.hooks.pick_save_as = Some(Box::new(move |filter, exts, suggested| {
             asked.lock().unwrap().push((filter.to_string(), exts.iter().map(|e| e.to_string()).collect(), suggested.to_string()));
             save_to.as_ref().map(|d| d.join(suggested).to_string_lossy().into_owned())
         }));
         let mut builder = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
-        if std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").is_some() {
+        if std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").is_some() {
             builder = builder.wgpu();
         }
         let harness = builder.build_eframe(move |_cc| app);
@@ -85,7 +85,7 @@ fn tmp(name: &str) -> std::path::PathBuf {
 }
 
 /// Every File ▸ Export entry whose command needs a path, and the extension it saves.
-const SAVED: [(&str, &str); 1] = [("file.exportSelectionProject", "fcproj")];
+const SAVED: [(&str, &str); 1] = [("file.exportSelectionProject", "waltcut")];
 
 #[test]
 fn file_export_entries_ask_for_the_destination() {
@@ -141,7 +141,7 @@ fn media_from_the_menu_opens_the_export_mode() {
 fn menu_routing_never_hides_unsupported_export_parameters_in_a_dialog() {
     let directory = tmp("invalid");
     let mut session = session();
-    session.path = Some(directory.join("project.fcproj").to_string_lossy().into_owned());
+    session.path = Some(directory.join("project.waltcut").to_string_lossy().into_owned());
     let before = session.project.clone();
     let mut d = Driver::new(session, None, Asked::default());
     for (command, params) in [
@@ -198,7 +198,7 @@ fn marker_csv_menu_exports_sequence_review_notes() {
     d.frames(3);
     let elements = d.ok("ui.elements", json!({"prefix":"menu.markers.exportCsv"}));
     assert!(!elements.as_array().unwrap().is_empty(), "the menu command has an automation id");
-    if let Some(dir) = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR") {
+    if let Some(dir) = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR") {
         let dir = std::path::PathBuf::from(dir);
         std::fs::create_dir_all(&dir).unwrap();
         d.harness.render().unwrap().save(dir.join("marker-csv-menu.png")).unwrap();

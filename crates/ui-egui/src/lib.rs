@@ -1,4 +1,4 @@
-//! The FilmCraft egui frontend.
+//! The WaltCut egui frontend.
 //!
 //! Thin by design: all project changes go through `waltcut_engine::Session::execute`; this crate
 //! owns only presentation state ([`state::UiState`]), GPU textures, the playback clock and the
@@ -151,7 +151,7 @@ pub struct HostHooks {
     /// Edit Original, Help ▸ Reveal Log Files).
     pub open_path: Option<Box<dyn FnMut(&str, bool) -> Result<(), String>>>,
     /// Show a file dialog without blocking the UI thread and answer on the returned channel with
-    /// the chosen paths (none: cancelled). With it, [`FilmcraftApp::pick`] keeps the frame loop
+    /// the chosen paths (none: cancelled). With it, [`WaltCutApp::pick`] keeps the frame loop
     /// running while the dialog is open (the desktop app on Linux, #260); without it the
     /// synchronous pickers above are used.
     pub run_dialog: Option<Box<dyn FnMut(native_dialogs::FileDialog) -> Receiver<Vec<String>>>>,
@@ -163,7 +163,7 @@ pub struct HostHooks {
     /// uses `egui::Context::system_theme`.
     pub system_theme: Option<SystemThemeFn>,
     /// Files or an image on the system clipboard, for Paste in the Timeline and the Project panel
-    /// (#611). Without it Paste only pastes clips copied in FilmCraft.
+    /// (#611). Without it Paste only pastes clips copied in WaltCut.
     pub clipboard_media: Option<Box<dyn FnMut() -> Option<ClipboardMedia>>>,
 }
 
@@ -254,9 +254,9 @@ const SCREENSHOT_SETTLE_MAX_S: f64 = 5.0;
 /// Export entries that run from the menus through the save panel: command, filter label,
 /// extension.
 pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 2] =
-    [("markers.exportCsv", "Marker report (CSV)", "csv"), ("file.exportSelectionProject", "FilmCraft Project", "fcproj")];
+    [("markers.exportCsv", "Marker report (CSV)", "csv"), ("file.exportSelectionProject", "WaltCut Project", "waltcut")];
 
-pub struct FilmcraftApp {
+pub struct WaltCutApp {
     pub session: Session,
     pub ui: UiState,
     pub tokens: Tokens,
@@ -432,7 +432,7 @@ pub fn gpu_compositor_unsupported(adapter: &eframe::wgpu::Adapter) -> Option<Str
     None
 }
 
-impl FilmcraftApp {
+impl WaltCutApp {
     /// Enable the GPU compositor on the eframe wgpu device.
     pub fn set_wgpu(&mut self, rs: eframe::egui_wgpu::RenderState) {
         if let Some(why) = gpu_compositor_unsupported(&rs.adapter) {
@@ -514,7 +514,7 @@ impl FilmcraftApp {
     }
 }
 
-impl FilmcraftApp {
+impl WaltCutApp {
     pub fn new(mut session: Session) -> Self {
         session.shortcuts.register_external(menus::external_commands());
         let recovery = !session.recovery_candidates().is_empty();
@@ -1238,8 +1238,11 @@ impl FilmcraftApp {
                 r
             }),
             "file.saveAs" | "file.save" | "file.saveCopy" => {
-                let suggested =
-                    if id == "file.saveCopy" { format!("{} copy.fcproj", self.session.project.name) } else { format!("{}.fcproj", self.session.project.name) };
+                let suggested = if id == "file.saveCopy" {
+                    format!("{} copy.waltcut", self.session.project.name)
+                } else {
+                    format!("{}.waltcut", self.session.project.name)
+                };
                 let cmd = if id == "file.saveCopy" { "file.saveCopy" } else { "file.saveAs" };
                 self.pick(FileDialog::SaveProject { name: suggested }, move |app, paths| {
                     let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
@@ -1826,14 +1829,14 @@ impl FilmcraftApp {
     }
 }
 
-impl FilmcraftApp {
-    /// The "FilmCraft hit an error" window after a caught UI panic. Automation ids:
+impl WaltCutApp {
+    /// The "WaltCut hit an error" window after a caught UI panic. Automation ids:
     /// `error.dismiss`, `error.save`.
     fn error_window(&mut self, ctx: &egui::Context) {
         let Some(msg) = self.ui_error.clone() else { return };
         let mut close = false;
-        egui::Window::new(tl!("FilmCraft hit an error"))
-            .id(egui::Id::new("FilmCraft hit an error"))
+        egui::Window::new(tl!("WaltCut hit an error"))
+            .id(egui::Id::new("WaltCut hit an error"))
             .collapsible(false)
             .resizable(false)
             .pivot(egui::Align2::CENTER_CENTER)
@@ -1895,7 +1898,7 @@ fn synthesize_mac_ctrl_click(armed: &mut bool, raw_input: &mut egui::RawInput) {
     }
 }
 
-impl eframe::App for FilmcraftApp {
+impl eframe::App for WaltCutApp {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         self.native_window_focused = Some(raw_input.focused);
         if !self.control_input_only {
@@ -2320,7 +2323,7 @@ mod audio_recovery_tests {
 
         let mut session = Session::default();
         session.execute("file.newSequence", json!({"width":16,"height":16})).unwrap();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         let starts = Arc::new(AtomicUsize::new(0));
         app.audio = Some(Box::new(Device { ready: true, starts: starts.clone(), reading: Some(0) }));
         app.play(2.0);
@@ -2367,7 +2370,7 @@ mod audio_recovery_tests {
         let bytes: Arc<[u8]> = waltcut_engine::previews::write_wav_f32(&inter, 48_000).into();
         let item = waltcut_engine::commands::import_bytes(&mut session, "/shuttle-tone.wav", bytes, None).unwrap();
         session.execute("timeline.place", json!({"item":item.0,"audioTrack":"A1","seconds":0.0})).unwrap();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         let samples = Arc::new(Mutex::new(Vec::new()));
         app.audio = Some(Box::new(Capture(samples.clone())));
         let mut normal = None;
@@ -2409,7 +2412,7 @@ mod audio_recovery_tests {
         let mut session = Session::default();
         session.execute("file.newSequence", json!({"width":16,"height":16})).unwrap();
         let ctx = egui::Context::default();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         let starts = Arc::new(AtomicUsize::new(0));
         app.audio = Some(Box::new(Device { ready: true, starts: starts.clone(), reading: Some(0) }));
         app.session.prefs.audio_hardware.default_output = "available".into();
@@ -2444,7 +2447,7 @@ mod audio_recovery_tests {
         let mut session = Session::default();
         session.execute("file.newSequence", json!({"width":16,"height":16})).unwrap();
         let ctx = egui::Context::default();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         let starts = Arc::new(AtomicUsize::new(0));
         app.audio = Some(Box::new(Device { ready: false, starts: starts.clone(), reading: Some(0) }));
         app.apply_prefs(&ctx);
@@ -2465,7 +2468,7 @@ mod audio_recovery_tests {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).unwrap();
         let ctx = egui::Context::default();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         app.audio = Some(Box::new(Device { ready: true, starts: Arc::new(AtomicUsize::new(0)), reading: None }));
         let displayed = app.session.sequence_rate().tick_of(48);
         app.session.set_playhead(displayed);
@@ -2508,7 +2511,7 @@ mod audio_recovery_tests {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).unwrap();
         let ctx = egui::Context::default();
-        let mut app = FilmcraftApp::new(session);
+        let mut app = WaltCutApp::new(session);
         app.audio = Some(Box::new(Restartable { reading: None }));
         app.playback.playing = true;
         app.playback.audio_clock = true;
@@ -2598,7 +2601,7 @@ mod native_menu_tests {
     #[test]
     fn native_menu_follows_undo_and_redo_availability() {
         let sent: Rc<RefCell<Vec<Vec<menus::MenuItem>>>> = Rc::default();
-        let mut app = FilmcraftApp::new(Session::default());
+        let mut app = WaltCutApp::new(Session::default());
         let sink = sent.clone();
         app.hooks.menu_changed = Some(Box::new(move |items: &[menus::MenuItem]| sink.borrow_mut().push(items.to_vec())));
 

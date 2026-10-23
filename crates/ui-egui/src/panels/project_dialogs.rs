@@ -6,14 +6,14 @@
 use crate::widgets::CenteredDialog as _;
 use serde_json::{Value, json};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::panels::project::ProjectDialog;
 
-fn push(app: &mut FilmcraftApp, id: &str, r: &egui::Response, label: &str) {
+fn push(app: &mut WaltCutApp, id: &str, r: &egui::Response, label: &str) {
     app.auto.add(id, r.rect, label);
 }
 
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.project_panel.dialog.clone() else { return };
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("project-dialog-before-drag"), &mut d);
     let mut close = false;
@@ -104,7 +104,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 }
 
 /// OK / Cancel row; true when OK was clicked.
-fn ok_cancel(app: &mut FilmcraftApp, ui: &mut egui::Ui, close: &mut bool) -> bool {
+fn ok_cancel(app: &mut WaltCutApp, ui: &mut egui::Ui, close: &mut bool) -> bool {
     ui.separator();
     let mut ok = false;
     ui.horizontal(|ui| {
@@ -120,7 +120,7 @@ fn ok_cancel(app: &mut FilmcraftApp, ui: &mut egui::Ui, close: &mut bool) -> boo
     ok
 }
 
-fn metadata_display(app: &mut FilmcraftApp, ui: &mut egui::Ui, columns: &mut Vec<String>, filter: &mut String, run: &mut Option<(String, Value)>) {
+fn metadata_display(app: &mut WaltCutApp, ui: &mut egui::Ui, columns: &mut Vec<String>, filter: &mut String, run: &mut Option<(String, Value)>) {
     let all = waltcut_engine::project_panel::all_columns(&app.session.project);
     ui.horizontal(|ui| {
         ui.label(tl!("Show:"));
@@ -196,7 +196,7 @@ fn metadata_display(app: &mut FilmcraftApp, ui: &mut egui::Ui, columns: &mut Vec
     }
 }
 
-fn manage_presets(app: &mut FilmcraftApp, ui: &mut egui::Ui, selected: &mut usize, name: &mut String, run: &mut Option<(String, Value)>, close: &mut bool) {
+fn manage_presets(app: &mut WaltCutApp, ui: &mut egui::Ui, selected: &mut usize, name: &mut String, run: &mut Option<(String, Value)>, close: &mut bool) {
     let presets = app.session.prefs.project_panel.presets.clone();
     egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
         ui.set_min_width(300.0);

@@ -1,14 +1,17 @@
 name: Release
 
+# Builds the macOS (Apple silicon) DMG and CLI zip and attaches them to a draft GitHub Release.
+# The first releases are unsigned: the app is ad-hoc signed only, so it is not notarized and
+# Gatekeeper asks for a right-click ▸ Open the first time. Signing and notarization come later
+# with an Apple Developer ID (packaging/macos/package.sh already supports them).
+#
+# Push a tag `vX.Y.Z` that matches `[workspace.package] version` in Cargo.toml, or run it by hand
+# (a manual run only builds and uploads the artifacts; it never creates a release).
+
 on:
   push:
-    branches: [release]
+    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version override for a test run, e.g. 0.2.0-rc.1 (empty: Cargo.toml)"
-        type: string
-        default: ""
 
 permissions:
   contents: write
@@ -17,19 +20,72 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CARGO_TERM_COLOR: always
+  # craft-fonts commit embedded in the release build (Japanese UI and title fonts).
+  CRAFT_FONTS_REF: abb83316d96aa59c1cf64784289e378fe9fa5695
+
 jobs:
-  release:
-    # Intentionally tracked at @main (not SHA-pinned) so org-wide CI improvements, security fixes, and build optimizations propagate without PR churn across all craftapp repos.
-    uses: storytold/craft-common-actions/.github/workflows/release.yml@main
-    with:
-      app-name: filmcraft
-      app-title: FilmCraft
-      craft-fonts-ref: abb83316d96aa59c1cf64784289e378fe9fa5695
-      version: ${{ inputs.version }}
-    secrets:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+  macos-arm64:
+    name: macOS arm64 DMG
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: macos-release
+      - name: Check the tag matches the Cargo version
+        if: github.ref_type == 'tag'
+        run: |
+          version="$(awk '/^\[/ { in_pkg = ($0 == "[workspace.package]"); next } in_pkg && $1 == "version" { gsub(/[" ]/, "", $3); print $3; exit }' Cargo.toml)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+            exit 1
+          fi
+      - name: Fetch craft-fonts
+        run: |
+          git clone https://github.com/storytold/craft-fonts "$RUNNER_TEMP/craft-fonts"
+          git -C "$RUNNER_TEMP/craft-fonts" checkout "$CRAFT_FONTS_REF"
+          echo "CRAFT_FONTS_DIR=$RUNNER_TEMP/craft-fonts" >> "$GITHUB_ENV"
+          # fail rather than ship without the Japanese fonts
+          echo "CRAFT_FONTS_REQUIRED=1" >> "$GITHUB_ENV"
+      - name: Package (ad-hoc signed, Apple silicon)
+        run: packaging/macos/package.sh --arch aarch64
+      - name: Checksums
+        run: |
+          cd dist/release
+          shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waltcut-macos-arm64
+          path: dist/release/*
+          if-no-files-found: error
+      - name: Draft the GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cat > release-notes.md <<NOTES
+          WaltCut ${version}: a drawing and 2D frame-by-frame animation editor for macOS (Apple silicon).
+
+          **This build is not signed or notarized.** To open it the first time:
+
+          1. Open the DMG and drag **WaltCut** to **Applications**.
+          2. In Applications, **right-click WaltCut ▸ Open**, then click **Open** in the dialog.
+             (Or run \`xattr -dr com.apple.quarantine /Applications/WaltCut.app\` once.)
+
+          Projects use the \`.waltcut\` extension. Projects made before the reduction do not open here;
+          use [v0.0.1-legacy](https://github.com/${GITHUB_REPOSITORY}/releases/tag/v0.0.1-legacy) for those.
+
+          Files: \`waltcut-${version}-macos-aarch64.dmg\` (the app), \`waltcut-cli-${version}-macos-aarch64.zip\`
+          (the headless CLI), and \`SHA256SUMS.txt\`.
+          NOTES
+          # drafts stay private until someone presses Publish
+          gh release create "$GITHUB_REF_NAME" dist/release/* \
+            --draft --prerelease \
+            --title "WaltCut ${version}" \
+            --notes-file release-notes.md

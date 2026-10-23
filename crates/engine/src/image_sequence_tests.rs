@@ -153,7 +153,7 @@ fn image_sequence_survives_save_and_reopen() {
     let mut s = demo();
     let paths = write_frames(&dir, "f", &[0, 1, 2, 3], "png");
     let id = item_of(&s.execute("file.import", json!({"paths": [paths[0]], "imageSequence": true})).unwrap());
-    let proj = dir.join("seq.fcproj");
+    let proj = dir.join("seq.waltcut");
     s.execute("file.saveAs", json!({"path": proj.to_string_lossy()})).unwrap();
     let mut t = Session::default();
     t.execute("file.open", json!({"path": proj.to_string_lossy()})).unwrap();

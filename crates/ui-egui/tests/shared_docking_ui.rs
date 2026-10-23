@@ -1,4 +1,4 @@
-//! Shared docking preserves FilmCraft document state and legacy workspace files.
+//! Shared docking preserves WaltCut document state and legacy workspace files.
 
 use craft_ui::docking::{Action, Placement, Zone};
 use egui::{Event, Modifiers, PointerButton, Rect, pos2, vec2};
@@ -7,7 +7,7 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 use waltcut_engine::Session;
 use waltcut_ui_egui::{
-    FilmcraftApp,
+    WaltCutApp,
     dock::{self, DockNode, Layout, PanelKind, SplitSize},
     menus,
 };
@@ -56,11 +56,11 @@ fn builtin_and_legacy_workspace_shapes_roundtrip_and_save_floating() {
         assert!(loaded.floating.is_empty());
         assert!(serde_json::to_value(&prefs).unwrap()["saved"][0].get("floating").is_none());
     }
-    let dir = std::env::temp_dir().join(format!("filmcraft-shared-dock-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("waltcut-shared-dock-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut session = Session::default();
     session.prefs_path = Some(dir.join("preferences.json"));
-    let mut app = FilmcraftApp::new(session);
+    let mut app = WaltCutApp::new(session);
     let ctx = egui::Context::default();
     app.ui.dock = layout().root;
     menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
@@ -71,7 +71,7 @@ fn builtin_and_legacy_workspace_shapes_roundtrip_and_save_floating() {
     assert_eq!(restored.root, app.ui.dock);
     let mut restarted_session = Session::default();
     restarted_session.prefs_path = Some(dir.join("preferences.json"));
-    let restarted = FilmcraftApp::new(restarted_session);
+    let restarted = WaltCutApp::new(restarted_session);
     let mut h = Harness::builder().with_size(vec2(1200.0, 760.0)).build_eframe(move |_| restarted);
     for _ in 0..4 {
         step(&mut h);
@@ -81,18 +81,18 @@ fn builtin_and_legacy_workspace_shapes_roundtrip_and_save_floating() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-fn step(h: &mut Harness<'_, FilmcraftApp>) {
+fn step(h: &mut Harness<'_, WaltCutApp>) {
     let ctx = h.ctx.clone();
     let mut input = std::mem::take(h.input_mut());
     eframe::App::raw_input_hook(h.state_mut(), &ctx, &mut input);
     *h.input_mut() = input;
     h.step();
 }
-fn rect(h: &Harness<'_, FilmcraftApp>, id: &str) -> Rect {
+fn rect(h: &Harness<'_, WaltCutApp>, id: &str) -> Rect {
     let element = h.state().auto.find(id).unwrap_or_else(|| panic!("missing {id}"));
     Rect::from_min_size(pos2(element.rect[0], element.rect[1]), vec2(element.rect[2], element.rect[3]))
 }
-fn click(h: &mut Harness<'_, FilmcraftApp>, id: &str) {
+fn click(h: &mut Harness<'_, WaltCutApp>, id: &str) {
     let pos = rect(h, id).center();
     h.event(Event::PointerMoved(pos));
     step(h);
@@ -104,7 +104,7 @@ fn click(h: &mut Harness<'_, FilmcraftApp>, id: &str) {
         step(h);
     }
 }
-fn drag(h: &mut Harness<'_, FilmcraftApp>, from: egui::Pos2, to: egui::Pos2, modifiers: Modifiers) {
+fn drag(h: &mut Harness<'_, WaltCutApp>, from: egui::Pos2, to: egui::Pos2, modifiers: Modifiers) {
     h.event(Event::ModifiersChanged(modifiers));
     h.event(Event::PointerMoved(from));
     step(h);
@@ -126,7 +126,7 @@ fn drag(h: &mut Harness<'_, FilmcraftApp>, from: egui::Pos2, to: egui::Pos2, mod
 fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
-    let app = FilmcraftApp::new(session);
+    let app = WaltCutApp::new(session);
     let snapshots = std::env::var_os("CRAFT_UI_DOCKING_SNAPSHOT_DIR").map(std::path::PathBuf::from);
     let mut builder = Harness::builder().with_size(vec2(1200.0, 760.0));
     if snapshots.is_some() {
@@ -228,7 +228,7 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
 
     if let Some(directory) = &snapshots {
         std::fs::create_dir_all(directory).unwrap();
-        h.render().unwrap().save(directory.join("filmcraft-floating.png")).unwrap();
+        h.render().unwrap().save(directory.join("waltcut-floating.png")).unwrap();
     }
     let from = rect(&h, "panel.tab.Markers").center();
     let to = rect(&h, "panel.History").center();
@@ -243,10 +243,10 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
     assert!(h.state().auto.elements.iter().any(|element| element.id.starts_with("timeline.clip.")));
     action_log.push(action_state(&h, "program-step-forward"));
     if let Some(directory) = &snapshots {
-        std::fs::write(directory.join("filmcraft-actions.json"), serde_json::to_vec_pretty(&action_log).unwrap()).unwrap();
+        std::fs::write(directory.join("waltcut-actions.json"), serde_json::to_vec_pretty(&action_log).unwrap()).unwrap();
     }
     if let Some(directory) = &snapshots {
-        h.render().unwrap().save(directory.join("filmcraft-redocked.png")).unwrap();
+        h.render().unwrap().save(directory.join("waltcut-redocked.png")).unwrap();
     }
     assert!(std::sync::Arc::ptr_eq(&project, &h.state().session.project));
     assert!(h.state().ui_error.is_none());
@@ -254,7 +254,7 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
 
 #[test]
 fn dropping_on_the_window_edge_docks_beside_the_whole_workspace() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     app.ui.dock = layout().root;
     let mut h = Harness::builder().with_size(vec2(1200.0, 760.0)).build_eframe(move |_| app);
     for _ in 0..4 {
@@ -282,7 +282,7 @@ fn dropping_on_the_window_edge_docks_beside_the_whole_workspace() {
 
 #[test]
 fn dock_panel_without_anchor_docks_along_a_workspace_edge() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     app.ui.dock = layout().root;
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Program", "zone": "bottom"})).unwrap();
@@ -318,7 +318,7 @@ fn tabs_containing(root: &DockNode, panel: PanelKind) -> Vec<PanelKind> {
 
 #[test]
 fn docking_commands_reject_bad_geometry_and_targets_without_partial_changes() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     app.ui.dock = layout().root;
     let ctx = egui::Context::default();
     let before = app.ui.dock.clone();
@@ -338,13 +338,13 @@ fn docking_commands_reject_bad_geometry_and_targets_without_partial_changes() {
     assert!(menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Project", "rect": [1, 2, 300, 200]})).is_err());
 }
 
-fn action_state(h: &Harness<'_, FilmcraftApp>, action: &str) -> serde_json::Value {
+fn action_state(h: &Harness<'_, WaltCutApp>, action: &str) -> serde_json::Value {
     json!({"action": action, "dock": h.state().ui.dock, "floating": h.state().ui.floating, "focused": h.state().ui.focused})
 }
 
 #[test]
 fn catalog_docking_action_supports_resize_reorder_and_floating_geometry() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     app.ui.dock = DockNode::Split {
         vertical: false,
         size: SplitSize::FixedA(300.0),
@@ -392,7 +392,7 @@ fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name
     .into_iter()
     .enumerate()
     {
-        let path = std::env::temp_dir().join(format!("filmcraft-floating-isolation-{}-{index}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!("waltcut-floating-isolation-{}-{index}.json", std::process::id()));
         let prefs = json!({"saved": [valid.clone(), {"name": "Broken", "layout": root, "floating": bad}], "current": "Valid"});
         std::fs::write(&path, serde_json::to_vec(&prefs).unwrap()).unwrap();
         let loaded = dock::WorkspacePrefs::load(&path);
@@ -413,7 +413,7 @@ fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name
 fn floating_panel_and_timeline_reveal_keeps_one_owner_without_project_edits() {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
-    let mut app = FilmcraftApp::new(session);
+    let mut app = WaltCutApp::new(session);
     app.show_panel(PanelKind::Events);
     let project = app.session.project.clone();
     let state = serde_json::to_value(&app.session.state).unwrap();
@@ -442,7 +442,7 @@ fn floating_panel_and_timeline_reveal_keeps_one_owner_without_project_edits() {
 /// it now floats again where it was. Closed while docked, it opens docked as before.
 #[test]
 fn a_panel_closed_while_floating_reopens_floating_where_it_was() {
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
     let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Markers)).unwrap().rect;
@@ -469,7 +469,7 @@ fn a_panel_closed_while_floating_reopens_floating_where_it_was() {
 
     // with nothing else docked, a reopened panel has to stay docked (the workspace keeps one
     // docked panel); its floating place is kept, not lost (#2482 review)
-    let mut app = FilmcraftApp::new(Session::default());
+    let mut app = WaltCutApp::new(Session::default());
     menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
     let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Markers)).unwrap().rect;
     for _ in 0..64 {

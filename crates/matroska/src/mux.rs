@@ -78,7 +78,7 @@ impl Default for MuxOptions {
             lacing: LacingMode::None,
             max_lace_frames: 8,
             title: None,
-            writing_app: "filmcraft".into(),
+            writing_app: "waltcut".into(),
         }
     }
 }

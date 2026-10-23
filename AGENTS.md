@@ -78,7 +78,7 @@ reproduce an image (for example, point lists traced from someone else's icon).
    ```
    Also add one line for the asset to [`ATTRIBUTION.md`](ATTRIBUTION.md). `cargo xtask assets` (part of
    `cargo xtask ci`) fails if any asset lacks a sidecar or index entry.
-4. **Screenshots** in the repo may show only FilmCraft (or other open projects), with media we generated
+4. **Screenshots** in the repo may show only WaltCut (or other open projects), with media we generated
    or media that is itself openly licensed. Never commit screenshots of Adobe products.
 5. **Local reference material stays local.** Screenshots or notes of other applications stay out of
    the repository. They must never be committed, bundled, embedded, traced or shipped.
@@ -90,7 +90,7 @@ reproduce an image (for example, point lists traced from someone else's icon).
    instead.
 9. **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), never in this
    repo.** Don't commit new font files (the small Latin UI fonts already in `assets/fonts/` stay). A
-   font FilmCraft needs is added to craft-fonts, which the app reads through the optional build input
+   font WaltCut needs is added to craft-fonts, which the app reads through the optional build input
    `CRAFT_FONTS_DIR=<absolute path of a craft-fonts checkout>` (`crates/text/build.rs` embeds the fonts in its
    `fonts/manifest.txt` as `waltcut_text::fonts::CRAFT_FONTS`; unset, it is empty and the app uses its
    bundled and system fonts). Never add craft-fonts to a `Cargo.toml`. Code using `CRAFT_FONTS` must work
@@ -135,7 +135,7 @@ as PhotoCraft does with `cargo xtask corpus`.
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contributing.md): setup, gates, commits, how to add things
 - [docs/architecture.md](docs/architecture.md): layers, data model, commands, pipeline
 - [docs/testing.md](docs/testing.md): oracle tests, criteria, benchmarks
-- [docs/agents.md](docs/agents.md): driving FilmCraft over MCP / the control channel, and the agent work loop
+- [docs/agents.md](docs/agents.md): driving WaltCut over MCP / the control channel, and the agent work loop
 - [docs/control-protocol.md](docs/control-protocol.md): control-channel method reference
 - [ATTRIBUTION.md](ATTRIBUTION.md): asset index
 - [ROADMAP.md](ROADMAP.md), [docs/roadmap.md](docs/roadmap.md), [docs/animation.md](docs/animation.md): stage, current focus and the product scope

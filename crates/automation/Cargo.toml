@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-automation"
-description = "MCP server (rmcp) over the FilmCraft engine, plus a bridge to the running app's control channel"
+description = "MCP server (rmcp) over the WaltCut engine, plus a bridge to the running app's control channel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

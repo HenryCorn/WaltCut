@@ -19,7 +19,7 @@ use waltcut_geom::{Affine, Vec2};
 use waltcut_project::{ClipId, EffectDef, EffectInstance, TrackItem};
 use waltcut_time::Tick;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::panels::graphics::{frame_to_screen, handle_points, unscale};
 use crate::state::Tool;
 
@@ -129,7 +129,7 @@ fn within(points: [Pos2; 8], view: Rect) -> [Pos2; 8] {
 
 /// The box of effect `e` (Motion) of clip `it` at media time `mt`, on the monitor
 /// picture `pic` showing a `frame`-sized sequence, with its handles kept inside `reach`.
-fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<Placement> {
+fn placement(app: &WaltCutApp, it: &TrackItem, e: &EffectInstance, mt: Tick, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<Placement> {
     let seq = app.session.active_sequence()?;
     let project = &app.session.project;
     let size = waltcut_render::source_size(project, it.item).unwrap_or(frame);
@@ -164,7 +164,7 @@ fn placement(app: &FilmcraftApp, it: &TrackItem, e: &EffectInstance, mt: Tick, p
 
 /// The selected effect (its clip and index) and its box, while it is Motion of a
 /// selected clip under the playhead.
-fn selected_placement(app: &FilmcraftApp, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<(Target, &'static EffectDef, Placement)> {
+fn selected_placement(app: &WaltCutApp, pic: Rect, reach: Rect, frame: (u32, u32)) -> Option<(Target, &'static EffectDef, Placement)> {
     let sel = app.session.state.selected_effect.as_ref()?;
     if !app.session.state.selection.contains(&sel.clip) {
         return None;
@@ -280,7 +280,7 @@ fn angle_deg(v: egui::Vec2) -> f64 {
 
 /// Draws the box over the whole monitor (the ui's clip), not just the picture, so its handles show
 /// beside the frame as well as on it.
-fn draw(app: &mut FilmcraftApp, ui: &egui::Ui, pl: &Placement, name: &str) {
+fn draw(app: &mut WaltCutApp, ui: &egui::Ui, pl: &Placement, name: &str) {
     let accent = app.tokens.accent;
     let painter = ui.painter();
     painter.add(egui::Shape::closed_line(pl.quad.to_vec(), Stroke::new(1.0, accent)));
@@ -358,7 +358,7 @@ fn rotate_pointer(painter: &egui::Painter, at: Pos2, out: egui::Vec2) {
 }
 
 /// The top-most clip at the playhead whose picture is under `p`.
-fn clip_under(app: &FilmcraftApp, pic: Rect, frame: (u32, u32), p: Pos2) -> Option<ClipId> {
+fn clip_under(app: &WaltCutApp, pic: Rect, frame: (u32, u32), p: Pos2) -> Option<ClipId> {
     let seq = app.session.active_sequence()?;
     let t = app.session.playhead();
     let view = frame_to_screen(pic, frame);
@@ -372,7 +372,7 @@ fn clip_under(app: &FilmcraftApp, pic: Rect, frame: (u32, u32), p: Pos2) -> Opti
 
 /// The selected effect's box on the Program monitor picture `pic`, and double-clicking a clip's
 /// picture to select its Motion.
-pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
+pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
     if app.ui.tool != Tool::Selection {
         return;
     }

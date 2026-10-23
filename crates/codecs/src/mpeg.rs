@@ -268,7 +268,7 @@ impl MpegSource {
                     }
                 }
                 None => {
-                    src.unsupported_video = Some(format!("{} video in {} (FilmCraft has no decoder for it)", st.codec.name(), file.format.name()));
+                    src.unsupported_video = Some(format!("{} video in {} (WaltCut has no decoder for it)", st.codec.name(), file.format.name()));
                     src.info.video = Some(VideoStreamInfo {
                         width: 0,
                         height: 0,
@@ -528,7 +528,7 @@ impl MpegSource {
         let st = &file.streams[ai];
         let codec_name = st.codec.name();
         if !audio_supported(&st.codec) || st.units.is_empty() {
-            let why = format!("{codec_name} audio in {} (FilmCraft has no decoder for it)", file.format.name());
+            let why = format!("{codec_name} audio in {} (WaltCut has no decoder for it)", file.format.name());
             return self.audio_unsupported(&codec_name, why);
         }
         let first = match file.read_unit(&self.bytes, ai, 0) {

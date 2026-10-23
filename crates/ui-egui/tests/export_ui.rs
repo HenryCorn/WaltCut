@@ -1,5 +1,5 @@
 //! Actual input/control-channel tests of the simple Export dialog and shared Quick Export.
-//! Optional FILMCRAFT_UI_SNAPSHOT_DIR renders snapshots; native visual acceptance is separate.
+//! Optional WALTCUT_UI_SNAPSHOT_DIR renders snapshots; native visual acceptance is separate.
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
@@ -11,7 +11,7 @@ use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{FrameRequest, Generator, MediaSource};
 use waltcut_project::{ItemKind, Label, MediaClip, MediaRef};
 use waltcut_time::FrameRate;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 /// Keep a long export running long enough to exercise the real Cancel widget, without hardware.
@@ -30,7 +30,7 @@ impl MediaSource for SlowSource {
 }
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     directory: PathBuf,
 }
@@ -67,14 +67,14 @@ impl Driver {
         session.media.insert(item, Arc::new(SlowSource(generator)));
         session.execute("timeline.place", json!({"item":item.0,"track":"V1"})).unwrap();
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(session).with_control(rx);
+        let mut app = WaltCutApp::new(session).with_control(rx);
         app.ui.export.path = directory.join("out.mov").to_string_lossy().into_owned();
         app.ui.export.format = waltcut_export::Format::ProRes;
         app.ui.export.range = "custom".into();
         app.ui.export.start_frame = 0;
         app.ui.export.end_frame = 6;
         let mut builder = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(10_000);
-        if std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").is_some() {
+        if std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").is_some() {
             builder = builder.wgpu();
         }
         let harness = builder.build_eframe(move |_cc| app);
@@ -134,7 +134,7 @@ impl Driver {
         panic!("export did not complete");
     }
     fn snapshot(&mut self, name: &str) {
-        let Some(directory) = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(PathBuf::from) else { return };
+        let Some(directory) = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(PathBuf::from) else { return };
         self.frames(2);
         let image = self.harness.render().unwrap();
         std::fs::create_dir_all(&directory).unwrap();

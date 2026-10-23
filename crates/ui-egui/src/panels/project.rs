@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use waltcut_engine::project_panel::{FontSize, ViewMode};
 use waltcut_project::{BinId, ItemId, ItemKind};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::icons::{self, Icon};
 use crate::theme::Tokens;
 
@@ -124,12 +124,12 @@ const HEADER_H: f32 = 26.0;
 const FOOTER_H: f32 = 32.0;
 const PREVIEW_H: f32 = 92.0;
 
-fn valid_bin(app: &FilmcraftApp, b: Option<u64>) -> Option<BinId> {
+fn valid_bin(app: &WaltCutApp, b: Option<u64>) -> Option<BinId> {
     b.map(BinId).filter(|b| app.session.project.root.find_bin(*b).is_some())
 }
 
 /// The view of a panel instance.
-pub fn view_of(app: &FilmcraftApp, inst: Inst) -> View {
+pub fn view_of(app: &WaltCutApp, inst: Inst) -> View {
     let root = app.session.project.root.id;
     match inst {
         Inst::Tab(k) if k < app.ui.project_panel.tabs.len() => {
@@ -156,7 +156,7 @@ pub fn view_of(app: &FilmcraftApp, inst: Inst) -> View {
 }
 
 /// The instance the Project panel shows now (its active tab).
-pub fn shown_inst(app: &FilmcraftApp) -> Inst {
+pub fn shown_inst(app: &WaltCutApp) -> Inst {
     match app.ui.project_panel.active_tab {
         Some(k) if app.ui.project_panel.tabs.get(k).is_some_and(|t| !t.floating) => Inst::Tab(k),
         _ => Inst::Main,
@@ -164,11 +164,11 @@ pub fn shown_inst(app: &FilmcraftApp) -> Inst {
 }
 
 /// Text size of the panel (Font Size).
-pub fn font(app: &FilmcraftApp) -> f32 {
+pub fn font(app: &WaltCutApp) -> f32 {
     app.session.prefs.project_panel.view.font_size.points()
 }
 
-pub fn set_mode(app: &mut FilmcraftApp, inst: Inst, mode: ViewMode, actions: &mut Actions) {
+pub fn set_mode(app: &mut WaltCutApp, inst: Inst, mode: ViewMode, actions: &mut Actions) {
     match inst {
         Inst::Main => actions.push(("project.view.set".into(), json!({"view": mode}))),
         Inst::Tab(k) => {
@@ -180,7 +180,7 @@ pub fn set_mode(app: &mut FilmcraftApp, inst: Inst, mode: ViewMode, actions: &mu
 }
 
 /// Show a bin in place in a panel instance (None = its top: the root or the tab's bin).
-pub fn navigate(app: &mut FilmcraftApp, inst: Inst, bin: Option<u64>) {
+pub fn navigate(app: &mut WaltCutApp, inst: Inst, bin: Option<u64>) {
     let root = app.session.project.root.id.0;
     match inst {
         Inst::Main => app.ui.project_panel.bin = bin.filter(|b| *b != root),
@@ -195,7 +195,7 @@ pub fn navigate(app: &mut FilmcraftApp, inst: Inst, bin: Option<u64>) {
 
 /// Open a bin as Settings ▸ General ▸ Bins says (`how`: `openInPlace` | `openNewTab` |
 /// `openNewWindow`, or None for the double-click setting with these modifiers).
-pub fn open_bin(app: &mut FilmcraftApp, inst: Inst, bin: u64, how: Option<&str>, mods: egui::Modifiers) -> Result<Value, String> {
+pub fn open_bin(app: &mut WaltCutApp, inst: Inst, bin: u64, how: Option<&str>, mods: egui::Modifiers) -> Result<Value, String> {
     if app.session.project.root.find_bin(BinId(bin)).is_none() {
         return Err(format!("no bin {bin}"));
     }
@@ -237,7 +237,7 @@ pub fn open_bin(app: &mut FilmcraftApp, inst: Inst, bin: u64, how: Option<&str>,
 }
 
 /// Close a bin tab or floating bin panel.
-pub fn close_tab(app: &mut FilmcraftApp, k: usize) {
+pub fn close_tab(app: &mut WaltCutApp, k: usize) {
     let pp = &mut app.ui.project_panel;
     if k >= pp.tabs.len() {
         return;
@@ -251,7 +251,7 @@ pub fn close_tab(app: &mut FilmcraftApp, k: usize) {
 }
 
 /// Items of a panel instance in display order (keyboard navigation, Select All).
-pub fn visible_items(app: &FilmcraftApp, inst: Inst) -> Vec<ItemId> {
+pub fn visible_items(app: &WaltCutApp, inst: Inst) -> Vec<ItemId> {
     let v = view_of(app, inst);
     crate::panels::project_views::items_in_view(app, &v, &app.ui.project_search.to_ascii_lowercase())
 }
@@ -260,7 +260,7 @@ pub fn visible_items(app: &FilmcraftApp, inst: Inst) -> Vec<ItemId> {
 /// bin, plus those of sub-bins twirled open in List view (`project.selectAll {bin, expanded}`).
 /// Items in closed bins and in bins of other tabs stay unselected, as in Premiere (#456). While a
 /// search filters the panel, exactly the rows it shows (`project.select {items}`).
-pub fn select_all_command(app: &FilmcraftApp) -> (String, Value) {
+pub fn select_all_command(app: &WaltCutApp) -> (String, Value) {
     let inst = shown_inst(app);
     if !app.ui.project_search.is_empty() {
         let items: Vec<u64> = visible_items(app, inst).into_iter().map(|i| i.0).collect();
@@ -273,7 +273,7 @@ pub fn select_all_command(app: &FilmcraftApp) -> (String, Value) {
 
 // ------------------------------------------------------------------------------------ panel
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let mut actions: Actions = Vec::new();
     let mut rect = rect;
     // bin tabs docked in the Project panel
@@ -289,7 +289,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     run(app, ui.ctx(), actions);
 }
 
-fn tab_strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, strip: Rect, docked: &[usize]) {
+fn tab_strip(app: &mut WaltCutApp, ui: &mut egui::Ui, strip: Rect, docked: &[usize]) {
     let t = app.tokens;
     ui.painter().line_segment([strip.left_bottom(), strip.right_bottom()], Stroke::new(1.0, t.separator));
     let mut x = strip.min.x + 6.0;
@@ -336,7 +336,7 @@ fn tab_strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, strip: Rect, docked: &[u
 }
 
 /// Floating bin panels (Open in New Window); drawn every frame by the panel layer.
-pub fn floating(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn floating(app: &mut WaltCutApp, ctx: &egui::Context) {
     let n = app.ui.project_panel.tabs.len();
     let mut close = None;
     let mut actions: Actions = Vec::new();
@@ -377,7 +377,7 @@ pub fn floating(app: &mut FilmcraftApp, ctx: &egui::Context) {
     run(app, ctx, actions);
 }
 
-fn run(app: &mut FilmcraftApp, ctx: &egui::Context, actions: Actions) {
+fn run(app: &mut WaltCutApp, ctx: &egui::Context, actions: Actions) {
     for (cmd, p) in actions {
         if let Err(e) = crate::menus::invoke(app, ctx, &cmd, p) {
             app.ui.status = e;
@@ -386,7 +386,7 @@ fn run(app: &mut FilmcraftApp, ctx: &egui::Context, actions: Actions) {
 }
 
 /// One panel instance: breadcrumb, search, Preview Area, the view, footer.
-fn body(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions: &mut Actions) {
+fn body(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions: &mut Actions) {
     let t = app.tokens;
     let pre = v.prefix.clone();
     // breadcrumb: up one level, project file and bin path
@@ -409,7 +409,7 @@ fn body(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions
         let parent = parent_bin(&app.session.project.root, v.bin);
         navigate(app, v.inst, parent.map(|b| b.0));
     }
-    let mut crumb = format!("{}.fcproj", app.session.project.name);
+    let mut crumb = format!("{}.waltcut", app.session.project.name);
     for b in bin_path(&app.session.project.root, v.bin) {
         crumb.push_str(" / ");
         crumb.push_str(&b);
@@ -498,7 +498,7 @@ pub fn parent_bin(root: &waltcut_project::Bin, id: BinId) -> Option<BinId> {
     None
 }
 
-fn count_items(app: &FilmcraftApp, bin: BinId) -> usize {
+fn count_items(app: &WaltCutApp, bin: BinId) -> usize {
     let mut ids = Vec::new();
     if let Some(b) = app.session.project.root.find_bin(bin) {
         b.all_items(&mut ids);
@@ -507,7 +507,7 @@ fn count_items(app: &FilmcraftApp, bin: BinId) -> usize {
 }
 
 /// Preview Area: the selected item's poster frame and its properties.
-fn preview_area(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, pre: &str) {
+fn preview_area(app: &mut WaltCutApp, ui: &mut egui::Ui, r: Rect, pre: &str) {
     let t = app.tokens;
     ui.painter().rect_filled(r, 4.0, t.tl_header_bg);
     app.auto.add(&format!("{pre}.previewArea"), r, "Preview Area");
@@ -552,7 +552,7 @@ pub fn quantize(t: waltcut_time::Tick) -> waltcut_time::Tick {
     waltcut_time::Tick((t.0 / q) * q)
 }
 
-fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, actions: &mut Actions) {
+fn footer(app: &mut WaltCutApp, ui: &mut egui::Ui, bar: Rect, v: &View, actions: &mut Actions) {
     let t = app.tokens;
     let pre = &v.prefix;
     let mut x = bar.min.x + 6.0;
@@ -662,7 +662,7 @@ pub const NEW_ITEMS: [(&str, &str); 7] = [
     ("Demo Footage", "file.importDemoFootage"),
 ];
 
-pub fn new_item_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, pre: &str, actions: &mut Actions) {
+pub fn new_item_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, pre: &str, actions: &mut Actions) {
     for (label, c) in NEW_ITEMS {
         let b = ui.button(crate::i18n::t(label));
         app.auto.add(&format!("{pre}.newItem.{c}"), b.rect, label);
@@ -673,7 +673,7 @@ pub fn new_item_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, pre: &str, actio
     }
 }
 
-fn sort_icons_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, pre: &str, actions: &mut Actions) {
+fn sort_icons_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, pre: &str, actions: &mut Actions) {
     let cur = app.session.prefs.project_panel.view.icon_sort.clone();
     let mut entries: Vec<(String, String)> = vec![("".into(), tl!("User Order").into())];
     for c in ["Name", "Label", "Media Type", "Frame Rate", "Media Start", "Media End", "Media Duration", "Video Info", "Audio Info", "Date Created"] {
@@ -700,7 +700,7 @@ fn sort_icons_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, pre: &str, actions
 // ------------------------------------------------------------------------------------ panel menu
 
 /// The Project panel's ≡ menu (after the generic panel items). Returns true to close it.
-pub fn panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
+pub fn panel_menu(app: &mut WaltCutApp, ui: &mut egui::Ui) -> bool {
     let mut actions: Actions = Vec::new();
     let mut close = false;
     let pp = app.session.prefs.project_panel.clone();
@@ -862,7 +862,7 @@ pub fn panel_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui) -> bool {
 // ------------------------------------------------------------------------------------ commands
 
 /// Project panel UI commands routed from `projectPanel.*` (see `panels::keyboard`).
-pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, op: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, ctx: &egui::Context, op: &str, params: &Value) -> Option<Result<Value, String>> {
     let inst = shown_inst(app);
     Some(match op {
         "markIn" | "markOut" => hover_mark(app, ctx, op == "markIn"),
@@ -942,7 +942,7 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, op: &str, params: &Val
 
 /// I / O over a hover-scrubbed card set that item's In / Out at the hovered time; otherwise the
 /// keys keep their usual meaning (Mark In / Out).
-fn hover_mark(app: &mut FilmcraftApp, ctx: &egui::Context, is_in: bool) -> Result<Value, String> {
+fn hover_mark(app: &mut WaltCutApp, ctx: &egui::Context, is_in: bool) -> Result<Value, String> {
     let fresh = app.ui.project_panel.hover.filter(|h| ctx.cumulative_frame_nr().saturating_sub(h.frame) <= 2);
     let Some(h) = fresh else {
         let id = if is_in { "markers.markIn" } else { "markers.markOut" };
@@ -953,7 +953,7 @@ fn hover_mark(app: &mut FilmcraftApp, ctx: &egui::Context, is_in: bool) -> Resul
     Ok(json!({"item": h.item, key: h.time}))
 }
 
-fn start_rename(app: &mut FilmcraftApp, params: &Value) -> Result<Value, String> {
+fn start_rename(app: &mut WaltCutApp, params: &Value) -> Result<Value, String> {
     let item = params.get("item").and_then(Value::as_u64);
     let bin = params.get("bin").and_then(Value::as_u64);
     let (item, bin) = match (item, bin) {
@@ -979,7 +979,7 @@ fn start_rename(app: &mut FilmcraftApp, params: &Value) -> Result<Value, String>
 /// (left out: the bin the Project panel shows; null: the project's root) and start renaming it, so
 /// its name can be typed right away (#456). `panel` names the panel instance that edits the name.
 /// Agents pass `name` to `file.newBin` to name the bin directly.
-pub fn new_bin(app: &mut FilmcraftApp, params: &Value) -> Result<Value, String> {
+pub fn new_bin(app: &mut WaltCutApp, params: &Value) -> Result<Value, String> {
     let shown = view_of(app, shown_inst(app));
     let parent = match params.get("parent") {
         None => (shown.bin != app.session.project.root.id).then_some(shown.bin.0),
@@ -1005,7 +1005,7 @@ pub fn new_bin(app: &mut FilmcraftApp, params: &Value) -> Result<Value, String> 
 }
 
 /// Commit the inline rename (Enter / focus lost).
-pub fn commit_rename(app: &mut FilmcraftApp) {
+pub fn commit_rename(app: &mut WaltCutApp) {
     let Some(r) = app.ui.project_panel.rename.take() else { return };
     let name = r.text.trim().to_string();
     if name.is_empty() {

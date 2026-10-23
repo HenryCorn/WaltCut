@@ -1,4 +1,4 @@
-//! `filmcraft-cli probe`: media info as JSON, plus container details for MPEG TS / PS (program,
+//! `waltcut-cli probe`: media info as JSON, plus container details for MPEG TS / PS (program,
 //! streams with their codecs, access units, picture types and timestamp ranges), Broadcast WAV
 //! (time reference) and image sequences (frames, missing numbers).
 

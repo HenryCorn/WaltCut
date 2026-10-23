@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use waltcut_project::ItemId;
 use waltcut_time::Tick;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::dock::PanelKind;
 use crate::frames::Rgba;
 use crate::panels::monitor::Which;
@@ -60,16 +60,16 @@ pub fn prefix(w: Which) -> &'static str {
     if w == Which::Program { "program" } else { "source" }
 }
 
-pub fn view(app: &FilmcraftApp, w: Which) -> &MonitorView {
+pub fn view(app: &WaltCutApp, w: Which) -> &MonitorView {
     if w == Which::Program { &app.ui.program } else { &app.ui.source }
 }
 
-pub fn view_mut(app: &mut FilmcraftApp, w: Which) -> &mut MonitorView {
+pub fn view_mut(app: &mut WaltCutApp, w: Which) -> &mut MonitorView {
     if w == Which::Program { &mut app.ui.program } else { &mut app.ui.source }
 }
 
 /// The monitor a `view.*` command acts on: `params.monitor`, else the focused monitor.
-fn which_of(app: &FilmcraftApp, params: &Value) -> Which {
+fn which_of(app: &WaltCutApp, params: &Value) -> Which {
     match params.get("monitor").and_then(Value::as_str) {
         Some("source") => Which::Source,
         Some("program") => Which::Program,
@@ -83,7 +83,7 @@ fn toggled(cur: bool, params: &Value) -> bool {
 }
 
 /// Frame size of a monitor's picture (sequence or source item), if it shows video.
-fn frame_size(app: &FilmcraftApp, w: Which) -> Option<(u32, u32)> {
+fn frame_size(app: &WaltCutApp, w: Which) -> Option<(u32, u32)> {
     match w {
         Which::Program => app.session.active_sequence().map(|q| (q.settings.width, q.settings.height)),
         Which::Source => {
@@ -100,7 +100,7 @@ fn frame_size(app: &FilmcraftApp, w: Which) -> Option<(u32, u32)> {
 /// Width over height of one pixel of a monitor's picture: the active sequence's pixel aspect
 /// ratio (Program) or the Source item's (Interpret Footage first). Monitors show the picture at
 /// its display aspect, so a 1440 x 1080 frame with 4:3 pixels is drawn 16:9.
-pub fn pixel_aspect(app: &FilmcraftApp, w: Which) -> f64 {
+pub fn pixel_aspect(app: &WaltCutApp, w: Which) -> f64 {
     let par = match w {
         Which::Program => app.session.active_sequence().map(|q| q.settings.par),
         Which::Source => app.session.state.source_item.and_then(|i| app.session.project.source_par(i)),
@@ -109,7 +109,7 @@ pub fn pixel_aspect(app: &FilmcraftApp, w: Which) -> f64 {
 }
 
 /// Handle a `view.*` command (None for other ids).
-pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let rest = id.strip_prefix("view.")?;
     let w = which_of(app, params);
     let pfx = prefix(w);
@@ -227,7 +227,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     Some(r)
 }
 
-fn set_display(app: &mut FilmcraftApp, w: Which, d: &str) -> Result<Value, String> {
+fn set_display(app: &mut WaltCutApp, w: Which, d: &str) -> Result<Value, String> {
     let (_, mode) = DISPLAY_NAMES.iter().find(|(n, _)| *n == d).ok_or_else(|| format!("unknown display mode `{d}`"))?;
     // Audio Waveform and the split view are Source Monitor modes.
     let w = match mode {
@@ -239,7 +239,7 @@ fn set_display(app: &mut FilmcraftApp, w: Which, d: &str) -> Result<Value, Strin
     Ok(json!({"monitor": prefix(w), "display": d}))
 }
 
-fn save_template(app: &mut FilmcraftApp, w: Which, name: &str) -> Result<Value, String> {
+fn save_template(app: &mut WaltCutApp, w: Which, name: &str) -> Result<Value, String> {
     let name = name.trim();
     if name.is_empty() {
         return Err("the template needs a name".into());
@@ -253,7 +253,7 @@ fn save_template(app: &mut FilmcraftApp, w: Which, name: &str) -> Result<Value, 
 }
 
 /// Menu checkmark state of a `view.*` command (None = not a toggle / radio item).
-pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
+pub fn checked(app: &WaltCutApp, id: &str) -> Option<bool> {
     let rest = id.strip_prefix("view.")?;
     let w = which_of(app, &Value::Null);
     let v = view(app, w);
@@ -286,7 +286,7 @@ pub fn checked(app: &FilmcraftApp, id: &str) -> Option<bool> {
 }
 
 /// Menu enablement of a `view.*` command.
-pub fn enabled(app: &FilmcraftApp, id: &str) -> bool {
+pub fn enabled(app: &WaltCutApp, id: &str) -> bool {
     let v = view(app, which_of(app, &Value::Null));
     match id {
         "view.lockGuides" | "view.clearGuides" | "view.guideTemplates.save" => !v.guides.is_empty(),
@@ -331,7 +331,7 @@ pub fn picture_rect(area: Rect, fw: f32, fh: f32, v: &MonitorView, ppp: f32) -> 
 /// Zoom and pan the picture `pic` shown in `area`: the wheel (or a pinch) zooms about the pointer,
 /// from Fit too, between the zoom menu's 10% and 1600%; a middle-button drag, or a drag with the
 /// Hand tool, pans a magnified picture. `fw` is the picture's width in frame pixels.
-pub fn zoom_pan_input(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, fw: f32, ppp: f32) {
+pub fn zoom_pan_input(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, fw: f32, ppp: f32) {
     let ctx = ui.ctx().clone();
     if ui.rect_contains_pointer(area)
         && let Some(p) = ctx.pointer_hover_pos()
@@ -397,7 +397,7 @@ pub fn snap_axis(edges: [f32; 3], targets: &[f32], thr: f32) -> Option<(f32, f32
 
 /// Snap in Program Monitor: adjust a drag offset so the moved box's edges or centre meet the
 /// frame edges / centre or a guide. Returns the offset and the lines snapped to (vertical?, coord).
-pub fn snap_move(app: &FilmcraftApp, pic: Rect, frame: (u32, u32), moving: Rect, off: Vec2) -> (Vec2, Vec<(bool, f32)>) {
+pub fn snap_move(app: &WaltCutApp, pic: Rect, frame: (u32, u32), moving: Rect, off: Vec2) -> (Vec2, Vec<(bool, f32)>) {
     let v = &app.ui.program;
     if !v.snap {
         return (off, Vec::new());
@@ -447,7 +447,7 @@ struct NewGuide {
 /// Rulers (frame pixels) along the top and left of the picture area; drag out of a ruler to add a
 /// guide (top ruler → horizontal guide, left ruler → vertical guide).
 #[allow(clippy::too_many_arguments)]
-pub fn rulers(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, top: Rect, left: Rect, area: Rect, pic: Rect, frame: (u32, u32)) {
+pub fn rulers(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, top: Rect, left: Rect, area: Rect, pic: Rect, frame: (u32, u32)) {
     let t = app.tokens;
     let pfx = prefix(w);
     let p = ui.painter().clone();
@@ -511,7 +511,7 @@ pub fn rulers(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, top: Rect, le
 
 /// Draw the guides; drag an unlocked guide to move it, or back onto a ruler (out of the picture
 /// area) to remove it.
-pub fn guides(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, frame: (u32, u32)) {
+pub fn guides(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, frame: (u32, u32)) {
     let v = view(app, w).clone();
     if !v.show_guides || v.guides.is_empty() {
         return;
@@ -576,7 +576,7 @@ pub fn guides(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area: Rect, p
 /// playhead.
 #[allow(clippy::too_many_arguments)]
 pub fn waveform(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     area: Rect,
     item: ItemId,
@@ -661,7 +661,7 @@ fn pick(ui: &mut egui::Ui, out: &mut Picks, key: &str, label: &str, on: bool) {
 }
 
 /// The view items of a monitor's wrench menu (display modes, resolutions, rulers, guides, snap).
-pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
+pub fn wrench_items(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which) {
     let v = view(app, w).clone();
     let mode = Some(v.display);
     let mut out: Picks = Vec::new();
@@ -714,7 +714,7 @@ pub fn wrench_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which) {
 }
 
 /// The magnification popup of a monitor's zoom dropdown.
-pub fn zoom_menu(app: &mut FilmcraftApp, resp: &egui::Response, w: Which) {
+pub fn zoom_menu(app: &mut WaltCutApp, resp: &egui::Response, w: Which) {
     let zoom = view(app, w).zoom;
     let mut out: Picks = Vec::new();
     egui::Popup::menu(resp).show(|ui| {
@@ -741,7 +741,7 @@ fn push(e: &mut Elems, id: &str, r: &egui::Response, label: &str) {
 }
 
 /// Add Guide… / Save Guides as Template… / Manage Guides… dialogs.
-pub fn dialogs(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn dialogs(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.guide_dialog.clone() else { return };
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("guide-dialog-before-drag"), &mut d);
     let mut elems: Elems = Vec::new();

@@ -5,22 +5,22 @@ use egui_kittest::Harness;
 use serde_json::json;
 use waltcut_engine::Session;
 use waltcut_ui_egui::{
-    FilmcraftApp,
+    WaltCutApp,
     dock::{self, DockNode, PanelKind, SeqTabs},
     panels::monitor::{self, Which},
     theme::{self, ThemeKind},
 };
 
-fn harness(width: f32, kind: ThemeKind, which: Which) -> Harness<'static, FilmcraftApp> {
+fn harness(width: f32, kind: ThemeKind, which: Which) -> Harness<'static, WaltCutApp> {
     harness_at_scale(width, kind, which, 1.0)
 }
 
-fn harness_at_scale(width: f32, kind: ThemeKind, which: Which, scale: f32) -> Harness<'static, FilmcraftApp> {
+fn harness_at_scale(width: f32, kind: ThemeKind, which: Which, scale: f32) -> Harness<'static, WaltCutApp> {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
     session.execute("source.open", json!({"item":5})).unwrap();
     let mut h = Harness::builder().with_size(vec2(width, 340.0)).with_pixels_per_point(scale).build_ui_state(
-        move |ui, app: &mut FilmcraftApp| {
+        move |ui, app: &mut WaltCutApp| {
             app.set_theme(ui.ctx(), kind);
             app.auto.begin_frame();
             let panel = if which == Which::Source { PanelKind::Source } else { PanelKind::Program };
@@ -35,20 +35,20 @@ fn harness_at_scale(width: f32, kind: ThemeKind, which: Which, scale: f32) -> Ha
             let source = waltcut_ui_egui::panels::dragged_source(ui);
             ui.ctx().data_mut(|data| data.insert_temp(egui::Id::new("observed-source-drag"), source));
         },
-        FilmcraftApp::new(session),
+        WaltCutApp::new(session),
     );
     theme::install(&h.ctx, &h.state().tokens);
     h.run_steps(4);
     h
 }
 
-fn element(h: &Harness<'_, FilmcraftApp>, id: &str) -> Rect {
+fn element(h: &Harness<'_, WaltCutApp>, id: &str) -> Rect {
     let element = h.state().auto.elements.iter().find(|element| element.id == id).unwrap_or_else(|| panic!("missing {id}"));
     let [x, y, w, h] = element.rect;
     Rect::from_min_size(pos2(x, y), vec2(w, h))
 }
 
-fn click(h: &mut Harness<'_, FilmcraftApp>, id: &str) {
+fn click(h: &mut Harness<'_, WaltCutApp>, id: &str) {
     let pos = element(h, id).center();
     h.event(Event::PointerMoved(pos));
     for pressed in [true, false] {

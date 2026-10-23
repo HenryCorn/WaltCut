@@ -133,9 +133,9 @@ mod tests {
 
     #[test]
     fn options_anywhere_and_positionals() {
-        let a = args("exec --demo timeline.razor seconds=3.5 --project p.fcproj --save --compact");
+        let a = args("exec --demo timeline.razor seconds=3.5 --project p.waltcut --save --compact");
         assert_eq!(a.positionals, ["exec", "timeline.razor", "seconds=3.5"]);
-        assert_eq!(a.opt("--project"), Some("p.fcproj"));
+        assert_eq!(a.opt("--project"), Some("p.waltcut"));
         assert!(a.flag("--save") && a.flag("--demo") && a.flag("--compact"));
         assert!(!a.flag("--bridge"));
         let b = args("--bridge=127.0.0.1:9876 inspect sequence");

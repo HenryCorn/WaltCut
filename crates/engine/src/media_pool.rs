@@ -5,7 +5,7 @@
 //!   relink, Make Offline or their undo picks up the right file on the next frame.
 //! - Media that can't be opened (missing, unreadable) or was made offline renders the offline
 //!   slate ([`waltcut_render::offline`]) instead of failing; the reason is kept for the UI. So
-//!   do the frames of a file that opens but whose picture FilmCraft cannot decode (a codec or
+//!   do the frames of a file that opens but whose picture WaltCut cannot decode (a codec or
 //!   profile without a decoder).
 //! - Paths that came from a document (the project file or a template) are
 //!   opened through [`crate::doc_path`] ([`MediaPool::follow`]); a refused one renders as missing.
@@ -613,7 +613,7 @@ mod tests {
     /// The desktop host reads media in place instead of loading every clip into memory.
     #[test]
     fn fs_services_open_media_through_a_file_reader() {
-        let dir = std::env::temp_dir().join(format!("filmcraft-pool-reader-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("waltcut-pool-reader-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("a.wav");
         let wav = waltcut_media::wav::write_wav16(&[0.0, 0.5, -0.5, 0.25], 2, 48_000);
@@ -627,7 +627,7 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// A file whose first frame decodes and whose later frames need a decoder FilmCraft lacks.
+    /// A file whose first frame decodes and whose later frames need a decoder WaltCut lacks.
     struct PartlyDecodable(MediaInfo);
     impl MediaSource for PartlyDecodable {
         fn info(&self) -> &MediaInfo {
@@ -786,7 +786,7 @@ mod tests {
         }
     }
 
-    /// #626 end to end: an H.264 profile FilmCraft does not decode yet (4:4:4) imports and shows
+    /// #626 end to end: an H.264 profile WaltCut does not decode yet (4:4:4) imports and shows
     /// the unreadable slate with the decoder's reason, instead of a black picture.
     #[test]
     fn ffmpeg_unsupported_h264_profile_shows_the_unreadable_slate() {
