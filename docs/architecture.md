@@ -284,9 +284,9 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   shader with the CPU reference's formulas. Intrinsic Motion, Opacity, blend and colour-management
   transforms remain on the GPU fast path. Graphic/drawing layers, non-plain nested sequences,
   log conversion and frame interpolation can be rasterised on the CPU and handed to the GPU as
-  images. Broad video effects, grading and video transitions are deleted in the #24 stacked draft;
-  there are no effect compute stages or transition shaders. `WALTCUT_CPU_COMPOSITE=1` forces
-  the CPU compositor in the desktop app. Native macOS CPU/GPU checks are pending, not claimed here.
+  images. Broad video effects, grading and video transitions are deleted; there are no effect compute
+  stages or transition shaders. `WALTCUT_CPU_COMPOSITE=1` forces the CPU compositor in the desktop
+  app.
 - **CPU compositor shortcuts.** The CPU compositor, also the export fallback, works on
   premultiplied linear `f32` images, 33 MB at 1080p, so what it does not allocate, convert or mix
   is time saved. Three shortcuts, each of which gives the general path's bits (compared bit for
@@ -329,95 +329,50 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   frames: shown when the exact picture was on screen while due, dropped otherwise (including frames
   passed over without a refresh, not while the window is hidden). `cargo xtask bench-playback`
   measures the whole path headlessly ([testing.md](testing.md) §5).
-  Sequence audio uses the minimal stereo renderer described in §5.1; output-rate resampling and
+  Sequence audio uses the stereo renderer described in §5.1; output-rate resampling and
   scrub/shuttle DSP remain.
 
-### 5.1 Retained soundtrack path (#23 draft)
+### 5.1 Soundtrack path
 
 ```text
 decoded mono/stereo source pair → source-time mapping → Audio Gain + intrinsic Volume (dB)
-    → sum enabled clips on enabled/unmuted tracks → stereo soundtrack
-    → stereo soundtrack → device-rate resampling / physical output mapping, or stereo export
+    → sum enabled clips on enabled, unmuted tracks → stereo soundtrack
+    → device-rate resampling / physical output mapping, or stereo export
 ```
 
-- **Model** (`project::mixer`). Every audio track, submix and the Mix has a `MixerStrip`. Static
-  values stay in `Track::volume_db`, `pan`, `muted` and the send/effect parameters; automation is
-  keyframes in sequence ticks: lanes `volume`, `pan`, `mute` (hold), `send.<i>.level` in
-  `MixerStrip::lanes`, and insert parameters (`fx.<slot>.<param>`) in the effect's own keyframes.
-  Up to 5 inserts (`EffectInstance::post_fader` picks the side) and 5 sends per strip. Submixes feed
-  the Mix or a submix after them (no feedback). All fields have serde defaults, so older projects
-  load unchanged.
-- **Graph** (`render::mixer::mix_graph`). Lanes are evaluated per sample; effect parameters update
-  on an absolute 64-sample grid, so the output does not depend on how callers cut the timeline into
-  requests (export batches and device callbacks give identical samples). Inserts that report
-  latency delay their strip; each route into a bus gets a compensation delay and the graph is read
-  ahead by its total latency. Graph state (DSP, delay lines) is cached per structure and continued by
-  sequential readers; other requests start fresh with a pre-roll (effect tails, ≤ 3 s). Tracks run
-  in parallel (rayon), buses in order. Mono tracks pan with the −3 dB constant-power law; stereo
-  tracks and sends use balance. Solo keeps soloed and solo-safe strips plus everything feeding them
-  or fed by them. 24 tracks × (EQ + Dynamics + Studio Reverb) + a compressed submix renders at
-  ~6× realtime on one core (release).
-- **Automation modes** . Off ignores lanes; Read plays them; Latch records from
-  the first touch and holds the last value until playback stops; Touch records while held and ramps
-  back to the existing automation over the **automatch time** (Preferences ▸ Audio, 1 s); Write
-  records every control from playback start (then switches to Touch unless "Switch to Touch after
-  Write" is off).
-- **Recording** (`engine::mixer`). Playback start runs `mixer.recordStart`, stop runs
-  `mixer.recordStop`. Fader and knob drags send `mixer.touch` (value, playhead) while held and
-  `mixer.release` when let go. Held values go to `render::mixer::LiveMix`, which the playing mix
-  reads, so moves are heard at once. At stop each gesture stream is thinned (linear keyframe
-  thinning, optional minimum time interval) and written over its time range as one undo step,
-  with boundary keyframes that keep the automation outside the range unchanged.
-- **Live state.** `PreviewStore::live` (`LiveMix`) also carries per-strip meter peaks posted by the
-  mix (one per channel; Track Mixer and Audio Meters read them) and the newest project snapshot,
-  which the audio callback uses, so edits made
-  during playback are heard.
-- **Audio Clip Mixer automation.** Each audio track has a Clip Mixer mode (`clipMixer.setMode`,
-  session state `EditorState::clip_mixer_modes`, Read by default). During a pass the Clip Mixer's
-  fader and pan knob are gestures on the track's `clip.volume` / `clip.pan` lanes
-  (`clipMixer.touch` / `clipMixer.release`): the clip under the playhead plays the held value at
-  once (`render::audio::track_input_live`), and Latch / Touch / Write follow the track rules. At
-  `mixer.recordStop` each stream is thinned and written as **clip keyframes** (Volume `level`,
-  Panner `balance`, in media time) into every clip it covers, with boundary keyframes that keep the
-  clip's values outside the range; one undo step for the whole pass.
-- **Track Mixer view.** The panel menu (`mixer.menu`) has Show/Hide Tracks (`UiState::mixer_hidden`).
-  Input capture, record arming and recording meters have been removed in the #23 draft train.
+Audio exists for timing to dialogue and music: synchronized playback, waveforms, scrubbing, clip
+Audio Gain, intrinsic Volume with keyframes, and track mute. `render::audio` mixes a sequence
+for playback and export; its output does not depend on how callers cut the timeline into requests
+(export batches and device callbacks produce identical samples).
 
 `engine::previews` owns the typed live project snapshot consumed by a playing callback. Gain,
-Volume/keyframe, source-map and mute edits invalidate audio-preview hashes. Waveforms and
-scrub/shuttle retain the same gain semantics. Device-rate resampling and pitch correction are
-live DSP dependencies, not audio-effect catalogue entries.
+Volume/keyframe, source-map and mute edits invalidate audio-preview hashes, so edits made during
+playback are heard. Waveforms and scrub/shuttle keep the same gain semantics. Device-rate
+resampling and pitch correction (`waltcut-audio-dsp`) are live DSP dependencies, not an audio
+effects catalogue.
 
 ### 5.1.1 Fixed stereo soundtrack
 
 Mono sources (or one selected source channel) are duplicated to left/right; a multichannel source
 defaults to its first stereo pair. The Source monitor follows its selected mono/stereo source pair.
-There is no multichannel source mixdown preference, shared layout/conversion DSP, export channel
-selector, surround track format, or surround output path. Exports write the retained stereo mix
-without loudness measurement or true-peak limiting. Removed output-layout and loudness settings
-are rejected by export commands rather than ignored.
+There is no multichannel source mixdown preference, channel-layout conversion, export channel
+selector, surround track format or surround output path. Exports write the stereo mix without
+loudness measurement or true-peak limiting; removed output-layout and loudness settings are
+rejected by export commands rather than ignored.
 
-### 5.2 Audio reduction boundary (#23, draft implementation)
+### 5.2 What was removed from audio
 
-Essential Sound has no panel, UI state, command registry, audio-type model, owned effects or
-preferences. Its automatic loudness matching and ducking detector/keyframe generator are deleted,
-including the feature-only DSP ducking module and render-time mute branch. Track items and effect
-instances reject unknown fields, including removed Essential Sound metadata, rather than silently
-rendering a different sound. No legacy-project compatibility path is provided.
-
-The narrower orphan-processing cut removes advanced audio definitions, transition data and
-commands, catalogue/preset folders, graphical editors, channel-volume/panner controls, render FX
-and crossfade modules, and unreachable DSP processors. Removed IDs and old fields fail explicitly,
-including in preset imports; there is no compatibility shell. Only intrinsic Volume remains as
-an audio effect, alongside shared Motion/Opacity/keyframe/graphic data.
+Track and clip mixers, submixes, sends, automation modes and recording, Essential Sound (automatic
+loudness matching, ducking), voice-over recording, Remix, the audio effects catalogue and audio
+transitions, surround and loudness tools are deleted, not disabled. Removed ids and fields fail
+explicitly (unknown commands, rejected fields in project files and preset imports); there is no
+compatibility shell, and `xtask/src/denylist.rs` stops the deleted modules and command families
+from coming back.
 
 `crates/ui-egui/tests/audio_timing.rs` compares actual callback samples and decoded written
-ProRes MOV/float-PCM
-samples for mono/stereo timing, source In, live gain/mute, additive Volume, bypass/disable,
-channel selection and keyframes across irregular blocks. Engine/project/format/UI tests cover
-removed commands/IDs/fields and hostile source maps. This is **DRAFT IMPLEMENTATION — native macOS acceptance pending**:
-native macOS CI, actual sample-test execution and animation-flow visual acceptance remain
-pending. #23 is not complete, accepted or merged.
+ProRes MOV/float-PCM samples for mono/stereo timing, source In, live gain/mute, additive Volume,
+bypass/disable, channel selection and keyframes across irregular blocks. Engine, project, format
+and UI tests cover the removed commands, ids and fields and hostile source maps.
 
 ### 5.3 Clip compositing
 
@@ -519,9 +474,7 @@ export.quick {same params; path optional}
 
 No queue, delivery presets, advanced encoder choices, overlays/watermarks/burn-ins, caption
 sidecars or loudness pass remain. The [export contract](../crates/export/README.md) lists commands,
-overwrite semantics and pending acceptance. **#25 IMPLEMENTATION DRAFTED**: native import fixtures,
-every retained output round trip, iPhone manual acceptance, full CI and animation screenshot are
-pending; this is not a completed/accepted/merged reduction.
+and overwrite semantics. No real iPhone file has been checked by hand.
 
 ## 7. Automation surfaces
 

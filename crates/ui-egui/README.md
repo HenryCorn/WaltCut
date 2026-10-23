@@ -9,20 +9,16 @@ Essential Graphics opens the text/shape editor directly, without a template brow
 layout, per-character styles, source graphics and Replace Fonts remain available. The font dialog
 draft is `UiState::replace_fonts`; the control channel edits it with `ui.set {"replaceFonts": …}`.
 `graphic_design_ui` covers the editor, font dialog, character styles and absent template commands.
-Native macOS execution and screenshots are pending for the #24 draft; cross-target Clippy only
-typechecks those tests on Windows.
 
 ## Clip compositing
 
 Effect Controls edits ordinary effect parameters, including their keyframes, interpolation menus
 and value/velocity graphs. Motion handles, clip opacity, blend modes and graphic paths remain.
-Effect-mask creation, rows, tracking controls and Program overlays are removed in the stacked
-#24 draft. Brush/cel editing and the drawing eraser are independent of effect masks and remain.
+Effect masks, tracking controls and Program overlays are removed. Brush/cel editing and the drawing eraser are independent of effect masks and remain.
 `keyframes_ui` retains an opacity-group movement regression; engine tests cover Motion/Opacity/
-blend on media, drawing, text and shape clips. Native macOS UI execution and animation-flow
-screenshots remain pending.
+blend on media, drawing, text and shape clips.
 
-## Audio reduction (#23, DRAFT IMPLEMENTATION)
+## Audio
 
 Essential Sound's panel, sub-tab state and automation ids are deleted with its engine commands,
 audio-type settings/presets and automatic processing. `scripted::essential_sound_panel_and_commands_are_absent`
@@ -45,9 +41,7 @@ no channel-layout or surround-authoring controls.
 `tests/audio_timing.rs` checks actual callback samples and written float WAV samples for mono and
 stereo sources, offsets/source In, gain/mute, additive Volume, bypass/disable, channel selection
 and keyframes. `clip_audio_ui` checks the independent gain line and retained Volume controls.
-The final bounded #23 deletion slice removes the active loudness, output-layout and Source-monitor
-mixdown paths. **Native macOS test execution, full CI, sample export tests and animation-flow
-screenshots are pending.** These stacked drafts are not complete, accepted or merged.
+The loudness, output-layout and Source-monitor mixdown paths are deleted.
 
 ## Language
 

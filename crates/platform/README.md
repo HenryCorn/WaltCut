@@ -29,9 +29,9 @@ let availability = waltcut_platform::register();
 - `pen.rs` retains pressure/proximity input used by the drawing brushes; export reduction does not
   remove or replace this input path.
 
-## Export boundary (#25)
+## Export boundary
 
-**IMPLEMENTATION DRAFTED.** Hardware encoding, capability probes, encoder registration and their
+Hardware encoding, capability probes, encoder registration and their
 tests are deleted. This crate no longer depends on `waltcut-export`. HEVC remains an **import**
 format (including iPhone Main10 HDR), not an output choice. Export uses fixed built-in Rust
 H.264 + AAC MP4 and alpha ProRes 4444 MOV; alpha PNG sequences and PNG/JPEG stills are handled by
@@ -46,7 +46,5 @@ the retained raster path. See [the export contract](../export/README.md).
 | `tests/setting.rs` | Hardware decoding Off/Auto through the factory and actual media stack |
 
 Fixtures use the existing external ffmpeg recipes under `target/fixtures/platform`; no third-party
-decoder source, linked ffmpeg or committed media is required. Native macOS execution/fixture
-decoding, every retained output round trip, real iPhone HEVC Main10 HLG MOV + AAC manual
-acceptance, full CI and the animation-flow screenshot are **pending**. No real iPhone file has
-been checked; this draft is not complete, accepted or merged.
+decoder source, linked ffmpeg or committed media is required. These tests run natively on macOS in
+CI. A real iPhone HEVC Main10 HLG MOV + AAC file has not been checked by hand.

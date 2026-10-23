@@ -7,12 +7,11 @@
 ## Current WaltCut scope
 
 The historical decisions/addenda below are retained as engineering history. #29 removed the
-non-macOS targets. **#25 IMPLEMENTATION DRAFTED** deletes the remaining VideoToolbox hardware
+non-macOS targets. #25 deleted the remaining VideoToolbox hardware
 encoders and export encoder/probe registries; the encoding addenda are superseded for the current
 product, not supported output contracts. Retained exports use built-in Rust H.264/AAC and
 ProRes 4444 encoders. The VideoToolbox **decoder**, safe hybrid fallback, import formats and tablet
-pressure path remain. Native import/output fixture verification, real iPhone acceptance, full CI
-and animation-flow visual acceptance are pending, not claimed passing.
+pressure path remain. A real iPhone HEVC Main10 HLG file has not been checked by hand.
 
 ## Context
 

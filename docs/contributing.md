@@ -218,48 +218,22 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 4. The command now appears in menus (from `menu`), shortcuts, `waltcut-cli commands`,
    `engine.commands` and MCP `command_list` without further work.
 
-### Effect parameters
+### Effects, transitions and audio processing
 
-1. Define it in `build_effects()` in `crates/project/src/effect.rs` with the `video(id, name,
-   CATEGORY, params)` helper. Parameter helpers cover floats with slider ranges, choices, bools,
-   angles, points, colours, curves and wheels. The Effects panel, Effect Controls and agent
-   parameter docs are generated from this.
-2. Implement it as a match arm in `render::effects::apply` (`crates/render/src/effects.rs`). It
-   works on a linear-light premultiplied f32 `Image`. Scale pixel-size parameters by `cx.px_scale`
-   so reduced-resolution playback matches full resolution. Unknown ids are a no-op.
-3. Add a test in `crates/render/src/tests.rs`.
-4. The GPU path needs no change: `render::plan` pre-renders layers with standard effects on the CPU.
-   To run it on the GPU too, make it an `FxOp` in `crates/render/src/gpufx.rs` instead (parameter
-   evaluation in `FxOp::eval`, the CPU reference in `FxOp::apply`, the id in `GPU_EFFECTS`), add
-   its passes to `crates/gpu/src/fx.rs` and its math to `fx.wgsl`, and a CPU-vs-GPU agreement case to
-   `crates/gpu/src/fx_tests.rs`.
+There is no effects or transitions catalogue to extend: it was removed with the reduction (#14).
+What remains is the intrinsic Motion, Opacity and Volume (defined in `build_effects()` in
+`crates/project/src/effect.rs`), blend modes, keyframes with their graphs, and graphic and drawing
+clips. New animation behaviour belongs in drawing, graphic or timeline code, not in a restored
+catalogue; the removed command ids and modules are listed in `xtask/src/denylist.rs`, and
+`cargo xtask layers` fails if one comes back.
 
-Audio effects implement `AudioEffect` in `crates/audio-dsp` and register in its `effects()`
-registry. Then add an `audio(…)` definition in `effect.rs` and a `Mapping` from project parameters
-to DSP parameters in `crates/render/src/audio_fx.rs`. The DSP must give the same output however the
-stream is cut into blocks (there are tests for this).
+### Export
 
-### Audio transitions (temporary, #23)
-
-1. Define video transitions with `tr(id, name, FOLDER, badges, params)` in
-   `crates/project/src/vtransition.rs` (ten `Video Transitions/*`
-   folders plus `Legacy/Video Transitions`). Parameters are not animatable. Never rename an id:
-   projects store it. Audio transitions are `EffectKind::AudioTransition` defs in `effect.rs`.
-2. Implement it in the matching module of `crates/render/src/transitions/` (`wipe`, `motion`,
-   `dissolve`, `lights`, `grunge`, `special`): read params through `Tx`, build pixels with `paint`,
-   shape wipes with `wipe::field_wipe` (feather/border/anti-aliasing for free) and 3D moves with
-   `cards`. Audio crossfade curves go in `transitions::audio_gains`. The property tests run over
-   every transition automatically; re-bless `goldens.txt` (see testing.md).
-3. It can then be applied with `sequence.applyVideoTransition {"effect": "<id or name>", "params":
-   {...}, "reverse": bool}` and edited with `sequence.setTransition`; `effects.list {"folder":
-   "Video Transitions/Wipe", "detail": true}` lists it with its parameters.
-
-The remaining #25 export simplification is **IMPLEMENTATION DRAFTED**. Delivery is limited to
-H.264 + AAC MP4, alpha ProRes 4444 MOV, alpha PNG sequences and PNG/JPEG stills. Do not restore
-queue/preset models, advanced delivery settings, hardware encoding or ignored compatibility keys.
-The one export worker must remain owned, cancellable, joined on shutdown and panic-contained;
-staged output must preserve existing destinations and source/project files on failure/cancel.
-See [the export contract](../crates/export/README.md) and [pending native acceptance](testing.md#25-native-acceptance-still-required).
+Delivery is limited to H.264 + AAC MP4, alpha ProRes 4444 MOV, alpha PNG sequences and PNG/JPEG
+stills. Do not restore queue or preset models, advanced delivery settings, hardware encoding or
+ignored compatibility keys. The one export worker must remain owned, cancellable, joined on
+shutdown and panic-contained; staged output must preserve existing destinations and source and
+project files on failure or cancel. See [the export contract](../crates/export/README.md).
 
 ### A codec or container crate
 

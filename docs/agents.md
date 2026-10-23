@@ -132,7 +132,7 @@ progress and stop it:
   "Exporting… NN%" in its status bar) and the call returns when it is written, however long it
   takes. `waltcut-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
 
-### Retained output contract (#25 draft)
+### Retained output contract
 
 Media outputs are only **H.264 + AAC MP4**, **ProRes 4444 MOV with alpha** (stereo float PCM), and
 **PNG sequence with alpha**; `file.exportFrame` writes **PNG/JPEG**. Export and Quick Export share
@@ -153,9 +153,7 @@ dispatches `file.exportFrame` at full resolution, without a scale override, and 
 the bridge. Offline output is named in the result and warned about; CLI exits 1 unless
 `--allow-offline` accepts placeholders. See [the command reference](control-protocol.md#export).
 
-**IMPLEMENTATION DRAFTED**: native retained-import fixtures, every retained output round trip,
-actual callback/MOV samples, real iPhone manual acceptance, full CI and animation-flow screenshot
-are pending. No real iPhone file has been checked; #25 is not complete, accepted or merged.
+These outputs are exercised natively on macOS in CI. No real iPhone file has been checked by hand.
 
 ## 2. Control channel
 
