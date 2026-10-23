@@ -4,9 +4,12 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
       time: "06:00"
       timezone: "America/New_York"
+    # Each update PR starts a macOS CI job; a few at a time keeps real PRs from queueing behind them.
+    open-pull-requests-limit: 3
     # Keep breaking upgrades isolated; review migration notes per package.
     groups:
       cargo-dependencies:
@@ -30,9 +33,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
       time: "06:00"
       timezone: "America/New_York"
+    # Each update PR starts a macOS CI job; a few at a time keeps real PRs from queueing behind them.
+    open-pull-requests-limit: 3
     groups:
       actions:
         patterns:
