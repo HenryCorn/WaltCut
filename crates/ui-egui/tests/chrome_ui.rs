@@ -30,7 +30,9 @@ fn body_extent(h: &Harness<'static, FilmcraftApp>) -> (f32, f32) {
     let body: Vec<_> = els.iter().filter(|e| !e.id.starts_with("header.") && !e.id.starts_with("menu.")).collect();
     assert!(!body.is_empty(), "no panel elements registered");
     let top = body.iter().map(|e| e.rect[1]).fold(f32::INFINITY, f32::min);
-    let bottom = body.iter().map(|e| e.rect[1] + e.rect[3]).fold(f32::NEG_INFINITY, f32::max);
+    // a panel's own rect is what the status bar must clear: its rows (a long track list, say) are
+    // registered even where the panel clips them
+    let bottom = body.iter().filter(|e| e.id.starts_with("panel.")).map(|e| e.rect[1] + e.rect[3]).fold(f32::NEG_INFINITY, f32::max);
     (top, bottom)
 }
 

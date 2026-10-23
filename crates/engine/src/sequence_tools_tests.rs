@@ -238,7 +238,7 @@ fn add_tracks_places_and_types_them() {
 
     // without a place: after the last track (and one video track when nothing is said, as before)
     let r = s.execute("sequence.addTracks", json!({})).unwrap();
-    assert_eq!((r["video"].as_array().unwrap().len(), r["audio"].as_array().unwrap().len(), r["submix"].as_array().unwrap().len()), (1, 0, 0));
+    assert_eq!((r["video"].as_array().unwrap().len(), r["audio"].as_array().unwrap().len()), (1, 0));
     assert_eq!(names(&s, TrackKind::Video), ["Video 1", "Video 2", "Video 3", "Video 4"]);
     assert_eq!(s.active_sequence().unwrap().video_tracks[3].id.0, r["video"][0].as_u64().unwrap());
     s.execute("edit.undo", json!({})).unwrap();

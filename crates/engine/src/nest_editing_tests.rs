@@ -54,12 +54,7 @@ fn with_the_toggle_on_a_sequence_edits_in_as_one_nest() {
 #[test]
 fn with_the_toggle_off_a_sequence_edits_in_as_its_linked_clips() {
     let mut s = demo();
-    let (source, target) = source_and_empty(&mut s);
-    // the only transitions left are audio ones: give the source one to carry
-    s.execute("sequence.open", json!({"item": source.0})).unwrap();
-    let joined = clips(&s, TrackKind::Audio, 0)[1].id.0;
-    s.execute("sequence.applyAudioTransition", json!({"clip": joined})).unwrap();
-    s.execute("sequence.open", json!({"item": target.0})).unwrap();
+    let (source, _) = source_and_empty(&mut s);
     let src = s.project.sequence(source).unwrap().clone();
     let (src_v, src_a) = (src.video_tracks[0].clone(), src.audio_tracks[0].clone());
     assert_eq!(src_v.items.len(), 3);

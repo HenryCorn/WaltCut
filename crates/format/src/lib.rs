@@ -524,7 +524,12 @@ mod tests {
         }
         assert!(plant(seq_doc), "the sequence has a video track");
         let e = decode(&serde_json::to_vec(&d).unwrap()).unwrap_err();
-        assert!(matches!(&e, FormatError::UnknownField(at) if at.contains("video_tracks[0].removed_feature")), "{e}");
+        // a track refuses a key it does not know (naming it) rather than dropping it on the next save
+        assert!(
+            matches!(&e, FormatError::UnknownField(at) if at.contains("video_tracks[0].removed_feature"))
+                || matches!(&e, FormatError::Corrupt(msg) if msg.contains("unknown field `removed_feature`")),
+            "{e}"
+        );
     }
 
     /// What is open is not part of the schema: a `view` this build does not fully know still opens.

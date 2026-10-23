@@ -2971,13 +2971,13 @@ mod new_track_tests {
     use waltcut_project::{Project, SequenceSettings};
 
     /// #483: a drop above the top video track adds a video track, one below the last audio track an
-    /// audio track; over a track, between the areas or on the Mix row it adds none.
+    /// audio track; over a track or between the areas it adds none.
     #[test]
     fn empty_space_past_the_tracks_adds_a_track() {
         let mut p = Project::new("t");
         let id = p.new_sequence("s", SequenceSettings::default(), 1, 1, None);
         let seq = p.sequence(id).cloned().expect("sequence");
-        // video area 0..200 (V1 at 150..200), divider, audio area 205..466 (A1 at 205..255), Mix 466..500
+        // video area 0..200 (V1 at 150..200), divider, audio area 205..500 (A1 at 205..255)
         let row = |kind, track: &waltcut_project::Track, y0: f32| Row {
             track: track.id,
             kind,
@@ -2995,7 +2995,7 @@ mod new_track_tests {
         let at = |y| new_track_at(&layout, y, 50.0, 50.0);
         assert_eq!(at(40.0), Some((TrackKind::Video, Rect::from_min_max(pos2(0.0, 100.0), pos2(800.0, 150.0)))));
         assert_eq!(at(300.0), Some((TrackKind::Audio, Rect::from_min_max(pos2(0.0, 255.0), pos2(800.0, 305.0)))));
-        for y in [160.0, 202.0, 230.0, 480.0] {
+        for y in [160.0, 202.0, 230.0] {
             assert_eq!(at(y), None, "y = {y}");
         }
     }
