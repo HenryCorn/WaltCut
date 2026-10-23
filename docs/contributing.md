@@ -115,9 +115,10 @@ For feedback before each push, run `cargo xtask check --base origin/main` after 
 `origin/main`. It checks formatting, all workspace targets, layers and assets, then tests changed
 packages and their transitive workspace dependents (including test/build dependencies). Global
 build inputs or unclassified code changes conservatively select all workspace tests. This is
-not a replacement for the full gate: run `cargo xtask ci` **natively on macOS before opening a
-ready-for-review PR**. Cross-target checking does not execute product tests. If macOS is unavailable,
-open a draft, state exactly which checks passed and which are pending, and request native CI.
+not a replacement for the full gate: run `cargo xtask ci` **natively on macOS before merging**.
+Cross-target checking does not execute product tests. If macOS is unavailable, state exactly
+which checks passed and which are pending, and request native CI. Finished implementations can
+be ready for review while CI runs; reserve draft status for unfinished work.
 
 `cargo xtask` is an alias in `.cargo/config.toml` for `cargo run -p xtask --`.
 
@@ -154,7 +155,7 @@ enabled and select the branch to verify. No privileged `pull_request_target` exe
 Cache-hit results appear in each job's "Report cache restore" step; inspect the rust-cache restore/
 save logs to confirm reuse across runs. A configured cache is not evidence of a cache hit.
 Both fast and full runs disable release LTO
-and uses 16 codegen units to keep the test build practical; this does not change the release profile
+and use 16 codegen units to keep the test build practical; this does not change the release profile
 used for shipped builds.
 
 For stacked PRs, run full verification at the tip early, fix failures there and move each fix to

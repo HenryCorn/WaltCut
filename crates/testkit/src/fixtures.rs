@@ -120,9 +120,10 @@ mod tests {
 
     #[test]
     fn changed_recipes_cannot_reuse_stale_fixtures() {
-        let old = recipe_dir("testkit-recipes", "blue 320x240");
-        let new = recipe_dir("testkit-recipes", "blue 160x120");
-        assert_eq!(old, recipe_dir("testkit-recipes", "blue 320x240"));
+        let namespace = format!("testkit-recipes/{}", std::process::id());
+        let old = recipe_dir(&namespace, "blue 320x240");
+        let new = recipe_dir(&namespace, "blue 160x120");
+        assert_eq!(old, recipe_dir(&namespace, "blue 320x240"));
         assert_ne!(old, new);
         let old_file = old.join("blue.mkv");
         let new_file = new.join("blue.mkv");
