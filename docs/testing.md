@@ -222,7 +222,7 @@ They check retained-import fixture decoding, a round trip of each output (H.264/
 ProRes 4444 MOV, alpha PNG sequence, PNG/JPEG stills), the PQ/HLG straight-colour and partial/zero
 alpha ProRes cases, and callback/MOV sample comparisons while a different-rate sequence is active.
 The control-channel end-to-end run (import, timeline, drawing, cels, preview, all three exports) is
-described in `docs/agents.md`. Still by hand: a real iPhone HEVC Main10 HLG MOV + AAC import,
+is `tools/e2e-animation-flow.py` ([e2e.md](e2e.md)). Still by hand: a real iPhone HEVC Main10 HLG MOV + AAC import,
 preview/scrub/timing and each retained output. Synthetic fixtures do not substitute for that check,
 and no real iPhone file has been checked.
 
