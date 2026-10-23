@@ -162,7 +162,7 @@ fn clip_volume_and_track_mute_affect_playback_and_exported_audio() {
                     "file.exportMedia",
                     json!({
                         "path": path, "format": "wav", "range": "custom", "startFrame": 1, "endFrame": 7, "wait": true,
-                        "settings": {"audio": {"sample_rate": SR, "channels": 2, "bits": 32, "float": true}}
+                        "settings": {"audio": {"sample_rate": SR, "bits": 32, "float": true}}
                     }),
                 )
                 .unwrap();

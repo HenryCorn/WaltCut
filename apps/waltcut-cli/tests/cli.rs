@@ -195,14 +195,14 @@ fn export_with_presets() {
         "export.presets.save",
         "name=Tiny WAV",
         "from=Waveform Audio 48 kHz 16-bit",
-        "settings={\"audio\":{\"channels\":1}}",
+        "settings={\"audio\":{\"bits\":24}}",
     ]));
     let list = json_out(&cli(&["--data-dir", data_s, "export", "--list-presets", "tiny"]));
     assert_eq!(list.as_array().unwrap().len(), 1, "{list}");
     let wav = dir.join("tiny.wav");
     json_out(&cli(&["--demo", "--data-dir", data_s, "export", wav.to_str().unwrap(), "--preset", "Tiny WAV", "--start", "0", "--end", "0.5"]));
     let b = std::fs::read(&wav).unwrap();
-    assert_eq!(u16::from_le_bytes([b[22], b[23]]), 1, "mono from the user preset");
+    assert_eq!(u16::from_le_bytes([b[34], b[35]]), 24, "24-bit from the user preset");
     // through the queue
     let q = dir.join("queued.wav");
     let v = json_out(&cli(&["--demo", "--data-dir", data_s, "export", q.to_str().unwrap(), "--preset", "Tiny WAV", "--queue", "--range", "entire"]));
