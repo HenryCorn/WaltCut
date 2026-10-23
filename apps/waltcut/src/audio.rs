@@ -187,7 +187,7 @@ impl CpalOut {
                 if buf.len() > 1_048_576 || scratch.try_reserve(buf.len().saturating_sub(scratch.len())).is_err() {
                     buf.fill(T::EQUILIBRIUM);
                     if !health.failed.swap(true, Ordering::SeqCst) {
-                        eprintln!("filmcraft: unable to allocate the audio conversion buffer");
+                        eprintln!("waltcut: unable to allocate the audio conversion buffer");
                     }
                     return;
                 }
@@ -356,7 +356,7 @@ fn render(fill: &Mutex<Fill>, buf: &mut [f32], channels: usize, played: &AtomicU
     if health.failed.load(Ordering::SeqCst) || catch_unwind(AssertUnwindSafe(|| (*guard)(buf, channels))).is_err() {
         buf.fill(0.0);
         if !health.failed.swap(true, Ordering::SeqCst) {
-            eprintln!("filmcraft: the audio mixer failed; playing without sound");
+            eprintln!("waltcut: the audio mixer failed; playing without sound");
         }
         return;
     }
@@ -369,7 +369,7 @@ fn stream_error(health: &Health, e: cpal::StreamError) {
         cpal::StreamError::BackendSpecific { .. } => health.errored.store(true, Ordering::SeqCst),
     }
     if !health.reported.swap(true, Ordering::SeqCst) {
-        eprintln!("filmcraft: audio stream error: {e}");
+        eprintln!("waltcut: audio stream error: {e}");
     }
 }
 

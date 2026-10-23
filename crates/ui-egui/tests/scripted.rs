@@ -1,4 +1,4 @@
-//! Scripted UI tests: the real `FilmcraftApp` runs headless under `egui_kittest` (no window, no
+//! Scripted UI tests: the real `WaltCutApp` runs headless under `egui_kittest` (no window, no
 //! GPU) and is driven through the same JSON control channel that agents use over TCP/MCP
 //! (`docs/control-protocol.md`). Each test opens the demo project, sends control requests
 //! (`engine.execute`, `ui.menu.invoke`, `ui.click`, `ui.inspect`, …) between frames and asserts on
@@ -13,11 +13,11 @@ use std::sync::mpsc::{Sender, channel};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -32,7 +32,7 @@ impl Driver {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
+        let app = WaltCutApp::new(session).with_control(rx);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if render {
             b = b.wgpu();
@@ -455,7 +455,7 @@ fn waveform_peaks_do_not_survive_opening_another_project() {
     }
     let (item, old) = first.expect("the demo timeline computes waveform peaks");
     // Reopen the same project from disk: same item ids, new media pool.
-    let path = std::env::temp_dir().join(format!("fc-peaks-{}.fcproj", std::process::id()));
+    let path = std::env::temp_dir().join(format!("fc-peaks-{}.waltcut", std::process::id()));
     let path = path.to_string_lossy().to_string();
     d.exec("file.saveAs", json!({"path": path}));
     d.exec("file.open", json!({"path": path}));

@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 
 use crate::native_dialogs::FileDialog;
 use crate::state::LinkMediaDraft;
-use crate::{FilmcraftApp, RelinkHint};
+use crate::{RelinkHint, WaltCutApp};
 
 type Elems = Vec<(String, egui::Rect, String)>;
 
@@ -23,7 +23,7 @@ fn push(elems: &mut Elems, id: impl Into<String>, r: &egui::Response, label: imp
 }
 
 /// Draw whichever media dialogs are open; open Link Media when a project needs it.
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     if app.session.offline.prompt && app.ui.link_media.is_none() {
         app.ui.link_media = Some(LinkMediaDraft::default());
     }
@@ -36,12 +36,12 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 }
 
 /// Menu / shortcut entry points without params open a dialog. Returns None for other ids.
-pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
+pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let empty = params.as_object().is_none_or(|m| m.is_empty());
     if !empty {
         return None;
     }
-    let enabled = |app: &FilmcraftApp, id: &str| waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session));
+    let enabled = |app: &WaltCutApp, id: &str| waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session));
     match id {
         "media.linkMedia" => {
             let r = app.session.execute("media.linkMedia", json!({})).map_err(|e| e.to_string());
@@ -62,7 +62,7 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     }
 }
 
-fn missing_list(app: &FilmcraftApp) -> Vec<(u64, String, String, String, &'static str)> {
+fn missing_list(app: &WaltCutApp) -> Vec<(u64, String, String, String, &'static str)> {
     app.session
         .offline
         .missing
@@ -85,7 +85,7 @@ fn match_params(d: &LinkMediaDraft) -> Value {
     })
 }
 
-fn preview_texture(app: &FilmcraftApp, ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
+fn preview_texture(app: &WaltCutApp, ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
     let key = egui::Id::new(("link-preview", path));
     if let Some(t) = ctx.data(|d| d.get_temp::<Option<egui::TextureHandle>>(key)) {
         return t;
@@ -100,7 +100,7 @@ fn preview_texture(app: &FilmcraftApp, ctx: &egui::Context, path: &str) -> Optio
     tex
 }
 
-fn link_media(app: &mut FilmcraftApp, ctx: &egui::Context) {
+fn link_media(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.link_media.clone() else { return };
     let rows: Vec<_> = missing_list(app).into_iter().filter(|r| !d.skipped.contains(&r.0)).collect();
     if rows.is_empty() {
@@ -257,7 +257,7 @@ fn link_media(app: &mut FilmcraftApp, ctx: &egui::Context) {
         action = Some("cancel");
     }
     let (item, ..) = rows[d.row].clone();
-    let relink = |app: &mut FilmcraftApp, d: &mut LinkMediaDraft, path: String| relink_to(app, d, &json!(item), path);
+    let relink = |app: &mut WaltCutApp, d: &mut LinkMediaDraft, path: String| relink_to(app, d, &json!(item), path);
     match action {
         Some("browse") => app.pick_ui(FileDialog::Folder { at: None }, |app, paths| {
             if let (Some(f), Some(d)) = (paths.into_iter().next(), app.ui.link_media.as_mut()) {
@@ -321,7 +321,7 @@ fn link_media(app: &mut FilmcraftApp, ctx: &egui::Context) {
     app.ui.link_media = keep.then_some(d);
 }
 
-fn make_offline(app: &mut FilmcraftApp, ctx: &egui::Context) {
+fn make_offline(app: &mut WaltCutApp, ctx: &egui::Context) {
     let Some(mut delete) = app.ui.make_offline else { return };
     let mut elems: Elems = Vec::new();
     let mut keep = true;
@@ -367,7 +367,7 @@ fn make_offline(app: &mut FilmcraftApp, ctx: &egui::Context) {
 }
 
 /// Link Media: relink `item` to `path` with the dialog's matching options; the result goes into `d`.
-fn relink_to(app: &mut FilmcraftApp, d: &mut LinkMediaDraft, item: &Value, path: String) {
+fn relink_to(app: &mut WaltCutApp, d: &mut LinkMediaDraft, item: &Value, path: String) {
     let mut p = match_params(d);
     p["item"] = item.clone();
     p["path"] = json!(path);

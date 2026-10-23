@@ -43,7 +43,7 @@ fn removed_effect_preset_imports_fail_without_rewriting_the_source_or_library() 
     for removed in
         ["gaussian_blur", "tint", "cross_dissolve", "parametric_eq", "hard_limiter", "channel_volume", "panner", "constant_power", "exponential_fade"]
     {
-        let mut source = json!({"format": "filmcraft.effect-presets", "version": 1, "presets": [preset]});
+        let mut source = json!({"format": "waltcut.effect-presets", "version": 1, "presets": [preset]});
         source["presets"][0]["effects"][0]["effect"] = json!(removed);
         let bytes = serde_json::to_vec(&source).unwrap();
         std::fs::write(&path, &bytes).unwrap();

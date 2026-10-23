@@ -3,10 +3,10 @@
 use egui::{Align2, Color32, Rect, Sense, pos2, vec2};
 use waltcut_time::{TimeDisplay, format_time};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::theme::Tokens;
 
-pub fn history(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn history(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(6.0)));
     let undo: Vec<String> = app.session.history.undo.iter().map(|h| h.0.clone()).collect();
@@ -59,7 +59,7 @@ pub const MARKER_FILTER: [waltcut_project::Label; 7] = {
 
 /// A marker's Label menu. An explicit program target keeps panel focus and clip/project
 /// selections from routing colour changes to another item (#1143).
-pub(crate) fn marker_label_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, marker: &waltcut_project::Marker, prefix: &str) {
+pub(crate) fn marker_label_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, marker: &waltcut_project::Marker, prefix: &str) {
     let label = crate::i18n::t("Label");
     let menu = ui.menu_button(label, |ui| {
         for color in waltcut_project::Label::ALL {
@@ -79,7 +79,7 @@ pub(crate) fn marker_label_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, marke
 
 /// Markers panel: a colour filter row (click a chip to show/hide that colour; automation ids
 /// `markers.filter.<label>`), then the sequence markers (`markers.row.<id>`; click = go to it).
-pub fn markers(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn markers(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     // Keep the immutable project snapshot alive while UI commands mutate the session.
     // Cloning a sequence here copies every clip and effect on every redraw.

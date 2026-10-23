@@ -407,7 +407,7 @@ impl FrameServer {
             let services = services.clone();
             let rp = repaint.clone();
             let pv = previews.clone();
-            std::thread::Builder::new().name(format!("filmcraft-frames-{i}")).spawn(move || worker(sh, pool, services, pv, rp)).ok();
+            std::thread::Builder::new().name(format!("waltcut-frames-{i}")).spawn(move || worker(sh, pool, services, pv, rp)).ok();
         }
         Self { shared, pool, services, previews, repaint }
     }

@@ -29,7 +29,7 @@ macOS.
 cargo run --release -p waltcut                      # desktop app with the demo project
 cargo run --release -p waltcut -- --empty           # start without the demo project
 cargo run --release -p waltcut -- --control 9876    # plus the JSON-lines control server
-cargo run --release -p waltcut -- a.mp4 b.wav       # import media (or open a .fcproj)
+cargo run --release -p waltcut -- a.mp4 b.wav       # import media (or open a .waltcut)
 cargo run --release -p waltcut-cli -- commands      # list engine commands
 cargo run --release -p waltcut-cli -- render --demo --seconds 3 --out frame.png
 cargo run --release -p waltcut-cli -- mcp --demo    # headless MCP server on stdio
@@ -38,13 +38,13 @@ cargo xtask web --serve 8765                          # the web app on http://12
 
 | Variable | Effect |
 |---|---|
-| `FILMCRAFT_CONTROL_PORT` | Same as `--control <port>` |
-| `FILMCRAFT_CPU_COMPOSITE=1` | Disables the GPU compositor |
-| `FILMCRAFT_DATA_DIR` | Same as `--data-dir <dir>`: auto-save, crash recovery, settings and logs |
+| `WALTCUT_CONTROL_PORT` | Same as `--control <port>` |
+| `WALTCUT_CPU_COMPOSITE=1` | Disables the GPU compositor |
+| `WALTCUT_DATA_DIR` | Same as `--data-dir <dir>`: auto-save, crash recovery, settings and logs |
 | `RUST_LOG` | Log levels for standard error and the log file (see [Logs](#logs)) |
 
-`filmcraft --help` lists the app's options. An option it does not know, or a control port that is
-not a number (from `--control` or from `FILMCRAFT_CONTROL_PORT`), is an error on stderr with exit
+`waltcut --help` lists the app's options. An option it does not know, or a control port that is
+not a number (from `--control` or from `WALTCUT_CONTROL_PORT`), is an error on stderr with exit
 code 2 instead of a window.
 
 Dev builds compile dependencies at `opt-level = 2` and workspace crates at `opt-level = 1`. For
@@ -52,18 +52,18 @@ playback and codec speed, use `--release`.
 
 ### Logs
 
-The desktop app writes its `log` records to standard error and to `Logs/filmcraft.log` in the data
-directory (`~/Library/Application Support/FilmCraft/Logs/`, or under `--data-dir` / `FILMCRAFT_DATA_DIR`), next to the crash logs; Help ▸ Reveal Log Files opens
+The desktop app writes its `log` records to standard error and to `Logs/waltcut.log` in the data
+directory (`~/Library/Application Support/WaltCut/Logs/`, or under `--data-dir` / `WALTCUT_DATA_DIR`), next to the crash logs; Help ▸ Reveal Log Files opens
 the folder. A start from a desktop menu or the Dock has no terminal, so this file is what to attach
 to a bug report: GPU compositor fallbacks, audio output problems, panicked frame jobs and container
-warnings all land there. Each launch moves the previous log to `filmcraft.1.log` (and that one to
-`filmcraft.2.log`), so the log of a run that crashed survives the next start. The file stops growing
+warnings all land there. Each launch moves the previous log to `waltcut.1.log` (and that one to
+`waltcut.2.log`), so the log of a run that crashed survives the next start. The file stops growing
 at 16 MiB. `--help`, `--version` and command-line errors write no file.
 
-By default FilmCraft's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces
+By default WaltCut's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces
 that with env_logger-style directives, for example `RUST_LOG=debug`,
 `RUST_LOG=warn,waltcut_codecs=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*`
-covers every target starting with it (`filmcraft*=debug`). The logger is
+covers every target starting with it (`waltcut*=debug`). The logger is
 `apps/waltcut/src/logging.rs`; the realtime audio callbacks do not log. The web app logs to the
 browser console instead.
 
@@ -83,7 +83,7 @@ resolve from there. `crates/text/build.rs` reads its `fonts/manifest.txt` and em
 `waltcut_text::fonts::CRAFT_FONTS` (all of them). The Japanese ones become the last fallback of every UI font family
 (`crates/ui-egui/src/theme.rs`, BIZ UDPGothic first) and fallback faces in the text engine (Gothic
 for sans text, Mincho for serif text). Without `CRAFT_FONTS_DIR`, `CRAFT_FONTS` is empty and
-FilmCraft uses its bundled and system fonts. A `CRAFT_FONTS_DIR` that is not a checkout is a build
+WaltCut uses its bundled and system fonts. A `CRAFT_FONTS_DIR` that is not a checkout is a build
 warning, or an error with `CRAFT_FONTS_REQUIRED=1` (release builds set both). Tests on these fonts'
 glyphs skip when it is empty; when you touch fonts, run the gates both with and without it.
 
@@ -187,7 +187,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
   The codecs unit-test generators use their source text as that signature: edits invalidate old
   dimensions/codec settings without deleting another worktree's fixtures. Include external input
   content/version in the signature too when a recipe uses it; an unchanged filename is not a cache key.
-- `.mcp.json` points at `target/release/filmcraft-cli`. With a custom target dir, use your own path.
+- `.mcp.json` points at `target/release/waltcut-cli`. With a custom target dir, use your own path.
 
 ## 7. How to add…
 
@@ -215,7 +215,7 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
    case.
 3. Frontend-only actions (tools, zoom, panels) go in `UI_COMMANDS` in
    `crates/ui-egui/src/menus.rs` with a branch in `menus::invoke`.
-4. The command now appears in menus (from `menu`), shortcuts, `filmcraft-cli commands`,
+4. The command now appears in menus (from `menu`), shortcuts, `waltcut-cli commands`,
    `engine.commands` and MCP `command_list` without further work.
 
 ### Effect parameters
@@ -305,7 +305,7 @@ In short:
   traced or "inspired-by" copies.
 - Open licences only (MIT, Apache-2.0, BSD, ISC, zlib, OFL, CC0, CC BY, CC BY-SA, or your own
   work under MIT OR Apache-2.0). No NC or ND licences. If the licence is unclear, leave the asset out.
-- Screenshots show only FilmCraft (or other open projects) with media we generated or that is
+- Screenshots show only WaltCut (or other open projects) with media we generated or that is
   openly licensed.
 
 - **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), not here.**

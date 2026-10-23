@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-ui-egui"
-description = "The FilmCraft egui frontend (swappable): panels, docking, timeline, monitors, control channel"
+description = "The WaltCut egui frontend (swappable): panels, docking, timeline, monitors, control channel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

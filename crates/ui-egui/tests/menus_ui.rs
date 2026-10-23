@@ -9,11 +9,11 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::project::ItemId;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -22,7 +22,7 @@ impl Driver {
         let mut s = Session::default();
         s.execute("file.openDemoProject", json!({})).unwrap();
         let (tx, rx) = channel();
-        let mut app = FilmcraftApp::new(s).with_control(rx);
+        let mut app = WaltCutApp::new(s).with_control(rx);
         // never hand paths to the real OS opener from a test
         app.hooks.open_path = Some(Box::new(|_, _| Ok(())));
         let harness = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000).build_eframe(move |_cc| app);
@@ -79,7 +79,7 @@ impl Driver {
         v.as_array().unwrap().iter().any(|e| e["id"] == json!(id))
     }
 
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 
@@ -307,8 +307,8 @@ fn reveal_in_finder_opens_an_imported_clip() {
 fn saved_projects_are_listed_in_home_and_open_recent() {
     let dir = std::env::temp_dir().join(format!("fc-ui-recent-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let a = dir.join("first cut.fcproj").to_string_lossy().to_string();
-    let b = dir.join("second cut.fcproj").to_string_lossy().to_string();
+    let a = dir.join("first cut.waltcut").to_string_lossy().to_string();
+    let b = dir.join("second cut.waltcut").to_string_lossy().to_string();
     let mut d = Driver::new();
     d.exec("file.saveAs", json!({"path": a}));
     d.exec("file.newProject", json!({"name": "Second"}));
@@ -316,7 +316,7 @@ fn saved_projects_are_listed_in_home_and_open_recent() {
     let menus = d.ok("ui.menu.list", json!({}));
     let recent: Vec<&Value> = menus.as_array().unwrap().iter().filter(|m| m["path"] == json!(["File", "Open Recent"])).collect();
     let labels: Vec<&str> = recent.iter().map(|m| m["label"].as_str().unwrap()).collect();
-    assert_eq!(labels, ["second cut.fcproj", "first cut.fcproj", "Clear Recent Files"]);
+    assert_eq!(labels, ["second cut.waltcut", "first cut.waltcut", "Clear Recent Files"]);
     assert_eq!(recent[0]["id"], "file.openRecent.0");
     // File ▸ Open Recent reopens the older one, which moves to the top
     d.menu("file.openRecent.1");
@@ -326,7 +326,7 @@ fn saved_projects_are_listed_in_home_and_open_recent() {
     d.click("header.home");
     let rows = d.ok("ui.elements", json!({"prefix": "import.recent."}));
     let rows: Vec<&str> = rows.as_array().unwrap().iter().map(|e| e["label"].as_str().unwrap()).collect();
-    assert_eq!(rows, ["first cut.fcproj", "second cut.fcproj"]);
+    assert_eq!(rows, ["first cut.waltcut", "second cut.waltcut"]);
     d.click("import.recent.1");
     assert_eq!(d.app().session.path.as_deref(), Some(b.as_str()));
     // Clear Recent Files empties both lists

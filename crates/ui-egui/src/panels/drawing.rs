@@ -14,7 +14,7 @@ use waltcut_geom::{Affine, Vec2};
 use waltcut_project::drawing::{Brush, Drawing, Stroke};
 use waltcut_project::{ClipId, TrackItem};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 
 /// What a stroke on a frame that does not start a cel draws into.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ struct Mapping {
 }
 
 impl Mapping {
-    fn new(app: &FilmcraftApp, item: &TrackItem, pic: Rect, frame: (u32, u32)) -> Option<Mapping> {
+    fn new(app: &WaltCutApp, item: &TrackItem, pic: Rect, frame: (u32, u32)) -> Option<Mapping> {
         let seq = app.session.active_sequence()?;
         let src = app.session.project.source_size(item.item)?;
         let par = app.session.project.source_par(item.item);
@@ -164,7 +164,7 @@ fn paint_cel(painter: &egui::Painter, map: &Mapping, strokes: &[Stroke], tint: O
 }
 
 /// The drawing clip the Brush tool paints on, with its drawing.
-fn target(app: &FilmcraftApp) -> Option<(ClipId, TrackItem, Drawing)> {
+fn target(app: &WaltCutApp) -> Option<(ClipId, TrackItem, Drawing)> {
     let clip = waltcut_engine::drawing::target_clip(&app.session, &Value::Null)?;
     let seq = app.session.active_sequence()?;
     let (_, it) = seq.find_item(clip)?;
@@ -173,7 +173,7 @@ fn target(app: &FilmcraftApp) -> Option<(ClipId, TrackItem, Drawing)> {
 }
 
 /// Current pen pressure: the host's tablet hook, else touch force from this frame, else full.
-fn pressure(app: &FilmcraftApp, ui: &egui::Ui) -> f32 {
+fn pressure(app: &WaltCutApp, ui: &egui::Ui) -> f32 {
     if !app.ui.brush.pressure {
         return 1.0;
     }
@@ -189,14 +189,14 @@ fn pressure(app: &FilmcraftApp, ui: &egui::Ui) -> f32 {
     .unwrap_or(1.0)
 }
 
-fn run(app: &mut FilmcraftApp, cmd: &str, p: Value) {
+fn run(app: &mut WaltCutApp, cmd: &str, p: Value) {
     if let Err(e) = app.session.execute(cmd, p) {
         app.ui.status = e.to_string();
     }
 }
 
 /// The Brush tool options bar, top-left over the picture.
-fn options_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, has_target: bool) -> Rect {
+fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: bool) -> Rect {
     let area = egui::Area::new(egui::Id::new("brush-options")).fixed_pos(pic.min + vec2(8.0, 8.0)).order(egui::Order::Foreground);
     let pen = app.hooks.pen_pressure.as_ref().and_then(|f| f());
     let tablet = pen.is_some();
@@ -260,7 +260,7 @@ fn options_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, has_target:
 }
 
 /// Draw the overlay and handle the Brush tool on the Program monitor picture `pic`.
-pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
+pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
     let tgt = target(app);
     let bar = options_bar(app, ui, pic, tgt.is_some());
     let Some((clip, item, d)) = tgt else {

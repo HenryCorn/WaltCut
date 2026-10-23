@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-WaltCut has one shortcut map, **FilmCraft Default** (Edit ▸ Keyboard Shortcuts…). It is each
+WaltCut has one shortcut map, **WaltCut Default** (Edit ▸ Keyboard Shortcuts…). It is each
 command's own default key plus the tables in `crates/engine/src/shortcut_presets.rs`: `EXTRA_KEYS`
 (application-wide keys for commands with no default key of their own, adopted when the key is free)
 and `PANEL_KEYS` (panel-scoped keys). You can edit bindings and save your own presets; there are no
@@ -8,7 +8,7 @@ other built-in presets.
 
 Every entry names a command id. Engine commands run through `Session::execute`; UI commands (frames,
 panels, monitor zoom, Project panel navigation) run through `menus::invoke`. Both are reachable by id
-from the CLI (`filmcraft-cli exec <id>`), the control channel (`engine.execute` / `ui.menu.invoke`)
+from the CLI (`waltcut-cli exec <id>`), the control channel (`engine.execute` / `ui.menu.invoke`)
 and MCP (`command_run`).
 
 Tests: `crates/engine/src/keyboard_tests.rs` (no key used twice in one scope; behaviour of the
@@ -40,5 +40,5 @@ Original, Make Subclip, Audio Channels, the Graphics New Layer / Arrange / Selec
 Program monitor Show Rulers / Show Guides / Snap / Lock Guides, New Bin From Selection, Paste and
 Paste Insert in the Timeline, the Audio Track Mixer Loop).
 
-FilmCraft Default keeps its own keys where they differ (Shift+E is Clip ▸ Enable there, so Export
+WaltCut Default keeps its own keys where they differ (Shift+E is Clip ▸ Enable there, so Export
 Frame has no default key).

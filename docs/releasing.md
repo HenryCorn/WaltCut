@@ -1,11 +1,16 @@
-# Releasing FilmCraft
+# Releasing WaltCut
 
-Every push to the `release` branch runs `.github/workflows/release.yml`. The workflow builds
-the macOS installer and creates or updates a **draft**
-GitHub Release named `FilmCraft v<version>`. Nobody sees a draft until a maintainer publishes it.
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`. It builds the macOS (Apple silicon)
+installer and creates a **draft** GitHub Release named `WaltCut X.Y.Z`. Nobody sees a draft until a
+maintainer publishes it.
 
-User-facing names say **FilmCraft**. Files, binaries and ids stay lowercase
-(`filmcraft-<version>-<platform>-<arch>.<ext>`, `ai.storyteller.filmcraft`).
+User-facing names say **WaltCut**. Files, binaries and ids stay lowercase
+(`waltcut-<version>-<platform>-<arch>.<ext>`, `io.github.henrycorn.waltcut`).
+
+The first releases are **unsigned**: the app is ad-hoc signed, not notarized, so Gatekeeper asks
+for **right-click ▸ Open** the first time (the release notes say so). Signing and notarization
+come later with an Apple Developer ID; `packaging/macos/package.sh` already supports them through
+the environment variables below.
 
 ## Cutting a release
 
@@ -13,81 +18,49 @@ User-facing names say **FilmCraft**. Files, binaries and ids stay lowercase
    in the root `Cargo.toml`; every crate inherits it and the packaging scripts read it from there:
 
    ```sh
-   cargo xtask version                 # prints the current version, e.g. 0.2.1
-   cargo xtask version set 0.3.0       # or 0.3.0-rc.1; updates Cargo.toml and Cargo.lock
+   cargo xtask version                 # prints the current version, e.g. 0.1.0
+   cargo xtask version set 0.2.0       # or 0.2.0-rc.1; updates Cargo.toml and Cargo.lock
    ```
 
-   Commit the change (`Cargo.toml` + `Cargo.lock`) through the normal review flow, as a
-   `Release: FilmCraft v0.3.0` commit whose message says what changed for users.
-2. **Merge `main` into `release`** (or fast-forward it) and push. The workflow starts by itself.
-3. **Wait for the draft.** When every job is done (macOS notarization is the slow part), the
-   Releases page has a draft `FilmCraft v0.3.0`, targeting the pushed commit, with every artifact
-   and `SHA256SUMS.txt`. The notes are generated from the merged pull requests.
-4. **Check it.** Download an installer or two and read the job summaries. A `::warning::` there
-   means a signing secret was missing and that artifact is unsigned.
-5. **Publish** the draft in the GitHub UI. Publishing creates the `v0.3.0` tag. A version with a
-   pre-release suffix (`-rc.1`) is marked as a pre-release.
+   Commit the change (`Cargo.toml` + `Cargo.lock`) through the normal review flow.
+2. **Tag the merge commit** and push the tag: `git tag v0.2.0 && git push origin v0.2.0`. The
+   workflow refuses a tag that does not match the Cargo version.
+3. **Wait for the draft.** The Releases page gets a draft with the DMG, the CLI zip and
+   `SHA256SUMS.txt`, marked as a pre-release.
+4. **Check it.** Download the DMG, open it, and run the app on a clean Apple silicon Mac.
+5. **Publish** the draft in the GitHub UI.
 
-Pushing to `release` again before you publish rebuilds the same draft and replaces its assets.
-Once the draft is published, the workflow refuses to touch that version again: bump it first.
-
-**Test runs:** *Actions › Release › Run workflow* runs the whole pipeline by hand. The optional
-`version` input (such as `0.3.0-rc.1`) overrides `Cargo.toml` for that run only; each build job
-applies it with `cargo xtask version set` before building. The signing job (macOS)
-and the draft-release job run in the `release` environment, which only the `release` branch can
-use, so pick that branch for a full run. Run from any other branch, it is a dry run: the
-signing job is refused, and the draft-release job, which needs it, is skipped.
+**Test runs:** *Actions › Release › Run workflow* builds and uploads the artifacts to the run
+without creating a release.
 
 ## What gets built
 
 | Platform | Artifacts | Built on |
 |---|---|---|
-| macOS 11+ (universal: Apple silicon and Intel) | `filmcraft-<v>-macos-universal.dmg`, `filmcraft-cli-<v>-macos-universal.zip` | `macos-15` |
+| macOS 11+ (Apple silicon only) | `waltcut-<v>-macos-aarch64.dmg`, `waltcut-cli-<v>-macos-aarch64.zip` | `macos-15` |
 
-`filmcraft --version` and `filmcraft-cli --version` print the version from `Cargo.toml`.
+`waltcut --version` and `waltcut-cli --version` print the version from `Cargo.toml`.
 
-**Fonts.** Every build job checks out [craft-fonts](https://github.com/storytold/craft-fonts) at a
-pinned commit (the `ref:` of its craft-fonts checkout step, marked `# bump deliberately`) and builds
-with `CRAFT_FONTS_DIR` and `CRAFT_FONTS_REQUIRED=1`, so releases embed its Japanese fonts and fail
-rather than ship without them. The packages
-carry each embedded font's licence (`copy_font_licences` in `packaging/env.sh`). Bump the pins
-deliberately, in every job at once.
+**Fonts.** The build checks out [craft-fonts](https://github.com/storytold/craft-fonts) at the
+pinned commit in `CRAFT_FONTS_REF` (bump it deliberately) and builds with `CRAFT_FONTS_DIR`, so the
+release embeds its Japanese fonts. The packages carry each embedded font's licence
+(`copy_font_licences` in `packaging/env.sh`).
 
 ### macOS
 
-`packaging/macos/package.sh` builds `aarch64-apple-darwin` and `x86_64-apple-darwin` with
-`MACOSX_DEPLOYMENT_TARGET=11.0`, joins them with `lipo` and assembles `FilmCraft.app`:
+`packaging/macos/package.sh --arch aarch64` builds `aarch64-apple-darwin` with
+`MACOSX_DEPLOYMENT_TARGET=11.0` and assembles `WaltCut.app`:
 
-- `Info.plist` is generated from `Info.plist.in` (bundle id `ai.storyteller.filmcraft`, the
+- `Info.plist` is generated from `Info.plist.in` (bundle id `io.github.henrycorn.waltcut`, the
   version and the build commit).
-- **Signing** uses the hardened runtime and a secure timestamp, with the entitlements in
-  `entitlements.plist`. The Developer ID certificate is imported into a temporary keychain by
-  `packaging/macos/import-cert.sh`.
-- **Notarization:** the app is sent with `xcrun notarytool submit`, then the ticket is stapled
-  and checked with `stapler validate`. The app goes on a DMG (`hdiutil makehybrid`), which is
-  signed and notarized too. The universal `filmcraft-cli` is signed the same way, zipped, and the zip is notarized.
-  Its Finder window (background, icon size and positions) comes from
-  [`packaging/macos/dmg/`](../packaging/macos/dmg/README.md), and its volume is named `FilmCraft`
-  without the version, which the window's background needs; the DMG file name keeps the version.
+- **Signing** is ad hoc unless `MACOS_SIGN_IDENTITY` is set. A real identity uses the hardened
+  runtime and a secure timestamp, with the entitlements in `entitlements.plist`;
+  `packaging/macos/import-cert.sh` imports a Developer ID certificate into a temporary keychain.
+- **Notarization** runs when `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password) and
+  `APPLE_TEAM_ID` are set with a real identity: the app, then the DMG and the CLI zip, are sent
+  with `xcrun notarytool submit` and the tickets are stapled.
+- The app goes on a plain DMG (`hdiutil makehybrid`) with an Applications link. The volume is
+  named `WaltCut`; the DMG file name keeps the version.
 
-Locally, without certificates, the script signs ad hoc and skips notarization, which is enough to
+Locally, with no variables set, the script signs ad hoc and skips notarization, which is enough to
 check the bundle and the DMG on your own Mac (`packaging/macos/package.sh`).
-
-## The draft release
-
-The last job waits for every build, downloads their artifacts, writes `SHA256SUMS.txt` and creates
-the draft `FilmCraft v<version>` with notes generated from the merged pull requests. If the draft
-already exists, it replaces its assets and keeps it a draft. If that version is already published,
-the job fails and asks for a version bump (`cargo xtask version set`).
-
-## Secrets
-
-The macOS and draft-release jobs run in the `release` environment, which only the
-`release` branch can use and which holds the signing secrets. The other jobs sign nothing and get
-no secrets. Every secret is optional: a missing one produces unsigned artifacts and a
-warning, never a failed build.
-
-| Secret | Used for |
-|---|---|
-| `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD` | the Developer ID certificate (base64 `.p12`), imported into a temporary keychain |
-| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | notarization (`APPLE_PASSWORD` is an app-specific password) |

@@ -3,7 +3,7 @@
 //! sequence New Sequence From Clip makes of it in the Program monitor. Square pixels stay 4:3.
 //! Driven headless through the control channel.
 //!
-//! With `FILMCRAFT_UI_SHOTS=<dir>` the test also renders the UI with wgpu and writes `par-*.png`.
+//! With `WALTCUT_UI_SHOTS=<dir>` the test also renders the UI with wgpu and writes `par-*.png`.
 
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
@@ -12,11 +12,11 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_engine::project::{ItemId, ItemKind};
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     shots: Option<std::path::PathBuf>,
 }
@@ -24,8 +24,8 @@ struct Driver {
 impl Driver {
     fn new(session: Session) -> Self {
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
-        let shots = std::env::var_os("FILMCRAFT_UI_SHOTS").map(std::path::PathBuf::from);
+        let app = WaltCutApp::new(session).with_control(rx);
+        let shots = std::env::var_os("WALTCUT_UI_SHOTS").map(std::path::PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if shots.is_some() {
             b = b.wgpu().with_pixels_per_point(1.0);

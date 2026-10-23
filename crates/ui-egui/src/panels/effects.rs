@@ -2,11 +2,11 @@
 
 use egui::{Align2, Rect, Sense, pos2, vec2};
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::icons::{self, Icon};
 use crate::theme::Tokens;
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let sr = Rect::from_min_size(rect.min + vec2(8.0, 6.0), vec2(rect.width() - 16.0, 22.0));
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(sr));
@@ -33,7 +33,7 @@ pub(crate) fn tree_x(depth: usize) -> f32 {
     8.0 + depth as f32 * 16.0
 }
 
-fn folder_row(app: &mut FilmcraftApp, ui: &mut egui::Ui, filter: &str) -> bool {
+fn folder_row(app: &mut WaltCutApp, ui: &mut egui::Ui, filter: &str) -> bool {
     let t = app.tokens;
     let key = "Presets";
     let open = !filter.is_empty() || app.ui.expanded_fx.iter().any(|k| k == key);

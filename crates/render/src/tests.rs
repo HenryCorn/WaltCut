@@ -221,7 +221,7 @@ fn offline_slate_is_deterministic_and_marked() {
     assert!(px(0, 359)[0] >= FIELD[0] && px(0, 359)[1] <= 0x20, "{:?}", px(0, 359));
     // tiny sizes work (thumbnails)
     assert_eq!(slate_rgba8(8, 4, "x", OfflineReason::Unreadable).len(), 8 * 4 * 4);
-    if let Some(p) = std::env::var_os("FILMCRAFT_SLATE_PNG") {
+    if let Some(p) = std::env::var_os("WALTCUT_SLATE_PNG") {
         ::image::save_buffer(p, &a, 640, 360, ::image::ExtendedColorType::Rgba8).unwrap();
     }
 }

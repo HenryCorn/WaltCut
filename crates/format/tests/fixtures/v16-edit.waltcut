@@ -1,11 +1,11 @@
 {
-  "format": "filmcraft.project",
+  "format": "waltcut.project",
   "schema_version": 16,
-  "generator": "FilmCraft 0.10.0",
+  "generator": "WaltCut 0.10.0",
   "project": {
     "name": "Legacy Edit",
     "settings": {
-      "renderer": "FilmCraft GPU Acceleration (wgpu)",
+      "renderer": "WaltCut GPU Acceleration (wgpu)",
       "video_display": "Timecode",
       "audio_display_samples": true,
       "default_still_duration": 1270080000000,

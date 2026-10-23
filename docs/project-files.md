@@ -1,6 +1,6 @@
 # Project files
 
-FilmCraft projects are `.fcproj` files: UTF-8 JSON with an explicit schema version. Reading and
+WaltCut projects are `.waltcut` files: UTF-8 JSON with an explicit schema version. Reading and
 writing them is `crates/format` (`waltcut-format`); the engine's `file.*` commands use it.
 
 ## Format
@@ -9,7 +9,7 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 {
   "format": "filmcraft.project",
   "schema_version": 16,
-  "generator": "FilmCraft 0.1.0",
+  "generator": "WaltCut 0.1.0",
   "project": { "name": "…", "settings": { … }, "root": { … }, "items": { … }, "next_id": 48 },
   "view": { "open_sequences": [21, 50], "active_sequence": 50, "sequences": { "21": { "pps": 40.0, "scroll": 0.0, … } } }
 }
@@ -39,7 +39,7 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 
 The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 16, the
 baseline of the reduced app, and there is no migration code: a project written before it does not
-open. Earlier versions (1–15) are the FilmCraft and first WaltCut builds, up to the
+open. Earlier versions (1–15) are the WaltCut and first WaltCut builds, up to the
 [`v0.0.1-legacy`](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy) release.
 
 Opening an older file returns one error and does nothing else:
@@ -61,7 +61,7 @@ Opening an older file returns one error and does nothing else:
   (`crates/format`, `tests::hostile_documents_return_errors` and the fixtures tests).
 
 To change the schema from here: bump `SCHEMA_VERSION`, add a fixture of the new shape under
-`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v16-edit.fcproj`) passing.
+`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v16-edit.waltcut`) passing.
 A change that older builds would load but then silently drop on save needs the bump too. Whether
 to write a migration for a later schema is decided when that happens; none exists today.
 
@@ -69,8 +69,8 @@ to write a migration for a later schema is decided when that happens; none exist
 
 A file with a `schema_version` newer than the build supports is **refused**, not half-read:
 
-> this project was saved by a newer version of FilmCraft (project schema v17); this build reads up to
-> v16. Update FilmCraft to open it.
+> this project was saved by a newer version of WaltCut (project schema v17); this build reads up to
+> v16. Update WaltCut to open it.
 
 Reading it partially and saving it back would silently drop whatever the newer version added.
 
@@ -101,7 +101,7 @@ In the UI, Save / Save As / Save a Copy without a `path` show a file dialog.
 
 ## Auto Save
 
-Preferences ▸ Auto Save (Edit ▸ Preferences ▸ Auto Save…, ⌘,; FilmCraft ▸ Settings… on macOS) works
+Preferences ▸ Auto Save (Edit ▸ Preferences ▸ Auto Save…, ⌘,; WaltCut ▸ Settings… on macOS) works
 as follows:
 
 | Setting | Key | Default |
@@ -114,9 +114,9 @@ as follows:
 | Update it at least every N second(s) | `autoSave.recoveryIntervalSeconds` | 5 (1–600) |
 
 At each interval, if the project changed since the last auto-save, a copy is written to the
-`Auto-Save` folder next to the project as `<name>-YYYY-MM-DD_HH-MM-SS.fcproj` (local time). An
+`Auto-Save` folder next to the project as `<name>-YYYY-MM-DD_HH-MM-SS.waltcut` (local time). An
 unsaved project uses `<data dir>/Auto-Save/`. After each write the oldest copies beyond the limit are
-deleted. Only files named exactly `<name>-<timestamp>.fcproj` are ever deleted. An auto-save is an
+deleted. Only files named exactly `<name>-<timestamp>.waltcut` are ever deleted. An auto-save is an
 ordinary project file: open it with File ▸ Open Project. `file.listAutoSaves` lists them, newest
 first.
 
@@ -124,23 +124,23 @@ Project Settings ▸ Scratch Disks can send auto-saves (Project Auto Save), rend
 Previews), captured and generated media (Captured Audio and Video)
 and audio previews to another folder. A folder named in a project file is used only when it is
 inside the project's own folder or was chosen in Scratch Disks on this computer (remembered in
-`autoSave.scratchFolders`). Otherwise FilmCraft uses the default location and says so when the
+`autoSave.scratchFolders`). Otherwise WaltCut uses the default location and says so when the
 project opens. Folders on another computer or a device are never used.
 
 Preferences are stored in `<data dir>/preferences.json`. The `prefs.*` commands read and change them.
 
 ## Crash recovery
 
-Auto-save alone can lose up to one interval of work. FilmCraft also keeps a **recovery journal**:
+Auto-save alone can lose up to one interval of work. WaltCut also keeps a **recovery journal**:
 
 - Whenever the project has unsaved changes, a snapshot is written to
-  `<data dir>/Recovery/<started>-<pid>[-<n>]/snapshot.fcproj`, plus `session.json` (time, revision, project
+  `<data dir>/Recovery/<started>-<pid>[-<n>]/snapshot.waltcut`, plus `session.json` (time, revision, project
   name and path). It is written about 1 s after the last edit, or after at most
   `recoveryIntervalSeconds` while edits keep coming. Saving the project deletes the snapshot.
-- Each running FilmCraft holds an OS file lock on `<session>/lock`. When the process dies (crash,
+- Each running WaltCut holds an OS file lock on `<session>/lock`. When the process dies (crash,
   `kill -9`, power loss) the OS releases the lock.
 - At startup, every other session directory whose lock can be taken and that has a snapshot is a
-  recovery candidate. FilmCraft asks: *"FilmCraft quit unexpectedly while 'X' had unsaved changes.
+  recovery candidate. WaltCut asks: *"WaltCut quit unexpectedly while 'X' had unsaved changes.
   Recover unsaved changes from 2026-10-01 00:02:09?"*, with the buttons **Recover**, **Not Now** and
   **Discard**. Stale directories without a snapshot are removed. Journals of running sessions are
   never touched.
@@ -151,21 +151,21 @@ Auto-save alone can lose up to one interval of work. FilmCraft also keeps a **re
   (Quit, Cmd+Q or the window's close button) first asks *"Save changes to 'X' before closing?"*
   with **Cancel**, **Don't Save** and **Save** (Save on a never-saved project opens the Save dialog);
   Don't Save discards the changes and their snapshot. A quit that does not ask (the control
-  channel's `app.quit`, the OS ending the session) keeps the snapshot, marked `cleanExit`, and FilmCraft offers it on the next launch ("FilmCraft was
+  channel's `app.quit`, the OS ending the session) keeps the snapshot, marked `cleanExit`, and WaltCut offers it on the next launch ("WaltCut was
   closed while … had unsaved changes").
 
 Desktop flags: `--recover` recovers the newest candidate without asking. `--no-recover` starts
 without asking; the changes stay available through File ▸ Recover Unsaved Changes…. `--data-dir
-<dir>` (or `FILMCRAFT_DATA_DIR`) moves the data directory. The default is `~/Library/Application
-Support/FilmCraft` on macOS, `%APPDATA%\FilmCraft` on Windows, and `$XDG_DATA_HOME/filmcraft` or
-`~/.local/share/filmcraft` elsewhere. A `portable.txt` file next to the executable (the Windows
+<dir>` (or `WALTCUT_DATA_DIR`) moves the data directory. The default is `~/Library/Application
+Support/WaltCut` on macOS, `%APPDATA%\WaltCut` on Windows, and `$XDG_DATA_HOME/waltcut` or
+`~/.local/share/waltcut` elsewhere. A `portable.txt` file next to the executable (the Windows
 portable zip ships one) makes it `data` next to the executable instead.
 
 ### Cost
 
 The UI thread only gives the worker thread an `Arc<Project>`: the immutable snapshot the engine
 already keeps for undo, passed through a channel. JSON encoding and all file I/O run on the
-`filmcraft-autosave` thread. Measured on the development Mac (release build) with a 2,000-clip project
+`waltcut-autosave` thread. Measured on the development Mac (release build) with a 2,000-clip project
 (`cargo test --release -p waltcut-format --test fixtures -- --nocapture`):
 
 | Step | Time | Size |
@@ -198,7 +198,7 @@ UI automation ids: `recovery.recover`, `recovery.later`, `recovery.discard`, `re
 The Settings dialog (app menu ▸ Settings ▸ <category> on macOS, Edit ▸ Preferences
 elsewhere; General is Cmd+,; the window is titled "Preferences"). The values are user preferences,
 not project data: they live in `preferences.json` in the per-user data directory (written
-atomically on every change) and never touch the `.fcproj` schema. The file carries a `version`
+atomically on every change) and never touch the `.waltcut` schema. The file carries a `version`
 (currently 2); older files are migrated on load, unknown dropdown values, bad colours and
 out-of-range numbers are repaired to defaults/limits, and an unreadable file falls back to the
 defaults.
@@ -207,7 +207,7 @@ Every value is a dotted key whose first segment is its category: `timeline.still
 `labels.colors.rose.name`. `prefs.get` / `prefs.set` / `prefs.reset {category?}` reach them from the
 CLI, the control channel and MCP; `prefs.set` rejects values that are not one of a dropdown's
 choices. `prefs.schema {category?}` lists every category with its fields (label, kind, choices,
-range, unit, current value, and `wired`: whether FilmCraft acts on it yet). `app.settings.<category>`
+range, unit, current value, and `wired`: whether WaltCut acts on it yet). `app.settings.<category>`
 opens the dialog on a page.
 
 | Category | Takes effect |
@@ -219,7 +219,7 @@ opens the dialog on a page.
 | Auto Save | the auto-save ring and the crash-recovery journal |
 | Color | stored only (display colour management, EDR monitoring, HDR graphics white) |
 | Graphics | new text layers: smart quotes, ligatures, default font |
-| Labels | the 16 label names and colours (timeline, Project panel, Edit ▸ Label), label defaults for imported movies / video / audio / stills and new sequences, Label Color Presets: JSON files (`{"name", "labels": [16 × {"name", "color": "#rrggbb"}]}`) in `<data dir>/Label Presets`, built in: "Default" (the labels FilmCraft ships with), "Bright" (16 saturated hues) and "Roles" (B-Roll, Footage, Dialogue… named so the label defaults land on matching roles) (`labels.presets`, `labels.importPreset {path}`, `labels.exportPreset {path}`, `labels.deletePreset {name}`; `labels.preset` is the selected one) |
+| Labels | the 16 label names and colours (timeline, Project panel, Edit ▸ Label), label defaults for imported movies / video / audio / stills and new sequences, Label Color Presets: JSON files (`{"name", "labels": [16 × {"name", "color": "#rrggbb"}]}`) in `<data dir>/Label Presets`, built in: "Default" (the labels WaltCut ships with), "Bright" (16 saturated hues) and "Roles" (B-Roll, Footage, Dialogue… named so the label defaults land on matching roles) (`labels.presets`, `labels.importPreset {path}`, `labels.exportPreset {path}`, `labels.deletePreset {name}`; `labels.preset` is the selected one) |
 | Media | Indeterminate Media Timebase (frame rate of stills), Default Media Scaling (Scale to / Set to frame size when a clip of another size is edited in) |
 | Media Cache | location (`<data dir>/Media Cache` by default; unsaved projects' render previews live there), automatic deletion (older than N days / beyond N GB), Delete… (`mediaCache.clean {all?}`, `mediaCache.info`) |
 | Memory | frame cache budget of the monitors and thumbnails |
@@ -309,10 +309,10 @@ presets live in `<data dir>/effect-presets.json`, and `presets.export` / `preset
 write the same JSON format:
 
 ```json
-{"format": "filmcraft.effect-presets", "version": 1, "presets": [
+{"format": "waltcut.effect-presets", "version": 1, "presets": [
   {"name": "My Fade", "description": "", "keyframes": "AnchorToIn",
    "source_duration": 2540160000000, "source_size": [1920, 1080],
-   "effects": [ /* EffectInstance, exactly as in .fcproj: effect, enabled, params */ ]}
+   "effects": [ /* EffectInstance, exactly as in .waltcut: effect, enabled, params */ ]}
 ]}
 ```
 

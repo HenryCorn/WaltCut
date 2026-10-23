@@ -6,7 +6,7 @@ use waltcut_project::{Interpolation, TrackItem};
 use waltcut_time::{FrameRate, Tick};
 
 use crate::{
-    FilmcraftApp,
+    WaltCutApp,
     icons::{self, Icon},
     state::KeyframeRef,
 };
@@ -59,7 +59,7 @@ pub(crate) struct Interaction {
     cancelled: bool,
 }
 
-fn limits(app: &FilmcraftApp, keys: &[KeyframeRef]) -> Option<(i64, i64)> {
+fn limits(app: &WaltCutApp, keys: &[KeyframeRef]) -> Option<(i64, i64)> {
     let q = app.session.active_sequence()?;
     let frame = q.settings.frame_rate.frame_duration();
     let (mut low, mut high) = (i64::MIN, i64::MAX);
@@ -103,7 +103,7 @@ fn update(group: &mut Group, points: &[Point], pos: Pos2, shift: bool, playhead:
 }
 
 impl Interaction {
-    pub(crate) fn begin(app: &mut FilmcraftApp, ui: &mut egui::Ui, area: Rect, clip: u64) -> Self {
+    pub(crate) fn begin(app: &mut WaltCutApp, ui: &mut egui::Ui, area: Rect, clip: u64) -> Self {
         let mut state = ui.data(|d| d.get_temp::<State>(state_id())).unwrap_or_default();
         if state.clip != clip {
             state = State { clip, ..Default::default() };
@@ -138,7 +138,7 @@ impl Interaction {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn key(
         &mut self,
-        app: &mut FilmcraftApp,
+        app: &mut WaltCutApp,
         ui: &egui::Ui,
         key: KeyframeRef,
         it: &TrackItem,
@@ -203,7 +203,7 @@ impl Interaction {
         rect
     }
 
-    pub(crate) fn finish(mut self, app: &mut FilmcraftApp, ui: &egui::Ui) {
+    pub(crate) fn finish(mut self, app: &mut WaltCutApp, ui: &egui::Ui) {
         if let Some(Gesture::Marquee { origin, end, base }) = &self.state.gesture {
             let rect = Rect::from_two_pos(*origin, *end).intersect(self.area);
             let mut selected = base.clone();

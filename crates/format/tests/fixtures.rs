@@ -10,12 +10,12 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// The golden file: a project written by this schema, with media, a sequence, markers and effects.
 fn golden() -> Project {
-    decode(&fixture("v16-edit.fcproj")).unwrap().project
+    decode(&fixture("v16-edit.waltcut")).unwrap().project
 }
 
 #[test]
 fn golden_project_opens_and_round_trips_without_loss() {
-    let bytes = fixture("v16-edit.fcproj");
+    let bytes = fixture("v16-edit.waltcut");
     let l = decode(&bytes).unwrap();
     assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
@@ -41,7 +41,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 
 #[test]
 fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
-    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v16-edit.fcproj")).unwrap();
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v16-edit.waltcut")).unwrap();
     for (path, value) in [
         ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
         ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
@@ -62,12 +62,12 @@ fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
 /// reading it changes nothing: the bytes are hashed before and after, on disk.
 #[test]
 fn pre_reduction_project_is_refused_and_left_untouched() {
-    let dir = std::env::temp_dir().join(format!("filmcraft-old-project-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("waltcut-old-project-{}", std::process::id()));
     let autosave = dir.join(waltcut_format::autosave::AUTO_SAVE_DIR);
     std::fs::create_dir_all(&autosave).unwrap();
-    let files = [dir.join("old.fcproj"), autosave.join("old-2026-10-01_10-00-00.fcproj"), dir.join("old (schema v1 backup).fcproj")];
+    let files = [dir.join("old.waltcut"), autosave.join("old-2026-10-01_10-00-00.waltcut"), dir.join("old (schema v1 backup).waltcut")];
     for f in &files {
-        std::fs::write(f, fixture("v15-edit.fcproj")).unwrap();
+        std::fs::write(f, fixture("v15-edit.waltcut")).unwrap();
     }
     let hash = |p: &std::path::Path| {
         use std::hash::{Hash, Hasher};
@@ -89,18 +89,18 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
 
 #[test]
 fn bare_pre_envelope_project_is_refused() {
-    let e = decode(&fixture("v1-minimal.fcproj")).unwrap_err();
+    let e = decode(&fixture("v1-minimal.waltcut")).unwrap_err();
     assert!(matches!(e, FormatError::TooOld { found: 1, .. }), "{e}");
 }
 
 #[test]
 fn future_schema_is_refused_with_a_clear_error() {
-    let mut v: serde_json::Value = serde_json::from_slice(&fixture("v1-minimal.fcproj")).unwrap();
+    let mut v: serde_json::Value = serde_json::from_slice(&fixture("v1-minimal.waltcut")).unwrap();
     // A bare v1-shaped project claiming a future `version` is refused too.
     v["version"] = 99.into();
     let e = decode(&serde_json::to_vec(&v).unwrap()).unwrap_err();
     assert!(matches!(e, FormatError::TooNew { found: 99, .. }), "{e}");
-    assert!(e.to_string().contains("Update FilmCraft"));
+    assert!(e.to_string().contains("Update WaltCut"));
 }
 
 #[test]
@@ -202,9 +202,9 @@ fn large_project_roundtrip_and_timing() {
     let decode_ms = t0.elapsed().as_secs_f64() * 1000.0;
     assert_eq!(back.project, p);
     let t0 = std::time::Instant::now();
-    let dir = std::env::temp_dir().join(format!("filmcraft-big-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("waltcut-big-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    waltcut_format::atomic_write(&dir.join("big.fcproj"), &compact).unwrap();
+    waltcut_format::atomic_write(&dir.join("big.waltcut"), &compact).unwrap();
     let write_ms = t0.elapsed().as_secs_f64() * 1000.0;
     std::fs::remove_dir_all(&dir).unwrap();
     println!(

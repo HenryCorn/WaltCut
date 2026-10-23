@@ -16,7 +16,7 @@
 //! are converted on import: their `Ctrl` is the primary modifier (`Cmd`) and `Win`/`Meta` maps to
 //! the macOS Control key.
 //!
-//! Built-in preset: **FilmCraft Default** (each command's default plus the extra editing keys,
+//! Built-in preset: **WaltCut Default** (each command's default plus the extra editing keys,
 //! see [`Shortcuts::audit`] and [`crate::shortcut_presets`]). Custom presets are JSON files in
 //! `<data dir>/Keyboard Shortcuts/`; the active set persists in `active.json` there.
 //!
@@ -39,10 +39,10 @@ pub const APPLICATION: &str = "Application";
 pub const PANELS: &[&str] =
     &["Timeline", "Program", "Source", "Project", "Effect Controls", "Effects", "History", "Markers", "Essential Graphics", "Properties"];
 
-pub const DEFAULT_PRESET: &str = "FilmCraft Default";
+pub const DEFAULT_PRESET: &str = "WaltCut Default";
 pub const BUILTIN_PRESETS: [&str; 1] = [DEFAULT_PRESET];
 
-const FILE_FORMAT: &str = "filmcraft-keyboard-shortcuts";
+const FILE_FORMAT: &str = "waltcut-keyboard-shortcuts";
 const DIR_NAME: &str = "Keyboard Shortcuts";
 const ACTIVE_FILE: &str = "active.json";
 
@@ -449,7 +449,7 @@ pub struct PresetFile {
     pub format: String,
     pub version: u32,
     pub name: String,
-    /// The OS the key names were written for; None = canonical (FilmCraft) notation.
+    /// The OS the key names were written for; None = canonical (WaltCut) notation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform: Option<Platform>,
     /// `active.json` only: the active set differs from the preset it started from.
@@ -542,7 +542,7 @@ impl Shortcuts {
 
     // ---------------------------------------------------------------- presets
 
-    /// Default bindings of every known command, plus FilmCraft's panel shortcuts.
+    /// Default bindings of every known command, plus WaltCut's panel shortcuts.
     fn base_defaults(&self) -> Vec<Binding> {
         let mut out = Vec::new();
         for c in self.commands() {
@@ -550,7 +550,7 @@ impl Shortcuts {
                 out.push(Binding::new(&c.id, k, p.as_deref()));
             }
         }
-        for (c, k, p) in presets::FILMCRAFT_PANEL.iter().chain(presets::PANEL_KEYS) {
+        for (c, k, p) in presets::WALTCUT_PANEL.iter().chain(presets::PANEL_KEYS) {
             if self.known(c) {
                 out.push(Binding::new(c, k, panel_opt(p)));
             }
@@ -1050,7 +1050,7 @@ fn read_file(path: &Path) -> std::result::Result<PresetFile, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let f: PresetFile = serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
     if f.format != FILE_FORMAT {
-        return Err(format!("{}: not a FilmCraft keyboard shortcuts file", path.display()));
+        return Err(format!("{}: not a WaltCut keyboard shortcuts file", path.display()));
     }
     Ok(f)
 }

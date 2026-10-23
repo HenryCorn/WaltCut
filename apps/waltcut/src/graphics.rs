@@ -71,7 +71,7 @@ pub enum Mode {
     /// DirectX 12 only (Windows), for Vulkan drivers that crash at start-up.
     Dx12,
     /// A software adapter (WARP on Windows, lavapipe / llvmpipe elsewhere); the preview then
-    /// composites on the CPU (`FilmcraftApp::set_wgpu`).
+    /// composites on the CPU (`WaltCutApp::set_wgpu`).
     Software,
 }
 
@@ -662,7 +662,7 @@ mod tests {
     }
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("filmcraft-graphics-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("waltcut-graphics-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
     }

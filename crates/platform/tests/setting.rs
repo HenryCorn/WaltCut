@@ -17,7 +17,7 @@ fn off_uses_the_software_decoder() {
 
     waltcut_codecs::hw::set_hardware_decoding(false);
     let d = waltcut_codecs::make_video_decoder(&s.entry).unwrap();
-    assert_eq!(d.name(), "FilmCraft HEVC");
+    assert_eq!(d.name(), "WaltCut HEVC");
     let bytes: std::sync::Arc<[u8]> = std::fs::read(&path).unwrap().into();
     let (g0, h0) = (waltcut_codecs::gop_stats(), waltcut_codecs::hw::hw_stats());
     let src = waltcut_codecs::open_bytes("hevc_main.mp4", bytes.clone()).unwrap();
@@ -33,7 +33,7 @@ fn off_uses_the_software_decoder() {
     let hw = waltcut_platform::hardware_decoder_for(&s.entry);
     if !hw {
         eprintln!("SKIPPED (Auto half): no hardware decoder ({available:?})");
-        assert_eq!(d.name(), "FilmCraft HEVC");
+        assert_eq!(d.name(), "WaltCut HEVC");
         return;
     }
     // Linux has two backends (NVDEC in front of VA-API): `register` reports the front one, but

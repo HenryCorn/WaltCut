@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-engine"
-description = "FilmCraft engine façade: session, command registry, history, media pool"
+description = "WaltCut engine façade: session, command registry, history, media pool"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

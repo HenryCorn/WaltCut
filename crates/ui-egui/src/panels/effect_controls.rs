@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use waltcut_project::{ClipId, EffectInstance, ParamKind, ParamValue, TrackItem, TrackKind};
 use waltcut_time::Tick;
 
-use crate::FilmcraftApp;
+use crate::WaltCutApp;
 use crate::icons::{self, Icon};
 use crate::state::KeyframeRef;
 use crate::theme::Tokens;
@@ -61,7 +61,7 @@ fn keyframe_exists(it: &TrackItem, k: &KeyframeRef) -> bool {
 
 /// Edit ▸ Select All (⌘A) with Effect Controls focused selects every keyframe the panel shows
 /// instead of the Timeline's clips (#1241). False when the panel is not focused or shows none.
-pub(crate) fn select_all_keyframes(app: &mut FilmcraftApp) -> bool {
+pub(crate) fn select_all_keyframes(app: &mut WaltCutApp) -> bool {
     if app.ui.focused != crate::dock::PanelKind::EffectControls {
         return false;
     }
@@ -83,7 +83,7 @@ pub(crate) fn select_all_keyframes(app: &mut FilmcraftApp) -> bool {
 
 /// The selected clip (video first) and the audio linked to it when that audio is selected or
 /// linked selection is on, so clip Volume stays visible on A/V pairs.
-fn selected_clips(app: &FilmcraftApp) -> Vec<(ClipId, TrackItem, TrackKind)> {
+fn selected_clips(app: &WaltCutApp) -> Vec<(ClipId, TrackItem, TrackKind)> {
     let Some(seq) = app.session.active_sequence() else { return Vec::new() };
     let picked: Vec<(ClipId, &TrackItem, TrackKind)> = app
         .session
@@ -112,7 +112,7 @@ fn selected_clips(app: &FilmcraftApp) -> Vec<(ClipId, TrackItem, TrackKind)> {
     out
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let clips = selected_clips(app);
     // keep only selected keyframes that still exist on a clip shown here
@@ -343,7 +343,7 @@ pub(crate) fn fit_to_row(ui: &mut egui::Ui) {
     ui.spacing_mut().button_padding.y = 1.0;
 }
 
-fn seq_name(app: &FilmcraftApp) -> String {
+fn seq_name(app: &WaltCutApp) -> String {
     app.session.state.active_sequence.and_then(|s| app.session.project.item(s)).map(|i| i.name.clone()).unwrap_or_default()
 }
 
@@ -404,7 +404,7 @@ fn paint_ruler(p: &egui::Painter, ruler: Rect, it: &TrackItem, rate: waltcut_tim
 /// Returns whether the diamond was clicked; the arrows queue their own `playhead.set`.
 #[allow(clippy::too_many_arguments)]
 fn keyframe_nav(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     at: Pos2,
     param: Option<&waltcut_project::Param>,
@@ -453,7 +453,7 @@ fn keyframe_nav(
 /// the clip does not have yet (Crop) is applied first.
 #[allow(clippy::too_many_arguments)]
 fn properties_nav(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     row: Rect,
     clip: ClipId,
@@ -478,7 +478,7 @@ fn properties_nav(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn param_row(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     body: Rect,
     clip: ClipId,
@@ -665,7 +665,7 @@ pub(crate) fn param_row(
 }
 
 /// Shared by the lane diamonds and graph points: commands use media time.
-fn keyframe_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, target: KeyframeRef, actions: &mut Vec<(String, Value)>) {
+fn keyframe_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, target: KeyframeRef, actions: &mut Vec<(String, Value)>) {
     let params = json!({"clip": target.clip, "effect": target.effect, "param": target.param, "mediaTime": target.time.0});
     ui.label(egui::RichText::new(tl!("Temporal Interpolation")).color(app.tokens.text_dim));
     for (label, key) in [
@@ -696,7 +696,7 @@ fn keyframe_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, target: KeyframeRef,
 }
 
 /// Properties panel (Premiere 26): a compact inspector for the selected clip.
-pub fn properties_panel(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+pub fn properties_panel(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let clips = selected_clips(app);
     let Some((clip, it, kind)) = clips.first().cloned() else {
@@ -718,7 +718,7 @@ pub fn properties_panel(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.painter().text(pos2(r.min.x + 18.0, r.center().y), Align2::LEFT_CENTER, label, Tokens::ui(12.0), t.text_dim);
         r
     };
-    let section = |ui: &mut egui::Ui, app: &mut FilmcraftApp, name: &str, reset: Option<(usize, u64)>, actions: &mut Vec<(String, Value)>| -> bool {
+    let section = |ui: &mut egui::Ui, app: &mut WaltCutApp, name: &str, reset: Option<(usize, u64)>, actions: &mut Vec<(String, Value)>| -> bool {
         ui.add_space(4.0);
         let key = format!("props:{name}");
         let open = !app.ui.collapsed_fx.contains(&key);
@@ -847,7 +847,7 @@ pub(crate) fn row_fill(r: Rect) -> Rect {
 /// with no value change — so a Scale scrub that pauses between percents is still one undo (#887). A
 /// change that brings its own `merge` key (a Program monitor handle changing several parameters)
 /// keeps it.
-pub(crate) fn run(app: &mut FilmcraftApp, ctx: &egui::Context, actions: Vec<(String, Value)>) {
+pub(crate) fn run(app: &mut WaltCutApp, ctx: &egui::Context, actions: Vec<(String, Value)>) {
     let (down, press) = ctx.input(|i| (i.pointer.any_down(), i.pointer.press_start_time()));
     let key = egui::Id::new("effect-controls-drag-step");
     let begun = ctx.data(|d| d.get_temp::<Option<f64>>(key)).flatten();
@@ -896,7 +896,7 @@ fn graph_components(v: &ParamValue) -> Vec<f64> {
 /// Keyframes drag vertically (value); Bezier influence handles drag horizontally.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn graph_rows(
-    app: &mut FilmcraftApp,
+    app: &mut WaltCutApp,
     ui: &mut egui::Ui,
     body: Rect,
     clip: ClipId,
@@ -1114,9 +1114,9 @@ mod drag_undo_tests {
         let mut s = waltcut_engine::Session::default();
         s.execute("file.openDemoProject", json!({})).unwrap();
         let clip = s.active_sequence().unwrap().video_tracks[0].items[0].id.0;
-        let mut app = crate::FilmcraftApp::new(s);
+        let mut app = crate::WaltCutApp::new(s);
         let ctx = egui::Context::default();
-        let opacity = |app: &crate::FilmcraftApp| {
+        let opacity = |app: &crate::WaltCutApp| {
             let q = app.session.active_sequence().unwrap();
             let it = q.find_item(waltcut_project::ClipId(clip)).unwrap().1;
             it.effects.iter().find(|e| e.effect == "opacity").unwrap().params["opacity"].value.as_f64().unwrap()
@@ -1125,7 +1125,7 @@ mod drag_undo_tests {
         let pos = egui::pos2(10.0, 10.0);
         let button = |pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         let mut time = 0.0;
-        let mut frame = |app: &mut crate::FilmcraftApp, events: Vec<egui::Event>, value: Option<f64>| {
+        let mut frame = |app: &mut crate::WaltCutApp, events: Vec<egui::Event>, value: Option<f64>| {
             time += 0.1;
             let raw = egui::RawInput { time: Some(time), events, ..Default::default() };
             let mut out = ctx.run_ui(raw, |ui| {
@@ -1155,9 +1155,9 @@ mod drag_undo_tests {
         let mut s = waltcut_engine::Session::default();
         s.execute("file.openDemoProject", json!({})).unwrap();
         let clip = s.active_sequence().unwrap().video_tracks[0].items[0].id.0;
-        let mut app = crate::FilmcraftApp::new(s);
+        let mut app = crate::WaltCutApp::new(s);
         let ctx = egui::Context::default();
-        let scale = |app: &crate::FilmcraftApp| {
+        let scale = |app: &crate::WaltCutApp| {
             let q = app.session.active_sequence().unwrap();
             let it = q.find_item(waltcut_project::ClipId(clip)).unwrap().1;
             it.effects.iter().find(|e| e.effect == "motion").unwrap().params["scale"].value.as_f64().unwrap()
@@ -1166,7 +1166,7 @@ mod drag_undo_tests {
         let pos = egui::pos2(10.0, 10.0);
         let button = |pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         let mut time = 0.0;
-        let mut frame = |app: &mut crate::FilmcraftApp, events: Vec<egui::Event>, value: Option<f64>| {
+        let mut frame = |app: &mut crate::WaltCutApp, events: Vec<egui::Event>, value: Option<f64>| {
             time += 0.1;
             let raw = egui::RawInput { time: Some(time), events, ..Default::default() };
             let mut out = ctx.run_ui(raw, |ui| {
@@ -1210,7 +1210,7 @@ mod lane_tests {
         s.execute("timeline.select", json!({"clips": [clip.0]})).unwrap();
         s.execute("effects.toggleAnimation", json!({"clip": clip.0, "effect": "motion", "param": "scale"})).unwrap();
         let seq = s.state.active_sequence.unwrap();
-        let mut app = crate::FilmcraftApp::new(s);
+        let mut app = crate::WaltCutApp::new(s);
         let ctx = context();
         for duration in [0, -5 * waltcut_time::TICKS_PER_SECOND] {
             let project = std::sync::Arc::make_mut(&mut app.session.project);
@@ -1288,7 +1288,7 @@ mod graph_drag_tests {
     use waltcut_project::{Interpolation, Keyframe, Param};
 
     struct Driver {
-        app: FilmcraftApp,
+        app: WaltCutApp,
         ctx: egui::Context,
         clip: ClipId,
         time: f64,
@@ -1311,7 +1311,7 @@ mod graph_drag_tests {
             a.interp = Interpolation::Bezier;
             b.interp = Interpolation::Bezier;
             it.effects.iter_mut().find(|e| e.effect == "motion").unwrap().params.insert(param.into(), Param { value: from, keyframes: vec![a, b] });
-            let app = FilmcraftApp::new(session);
+            let app = WaltCutApp::new(session);
             let ctx = egui::Context::default();
             crate::theme::install(&ctx, &app.tokens);
             Self { app, ctx, clip, time: 0.0, param }

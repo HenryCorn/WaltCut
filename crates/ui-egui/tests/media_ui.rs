@@ -1,7 +1,7 @@
 //! Headless UI tests of media management: the Link Media dialog opening for a project whose media
 //! moved (search a folder, link, the others follow) and Locate.
 //!
-//! Set `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` to also render the window offscreen with wgpu and write PNGs
+//! Set `WALTCUT_UI_SNAPSHOT_DIR=<dir>` to also render the window offscreen with wgpu and write PNGs
 //! there (`media-*.png`).
 
 use std::path::{Path, PathBuf};
@@ -15,12 +15,12 @@ use waltcut_engine::project::{ItemKind, Label, MediaClip, MediaRef, Project, Seq
 use waltcut_media::generators::GeneratorSource;
 use waltcut_media::{DemoScene, Generator, MediaSource};
 use waltcut_time::{FrameRate, Tick, TimeRange};
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 fn tmp_dir(name: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let d = std::env::temp_dir().join(format!("filmcraft-ui-{name}-{}-{nanos}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("waltcut-ui-{name}-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }
@@ -59,7 +59,7 @@ fn make_movie(path: &Path, scene: DemoScene, w: u32, h: u32, frames: i64) {
     waltcut_engine::export::export(&Arc::new(p), seq, &settings, &provider, &Default::default()).unwrap();
 }
 
-/// `<root>/p.fcproj` with a sequence of `<root>/Media/{Harbour,Night}.mov`; the media folder is
+/// `<root>/p.waltcut` with a sequence of `<root>/Media/{Harbour,Night}.mov`; the media folder is
 /// then moved to `<root>/Moved/Media`.
 fn moved_project(root: &Path) -> String {
     let media = root.join("Media");
@@ -85,7 +85,7 @@ fn moved_project(root: &Path) -> String {
         at += d;
     }
     s.project = Arc::new(p);
-    let path = root.join("p.fcproj").to_string_lossy().into_owned();
+    let path = root.join("p.waltcut").to_string_lossy().into_owned();
     s.execute("file.save", json!({"path": path})).unwrap();
     drop(s); // Close decoder files before moving their directory on Windows.
     std::fs::create_dir_all(root.join("Moved")).unwrap();
@@ -94,7 +94,7 @@ fn moved_project(root: &Path) -> String {
 }
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     snapshots: Option<PathBuf>,
 }
@@ -102,8 +102,8 @@ struct Driver {
 impl Driver {
     fn new(session: Session) -> Self {
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
-        let snapshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(PathBuf::from);
+        let app = WaltCutApp::new(session).with_control(rx);
+        let snapshots = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if snapshots.is_some() {
             b = b.wgpu();
@@ -156,7 +156,7 @@ impl Driver {
         v.as_array().unwrap().iter().filter_map(|e| e["id"].as_str().map(str::to_string)).collect()
     }
 
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 
@@ -361,10 +361,10 @@ fn link_media_large_lists_and_long_paths_keep_actions_on_screen() {
             s.offline.missing.push(id);
         }
         s.project = Arc::new(p);
-        let mut app = FilmcraftApp::new(s);
+        let mut app = WaltCutApp::new(s);
         app.ui.link_media = Some(Default::default());
         let mut builder = Harness::builder().with_size(egui::vec2(width, height)).with_max_steps(10_000);
-        let snapshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(PathBuf::from);
+        let snapshots = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(PathBuf::from);
         if snapshots.is_some() {
             builder = builder.wgpu();
         }

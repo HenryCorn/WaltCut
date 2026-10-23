@@ -1,8 +1,8 @@
 //! Headless UI tests of the Sequence / Markers menu additions: the Add Tracks and Delete Tracks dialogs, the
 //! through-edit marks on the timeline, the Markers panel colour filter and the Shift+; gap key.
-//! The real `FilmcraftApp` under `egui_kittest`, driven over the control channel by automation id.
+//! The real `WaltCutApp` under `egui_kittest`, driven over the control channel by automation id.
 //!
-//! Set `FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` to also render the window offscreen with wgpu and write
+//! Set `WALTCUT_UI_SNAPSHOT_DIR=<dir>` to also render the window offscreen with wgpu and write
 //! `sequence-settings-*.png` there; without it no GPU is needed.
 
 use std::sync::mpsc::{Sender, channel};
@@ -10,11 +10,11 @@ use std::sync::mpsc::{Sender, channel};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
     snapshots: Option<std::path::PathBuf>,
 }
@@ -24,8 +24,8 @@ impl Driver {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
-        let snapshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
+        let app = WaltCutApp::new(session).with_control(rx);
+        let snapshots = std::env::var_os("WALTCUT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
         let mut b = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000);
         if snapshots.is_some() {
             b = b.wgpu();
@@ -73,7 +73,7 @@ impl Driver {
         self.frames(2);
     }
 
-    fn app(&mut self) -> &mut FilmcraftApp {
+    fn app(&mut self) -> &mut WaltCutApp {
         self.harness.state_mut()
     }
 
@@ -89,7 +89,7 @@ impl Driver {
         e["label"].as_str().unwrap_or_default().to_string()
     }
 
-    /// With `FILMCRAFT_UI_SNAPSHOT_DIR` set, render the window offscreen and write `<name>.png`,
+    /// With `WALTCUT_UI_SNAPSHOT_DIR` set, render the window offscreen and write `<name>.png`,
     /// cropped to the elements whose ids start with `prefix`.
     fn snapshot(&mut self, name: &str, prefix: &str) {
         let Some(dir) = self.snapshots.clone() else { return };
@@ -475,7 +475,7 @@ fn ctrl_x_cuts_clips() {
 }
 
 /// Sequence ▸ Sequence Settings… opens Premiere Pro's dialog (it used to do nothing, #172): the
-/// General tab shows the sequence's settings, the ones FilmCraft can't change yet are shown (greyed
+/// General tab shows the sequence's settings, the ones WaltCut can't change yet are shown (greyed
 /// out), and the Color Management and VR Properties tabs are there. Opening and cancelling change
 /// nothing.
 #[test]

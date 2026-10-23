@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-format"
-description = "FilmCraft .fcproj files: one schema, atomic saves, auto-save naming and rotation"
+description = "WaltCut .waltcut files: one schema, atomic saves, auto-save naming and rotation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

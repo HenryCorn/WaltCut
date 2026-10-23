@@ -10,13 +10,13 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
 use waltcut_ui_egui::{
-    FilmcraftApp,
+    WaltCutApp,
     control::ControlRequest,
     dock::{DockNode, PanelKind, SplitSize},
 };
 
 struct Driver {
-    h: Harness<'static, FilmcraftApp>,
+    h: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -25,7 +25,7 @@ impl Driver {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).unwrap();
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session);
+        let app = WaltCutApp::new(session);
         let app = if isolated { app.with_control_input_only(rx) } else { app.with_control(rx) };
         let mut driver = Self { h: Harness::builder().with_size(vec2(1400.0, 900.0)).build_eframe(move |_| app), tx };
         driver.frames(4, true);
@@ -62,7 +62,7 @@ impl Driver {
     }
 }
 
-fn native_key(h: &mut Harness<'_, FilmcraftApp>, key: Key) {
+fn native_key(h: &mut Harness<'_, WaltCutApp>, key: Key) {
     for pressed in [true, false] {
         // The backend supplies native events before raw_input_hook. Harness::event would
         // instead append them after that hook and bypass the input boundary under test.

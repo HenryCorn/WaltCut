@@ -5327,7 +5327,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -5357,7 +5357,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-aac"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5367,14 +5367,14 @@ dependencies = [
 
 [[package]]
 name = "waltcut-audio-dsp"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "waltcut-testkit",
 ]
 
 [[package]]
 name = "waltcut-automation"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "base64",
  "image",
@@ -5390,7 +5390,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-av1"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "rustix 1.1.5",
@@ -5401,21 +5401,21 @@ dependencies = [
 
 [[package]]
 name = "waltcut-avi"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "waltcut-testkit",
 ]
 
 [[package]]
 name = "waltcut-bitstream"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "waltcut-cli"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "tokio",
@@ -5435,7 +5435,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-codecs"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "image",
  "log",
@@ -5466,7 +5466,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-color"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "serde",
@@ -5474,7 +5474,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-edit"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "thiserror 2.0.21",
@@ -5485,7 +5485,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-engine"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "craft-docpath",
  "image",
@@ -5513,7 +5513,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-export"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "image",
  "rayon",
@@ -5536,7 +5536,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-format"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "log",
  "serde",
@@ -5549,7 +5549,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-frame"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "serde",
@@ -5559,7 +5559,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-genai"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "base64",
  "rustls",
@@ -5572,7 +5572,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-geom"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "serde",
@@ -5580,7 +5580,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-golden"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "pollster 1.0.1",
  "waltcut-color",
@@ -5597,7 +5597,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-gpu"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "image",
  "log",
@@ -5616,7 +5616,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-h264"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5626,7 +5626,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-h264enc"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5636,7 +5636,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-hevc"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5646,7 +5646,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-isobmff"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "serde_json",
@@ -5657,7 +5657,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-matroska"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "waltcut-testkit",
@@ -5665,7 +5665,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-media"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "image",
  "png",
@@ -5680,7 +5680,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-mpa"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "thiserror 2.0.21",
  "waltcut-bitstream",
@@ -5689,7 +5689,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-mpeg2v"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5698,7 +5698,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-mpegts"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "thiserror 2.0.21",
  "waltcut-testkit",
@@ -5706,14 +5706,14 @@ dependencies = [
 
 [[package]]
 name = "waltcut-opus"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "waltcut-testkit",
 ]
 
 [[package]]
 name = "waltcut-platform"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "block2 0.6.2",
  "log",
@@ -5736,7 +5736,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-project"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "serde",
@@ -5750,7 +5750,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-prores"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -5760,7 +5760,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-render"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "image",
  "rayon",
@@ -5778,14 +5778,14 @@ dependencies = [
 
 [[package]]
 name = "waltcut-testkit"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "png",
 ]
 
 [[package]]
 name = "waltcut-text"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "harfrust",
  "skrifa",
@@ -5797,7 +5797,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-time"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "proptest",
  "serde",
@@ -5805,7 +5805,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-ui-egui"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "craft-ui",
  "eframe",
@@ -5839,7 +5839,7 @@ dependencies = [
 
 [[package]]
 name = "waltcut-vp9"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "rayon",
  "thiserror 2.0.21",
@@ -6748,7 +6748,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.10.0"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "waltcut-testkit",

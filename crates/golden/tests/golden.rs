@@ -1,5 +1,5 @@
 //! Golden-image tests: procedural projects rendered through the CPU compositor and compared with
-//! committed reference PNGs (`goldens/*.png`, made by this test with `FILMCRAFT_BLESS=1`), plus
+//! committed reference PNGs (`goldens/*.png`, made by this test with `WALTCUT_BLESS=1`), plus
 //! GPU-vs-CPU parity on the same scenes when a GPU adapter is available.
 //!
 //! Tolerances (8-bit sRGB levels, see `waltcut_testkit::golden`):

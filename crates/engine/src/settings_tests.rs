@@ -214,14 +214,14 @@ fn prefs_set_validates_and_reset_works_per_category() {
     set(&mut s, "labels.defaults.movie", json!("Rose"));
     set(&mut s, "timeline.autoScroll", json!("smoothScroll"));
     set(&mut s, "general.showToolTips", json!(false));
-    s.prefs.general.recent_projects = vec!["/a.fcproj".into()];
+    s.prefs.general.recent_projects = vec!["/a.waltcut".into()];
     // reset one category
     s.execute("prefs.reset", json!({"category": "timeline"})).unwrap();
     assert_eq!(s.prefs.timeline.auto_scroll, "pageScroll");
     assert_eq!(s.prefs.labels.defaults.movie, Label::Rose, "other categories keep their values");
     s.execute("prefs.reset", json!({"category": "general"})).unwrap();
     assert!(s.prefs.general.show_tool_tips);
-    assert_eq!(s.prefs.general.recent_projects, ["/a.fcproj"], "recent projects survive a reset");
+    assert_eq!(s.prefs.general.recent_projects, ["/a.waltcut"], "recent projects survive a reset");
     assert!(s.execute("prefs.reset", json!({"category": "nope"})).is_err());
     s.execute("prefs.reset", json!({})).unwrap();
     assert_eq!(s.prefs, Preferences::default());
@@ -365,8 +365,8 @@ fn default_media_scaling() {
 fn recent_projects_are_remembered() {
     let dir = tmp_dir("prefs-recent");
     let mut s = demo();
-    let a = dir.join("a.fcproj").to_string_lossy().into_owned();
-    let b = dir.join("b.fcproj").to_string_lossy().into_owned();
+    let a = dir.join("a.waltcut").to_string_lossy().into_owned();
+    let b = dir.join("b.waltcut").to_string_lossy().into_owned();
     s.execute("file.saveAs", json!({"path": a})).unwrap();
     s.execute("file.saveAs", json!({"path": b})).unwrap();
     s.execute("file.open", json!({"path": a})).unwrap();

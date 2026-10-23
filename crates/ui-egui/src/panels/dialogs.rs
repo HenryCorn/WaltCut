@@ -1,9 +1,9 @@
 //! Modal dialogs (About; Keyboard Shortcuts in `shortcuts_dialog`; Settings in `settings`;
 //! Recovery/Revert in `file_dialogs`).
 
-use crate::{Dialog, FilmcraftApp};
+use crate::{Dialog, WaltCutApp};
 
-pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut WaltCutApp, ctx: &egui::Context) {
     crate::panels::media_dialogs::show(app, ctx);
     crate::panels::color_dialogs::show(app, ctx);
     crate::panels::clip_dialogs::show(app, ctx);
@@ -26,8 +26,8 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut open = true;
     match d {
         Dialog::About => {
-            egui::Window::new(tl!("About FilmCraft"))
-                .id(egui::Id::new("About FilmCraft"))
+            egui::Window::new(tl!("About WaltCut"))
+                .id(egui::Id::new("About WaltCut"))
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
@@ -79,7 +79,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 ///
 /// Automation ids: `audioGain.<set|adjust>` (radio buttons), `audioGain.<mode>.value` (dB fields),
 /// `audioGain.ok`, `audioGain.cancel`.
-fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
+fn audio_gain(app: &mut WaltCutApp, ctx: &egui::Context) -> bool {
     let mut draft = app.ui.audio_gain.clone();
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::new("audio-gain-before-drag"), &mut draft);
     let mut keep = true;
@@ -149,7 +149,7 @@ fn audio_gain(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
 /// (n tracks before the new ones; 0 = Before First Track); `addTracks.audio.type` and
 /// `addTracks.audio.type.option.<stereo|mono>`; `addTracks.ok`,
 /// `addTracks.cancel`.
-fn add_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
+fn add_tracks(app: &mut WaltCutApp, ctx: &egui::Context) -> bool {
     let Some(seq) = app.session.active_sequence() else { return false };
     let names = |tracks: &[waltcut_engine::project::Track]| tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
     let (vnames, anames) = (names(&seq.video_tracks), names(&seq.audio_tracks));
@@ -277,7 +277,7 @@ fn add_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
 /// Automation ids: `deleteTracks.video`, `deleteTracks.audio` (checkboxes),
 /// `deleteTracks.<kind>.target` (track menus), `deleteTracks.<kind>.option.<empty|V1|A2…>`
 /// (menu entries while open), `deleteTracks.ok`, `deleteTracks.cancel`.
-fn delete_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
+fn delete_tracks(app: &mut WaltCutApp, ctx: &egui::Context) -> bool {
     let Some(seq) = app.session.active_sequence() else { return false };
     let names = |n: usize, p: &str| (1..=n).map(|i| format!("{p}{i}")).collect::<Vec<_>>();
     let vnames = names(seq.video_tracks.len(), "V");
@@ -368,7 +368,7 @@ fn delete_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
 ///
 /// Automation ids: `about.tab.about`, `about.tab.contributors`, `about.tab.models`; the About tab's
 /// links and the credits controls are listed on [`about_tab`] and [`crate::credits::contributors_ui`].
-fn about(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
+fn about(app: &mut WaltCutApp, ui: &mut egui::Ui) {
     let tab_id = egui::Id::new("about_tab");
     let mut tab = ui.data_mut(|d| d.get_temp::<u8>(tab_id)).unwrap_or(0);
     ui.horizontal(|ui| {
@@ -400,7 +400,7 @@ fn about(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
 /// About ▸ About: version, licence and the project links.
 ///
 /// Automation ids: `about.github`, `about.reportIssue`.
-fn about_tab(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
+fn about_tab(app: &mut WaltCutApp, ui: &mut egui::Ui) {
     use crate::icons::{self, Icon};
     use crate::links;
     let t = app.tokens;

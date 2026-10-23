@@ -59,7 +59,7 @@ impl ExportOutput {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         for _ in 0..32 {
             let serial = NEXT.fetch_add(1, Ordering::Relaxed);
-            let directory = parent.join(format!(".filmcraft-export-{}-{serial}", std::process::id()));
+            let directory = parent.join(format!(".waltcut-export-{}-{serial}", std::process::id()));
             match std::fs::create_dir(&directory) {
                 Ok(()) => {
                     return Ok(Self { destination: destination.to_path_buf(), staged: directory.join(name), directory, frames, overwrite, installed: 0 });

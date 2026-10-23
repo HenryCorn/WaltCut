@@ -7,7 +7,7 @@ use std::sync::mpsc::{Sender, channel};
 use egui_kittest::Harness;
 use serde_json::{Value, json};
 use waltcut_engine::Session;
-use waltcut_ui_egui::FilmcraftApp;
+use waltcut_ui_egui::WaltCutApp;
 use waltcut_ui_egui::control::ControlRequest;
 
 /// The tests run one at a time: fault injection (`inject_job_panics`) is process-wide, so frame
@@ -19,7 +19,7 @@ fn serial() -> std::sync::MutexGuard<'static, ()> {
 }
 
 struct Driver {
-    harness: Harness<'static, FilmcraftApp>,
+    harness: Harness<'static, WaltCutApp>,
     tx: Sender<ControlRequest>,
 }
 
@@ -29,7 +29,7 @@ impl Driver {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let (tx, rx) = channel();
-        let app = FilmcraftApp::new(session).with_control(rx);
+        let app = WaltCutApp::new(session).with_control(rx);
         let harness = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000).build_eframe(move |_cc| app);
         let mut d = Driver { harness, tx };
         d.frames(4);
@@ -129,7 +129,7 @@ fn tiny_windows_and_squeezed_panels_do_not_panic() {
     for (w, h) in [(120.0, 80.0), (300.0, 200.0), (60.0, 40.0), (900.0, 560.0)] {
         let mut session = Session::default();
         session.execute("file.openDemoProject", json!({})).expect("demo project");
-        let app = FilmcraftApp::new(session);
+        let app = WaltCutApp::new(session);
         let mut harness = Harness::builder().with_size(egui::vec2(w, h)).with_max_steps(10_000).build_eframe(move |_cc| app);
         for ws in ["Editing", "Color", "Audio", "Effects", "Captions and Graphics", "Assembly"] {
             harness.state_mut().set_workspace(ws);
