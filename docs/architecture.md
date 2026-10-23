@@ -541,11 +541,11 @@ All of these dispatch the same command ids.
   settings) is in `crates/ui-egui/src/state.rs` as serde structs, so `ui.inspect` and `ui.set` can
   read and write it.
 
-- **Panels with engine data** (M8.9 / M12.6): Metadata (`metadata.get` / `metadata.set`, one undo step per edit, stored in
-  `ProjectItem::metadata`), Events (`events.list` / `events.clear`), Progress (`jobs.list` /
-  `jobs.cancel`), Project Notes (`project.notes` / `project.setNotes`, plain text in
-  `Project::notes`, schema v15; one typing session is one undo step). The Timecode panel is a frontend-only view. Their settings are
-  `UiState::panels` (`ui.set {"panels": {...}}`).
+- **Panels with engine data**: Events (`events.list` / `events.clear`) and Progress (`jobs.list` /
+  `jobs.cancel`). Their settings are `UiState::panels` (`ui.set {"panels": {...}}`). Item metadata
+  (`metadata.get` / `metadata.set`, stored in `ProjectItem::metadata`) and project notes
+  (`project.notes` / `project.setNotes`, plain text in `Project::notes`) stay engine commands; the
+  Metadata, Project Notes, Timecode, Info and Libraries panels were removed with the reduction (#14).
 - **Project panel** (M12.7). View settings (List / Icon / Freeform, thumbnail
   and font size, Preview Area, Hover Scrub), the List view's columns, widths and sort, and ten view
   presets are preferences (`Preferences::project_panel`; `project.view.*`, `project.columns.*`,

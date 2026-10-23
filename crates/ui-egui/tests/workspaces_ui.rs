@@ -150,10 +150,10 @@ fn save_switch_reset_rename_delete_and_restart() {
     let data = data_dir("cycle");
     let mut d = Driver::launch(&data);
     assert_eq!(d.workspace(), "Editing");
-    assert!(d.shows(PanelKind::Metadata));
+    assert!(d.shows(PanelKind::History));
 
     // Save as New Workspace: the current layout under a new name, now the current workspace
-    d.ok("ui.panel.close", json!({"panel": "Metadata"}));
+    d.ok("ui.panel.close", json!({"panel": "History"}));
     assert_eq!(d.menu("window.workspace.saveAs", json!({"name": "Cutting"}))["workspace"], "Cutting");
     assert_eq!(d.workspace(), "Cutting");
     assert_eq!(saved_file(&data)["saved"][0]["name"], "Cutting");
@@ -175,16 +175,16 @@ fn save_switch_reset_rename_delete_and_restart() {
     // switch away and back (by menu and by ui.set): the saved layout comes back
     d.ok("ui.set", json!({"workspace": "Editing"}));
     assert_eq!(d.workspace(), "Editing");
-    assert!(d.shows(PanelKind::Metadata));
+    assert!(d.shows(PanelKind::History));
     d.ok("ui.set", json!({"workspace": "cutting"}));
     assert_eq!(d.workspace(), "Cutting");
-    assert!(!d.shows(PanelKind::Metadata));
+    assert!(!d.shows(PanelKind::History));
 
     // Reset to Saved Layout undoes changes made since the save
     d.ok("ui.panel.close", json!({"panel": "Project"}));
     assert!(!d.shows(PanelKind::Project));
     d.menu("window.workspace.reset", json!({}));
-    assert!(d.shows(PanelKind::Project) && !d.shows(PanelKind::Metadata));
+    assert!(d.shows(PanelKind::Project) && !d.shows(PanelKind::History));
 
     // Save Changes to this Workspace on a built-in; it can't be deleted, only restored
     d.ok("ui.set", json!({"workspace": "Editing"}));
@@ -208,7 +208,7 @@ fn save_switch_reset_rename_delete_and_restart() {
     // restart: the saved workspaces and the one in use come back
     let mut d = Driver::launch(&data);
     assert_eq!(d.workspace(), "Fine Cut");
-    assert!(!d.shows(PanelKind::Metadata));
+    assert!(!d.shows(PanelKind::History));
     assert!(d.workspaces_menu().iter().any(|(l, c)| l == "Fine Cut" && *c));
 
     // delete the current user workspace: back to Editing, gone from the menu and the file
@@ -223,7 +223,7 @@ fn save_switch_reset_rename_delete_and_restart() {
 fn save_rename_and_delete_through_the_dialogs() {
     let data = data_dir("dialogs");
     let mut d = Driver::launch(&data);
-    d.ok("ui.panel.close", json!({"panel": "Metadata"}));
+    d.ok("ui.panel.close", json!({"panel": "History"}));
 
     // Save as New Workspace… asks for a name
     assert_eq!(d.menu("window.workspace.saveAs", json!({}))["dialog"], "saveWorkspace");

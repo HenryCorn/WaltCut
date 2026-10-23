@@ -17,7 +17,7 @@ fn layout() -> Layout {
         root: DockNode::Split {
             vertical: false,
             size: SplitSize::FixedA(400.0),
-            a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Project, PanelKind::Info, PanelKind::History], active: 1 }),
+            a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Project, PanelKind::Markers, PanelKind::History], active: 1 }),
             b: Box::new(DockNode::Tabs { panels: vec![PanelKind::Source, PanelKind::Program], active: 1 }),
         },
         floating: vec![],
@@ -28,20 +28,20 @@ fn layout() -> Layout {
 fn shared_transactions_keep_selection_and_reject_invalid_moves_atomically() {
     let mut layout = layout();
     layout.apply(Action::Close { panel: PanelKind::Project }).unwrap();
-    assert!(layout.root.is_visible(PanelKind::Info));
+    assert!(layout.root.is_visible(PanelKind::Markers));
     let before = layout.clone();
     for action in [
-        Action::Move { panel: PanelKind::Info, anchor: PanelKind::Tools, placement: Placement::Split(Zone::Left) },
-        Action::Float { panel: PanelKind::Info, rect: [0.0, 0.0, f32::NAN, 100.0] },
-        Action::Move { panel: PanelKind::Info, anchor: PanelKind::Program, placement: Placement::Tab { before: Some(PanelKind::Tools) } },
+        Action::Move { panel: PanelKind::Markers, anchor: PanelKind::Tools, placement: Placement::Split(Zone::Left) },
+        Action::Float { panel: PanelKind::Markers, rect: [0.0, 0.0, f32::NAN, 100.0] },
+        Action::Move { panel: PanelKind::Markers, anchor: PanelKind::Program, placement: Placement::Tab { before: Some(PanelKind::Tools) } },
     ] {
         assert!(layout.apply(action).is_err());
         assert_eq!(layout, before);
     }
-    layout.apply(Action::Float { panel: PanelKind::Info, rect: [50.0, 50.0, 400.0, 300.0] }).unwrap();
-    layout.apply(Action::Move { panel: PanelKind::Info, anchor: PanelKind::Program, placement: Placement::Split(Zone::Bottom) }).unwrap();
+    layout.apply(Action::Float { panel: PanelKind::Markers, rect: [50.0, 50.0, 400.0, 300.0] }).unwrap();
+    layout.apply(Action::Move { panel: PanelKind::Markers, anchor: PanelKind::Program, placement: Placement::Split(Zone::Bottom) }).unwrap();
     assert!(layout.floating.is_empty());
-    assert!(layout.root.is_visible(PanelKind::Info));
+    assert!(layout.root.is_visible(PanelKind::Markers));
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn builtin_and_legacy_workspace_shapes_roundtrip_and_save_floating() {
     let mut app = FilmcraftApp::new(session);
     let ctx = egui::Context::default();
     app.ui.dock = layout().root;
-    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Info", "rect": [45, 65, 420, 320]})).unwrap();
+    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
     menus::invoke(&mut app, &ctx, "window.workspace.saveAs", json!({"name": "Floating test"})).unwrap();
     let prefs = dock::WorkspacePrefs::load(&dir.join(dock::WORKSPACES_FILE));
     let restored = dock::saved_docking(&prefs, "Floating test");
@@ -148,31 +148,31 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
     let project = h.state().session.project.clone();
     let mut action_log = vec![action_state(&h, "start")];
     let playheads = h.state().session.state.playheads.clone();
-    let from = rect(&h, "panel.tab.Info").center();
+    let from = rect(&h, "panel.tab.Markers").center();
     let to = rect(&h, "panel.Program").center();
     drag(&mut h, from, to, Modifiers::NONE);
-    assert!(h.state().ui.dock.is_visible(PanelKind::Info));
-    assert!(same_group(&h.state().ui.dock, PanelKind::Info, PanelKind::Program));
+    assert!(h.state().ui.dock.is_visible(PanelKind::Markers));
+    assert!(same_group(&h.state().ui.dock, PanelKind::Markers, PanelKind::Program));
     action_log.push(action_state(&h, "merged"));
-    let from = rect(&h, "panel.tab.Info").center();
+    let from = rect(&h, "panel.tab.Markers").center();
     let before = rect(&h, "panel.tab.Source");
     drag(&mut h, from, pos2(before.left() + 2.0, before.center().y), Modifiers::NONE);
-    assert_eq!(tabs_containing(&h.state().ui.dock, PanelKind::Info).first(), Some(&PanelKind::Info));
+    assert_eq!(tabs_containing(&h.state().ui.dock, PanelKind::Markers).first(), Some(&PanelKind::Markers));
     action_log.push(action_state(&h, "reordered"));
 
-    let from = rect(&h, "panel.tab.Info").center();
+    let from = rect(&h, "panel.tab.Markers").center();
     let left = rect(&h, "panel.History");
     // Activate a visible sibling after the source left its original group.
     let to = pos2(left.left() + 8.0, left.center().y);
     drag(&mut h, from, to, Modifiers::NONE);
-    assert!(h.state().ui.dock.is_visible(PanelKind::Info));
-    assert!(!same_group(&h.state().ui.dock, PanelKind::Info, PanelKind::History));
-    assert!(!same_group(&h.state().ui.dock, PanelKind::Info, PanelKind::Program));
+    assert!(h.state().ui.dock.is_visible(PanelKind::Markers));
+    assert!(!same_group(&h.state().ui.dock, PanelKind::Markers, PanelKind::History));
+    assert!(!same_group(&h.state().ui.dock, PanelKind::Markers, PanelKind::Program));
     action_log.push(action_state(&h, "split"));
     click(&mut h, "panel.tab.Program");
     assert!(h.state().auto.elements.iter().any(|element| element.id.starts_with("timeline.clip.")));
     assert!(h.state().auto.find("program.transport.playhead.stepForward").is_some());
-    let from = rect(&h, "panel.tab.Info").center();
+    let from = rect(&h, "panel.tab.Markers").center();
     drag(&mut h, from, pos2(700.0, 400.0), Modifiers::COMMAND);
     assert_eq!(h.state().ui.floating.len(), 1);
     assert_eq!(h.get_by_label("Resize floating panel").accesskit_node().role(), egui::accesskit::Role::Button);
@@ -183,7 +183,7 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
     assert!(h.state().ui.floating[0].rect[2] > original[2] + 25.0);
     assert!(h.state().ui.floating[0].rect[3] > original[3] + 15.0);
     action_log.push(action_state(&h, "resized"));
-    let grip_id = egui::Id::new(("floating-panel", PanelKind::Info.id())).with("resize");
+    let grip_id = egui::Id::new(("floating-panel", PanelKind::Markers.id())).with("resize");
     assert_eq!(h.ctx.memory(|memory| memory.focused()), Some(grip_id));
     let before_keys = h.state().ui.floating[0].rect;
     for key in [egui::Key::ArrowRight, egui::Key::ArrowDown] {
@@ -216,7 +216,7 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
     for _ in 0..3 {
         step(&mut h);
     }
-    assert!(rect(&h, "panel.Info").width() > 1000.0);
+    assert!(rect(&h, "panel.Markers").width() > 1000.0);
     action_log.push(action_state(&h, "maximized"));
     assert_eq!(h.state().ui.dock, saved_root);
     assert_eq!(h.state().ui.floating, saved_floating);
@@ -230,7 +230,7 @@ fn real_panel_drag_merges_splits_floats_and_redocks_without_editing_documents() 
         std::fs::create_dir_all(directory).unwrap();
         h.render().unwrap().save(directory.join("filmcraft-floating.png")).unwrap();
     }
-    let from = rect(&h, "panel.tab.Info").center();
+    let from = rect(&h, "panel.tab.Markers").center();
     let to = rect(&h, "panel.History").center();
     drag(&mut h, from, to, Modifiers::NONE);
     assert!(h.state().ui.floating.is_empty());
@@ -260,8 +260,8 @@ fn dropping_on_the_window_edge_docks_beside_the_whole_workspace() {
     for _ in 0..4 {
         step(&mut h);
     }
-    let from = rect(&h, "panel.tab.Info").center();
-    let leftmost = rect(&h, "panel.Info");
+    let from = rect(&h, "panel.tab.Markers").center();
+    let leftmost = rect(&h, "panel.Markers");
     // The outer edge of the leftmost group: without the window-edge zone this splits only that group.
     drag(&mut h, from, pos2(leftmost.left() + 2.0, leftmost.center().y), Modifiers::NONE);
     assert_eq!(
@@ -269,7 +269,7 @@ fn dropping_on_the_window_edge_docks_beside_the_whole_workspace() {
         DockNode::Split {
             vertical: false,
             size: SplitSize::Ratio(0.25),
-            a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Info], active: 0 }),
+            a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Markers], active: 0 }),
             b: Box::new(DockNode::Split {
                 vertical: false,
                 size: SplitSize::FixedA(400.0),
@@ -289,9 +289,9 @@ fn dock_panel_without_anchor_docks_along_a_workspace_edge() {
     let DockNode::Split { vertical: true, size: SplitSize::Ratio(ratio), a, b } = &app.ui.dock else { panic!("root not split: {:?}", app.ui.dock) };
     assert_eq!(*ratio, 0.75);
     assert_eq!(**b, DockNode::Tabs { panels: vec![PanelKind::Program], active: 0 });
-    assert!(!a.contains(PanelKind::Program) && a.contains(PanelKind::Source) && a.contains(PanelKind::Info));
+    assert!(!a.contains(PanelKind::Program) && a.contains(PanelKind::Source) && a.contains(PanelKind::Markers));
     let before = app.ui.dock.clone();
-    assert!(menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Info", "zone": "center"})).is_err());
+    assert!(menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Markers", "zone": "center"})).is_err());
     assert_eq!(app.ui.dock, before);
     app.ui.dock = DockNode::Tabs { panels: vec![PanelKind::Project], active: 0 };
     assert!(menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Project", "zone": "left"})).is_err());
@@ -323,12 +323,12 @@ fn docking_commands_reject_bad_geometry_and_targets_without_partial_changes() {
     let ctx = egui::Context::default();
     let before = app.ui.dock.clone();
     for (id, params) in [
-        ("window.floatPanel", json!({"panel": "Info", "rect": [1, 2, 300]})),
-        ("window.floatPanel", json!({"panel": "Info", "rect": [1, 2, 300, 200, 7]})),
-        ("window.floatPanel", json!({"panel": "Info", "rect": [1, 2, 1e100, 200]})),
-        ("window.dockPanel", json!({"panel": "Info", "anchor": "Tools"})),
-        ("window.dockPanel", json!({"panel": "Info", "anchor": "Program", "zone": 42})),
-        ("window.dockPanel", json!({"panel": "Info", "anchor": "Program", "before": "Tools"})),
+        ("window.floatPanel", json!({"panel": "Markers", "rect": [1, 2, 300]})),
+        ("window.floatPanel", json!({"panel": "Markers", "rect": [1, 2, 300, 200, 7]})),
+        ("window.floatPanel", json!({"panel": "Markers", "rect": [1, 2, 1e100, 200]})),
+        ("window.dockPanel", json!({"panel": "Markers", "anchor": "Tools"})),
+        ("window.dockPanel", json!({"panel": "Markers", "anchor": "Program", "zone": 42})),
+        ("window.dockPanel", json!({"panel": "Markers", "anchor": "Program", "before": "Tools"})),
     ] {
         assert!(menus::invoke(&mut app, &ctx, id, params.clone()).is_err(), "{id} accepted {params}");
         assert_eq!(app.ui.dock, before);
@@ -348,15 +348,15 @@ fn catalog_docking_action_supports_resize_reorder_and_floating_geometry() {
     app.ui.dock = DockNode::Split {
         vertical: false,
         size: SplitSize::FixedA(300.0),
-        a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Project, PanelKind::Info], active: 1 }),
+        a: Box::new(DockNode::Tabs { panels: vec![PanelKind::Project, PanelKind::Markers], active: 1 }),
         b: Box::new(DockNode::Tabs { panels: vec![PanelKind::Program], active: 0 }),
     };
     let ctx = egui::Context::default();
     for action in [
         Action::ResizeSplit { path: vec![], size: craft_ui::layout::SplitSize::FixedFirst(360.0) },
-        Action::Move { panel: PanelKind::Info, anchor: PanelKind::Project, placement: Placement::Tab { before: Some(PanelKind::Project) } },
-        Action::Float { panel: PanelKind::Info, rect: [20.0, 40.0, 300.0, 200.0] },
-        Action::MoveFloating { panel: PanelKind::Info, rect: [45.0, 65.0, 330.0, 240.0] },
+        Action::Move { panel: PanelKind::Markers, anchor: PanelKind::Project, placement: Placement::Tab { before: Some(PanelKind::Project) } },
+        Action::Float { panel: PanelKind::Markers, rect: [20.0, 40.0, 300.0, 200.0] },
+        Action::MoveFloating { panel: PanelKind::Markers, rect: [45.0, 65.0, 330.0, 240.0] },
     ] {
         waltcut_ui_egui::menus::invoke(&mut app, &ctx, "window.dockAction", json!({"action": action})).unwrap();
     }
@@ -382,11 +382,11 @@ fn catalog_docking_action_supports_resize_reorder_and_floating_geometry() {
 fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name() {
     let root = DockNode::Tabs { panels: vec![PanelKind::Project], active: 0 };
     let valid = json!({"name": "Valid", "layout": root, "floating": [{
-        "panels": ["Metadata", "Timeline"], "active": 0, "rect": [80, 90, 420, 320]
+        "panels": ["Events", "Timeline"], "active": 0, "rect": [80, 90, 420, 320]
     }]});
     for (index, bad) in [
         json!([{"panels": ["FuturePanel"], "active": 0, "rect": [80, 90, 420, 320]}]),
-        json!([{"panels": ["Info"], "active": "invalid", "rect": [80, 90, 420, 320]}]),
+        json!([{"panels": ["Markers"], "active": "invalid", "rect": [80, 90, 420, 320]}]),
         json!({"malformed": true}),
     ]
     .into_iter()
@@ -401,7 +401,7 @@ fn unreadable_floating_workspace_does_not_erase_valid_workspaces_or_current_name
         let restored = dock::saved_docking(&loaded, "Valid");
         restored.validate().unwrap();
         assert_eq!(restored.root, root);
-        assert_eq!(restored.floating[0].panels, vec![PanelKind::Metadata, PanelKind::Timeline]);
+        assert_eq!(restored.floating[0].panels, vec![PanelKind::Events, PanelKind::Timeline]);
         assert_eq!(dock::saved_docking(&loaded, "Broken").root, dock::workspace("Broken"));
         loaded.save(&path).unwrap();
         assert_eq!(dock::WorkspacePrefs::load(&path), loaded, "saving preserves the unreadable entry for a future version");
@@ -414,25 +414,25 @@ fn floating_panel_and_timeline_reveal_keeps_one_owner_without_project_edits() {
     let mut session = Session::default();
     session.execute("file.openDemoProject", json!({})).unwrap();
     let mut app = FilmcraftApp::new(session);
-    app.show_panel(PanelKind::Metadata);
+    app.show_panel(PanelKind::Events);
     let project = app.session.project.clone();
     let state = serde_json::to_value(&app.session.state).unwrap();
     let ctx = egui::Context::default();
-    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Metadata", "rect": [80, 90, 420, 320]})).unwrap();
+    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Events", "rect": [80, 90, 420, 320]})).unwrap();
     menus::invoke(
         &mut app,
         &ctx,
         "window.dockAction",
         json!({"action": Action::Move {
-            panel: PanelKind::Timeline, anchor: PanelKind::Metadata, placement: Placement::Tab { before: None }
+            panel: PanelKind::Timeline, anchor: PanelKind::Events, placement: Placement::Tab { before: None }
         }}),
     )
     .unwrap();
-    app.show_panel(PanelKind::Metadata);
+    app.show_panel(PanelKind::Events);
     app.show_panel(PanelKind::Timeline);
-    assert!(!app.ui.dock.contains(PanelKind::Metadata));
+    assert!(!app.ui.dock.contains(PanelKind::Events));
     assert!(!app.ui.dock.contains(PanelKind::Timeline));
-    assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::Metadata).count(), 1);
+    assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::Events).count(), 1);
     assert_eq!(app.ui.floating.iter().flat_map(|group| &group.panels).filter(|panel| **panel == PanelKind::Timeline).count(), 1);
     assert!(std::sync::Arc::ptr_eq(&project, &app.session.project));
     assert_eq!(serde_json::to_value(&app.session.state).unwrap(), state);
@@ -444,20 +444,20 @@ fn floating_panel_and_timeline_reveal_keeps_one_owner_without_project_edits() {
 fn a_panel_closed_while_floating_reopens_floating_where_it_was() {
     let mut app = FilmcraftApp::new(Session::default());
     let ctx = egui::Context::default();
-    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Info", "rect": [45, 65, 420, 320]})).unwrap();
-    let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Info)).unwrap().rect;
-    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Info"})).unwrap();
-    assert!(!app.ui.dock.contains(PanelKind::Info) && !app.ui.floating.iter().any(|g| g.panels.contains(&PanelKind::Info)));
-    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Info), json!({})).unwrap();
-    let back = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Info)).expect("Info floats again");
+    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
+    let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Markers)).unwrap().rect;
+    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Markers"})).unwrap();
+    assert!(!app.ui.dock.contains(PanelKind::Markers) && !app.ui.floating.iter().any(|g| g.panels.contains(&PanelKind::Markers)));
+    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Markers), json!({})).unwrap();
+    let back = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Markers)).expect("Markers floats again");
     assert_eq!(back.rect, rect, "where it was");
-    assert!(!app.ui.dock.contains(PanelKind::Info));
+    assert!(!app.ui.dock.contains(PanelKind::Markers));
     // docked, then closed: it opens docked
-    menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Info", "anchor": "Project"})).unwrap();
-    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Info"})).unwrap();
-    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Info), json!({})).unwrap();
-    assert!(app.ui.dock.contains(PanelKind::Info));
-    assert!(!app.ui.floating.iter().any(|g| g.panels.contains(&PanelKind::Info)));
+    menus::invoke(&mut app, &ctx, "window.dockPanel", json!({"panel": "Markers", "anchor": "Project"})).unwrap();
+    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Markers"})).unwrap();
+    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Markers), json!({})).unwrap();
+    assert!(app.ui.dock.contains(PanelKind::Markers));
+    assert!(!app.ui.floating.iter().any(|g| g.panels.contains(&PanelKind::Markers)));
     // the Timeline too, though reopening it first puts it back in its own place in the dock
     menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Timeline", "rect": [60, 80, 700, 300]})).unwrap();
     let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Timeline)).unwrap().rect;
@@ -470,8 +470,8 @@ fn a_panel_closed_while_floating_reopens_floating_where_it_was() {
     // with nothing else docked, a reopened panel has to stay docked (the workspace keeps one
     // docked panel); its floating place is kept, not lost (#2482 review)
     let mut app = FilmcraftApp::new(Session::default());
-    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Info", "rect": [45, 65, 420, 320]})).unwrap();
-    let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Info)).unwrap().rect;
+    menus::invoke(&mut app, &ctx, "window.floatPanel", json!({"panel": "Markers", "rect": [45, 65, 420, 320]})).unwrap();
+    let rect = app.ui.floating.iter().find(|g| g.panels.contains(&PanelKind::Markers)).unwrap().rect;
     for _ in 0..64 {
         let Some(p) = PanelKind::ALL.iter().copied().find(|p| app.ui.dock.contains(*p)) else { break };
         if menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": p.id()})).is_err() {
@@ -483,8 +483,8 @@ fn a_panel_closed_while_floating_reopens_floating_where_it_was() {
         eprintln!("SKIPPED: the dock cannot be emptied ({docked} panels stay)");
         return;
     }
-    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Info"})).unwrap();
-    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Info), json!({})).unwrap();
-    assert!(app.ui.dock.contains(PanelKind::Info), "the only panel stays docked");
-    assert!(app.ui.closed_floating.iter().any(|(p, r)| *p == PanelKind::Info && *r == rect), "{:?}", app.ui.closed_floating);
+    menus::invoke(&mut app, &ctx, "window.closePanel", json!({"panel": "Markers"})).unwrap();
+    menus::invoke(&mut app, &ctx, &menus::panel_command_id(PanelKind::Markers), json!({})).unwrap();
+    assert!(app.ui.dock.contains(PanelKind::Markers), "the only panel stays docked");
+    assert!(app.ui.closed_floating.iter().any(|(p, r)| *p == PanelKind::Markers && *r == rect), "{:?}", app.ui.closed_floating);
 }
