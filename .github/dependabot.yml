@@ -7,11 +7,22 @@ updates:
       interval: "daily"
       time: "06:00"
       timezone: "America/New_York"
-    # Consolidate updates into a single PR rather than one PR per crate
+    # Keep breaking upgrades isolated; review migration notes per package.
     groups:
       cargo-dependencies:
         patterns:
           - "*"
+        # These 0.x libraries can require migrations even on a minor update.
+        exclude-patterns:
+          - "egui*"
+          - "eframe"
+          - "cpal"
+          - "symphonia*"
+          - "skrifa"
+          - "harfrust"
+        update-types:
+          - "minor"
+          - "patch"
     commit-message:
       prefix: "chore(deps)"
 
@@ -26,5 +37,8 @@ updates:
       actions:
         patterns:
           - "*"
+    ignore:
+      # This action uses Rust release versions as refs, not action semver.
+      - dependency-name: "dtolnay/rust-toolchain"
     commit-message:
       prefix: "ci(deps)"

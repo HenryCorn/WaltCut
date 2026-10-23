@@ -1,4 +1,4 @@
-//! Workspace automation: `cargo xtask <layers|ci>`.
+//! Workspace automation: `cargo xtask <check|layers|ci>`.
 //!
 //! - `layers`: enforces the dependency layering of `docs/architecture.md` §1 (downward-only edges,
 //!   listed same-layer edges, L0 codec crates depend on `bitstream` only, no UI/OS crates below L5).
@@ -8,7 +8,10 @@
 //!   crate's ignored `generate_fixtures` test, i.e. the same generators the tests use) and print
 //!   what was made, reused or skipped.
 //! - `ci`: fmt check, clippy -D warnings, tests, layers, assets.
+//! - `check [--base REF]`: fmt, workspace/all-targets check, layers, assets and affected release tests.
+//!   Defaults to origin/main; includes committed changes since the merge base and local changes.
 
+mod check;
 mod tidy;
 mod version;
 
@@ -311,6 +314,7 @@ fn main() -> ExitCode {
     let r = match task.as_str() {
         "layers" => layers(),
         "assets" => assets(),
+        "check" => check::run(&std::env::args().skip(2).collect::<Vec<_>>()),
         "fixtures" => fixtures(&std::env::args().skip(2).collect::<Vec<_>>()),
         "tidy" => {
             let rest: Vec<String> = std::env::args().skip(2).collect();
@@ -324,7 +328,7 @@ fn main() -> ExitCode {
             version::run(&root(), &rest.iter().map(String::as_str).collect::<Vec<_>>())
         }
         _ => {
-            Err("usage: cargo xtask <layers|assets|tidy [--apply] [--fixtures]|fixtures [crate…]|version [set X.Y.Z]|ci|bench [args]|bench-playback [args]>"
+            Err("usage: cargo xtask <check [--base REF]|layers|assets|tidy [--apply] [--fixtures]|fixtures [crate…]|version [set X.Y.Z]|ci|bench [args]|bench-playback [args]>"
                 .into())
         }
     };

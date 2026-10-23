@@ -111,6 +111,14 @@ Every commit must pass all of these:
 
 Run them with `CRAFT_FONTS_DIR` set too when you change font code ([craft-fonts](#building-with-craft-fonts)).
 
+For feedback before each push, run `cargo xtask check --base origin/main` after fetching
+`origin/main`. It checks formatting, all workspace targets, layers and assets, then tests changed
+packages and their transitive workspace dependents (including test/build dependencies). Global
+build inputs or unclassified code changes conservatively select all workspace tests. This is
+not a replacement for the full gate: run `cargo xtask ci` **natively on macOS before opening a
+ready-for-review PR**. Cross-target checking does not execute product tests. If macOS is unavailable,
+open a draft, state exactly which checks passed and which are pending, and request native CI.
+
 `cargo xtask` is an alias in `.cargo/config.toml` for `cargo run -p xtask --`.
 
 ### Never crash
@@ -138,11 +146,23 @@ comes with a regression test; parsers, decoders and commands get fuzz / hostile-
 
 Open pull requests against `main` from a short-lived branch named for the work. Link the issue,
 explain the user-visible change, and report relevant local checks in the pull request description.
-Pull-request CI checks formatting on macOS, with a three-minute timeout. The full Clippy, test,
-layer, and asset gates remain available by manually dispatching the CI workflow with
-`full_quality` enabled. The full run disables release LTO
+Pull-request CI runs the shared fast gate on macOS for every base branch, including stacked PRs.
+The required check name remains `quality (macos-latest)`. Full Clippy, test, layer and asset gates
+run on pushes to `main`, nightly, and on PRs carrying the `full-quality` label. Add that label to
+request a full run; subsequent pushes rerun it. Alternatively, dispatch CI with `full_quality`
+enabled and select the branch to verify. No privileged `pull_request_target` execution is used.
+Cache-hit results appear in each job's "Report cache restore" step; inspect the rust-cache restore/
+save logs to confirm reuse across runs. A configured cache is not evidence of a cache hit.
+Both fast and full runs disable release LTO
 and uses 16 codegen units to keep the test build practical; this does not change the release profile
 used for shipped builds.
+
+For stacked PRs, run full verification at the tip early, fix failures there and move each fix to
+its owning PR before final validation. Do not pay for a full run on every intermediate revision.
+Tip success only proves the integrated stack: each intermediate merge must still pass its fast
+gate and any relevant acceptance checks. Rebase/retarget and merge in dependency order; rerun
+checks after conflict resolution or code changes. Keep a full-gate result for the final integrated
+tree, rather than assuming fixes split across PRs preserve a previously tested tree.
 
 CodeRabbit is configured to review pull requests when its GitHub integration is enabled. Its
 findings are advisory; resolve review conversations and follow the project's safety and licensing
@@ -161,6 +181,11 @@ export CARGO_TARGET_DIR=target/agent-hevc     # separate build dir, no lock figh
 - The workspace includes `crates/*` and `apps/*` by glob, so one broken `Cargo.toml` breaks every
   build. Keep every manifest valid at all times, including half-finished crates.
 - Test fixtures always go to `<repo>/target/fixtures/`, whatever `CARGO_TARGET_DIR` says.
+- Cache generated fixtures with `waltcut_testkit::fixtures::recipe_dir` using the complete recipe
+  as its signature (arguments and embedded inputs), and `fixtures::generate` for atomic generation.
+  The codecs unit-test generators use their source text as that signature: edits invalidate old
+  dimensions/codec settings without deleting another worktree's fixtures. Include external input
+  content/version in the signature too when a recipe uses it; an unchanged filename is not a cache key.
 - `.mcp.json` points at `target/release/filmcraft-cli`. With a custom target dir, use your own path.
 
 ## 7. How to add…
