@@ -32,6 +32,15 @@ pub fn fixtures_dir(sub: &str) -> PathBuf {
     d
 }
 
+/// Namespace cached fixtures by their generator recipe (including embedded input data).
+/// Hash stability across Rust versions is not required: a new namespace only regenerates fixtures.
+pub fn recipe_dir(sub: &str, recipe: &str) -> PathBuf {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    recipe.hash(&mut hash);
+    fixtures_dir(sub).join(format!("recipe-{:016x}", hash.finish()))
+}
+
 /// A temporary sibling of `out` that no other thread or process will pick: the stem gets
 /// `.tmp-<pid>-<thread>-<n>` and the extension is kept (ffmpeg chooses the muxer from it).
 pub fn temp_path(out: &Path) -> PathBuf {
@@ -107,6 +116,22 @@ mod tests {
     fn root_is_the_workspace() {
         assert!(workspace_root().join("Cargo.toml").exists());
         assert!(workspace_root().join("crates").join("testkit").exists());
+    }
+
+    #[test]
+    fn changed_recipes_cannot_reuse_stale_fixtures() {
+        let old = recipe_dir("testkit-recipes", "blue 320x240");
+        let new = recipe_dir("testkit-recipes", "blue 160x120");
+        assert_eq!(old, recipe_dir("testkit-recipes", "blue 320x240"));
+        assert_ne!(old, new);
+        let old_file = old.join("blue.mkv");
+        let new_file = new.join("blue.mkv");
+        generate(&old_file, |p| std::fs::write(p, b"old dimensions").is_ok()).unwrap();
+        generate(&new_file, |p| std::fs::write(p, b"new dimensions").is_ok()).unwrap();
+        assert_eq!(std::fs::read(new_file).unwrap(), b"new dimensions");
+        assert_eq!(std::fs::read(old_file).unwrap(), b"old dimensions");
+        std::fs::remove_dir_all(old).unwrap();
+        std::fs::remove_dir_all(new).unwrap();
     }
 
     #[test]

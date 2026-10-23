@@ -11,21 +11,20 @@ pub(crate) fn ffmpeg() -> Option<&'static str> {
     ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"].into_iter().find(|p| std::path::Path::new(p).exists())
 }
 
+fn fixture_dir() -> PathBuf {
+    // The source includes all recipe arguments and inline inputs; edits invalidate old media.
+    waltcut_testkit::fixtures::recipe_dir("codecs", include_str!("tests.rs"))
+}
+
 fn fixture(name: &str, args: &[&str]) -> Option<Arc<[u8]>> {
     let ff = ffmpeg().or_else(|| {
         eprintln!("ffmpeg not found; skipping");
         None
     })?;
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs");
+    let dir = fixture_dir();
     std::fs::create_dir_all(&dir).ok()?;
     let out = dir.join(name);
-    if !out.exists() {
-        let st = Command::new(ff).args(["-y", "-v", "error"]).args(args).arg(&out).status().ok()?;
-        if !st.success() {
-            eprintln!("fixture {name} failed; skipping");
-            return None;
-        }
-    }
+    waltcut_testkit::fixtures::generate(&out, |tmp| Command::new(ff).args(["-y", "-v", "error"]).args(args).arg(tmp).status().is_ok_and(|s| s.success()))?;
     Some(std::fs::read(out).ok()?.into())
 }
 
@@ -34,25 +33,26 @@ fn check_mkv(name: &str, video_args: &[&str], audio_args: &[&str]) {
         eprintln!("ffmpeg not found; skipping");
         return;
     };
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs").join(name);
+    let path = fixture_dir().join(name);
     if let Some(parent) = path.parent()
         && std::fs::create_dir_all(parent).is_err()
     {
         eprintln!("could not create fixture directory; skipping");
         return;
     }
-    if !path.exists() {
+    let generated = waltcut_testkit::fixtures::generate(&path, |tmp| {
         let status = Command::new(ffmpeg)
             .args(["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=160x120:r=25:d=1", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:d=1"])
             .args(video_args)
             .args(audio_args)
             .args(["-shortest"])
-            .arg(&path)
+            .arg(tmp)
             .status();
-        if !status.is_ok_and(|status| status.success()) {
-            eprintln!("fixture {name} failed; skipping");
-            return;
-        }
+        status.is_ok_and(|status| status.success())
+    });
+    if generated.is_none() {
+        eprintln!("fixture {name} failed; skipping");
+        return;
     }
     let Ok(bytes) = std::fs::read(&path) else {
         eprintln!("fixture {name} could not be read; skipping");
