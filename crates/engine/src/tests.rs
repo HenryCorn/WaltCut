@@ -73,7 +73,10 @@ fn media_drawing_and_graphic_clips_keep_motion_opacity_and_blend_edits() {
         let opacity = |s: &Session| s.active_sequence().unwrap().find_item(ClipId(clip)).unwrap().1.effect("opacity").unwrap().clone();
         let animated = opacity(&s);
         assert!(animated.is_animated());
-        assert!((animated.f64_at("opacity", Tick(one.0 / 2)) - 50.0).abs() < 1e-9);
+        // keyframes are stored in media time (the clip's source offset applies): sample halfway between them
+        let keys = &animated.param("opacity").unwrap().keyframes;
+        let mid = Tick((keys[0].time.0 + keys[1].time.0) / 2);
+        assert!((animated.f64_at("opacity", mid) - 50.0).abs() < 1e-9);
         let blend = animated.param("blend").unwrap().value.as_f64().unwrap() as usize;
         assert_eq!(waltcut_project::effect::BLEND_MODES[blend], "Multiply");
         s.undo();
