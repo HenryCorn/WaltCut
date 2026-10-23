@@ -139,3 +139,61 @@ fn hostile_parameters_are_refused_not_fatal() {
     assert!(s.execute("drawing.tween", json!({"frame": 0})).is_err());
     assert!(s.execute("drawing.deleteCel", json!({"frame": -5})).is_err());
 }
+
+fn cels(s: &Session) -> Vec<std::sync::Arc<Vec<waltcut_project::drawing::Stroke>>> {
+    s.project.items.values().find_map(|i| i.as_drawing()).map(|d| d.cels.iter().map(|c| c.strokes.clone()).collect()).unwrap_or_default()
+}
+
+#[test]
+fn adding_a_stroke_copies_only_its_own_cel_and_undo_restores_the_shared_strokes() {
+    let mut s = session();
+    new_drawing(&mut s);
+    for f in [0, 2, 4] {
+        s.execute("drawing.addStroke", json!({"frame": f, "cel": "new", "stroke": line(f as f64 * 10.0)})).unwrap();
+    }
+    let before = cels(&s);
+    s.execute("drawing.addStroke", json!({"frame": 2, "stroke": line(99.0)})).unwrap();
+    let after = cels(&s);
+    // the cels that were not drawn on still share their strokes with the snapshot before the edit
+    assert!(std::sync::Arc::ptr_eq(&before[0], &after[0]) && std::sync::Arc::ptr_eq(&before[2], &after[2]), "untouched cels are not copied");
+    assert!(!std::sync::Arc::ptr_eq(&before[1], &after[1]));
+    assert_eq!((before[1].len(), after[1].len()), (1, 2), "the snapshot keeps the old strokes");
+    s.execute("edit.undo", json!({})).unwrap();
+    let undone = cels(&s);
+    assert!(std::sync::Arc::ptr_eq(&before[1], &undone[1]) && undone[1].len() == 1);
+    // clearing and replacing also leave the other cels alone
+    s.execute("drawing.clearCel", json!({"frame": 4})).unwrap();
+    let cleared = cels(&s);
+    assert!(std::sync::Arc::ptr_eq(&before[0], &cleared[0]) && cleared[2].is_empty());
+}
+
+#[test]
+fn a_copied_cel_shares_strokes_until_either_is_edited_and_then_they_diverge() {
+    let mut s = session();
+    new_drawing(&mut s);
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": line(10.0)})).unwrap();
+    s.execute("drawing.newCel", json!({"frame": 3, "copy": true})).unwrap();
+    let both = cels(&s);
+    assert!(std::sync::Arc::ptr_eq(&both[0], &both[1]), "a copy is free");
+    s.execute("drawing.addStroke", json!({"frame": 3, "stroke": line(60.0)})).unwrap();
+    let r = s.execute("drawing.inspect", json!({})).unwrap();
+    assert_eq!(r["cels"], json!([{"frame": 0, "strokes": 1}, {"frame": 3, "strokes": 2}]), "the original is not changed by drawing on the copy");
+    s.execute("drawing.clearCel", json!({"frame": 0})).unwrap();
+    let r = s.execute("drawing.inspect", json!({})).unwrap();
+    assert_eq!(r["cels"], json!([{"frame": 0, "strokes": 0}, {"frame": 3, "strokes": 2}]));
+}
+
+#[test]
+fn the_project_file_format_of_cels_is_unchanged() {
+    let mut s = session();
+    new_drawing(&mut s);
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": line(10.0)})).unwrap();
+    let d = s.project.items.values().find_map(|i| i.as_drawing()).unwrap().clone();
+    let v = serde_json::to_value(&d).unwrap();
+    assert!(v["cels"][0]["strokes"].is_array(), "strokes are a plain list: {v}");
+    let back: waltcut_project::drawing::Drawing = serde_json::from_value(v).unwrap();
+    assert_eq!(back, d);
+    // an old file without `strokes` still loads
+    let old: waltcut_project::drawing::Cel = serde_json::from_value(json!({"frame": 5})).unwrap();
+    assert!(old.strokes.is_empty());
+}

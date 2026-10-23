@@ -401,7 +401,7 @@ mod tests {
             stroke(Brush::Eraser, &[(64.0, 5.0, 0.8), (64.0, 75.0, 0.8)], 12.0, WHITE),
         ];
         let mut drawing = Drawing::new(128, 80, rate);
-        drawing.cels = vec![Cel { frame: 0, strokes: strokes.clone() }];
+        drawing.cels = vec![Cel { frame: 0, strokes: strokes.clone().into() }];
         let mut p = Project::new("preview equals engine");
         let item = p.add_item("cels", Label::Iris, ItemKind::Drawing(drawing.into()), None);
         let seq = p.new_sequence("s", SequenceSettings { width: 160, height: 100, frame_rate: rate, ..Default::default() }, 1, 0, None);

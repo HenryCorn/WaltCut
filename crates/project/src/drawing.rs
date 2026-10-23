@@ -132,8 +132,18 @@ impl Stroke {
 pub struct Cel {
     /// First drawing frame (0 = the drawing's start) this cel is shown on.
     pub frame: i64,
+    /// Shared, copy-on-write: a clone of the cel, of the drawing, or an undo snapshot holds the
+    /// same strokes until one of them is edited ([`Cel::strokes_mut`]), so adding a stroke copies
+    /// the strokes of that one cel, not of the whole drawing.
     #[serde(default)]
-    pub strokes: Vec<Stroke>,
+    pub strokes: std::sync::Arc<Vec<Stroke>>,
+}
+
+impl Cel {
+    /// The strokes for editing: copies them first when another clone of the cel still shares them.
+    pub fn strokes_mut(&mut self) -> &mut Vec<Stroke> {
+        std::sync::Arc::make_mut(&mut self.strokes)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -182,7 +192,7 @@ impl Drawing {
         if self.cels.len() >= MAX_CELS {
             return Err(format!("a drawing may hold at most {MAX_CELS} cels"));
         }
-        let strokes = if copy_held { self.cel_at(f).map(|c| c.strokes.clone()).unwrap_or_default() } else { Vec::new() };
+        let strokes = if copy_held { self.cel_at(f).map(|c| c.strokes.clone()).unwrap_or_default() } else { Default::default() };
         let i = self.cels.partition_point(|c| c.frame < f);
         self.cels.insert(i, Cel { frame: f, strokes });
         Ok(i)
@@ -202,8 +212,9 @@ impl Drawing {
         self.cels.sort_by_key(|c| c.frame);
         self.cels.dedup_by_key(|c| c.frame);
         for c in &mut self.cels {
-            c.strokes.truncate(MAX_CEL_STROKES);
-            c.strokes = std::mem::take(&mut c.strokes).into_iter().filter_map(|s| s.sanitized().ok()).collect();
+            let strokes = c.strokes_mut();
+            strokes.truncate(MAX_CEL_STROKES);
+            *strokes = std::mem::take(strokes).into_iter().filter_map(|s| s.sanitized().ok()).collect();
         }
     }
 }
@@ -300,7 +311,7 @@ mod tests {
     fn ensure_cel_can_copy_the_held_drawing() {
         let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
         let i = d.ensure_cel(0, false).unwrap();
-        d.cels[i].strokes.push(line(0.0, 10.0, 3));
+        d.cels[i].strokes_mut().push(line(0.0, 10.0, 3));
         let j = d.ensure_cel(5, true).unwrap();
         assert_eq!(d.cels[j].strokes.len(), 1);
         assert_eq!(d.ensure_cel(5, true).unwrap(), j);
@@ -327,15 +338,15 @@ mod tests {
     #[test]
     fn sanitize_restores_order_and_uniqueness() {
         let mut d = Drawing::new(10, 10, FrameRate::new(24, 1));
-        d.cels = vec![Cel { frame: 5, strokes: vec![] }, Cel { frame: 1, strokes: vec![] }, Cel { frame: 5, strokes: vec![] }];
+        d.cels = vec![Cel { frame: 5, strokes: vec![].into() }, Cel { frame: 1, strokes: vec![].into() }, Cel { frame: 5, strokes: vec![].into() }];
         d.sanitize();
         assert_eq!(d.cels.iter().map(|c| c.frame).collect::<Vec<_>>(), vec![1, 5]);
     }
 
     #[test]
     fn tween_halfway_between_two_lines() {
-        let a = Cel { frame: 0, strokes: vec![line(0.0, 10.0, 3)] };
-        let b = Cel { frame: 4, strokes: vec![line(20.0, 30.0, 7)] };
+        let a = Cel { frame: 0, strokes: vec![line(0.0, 10.0, 3)].into() };
+        let b = Cel { frame: 4, strokes: vec![line(20.0, 30.0, 7)].into() };
         let mid = tween(&a, &b, 0.5);
         assert_eq!(mid.len(), 1);
         let pts = &mid[0].points;
@@ -344,7 +355,7 @@ mod tests {
         assert!((pts[6].x - 20.0).abs() < 1e-4);
         // degenerate input never panics
         assert!(tween(&Cel::default(), &Cel::default(), f32::NAN).is_empty());
-        let dot = Cel { frame: 0, strokes: vec![line(5.0, 5.0, 1)] };
+        let dot = Cel { frame: 0, strokes: vec![line(5.0, 5.0, 1)].into() };
         assert_eq!(tween(&dot, &b, 0.25).len(), 1);
     }
 }

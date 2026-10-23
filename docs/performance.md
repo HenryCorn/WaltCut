@@ -147,7 +147,15 @@ needs a cel under ≈ 40 ms for the prefetch to hold. *Small* meets all of them 
 the pen-up budget (1.1 ms); its 41 ms cel is at the playback limit and plays without drops only
 because six frame workers prefetch. *Stress* misses every budget by 10×–80×.
 
-Focused proposal, in order of benefit per effort (each needs its own issue; none is started here):
+**After the clone fix** (cels hold their strokes behind an `Arc`, copied on write; the Brush tool
+takes a handle on the drawing instead of a copy; same machine and workloads, `--only <workload>/pen_up`
+and `/ui`): `drawing.addStroke` 0.02 / 0.03 / 0.64 ms (was 0.03 / 1.1 / 31.5), the Brush-tool UI
+frame with onion skin on 0.48 / 0.51 / 0.49 ms (was 0.6 / 4.2 / 87 before the onion cache of #55,
+35 ms for stress after it), with a live stroke 0.76 / 0.75 / 0.75 ms. Undo is still a pointer swap.
+Pen-up to the exact frame stays at 11 / 54 / 671 ms: that is the cel rasterisation (proposal 2).
+Duplicating a held cel is free until either copy is edited. The saved project format is unchanged.
+
+Focused proposal, in order of benefit per effort (each needs its own issue; 1 is done, see above):
 
 1. Hold an `Arc<Drawing>` instead of cloning it every UI frame in the Brush tool (removes the
    36 ms floor of *stress*), and avoid the whole-drawing clone on `drawing.addStroke` (a persistent
