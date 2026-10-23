@@ -87,7 +87,6 @@ impl EffectDef {
             enabled: true,
             params: self.params.iter().map(|p| (p.id.to_string(), Param::new(p.default.clone()))).collect(),
             post_fader: false,
-            essential: false,
             layer: None,
         }
     }
@@ -103,9 +102,6 @@ pub struct EffectInstance {
     /// Track/Mix inserts only: process after the fader instead of before it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub post_fader: bool,
-    /// Managed by the Essential Sound panel (see [`crate::essential`]).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub essential: bool,
     /// Graphic layers only: stable uid, per-character styles and responsive pin
     /// ([`crate::graphic_design::LayerExtra`]). Schema v12.
     #[serde(default, skip_serializing_if = "Option::is_none")]

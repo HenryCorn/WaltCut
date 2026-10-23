@@ -977,8 +977,6 @@ static CATEGORIES: &[Category] = &[
             b("audio.generateWaveformsOnImport", "Generate waveforms automatically during import", false),
             b("audio.multithreadedWaveforms", "Generate waveforms and conform audio using multithreading", false),
             b("audio.renderAudioWithVideo", "Render audio when rendering video", false),
-            b("audio.autoTagAudioTypes", "Auto-tag audio types in the timeline", false),
-            b("audio.alwaysOverrideAudioTags", "Always override audio tags", false),
             Row::Group(
                 "Automation Keyframe Optimization",
                 &[

@@ -984,7 +984,7 @@ fn attr_sel(p: &Value) -> AttrSel {
 }
 
 fn is_standard(e: &waltcut_project::EffectInstance) -> bool {
-    e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e) && !e.essential
+    e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)
 }
 
 fn wants_effect(sel: &AttrSel, e: &waltcut_project::EffectInstance) -> bool {

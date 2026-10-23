@@ -18,7 +18,6 @@ pub mod commands;
 pub mod demo;
 pub mod doc_path;
 pub mod drawing;
-pub mod essential_sound;
 pub mod export_tools;
 pub mod graphic_design;
 pub mod graphics;
@@ -1090,8 +1089,6 @@ mod clip_ops_tests;
 mod color_tests;
 #[cfg(test)]
 mod drawing_tests;
-#[cfg(test)]
-mod essential_sound_tests;
 #[cfg(test)]
 mod explicit_targets_tests;
 #[cfg(test)]

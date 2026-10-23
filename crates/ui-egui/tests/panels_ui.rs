@@ -433,7 +433,7 @@ fn focused_panel_outline_is_not_covered_by_child_backgrounds() {
     let mut d = Driver::demo();
     for theme in ["dark", "light"] {
         d.ok("ui.set", json!({"theme": theme}));
-        for panel in ["Program", "EssentialSound", "Timeline", "Libraries"] {
+        for panel in ["Program", "EssentialGraphics", "Timeline", "Libraries"] {
             d.ok("ui.panel.show", json!({"panel": panel}));
             d.ok("ui.set", json!({"focused": panel}));
             d.frames(3);

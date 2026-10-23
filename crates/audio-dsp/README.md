@@ -10,10 +10,12 @@ model).
 
 The first draft slice of [#23](https://github.com/HenryCorn/WaltCut/issues/23) deletes the music
 retiming analysis, planner, plan serialization and crossfade renderer. This crate is not yet the
-minimal retained audio path: effects, loudness, ducking, channel mixing and streaming playback
-resampling still have production callers. Their reduction remains pending; see the current
+minimal retained audio path: effects, loudness, channel mixing and streaming playback resampling
+still have independent production callers. A later stacked draft deletes Essential Sound's
+feature-only ducking analysis module. General effects (including the restoration processors in
+`effects::essential`) and loudness remain for the next slice. See the current
 [audio status](../../docs/animation.md#audio-reduction-status). No dependency or crate is removed
-in this first slice.
+by the Essential Sound slice; native macOS acceptance of #23 remains pending.
 
 ## Conventions
 
@@ -37,8 +39,7 @@ in this first slice.
 - Oracle-tested against ffmpeg's `ebur128` filter (`tests/loudness_oracle.rs`, skipped without ffmpeg):
   M/S within 0.0005 LU, I within 0.007 LU, LRA within 0.04 LU and true peak within 0.045 dB (0.053 dB of the analytic value on an fs/4 tone) on
   sine, pink-noise, speech-like and gated stereo signals at 44.1/48/96 kHz.
-- `normalize_gain_db(measured, target)` and `normalize_gain_db_peak_limited(...)` for Normalize /
-  Essential Sound loudness auto-match.
+- `normalize_gain_db(measured, target)` and `normalize_gain_db_peak_limited(...)` for Normalize.
 
 ## Effects (`effects`)
 
@@ -96,10 +97,6 @@ playback.
 deterministic and latency constant (impulse lands at `latency()`), plus a level / frequency-response
 test on generated tones, noise or impulses and a realtime-factor floor.
 
-Essential Sound builds on these (Repair: `denoise`, high-pass via `parametric_eq`, `dehum`,
-`deesser`, `dereverb`; Clarity: `compressor`, `simple_eq`, `speech_enhance`; Creative: `reverb`,
-`stereo_width`).
-
 **Enhance Speech decision.** No machine-learning model is bundled: we found no openly licensed
 speech-enhancement model that is also practical to ship here (pure Rust, wasm, asset rules).
 DeepFilterNet (MIT/Apache-2.0, with a Rust implementation on `tract`) is the candidate for a future
@@ -114,20 +111,6 @@ Measured on synthetic signals (`effects::essential::tests`, 48 kHz):
 | `dereverb` (100 %) | harmonic syllables (100 ms / 400 ms gaps) + Polack-model late reverb, RT60 0.8 s | tail-to-burst energy −5.0 → −10.1 dB (5.0 dB better); burst energy −1.7 dB |
 | `speech_enhance` | voice + fricative noise syllables over −60 dBFS noise | presence/mud tilt +5.5 dB; noise between syllables −8.7 dB; overall level +1.0 dB |
 | Dialogue chain | `denoise` + `parametric_eq` (2 HP bands) + `dehum` + `deesser` + `dereverb` + `compressor` + `simple_eq` + `speech_enhance` + `reverb`, 60 s stereo | 1.36 s = **44× realtime** on one core (release, Apple Silicon; `cargo test --release -p waltcut-audio-dsp dialogue_chain_realtime -- --ignored --nocapture`) |
-
-## Ducking analysis (`ducking`)
-
-Pure functions for Essential Sound auto-ducking:
-
-- `envelope_db(channels, sample_rate, hop_s, window_s)`: centred-window RMS level per hop (dBFS,
-  channel-averaged power, floor −120).
-- `activity(env_db, hop_s, threshold_db, min_on_s, bridge_s)`: regions above the threshold; gaps
-  shorter than `bridge_s` are merged first, then regions shorter than `min_on_s` are dropped.
-- `sensitivity_threshold_db(s)`: Sensitivity 0–10 → −20 − 4·s dBFS.
-- `duck_keyframes(regions, clip_start, clip_end, base_db, reduce_db, fade_s)`: (time, dB) volume
-  keyframes — ramp down over `fade_s` before each region, hold, ramp up after; overlapping ramps
-  merge; clamped to the clip (a ramp cut by an edge gets the ramp's value at the edge); strictly
-  increasing times.
 
 ## Audio synchronisation (`sync`)
 

@@ -202,6 +202,26 @@ fn unknown_methods_and_commands_fail_cleanly() {
     assert_eq!(v["ok"], json!(false));
 }
 
+#[test]
+fn essential_sound_panel_and_commands_are_absent() {
+    let mut d = Driver::demo();
+    let project = d.harness.state().session.project.clone();
+    let dock = d.harness.state().ui.dock.clone();
+    assert!(waltcut_ui_egui::dock::PanelKind::from_name("Essential Sound").is_none());
+    for (method, params) in [
+        ("ui.panel.show", json!({"panel": "EssentialSound"})),
+        ("engine.execute", json!({"command": "window.panel.EssentialSound"})),
+        ("engine.execute", json!({"command": "essentialSound.set", "params": {"clip": u64::MAX, "values": {"mute": true}}})),
+    ] {
+        assert_eq!(d.call(method, params)["ok"], json!(false));
+        assert_eq!(d.harness.state().session.project, project);
+        assert_eq!(d.harness.state().ui.dock, dock);
+    }
+    assert!(d.element_ids("essentialSound.").is_empty());
+    let state = serde_json::to_value(&d.harness.state().ui).unwrap();
+    assert!(state.get("essential_sound_tab").is_none());
+}
+
 /// End of the first V1 clip (ticks).
 fn first_cut(d: &mut Driver) -> (u64, i64) {
     let c = &track_clips(&d.sequence(), 0)[0];

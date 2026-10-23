@@ -204,7 +204,6 @@ fn media_len(it: &TrackItem) -> Tick {
 pub fn capture(it: &TrackItem, idx: &[usize], name: &str, description: &str, mode: Option<KeyframeMode>, mt: Tick, size: (u32, u32)) -> EffectPreset {
     let mut effects: Vec<EffectInstance> = idx.iter().filter_map(|i| it.effects.get(*i).cloned()).collect();
     for e in &mut effects {
-        e.essential = false;
         for p in e.params.values_mut() {
             match mode {
                 None => {
@@ -378,7 +377,7 @@ fn save(s: &mut Session, p: &Value) -> Result<Value> {
         None => (0..it.effects.len())
             .filter(|i| {
                 let e = &it.effects[*i];
-                e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e) && !e.essential
+                e.def().is_some_and(|d| !d.intrinsic) && !waltcut_project::graphic::is_layer(e)
             })
             .collect(),
     };

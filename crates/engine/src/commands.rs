@@ -3262,7 +3262,6 @@ fn build() -> Vec<CommandSpec> {
     crate::sequence_tools::splice(&mut v);
     v.extend(crate::settings::commands());
     v.extend(crate::mixer::commands());
-    v.extend(crate::essential_sound::commands());
     v.extend(crate::color::commands());
     v.extend(crate::graphics::commands());
     v.extend(crate::drawing::commands());

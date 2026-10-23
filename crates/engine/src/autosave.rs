@@ -172,7 +172,6 @@ pub struct Preferences {
     pub plugins: settings::PluginPrefs,
     pub timeline: settings::TimelinePrefs,
     pub trim: TrimPrefs,
-    pub essential_sound: EssentialSoundPrefs,
     pub guides: GuidePrefs,
     /// Project panel: view, List view columns and sort, view presets, Freeform options.
     pub project_panel: crate::project_panel::ProjectPanelPrefs,
@@ -199,7 +198,6 @@ impl Default for Preferences {
             plugins: Default::default(),
             timeline: Default::default(),
             trim: Default::default(),
-            essential_sound: Default::default(),
             guides: Default::default(),
             project_panel: Default::default(),
             ai: Default::default(),
@@ -281,20 +279,6 @@ impl Default for MediaPrefs {
     }
 }
 
-/// Essential Sound: user presets saved from the panel (built-in presets live in
-/// `waltcut_project::essential`).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct EssentialSoundPrefs {
-    pub user_presets: Vec<UserSoundPreset>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct UserSoundPreset {
-    pub name: String,
-    pub settings: waltcut_project::EssentialSound,
-}
-
 /// Preferences ▸ Audio (the mixer-automation part) and the Track Mixer panel-menu toggle.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -320,15 +304,8 @@ pub struct AudioPrefs {
     pub generate_waveforms_on_import: bool,
     pub multithreaded_waveforms: bool,
     pub render_audio_with_video: bool,
-    pub auto_tag_audio_types: bool,
-    pub always_override_audio_tags: bool,
     /// "Render Edit in Audition files to": `scratch` | `nextToMedia`.
     pub edit_in_audition_location: String,
-    /// Essential Sound Loudness Auto-Match targets (integrated LUFS) per audio type.
-    pub dialogue_target_lufs: f64,
-    pub music_target_lufs: f64,
-    pub sfx_target_lufs: f64,
-    pub ambience_target_lufs: f64,
 }
 
 impl Default for AudioPrefs {
@@ -348,39 +325,16 @@ impl Default for AudioPrefs {
             generate_waveforms_on_import: true,
             multithreaded_waveforms: false,
             render_audio_with_video: false,
-            auto_tag_audio_types: true,
-            always_override_audio_tags: false,
             edit_in_audition_location: "nextToMedia".into(),
-            dialogue_target_lufs: -23.0,
-            music_target_lufs: -25.0,
-            sfx_target_lufs: -21.0,
-            ambience_target_lufs: -30.0,
         }
     }
 }
 
 impl AudioPrefs {
-    /// Auto-Match target for an audio type.
-    pub fn loudness_target(&self, t: waltcut_project::AudioType) -> f64 {
-        match t {
-            waltcut_project::AudioType::Dialogue => self.dialogue_target_lufs,
-            waltcut_project::AudioType::Music => self.music_target_lufs,
-            waltcut_project::AudioType::Sfx => self.sfx_target_lufs,
-            waltcut_project::AudioType::Ambience => self.ambience_target_lufs,
-        }
-    }
     fn clamp(&mut self) {
         self.automatch_time = if self.automatch_time.is_finite() { self.automatch_time.clamp(0.0, 30.0) } else { 1.0 };
         self.large_volume_adjustment = if self.large_volume_adjustment.is_finite() { self.large_volume_adjustment.clamp(0.0, 96.0) } else { 6.0 };
         self.minimum_time_ms = self.minimum_time_ms.clamp(1, 10_000);
-        for (v, d) in [
-            (&mut self.dialogue_target_lufs, -23.0),
-            (&mut self.music_target_lufs, -25.0),
-            (&mut self.sfx_target_lufs, -21.0),
-            (&mut self.ambience_target_lufs, -30.0),
-        ] {
-            *v = if v.is_finite() { v.clamp(-60.0, 0.0) } else { d };
-        }
     }
 }
 

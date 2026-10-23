@@ -161,7 +161,7 @@ impl Driver {
 fn audio_chrome_switches_between_themes() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
-    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
     for theme in ["light", "dark", "medium"] {
         d.ok("ui.set", json!({"theme": theme}));
         d.frames(3);
@@ -175,7 +175,7 @@ fn audio_chrome_switches_between_themes() {
 fn track_mixer_controls_by_id_and_by_drag() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
-    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
     d.frames(3);
     let ids = d.ids("mixer.");
     for id in ["mixer.A1.fader", "mixer.A1.pan", "mixer.A1.mode", "mixer.A1.mute", "mixer.A1.solo", "mixer.A1.output", "mixer.Mix.fader", "mixer.showEffects"] {
@@ -216,7 +216,7 @@ fn track_mixer_controls_by_id_and_by_drag() {
 fn recording_a_touch_pass_from_the_fader() {
     let mut d = Driver::demo();
     d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
-    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
     d.frames(3);
     d.exec("mixer.setStrip", json!({"strip": "A1", "mode": "Touch"}));
     d.exec("playhead.set", json!({"seconds": 1.0}));

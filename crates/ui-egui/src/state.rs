@@ -466,9 +466,6 @@ pub struct UiState {
     /// Effect Controls: the selected keyframes, highlighted in the keyframe lane (a click selects one).
     #[serde(default)]
     pub keyframe_selection: Vec<KeyframeRef>,
-    /// Essential Sound sub-tab: "Edit" or "Browse".
-    #[serde(default)]
-    pub essential_sound_tab: String,
     /// Export mode: settings, preset, destination, range, the Preset Manager and Quick Export.
     #[serde(default)]
     pub export: crate::panels::export_mode::ExportUi,
@@ -811,7 +808,6 @@ impl Default for UiState {
             failed_link: None,
             eyedropper: None,
             keyframe_selection: Vec::new(),
-            essential_sound_tab: "Edit".into(),
             export: Default::default(),
             play_after_render: true,
             mixer_fx_open: false,

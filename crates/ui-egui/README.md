@@ -22,6 +22,16 @@ Effect-mask creation, rows, tracking controls and Program overlays are removed i
 blend on media, drawing, text and shape clips. Native macOS UI execution and animation-flow
 screenshots remain pending.
 
+## Audio reduction (#23, partial draft)
+
+Essential Sound's panel, sub-tab state and automation ids are deleted with its engine commands,
+audio-type settings/presets and automatic processing. `scripted::essential_sound_panel_and_commands_are_absent`
+checks clean rejection without project or layout mutation. The focus-outline regression now uses
+the retained Essential Graphics panel. General audio effects, mixers and loudness remain for the
+next slice; playback, scrubbing, waveforms, mono/stereo, track mute and clip volume are unchanged.
+The production playback/export sample tests in `tests/audio_timing.rs` remain. Native macOS
+test execution and visual acceptance are pending; these stacked drafts are not complete or merged.
+
 ## Transition drop previews
 
 Dragging a video or audio transition over a compatible clip shows its actual time span, the

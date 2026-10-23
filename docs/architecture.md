@@ -432,41 +432,21 @@ stereo / mono track ──5.1 panner───┼─► 5.1 submix / 5.1 Mix ─�
   supported 1–8 channels; the exporter reorders to AAC's C, L, R, Ls, Rs, LFE). A stereo export of a
   5.1 Mix is the BS.775 downmix.
 
-### 5.2 Essential Sound
+### 5.2 Audio reduction boundary (#23, partial draft)
 
-```text
-clip.essential (type + settings)  ──apply()──►  clip effects marked `essential`, clip gain, Volume, Panner
-essentialSound.autoMatch   BS.1770 integrated loudness of render::audio::clip_signal (mono clips as one channel) → match gain (clip gain)
-essentialSound.generateDucking   trigger clips' summed level (10 ms hops) → activity regions → Volume keyframes
-```
+Essential Sound has no panel, UI state, command registry, audio-type model, owned effects or
+preferences. Its automatic loudness matching and ducking detector/keyframe generator are deleted,
+including the feature-only DSP ducking module and render-time mute branch. Track items and effect
+instances reject unknown fields, including removed Essential Sound metadata, rather than silently
+rendering a different sound. No legacy-project compatibility path is provided.
 
-- **Model** (`project::essential`). A clip's `essential: Option<EssentialSound>` holds its audio type
-  (Dialogue / Music / SFX / Ambience) and per-type sections: Loudness (match gain, measured and target
-  LUFS), Repair (Reduce Noise, Reduce Rumble, DeHum 50/60 Hz, DeEss, Reduce Reverb), Clarity
-  (Dynamics, EQ preset + amount, Enhance Speech), Creative (Reverb preset + amount, Stereo Width for
-  Ambience), Ducking (against types, sensitivity, reduce by, fades), Pan, Clip Volume and Mute.
-- **Effects under the hood.** `essential::apply(item, old, t)` turns the settings into ordinary clip
-  effects (Highpass, DeNoise, DeHummer, DeEsser, DeReverb, Dynamics Processing, Parametric Equalizer,
-  Enhance Speech, Stereo Width, Studio Reverb) flagged `EffectInstance::essential`, in that order, ahead
-  of the user's own effects. Only parameters whose derived value changed are written (at the playhead),
-  so keyframes added in Effect Controls survive. A section switch bypasses its effects, a slot switch
-  removes its effect, clearing the type removes them all. Auto-match gain, Clip Volume (an offset on
-  the Volume level or on all its keyframes) and Pan are applied as deltas, so clearing restores the
-  clip. Because these are normal effects, playback, the mixer and export need nothing special.
-- **Loudness.** The clip signal (clip gain + effects, before Volume) is measured with the BS.1770
-  meter; the gain is linear after the effects, so one measurement hits the target exactly. Targets are
-  preferences (`audio.dialogueTargetLufs` −23, `musicTargetLufs` −25, `sfxTargetLufs` −21,
-  `ambienceTargetLufs` −30).
-- **Ducking.** Sensitivity 0…10 maps to a threshold −20 − 4·s dBFS on the summed trigger signal (50 ms
-  window); regions shorter than 100 ms are dropped and pauses under 250 ms bridged; each region gets a
-  fade-down before it and a fade-up after it (`audio_dsp::ducking::duck_keyframes`), written as Volume
-  level keyframes that replace earlier ones.
-- **Presets** (our own names and values) per type; user presets are saved in preferences
-  (`essentialSound.userPresets`).
-- **Enhance Speech** is a DSP chain (high-pass, de-mud, presence and air EQ, expander, compressor), not a
-  model: no speech-enhancement model with an open licence that we could ship and verify is bundled.
-  DeepFilterNet (MIT/Apache-2.0, Rust inference via tract) is the candidate for a future optional
-  integration behind a trait.
+General audio effects (including DeEsser, DeReverb, Enhance Speech and Stereo Width), loudness
+metering/normalisation and mixer automation still have independent callers and remain for the next
+slice. `render::audio::clip_signal` remains for retained effect-render tests; the feature-only mono
+measurement helper is gone. Mono/stereo channel mapping, clip gain/Volume, track mute, waveforms,
+scrubbing, playback resampling and export are unchanged. Native macOS execution of the retained
+`audio_timing` playback/export tests and visual acceptance remain pending; #23 is not complete or
+merged.
 
 ### 5.3 Clip compositing
 
