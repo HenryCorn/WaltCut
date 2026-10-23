@@ -31,6 +31,23 @@ used to position or fade a drawing.
   shows the current input and pressure when available.
 - The lower barrel button erases while drawing when the tablet driver maps it to the secondary
   mouse button.
+- **Brush size and temporary erase** (Brush tool selected; **Graphics and Titles ▸ Drawing**, and
+  the same command ids over the control channel and MCP):
+  - `drawing.brushSizeUp` (`Alt+]`) and `drawing.brushSizeDown` (`Alt+[`), parameter `steps`
+    (1–100, default 1), step through 1, 2, 3, 4, 5, 6, 8, 10, 12 … 160, 200 px and stop at both
+    ends (the reply says `atLimit`). They are listed with their parameters in `ui.menu.list` and
+    are disabled when another tool is selected. A tablet driver can map an express key or dial
+    to these chords.
+  - `drawing.eraseTemporarily` (`Alt+E`): strokes erase while the key is held, whichever brush
+    is selected; the selected brush and all its settings are never changed, so letting go
+    brings back the same Pen, Pencil or Marker. Over the control channel
+    `{"active": true}` erases until `{"active": false}`. The hold also ends when the window
+    loses focus (a stroke in progress is abandoned, as with Escape) or another tool is
+    chosen. A stroke already begun keeps the mode it began in. A driver that sends the key as a
+    quick tap instead of holding it gives no erasing.
+  - The keys do not collide with anything in the default map: `[` and `]` remain the
+    clip-volume keys, `E` remains Extend Edit to Playhead, and `ui.brush.erase_held` in
+    `ui.inspect` shows an active hold.
 - **Input samples.** On macOS every pointer event of a pen becomes one sample with its own
   position, pressure, monotonic event time and phase (down, move, up). A stroke is built from that
   ordered stream, so several positions with different pressures inside one UI frame keep their
