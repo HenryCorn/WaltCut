@@ -18,7 +18,7 @@ cloud = ["dep:ureq", "dep:rustls", "dep:rustls-rustcrypto"]
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-base64 = "0.22"
+base64 = "0.23"
 ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier"], optional = true }
 rustls = { version = "0.23", default-features = false, optional = true }
 rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
