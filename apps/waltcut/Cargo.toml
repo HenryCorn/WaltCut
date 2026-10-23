@@ -6,7 +6,6 @@ edition.workspace = true
 license.workspace = true
 default-run = "waltcut"
 
-# The binary keeps its name until the product rename (#2 step 3).
 [[bin]]
 name = "waltcut"
 path = "src/main.rs"

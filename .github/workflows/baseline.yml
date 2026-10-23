@@ -52,16 +52,15 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          # the app package is `waltcut` before the crate rename (#2) and `waltcut` after it
-          pkg=waltcut
+          # the app package is `filmcraft` on the pre-reduction tag and `waltcut` after the rename (#2)
+          pkg=filmcraft
           cargo metadata --no-deps --format-version 1 | jq -e '.packages[] | select(.name == "waltcut")' > /dev/null && pkg=waltcut
           t0=$(date +%s)
           cargo build --release -p "$pkg"
           status=$?
           secs=$(( $(date +%s) - t0 ))
-          # the binary keeps its name until the product rename
-          bin=target/release/waltcut
-          [ -f "$bin" ] || bin=target/release/waltcut
+          # the binary is named after the package
+          bin="target/release/$pkg"
           {
             echo "release_build_seconds=$secs"
             echo "release_build_exit=$status"
