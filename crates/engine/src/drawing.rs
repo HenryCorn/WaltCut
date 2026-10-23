@@ -155,7 +155,7 @@ fn add_stroke(s: &mut Session, p: &Value) -> Result<Value> {
         if cel.strokes.len() >= drawing::MAX_CEL_STROKES {
             return Err(bad(ID, format!("a cel may hold at most {} strokes", drawing::MAX_CEL_STROKES)));
         }
-        cel.strokes.push(stroke);
+        cel.strokes_mut().push(stroke);
         Ok((cel.frame, cel.strokes.len()))
     })?;
     Ok(json!({"clip": clip.0, "cel": cel_frame, "strokes": n}))
@@ -173,7 +173,7 @@ fn set_strokes(s: &mut Session, p: &Value) -> Result<Value> {
     edit_drawing(s, ID, "Set Drawing", id, |d| {
         let i = d.ensure_cel(frame, false).map_err(|e| bad(ID, e))?;
         if let Some(c) = d.cels.get_mut(i) {
-            c.strokes = strokes;
+            c.strokes = strokes.into();
         }
         Ok(())
     })?;
@@ -199,7 +199,7 @@ fn clear_cel(s: &mut Session, p: &Value) -> Result<Value> {
     let cel = edit_drawing(s, ID, "Clear Cel", id, |d| {
         let i = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown here"))?;
         let c = d.cels.get_mut(i).ok_or_else(|| bad(ID, "no such cel"))?;
-        c.strokes.clear();
+        c.strokes_mut().clear();
         Ok(c.frame)
     })?;
     Ok(json!({"clip": clip.0, "cel": cel}))
@@ -233,7 +233,7 @@ fn tween_cels(s: &mut Session, p: &Value) -> Result<Value> {
             let strokes = drawing::tween(&a, &b, t);
             let k = d.ensure_cel(f, false).map_err(|e| bad(ID, e))?;
             if let Some(c) = d.cels.get_mut(k) {
-                *c = Cel { frame: f, strokes };
+                *c = Cel { frame: f, strokes: strokes.into() };
             }
             made.push(f);
             f = f.saturating_add(step);

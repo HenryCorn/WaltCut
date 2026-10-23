@@ -269,11 +269,12 @@ fn color32(c: [f32; 4], alpha: f32) -> Color32 {
 }
 
 /// The drawing clip the Brush tool paints on, with its drawing.
-fn target(app: &WaltCutApp) -> Option<(ClipId, TrackItem, Drawing)> {
+fn target(app: &WaltCutApp) -> Option<(ClipId, TrackItem, std::sync::Arc<Drawing>)> {
     let clip = waltcut_engine::drawing::target_clip(&app.session, &Value::Null)?;
     let seq = app.session.active_sequence()?;
     let (_, it) = seq.find_item(clip)?;
-    let (_, d) = waltcut_engine::drawing::drawing_of(&app.session, seq, clip)?;
+    // the project item holds the drawing behind an `Arc`: take a handle, not a copy of every cel
+    let waltcut_project::ItemKind::Drawing(d) = &app.session.project.item(it.item)?.kind else { return None };
     Some((clip, it.clone(), d.clone()))
 }
 

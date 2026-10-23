@@ -152,8 +152,11 @@ mod tests {
         let mut p = Project::new("retained drawing");
         let mut drawing = Drawing::new(64, 32, rate);
         drawing.cels = vec![
-            Cel { frame: 0, strokes: vec![stroke(Brush::Pen, &[(8.0, 16.0, 1.0), (56.0, 16.0, 1.0)], 6.0), stroke(Brush::Eraser, &[(32.0, 16.0, 1.0)], 10.0)] },
-            Cel { frame: 24, strokes: vec![] },
+            Cel {
+                frame: 0,
+                strokes: vec![stroke(Brush::Pen, &[(8.0, 16.0, 1.0), (56.0, 16.0, 1.0)], 6.0), stroke(Brush::Eraser, &[(32.0, 16.0, 1.0)], 10.0)].into(),
+            },
+            Cel { frame: 24, strokes: vec![].into() },
         ];
         let item = p.add_item("cels", Label::Iris, ItemKind::Drawing(drawing.into()), None);
         let seq = p.new_sequence("animation", SequenceSettings { width: 64, height: 32, frame_rate: rate, ..Default::default() }, 1, 0, None);

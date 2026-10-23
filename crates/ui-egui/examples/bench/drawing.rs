@@ -80,7 +80,10 @@ pub fn gen_drawing(wl: &Workload, w: u32, h: u32, rate: waltcut_time::FrameRate)
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let mut d = Drawing::new(w, h, rate);
     d.cels = (0..wl.cels)
-        .map(|c| Cel { frame: c * wl.hold, strokes: (0..wl.strokes).map(|i| gen_stroke(&mut rng, w as f32, h as f32, wl.points, i)).collect() })
+        .map(|c| Cel {
+            frame: c * wl.hold,
+            strokes: (0..wl.strokes).map(|i| gen_stroke(&mut rng, w as f32, h as f32, wl.points, i)).collect::<Vec<_>>().into(),
+        })
         .collect();
     d
 }
