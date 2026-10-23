@@ -1,0 +1,8 @@
+asset:        waltcut-drawing.png
+title:        README: Drawing a cel with the pen, onion skin and the cel controls over footage
+author:       WaltCut contributors (captured by Claude for the project)
+source:       original work (screenshot of WaltCut captured with its ui.screenshot control command, downscaled to 2000 px)
+license:      MIT OR Apache-2.0
+license-file: LICENSE-MIT
+added:        2026-10-23 by Claude (agent)
+notes:        Footage is synthetic (ffmpeg testsrc2 and gradients test patterns), the drawing strokes were made through the control channel, and the audio is a generated 440 Hz sine tone. No third-party footage. All UI icons are drawn in code; fonts are Inter and JetBrains Mono (OFL-1.1). Contains no Adobe artwork.
