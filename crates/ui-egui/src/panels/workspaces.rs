@@ -159,6 +159,7 @@ fn splice(items: &mut Vec<MenuItem>, prefs: &dock::WorkspacePrefs, session: &wal
                 shortcut: session.shortcuts.primary(&id),
                 enabled: true,
                 checked: current.map(|c| n == c),
+                params: None,
                 id,
             }
         })

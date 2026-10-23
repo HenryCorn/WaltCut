@@ -39,6 +39,9 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("playback.inToOut", "Play In to Out", [], Some("Alt+K")),
     uic!("playback.loop", "Loop", [], None),
     uic!("ai.restyleWindow", "AI Restyle…", ["Graphics and Titles"], None),
+    uic!("drawing.brushSizeUp", "Increase Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+]")),
+    uic!("drawing.brushSizeDown", "Decrease Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+[")),
+    uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
     uic!("view.zoomIn", "Zoom In", ["View"], Some("=")),
     uic!("view.zoomOut", "Zoom Out", ["View"], Some("-")),
     uic!("view.zoomToSequence", "Zoom to Sequence", ["View"], Some("\\")),
@@ -200,6 +203,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         let tool = Tool::from_name(t).ok_or_else(|| format!("unknown tool `{t}`"))?;
         app.ui.tool = tool;
         return Ok(json!({"tool": tool}));
+    }
+    if let Some(r) = crate::panels::drawing::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
     }
     if let Some(r) = crate::panels::keyboard::route(app, ctx, id, &params) {
         return r;
@@ -595,6 +604,9 @@ pub struct MenuItem {
     /// Checkmark state of toggle / radio items (None = not checkable).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checked: Option<bool>,
+    /// The parameters a UI command takes, as the command registry documents engine commands.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<String>,
 }
 
 pub const MENUS: [&str; 9] = ["File", "Edit", "Clip", "Sequence", "Markers", "Graphics and Titles", "View", "Window", "Help"];
@@ -612,6 +624,10 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
             it.checked = crate::panels::monitor_view::checked(app, &it.id).or(crate::panels::menu_dialogs::checked(app, &it.id));
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
         }
+        if let Some(doc) = crate::panels::drawing::params_doc(&it.id) {
+            it.params = Some(doc.to_string());
+            it.enabled &= crate::panels::drawing::enabled(app, &it.id);
+        }
     }
     crate::panels::workspaces::menu(app, &mut v);
     open_recent(&mut v, &app.session, |n| crate::i18n::t(n).to_string());
@@ -628,9 +644,25 @@ fn open_recent(items: &mut Vec<MenuItem>, session: &waltcut_engine::Session, tr:
     let mut sub: Vec<MenuItem> = recent
         .iter()
         .enumerate()
-        .map(|(i, p)| MenuItem { id: format!("file.openRecent.{i}"), label: recent_name(p), path: path.clone(), shortcut: None, enabled: true, checked: None })
+        .map(|(i, p)| MenuItem {
+            id: format!("file.openRecent.{i}"),
+            label: recent_name(p),
+            path: path.clone(),
+            shortcut: None,
+            enabled: true,
+            checked: None,
+            params: None,
+        })
         .collect();
-    sub.push(MenuItem { id: "file.clearRecent".into(), label: tr("Clear Recent Files"), path, shortcut: None, enabled: !recent.is_empty(), checked: None });
+    sub.push(MenuItem {
+        id: "file.clearRecent".into(),
+        label: tr("Clear Recent Files"),
+        path,
+        shortcut: None,
+        enabled: !recent.is_empty(),
+        checked: None,
+        params: None,
+    });
     items.splice(at + 1..at + 1, sub);
 }
 
@@ -669,6 +701,7 @@ pub fn menu_items_for(session: &waltcut_engine::Session) -> Vec<MenuItem> {
             shortcut: session.shortcuts.primary(c.id),
             enabled: session.is_enabled(c.id),
             checked: None,
+            params: None,
         });
     }
     for c in UI_COMMANDS.iter().chain(crate::panels::keyboard::COMMANDS) {
@@ -682,6 +715,7 @@ pub fn menu_items_for(session: &waltcut_engine::Session) -> Vec<MenuItem> {
             shortcut: session.shortcuts.primary(c.id),
             enabled: true,
             checked: None,
+            params: None,
         });
     }
     for p in PanelKind::ALL {
@@ -692,6 +726,7 @@ pub fn menu_items_for(session: &waltcut_engine::Session) -> Vec<MenuItem> {
             shortcut: session.shortcuts.primary(&panel_command_id(p)),
             enabled: true,
             checked: None,
+            params: None,
         });
     }
     out

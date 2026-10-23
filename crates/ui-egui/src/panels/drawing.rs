@@ -17,6 +17,113 @@ use waltcut_project::{ClipId, TrackItem};
 use super::drawing_input::{FrameInput, PenPhase, PenSample, PenStats, Sample, Source, StrokeBuilder, frame_samples};
 use super::drawing_raster::{SharedSlot, paint_onion, paint_stroke_preview};
 use crate::WaltCutApp;
+use crate::state::Tool;
+
+/// Why strokes erase for now, if they do (the selected brush and its settings are untouched, so
+/// there is nothing to restore but this flag).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EraseHold {
+    #[default]
+    Off,
+    /// The key bound to Erase While Held is down.
+    Key,
+    /// Switched on by `drawing.eraseTemporarily {active: true}` until `{active: false}`.
+    Command,
+}
+
+/// Brush sizes the size commands step through, in canvas pixels: bounded by the Brush options
+/// slider (1..=200).
+const SIZE_LADDER: [f32; 25] =
+    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 20.0, 24.0, 28.0, 32.0, 40.0, 48.0, 56.0, 64.0, 80.0, 96.0, 112.0, 128.0, 160.0, 200.0];
+pub const MIN_BRUSH_SIZE: f32 = 1.0;
+pub const MAX_BRUSH_SIZE: f32 = 200.0;
+/// Most ladder steps one command takes.
+const MAX_SIZE_STEPS: u64 = 100;
+
+/// The brush size `steps` ladder steps up or down from `current`, never past the bounds. A
+/// size between two steps moves to the next step in that direction; a non-finite size counts as
+/// the default.
+pub fn step_size(current: f32, up: bool, steps: u32) -> f32 {
+    let mut size = if current.is_finite() { current.clamp(MIN_BRUSH_SIZE, MAX_BRUSH_SIZE) } else { BrushSettings::default().size };
+    for _ in 0..steps.min(MAX_SIZE_STEPS as u32) {
+        let next = if up { SIZE_LADDER.iter().copied().find(|s| *s > size + 1e-3) } else { SIZE_LADDER.iter().rev().copied().find(|s| *s < size - 1e-3) };
+        match next {
+            Some(n) => size = n,
+            None => break,
+        }
+    }
+    size
+}
+
+/// Parameter documentation of the Brush commands (shown by `ui.menu.list`).
+pub fn params_doc(id: &str) -> Option<&'static str> {
+    match id {
+        "drawing.brushSizeUp" | "drawing.brushSizeDown" => Some(r#"{"steps":int?}  steps of the size ladder 1…200 px (1–100, default 1); stops at the bounds"#),
+        "drawing.eraseTemporarily" => Some(
+            r#"{"active":bool?}  true (default) erases until false, until the window loses focus or another tool is chosen; bound to a key it erases while the key is held"#,
+        ),
+        _ => None,
+    }
+}
+
+/// The Brush commands act while the Brush tool is selected.
+pub fn enabled(app: &WaltCutApp, id: &str) -> bool {
+    params_doc(id).is_some() && app.ui.tool == Tool::Brush
+}
+
+/// `drawing.brushSizeUp`, `drawing.brushSizeDown` and `drawing.eraseTemporarily`.
+pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
+    params_doc(id)?;
+    if app.ui.tool != Tool::Brush {
+        return Some(Err(format!("`{id}` is available while the Brush tool is selected")));
+    }
+    Some(match id {
+        "drawing.eraseTemporarily" => {
+            let active = match params.get("active") {
+                None | Some(Value::Null) => true,
+                Some(Value::Bool(b)) => *b,
+                Some(_) => return Some(Err("`active` must be true or false".into())),
+            };
+            // from a key press the hold lasts as long as the key; from a command, until told otherwise
+            let held_by_key = params.get("key").and_then(Value::as_bool).unwrap_or(false);
+            app.ui.brush.erase_held = match (active, held_by_key) {
+                (false, _) => EraseHold::Off,
+                (true, true) => EraseHold::Key,
+                (true, false) => EraseHold::Command,
+            };
+            Ok(json!({"erasing": active}))
+        }
+        _ => {
+            let steps = match params.get("steps") {
+                None | Some(Value::Null) => 1,
+                Some(v) => match v.as_u64() {
+                    Some(n) if (1..=MAX_SIZE_STEPS).contains(&n) => n as u32,
+                    _ => return Some(Err(format!("`steps` must be a whole number from 1 to {MAX_SIZE_STEPS}"))),
+                },
+            };
+            let before = app.ui.brush.size;
+            let size = step_size(before, id == "drawing.brushSizeUp", steps);
+            app.ui.brush.size = size;
+            let at_limit = if id == "drawing.brushSizeUp" { size >= MAX_BRUSH_SIZE } else { size <= MIN_BRUSH_SIZE };
+            Ok(json!({"size": size, "previous": before, "atLimit": at_limit}))
+        }
+    })
+}
+
+/// End a hold that no longer applies: its key came up, the window lost focus, or the Brush tool is
+/// not selected any more. Called every frame before shortcuts are handled.
+pub fn release_stale_erase(app: &mut WaltCutApp, ctx: &egui::Context) {
+    if app.ui.brush.erase_held == EraseHold::Off {
+        return;
+    }
+    // the loss itself, not the state: a window driven over the control channel is never focused
+    let focus_lost = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false))));
+    let key_up = app.ui.brush.erase_held == EraseHold::Key
+        && !app.bindings.iter().any(|(_, k, id, _)| id == "drawing.eraseTemporarily" && ctx.input(|i| i.key_down(*k)));
+    if app.ui.tool != Tool::Brush || focus_lost || key_up {
+        app.ui.brush.erase_held = EraseHold::Off;
+    }
+}
 
 /// What a stroke on a frame that does not start a cel draws into.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +174,10 @@ pub struct BrushSettings {
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
     #[serde(skip_deserializing)]
     pub pen: PenStats,
+    /// Whether strokes erase for now (Erase While Held), whatever brush is selected. Never loaded
+    /// back: the app starts with the brush it was left with.
+    #[serde(skip_deserializing)]
+    pub erase_held: EraseHold,
 }
 
 impl Default for BrushSettings {
@@ -81,6 +192,7 @@ impl Default for BrushSettings {
             onion_opacity: 0.35,
             tween_step: 2,
             pen: PenStats::default(),
+            erase_held: EraseHold::Off,
         }
     }
 }
@@ -280,7 +392,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                     let [r, g, bb, a] = c32.to_srgba_unmultiplied();
                     b.color = [r as f32 / 255.0, g as f32 / 255.0, bb as f32 / 255.0, a as f32 / 255.0];
                 }
-                ui.add(egui::Slider::new(&mut b.size, 1.0..=200.0).logarithmic(true).text("px"));
+                ui.add(egui::Slider::new(&mut b.size, MIN_BRUSH_SIZE..=MAX_BRUSH_SIZE).logarithmic(true).text("px"));
                 ui.checkbox(&mut b.pressure, if tablet { "Pressure (tablet)" } else { "Pressure" });
                 // live pen readout: confirms the tablet's pressure and buttons reach the app
                 let (pb, sb, mb) = ui.input(|i| (i.pointer.primary_down(), i.pointer.secondary_down(), i.pointer.middle_down()));
@@ -292,6 +404,11 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 );
                 let r = ui.label(egui::RichText::new(readout).monospace().small());
                 app.auto.add("program.brush.readout", r.rect, "pen readout");
+                if b.erase_held != EraseHold::Off {
+                    // the selected brush is unchanged and comes back when the hold ends
+                    let r = ui.label(egui::RichText::new(format!("Erasing (back to {})", b.brush.label())).strong());
+                    app.auto.add("program.brush.erasing", r.rect, "temporary eraser");
+                }
                 ui.separator();
                 egui::ComboBox::from_id_salt("brush-cel-mode").selected_text(b.cel_mode.label()).show_ui(ui, |ui| {
                     for m in CelMode::ALL {
@@ -402,7 +519,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
         let ended = pending.last().is_some_and(|s| s.phase == PenPhase::Up);
         let start = ui.input(|i| i.pointer.press_origin()).or_else(|| ui.input(|i| i.pointer.interact_pos()));
         if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && pic.contains(p)) {
-            let mut l = Live { clip: clip.0, stroke: StrokeBuilder::default(), eraser: secondary };
+            let mut l = Live { clip: clip.0, stroke: StrokeBuilder::default(), eraser: secondary || app.ui.brush.erase_held != EraseHold::Off };
             let mut samples = std::mem::take(&mut pending);
             if samples.first().is_none_or(|s| s.phase != PenPhase::Down) {
                 // the press itself was not seen (no hook, or a drag that began elsewhere): start where it was pressed
@@ -494,4 +611,38 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
         None => format!("Frame {f} · no cel yet"),
     };
     painter.text(pic.left_bottom() + vec2(8.0, -8.0), egui::Align2::LEFT_BOTTOM, label, egui::FontId::proportional(12.0), Color32::from_white_alpha(200));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_size_ladder_is_monotonic_bounded_and_stops_at_both_ends() {
+        assert!(SIZE_LADDER.windows(2).all(|w| w[0] < w[1]));
+        assert_eq!((SIZE_LADDER[0], SIZE_LADDER[SIZE_LADDER.len() - 1]), (MIN_BRUSH_SIZE, MAX_BRUSH_SIZE));
+        let (mut up, mut down) = (6.0, 6.0);
+        for _ in 0..200 {
+            up = step_size(up, true, 1);
+            down = step_size(down, false, 1);
+        }
+        assert_eq!((up, down), (MAX_BRUSH_SIZE, MIN_BRUSH_SIZE));
+        assert_eq!(step_size(6.0, true, 3), 12.0);
+        assert_eq!(step_size(6.0, false, 2), 4.0);
+        // a size between two steps goes to the next step in that direction
+        assert_eq!(step_size(7.0, true, 1), 8.0);
+        assert_eq!(step_size(7.0, false, 1), 6.0);
+        // a huge step count is bounded, not a long loop
+        assert_eq!(step_size(6.0, true, u32::MAX), MAX_BRUSH_SIZE);
+    }
+
+    #[test]
+    fn hostile_sizes_are_brought_back_in_range() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -5.0, 0.0, 1e30] {
+            let s = step_size(bad, true, 1);
+            assert!((MIN_BRUSH_SIZE..=MAX_BRUSH_SIZE).contains(&s), "{bad} -> {s}");
+            let s = step_size(bad, false, 1);
+            assert!((MIN_BRUSH_SIZE..=MAX_BRUSH_SIZE).contains(&s), "{bad} -> {s}");
+        }
+    }
 }
