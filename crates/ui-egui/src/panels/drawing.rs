@@ -7,7 +7,7 @@
 //! it is full. The neighbouring cels show as onion skins: the one before in red, the one after
 //! in green.
 
-use egui::{Color32, Pos2, Rect, Sense, Stroke as EStroke, pos2, vec2};
+use egui::{Color32, Pos2, Rect, Sense, Stroke as EStroke, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use waltcut_geom::{Affine, Vec2};
@@ -15,6 +15,7 @@ use waltcut_project::drawing::{Brush, Drawing, Stroke};
 use waltcut_project::{ClipId, TrackItem};
 
 use super::drawing_input::{FrameInput, PenPhase, PenSample, PenStats, Sample, Source, StrokeBuilder, frame_samples};
+use super::drawing_raster::{SharedSlot, paint_onion, paint_stroke_preview};
 use crate::WaltCutApp;
 
 /// What a stroke on a frame that does not start a cel draws into.
@@ -93,6 +94,30 @@ struct Live {
     eraser: bool,
 }
 
+/// A stroke that was committed and whose frame the Program monitor has not shown yet.
+#[derive(Clone, Debug)]
+struct Committed {
+    clip: u64,
+    stroke: Stroke,
+    /// The project revision that contains it.
+    revision: u64,
+    /// UI time of the commit, seconds.
+    time: f64,
+}
+
+/// Give up waiting for the engine's frame after this long.
+const COMMITTED_TIMEOUT_S: f64 = 3.0;
+
+/// The live stroke as the project stroke it will become.
+fn live_stroke(b: &BrushSettings, l: &Live) -> Stroke {
+    Stroke {
+        brush: if l.eraser { Brush::Eraser } else { b.brush },
+        color: b.color,
+        size: b.size,
+        points: l.stroke.points.iter().map(|p| waltcut_project::drawing::StrokePoint { x: p[0], y: p[1], p: p[2] }).collect(),
+    }
+}
+
 /// Samples of a press that has not become a stroke (yet): the press, and the moves after it, until
 /// the canvas decides the press belongs to it. Bounded, newest replacing the last when full.
 const MAX_PENDING: usize = 512;
@@ -120,10 +145,6 @@ impl Mapping {
         let scale = to_screen.determinant().abs().sqrt() as f32;
         (scale.is_finite() && scale > 0.0).then_some(Mapping { to_screen, from_screen, scale })
     }
-    fn screen(&self, x: f32, y: f32) -> Pos2 {
-        let p = self.to_screen.apply(Vec2::new(x as f64, y as f64));
-        pos2(p.x as f32, p.y as f32)
-    }
     fn canvas(&self, p: Pos2) -> (f32, f32) {
         let q = self.from_screen.apply(Vec2::new(p.x as f64, p.y as f64));
         (q.x as f32, q.y as f32)
@@ -133,43 +154,6 @@ impl Mapping {
 fn color32(c: [f32; 4], alpha: f32) -> Color32 {
     let b = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
     Color32::from_rgba_unmultiplied(b(c[0]), b(c[1]), b(c[2]), b(c[3] * alpha))
-}
-
-/// Paint a stroke preview: round-capped segments, width following pressure.
-fn paint_stroke(painter: &egui::Painter, map: &Mapping, brush: Brush, size: f32, pts: &[[f32; 3]], color: Color32) {
-    let radius = |p: f32| (size * 0.5 * brush.response(p).0 * map.scale).max(0.5);
-    if color.a() < 255 && pts.len() > 1 {
-        // translucent (onion skins): bare segments, no round joints, so overlapping joints don't
-        // stack their alpha into beads (and no polyline, whose miters spike where samples double back)
-        for w in pts.windows(2) {
-            if let [a, b] = w {
-                painter.line_segment([map.screen(a[0], a[1]), map.screen(b[0], b[1])], EStroke::new(radius(a[2]) + radius(b[2]), color));
-            }
-        }
-        return;
-    }
-    let mut prev: Option<(Pos2, f32)> = None;
-    for &[x, y, p] in pts {
-        let s = map.screen(x, y);
-        let r = radius(p);
-        if let Some((q, rq)) = prev {
-            painter.line_segment([q, s], EStroke::new(r + rq, color));
-        }
-        painter.circle_filled(s, r, color);
-        prev = Some((s, r));
-    }
-}
-
-fn paint_cel(painter: &egui::Painter, map: &Mapping, strokes: &[Stroke], tint: Option<Color32>, alpha: f32) {
-    for s in strokes {
-        let pts: Vec<[f32; 3]> = s.points.iter().map(|p| [p.x, p.y, p.p]).collect();
-        let c = match (s.brush, tint) {
-            (Brush::Eraser, _) => continue,
-            (_, Some(t)) => t.gamma_multiply(alpha),
-            (_, None) => color32(s.color, alpha),
-        };
-        paint_stroke(painter, map, s.brush, s.size, &pts, c);
-    }
 }
 
 /// The drawing clip the Brush tool paints on, with its drawing.
@@ -353,14 +337,13 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
     let f = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
     let f = d.frame_at(f);
     if app.ui.brush.onion {
+        // the neighbouring cels as the engine rasterises them (erasers applied), tinted, cached
         let (prev, next) = d.neighbours(f);
         let a = app.ui.brush.onion_opacity.clamp(0.0, 1.0);
-        if let Some(c) = prev {
-            paint_cel(&painter, &map, &c.strokes, Some(Color32::from_rgb(230, 70, 70)), a);
-        }
-        if let Some(c) = next {
-            paint_cel(&painter, &map, &c.strokes, Some(Color32::from_rgb(60, 190, 90)), a);
-        }
+        let slot = |name: &str| ui.data_mut(|dd| dd.get_temp_mut_or_default::<SharedSlot>(egui::Id::new(("brush-onion", name))).clone());
+        let revision = app.session.revision;
+        paint_onion(&painter, &slot("prev"), revision, clip.0, prev.map(|c| (c.frame, c.strokes.as_slice())), [230, 70, 70], a, &map.to_screen, pic);
+        paint_onion(&painter, &slot("next"), revision, clip.0, next.map(|c| (c.frame, c.strokes.as_slice())), [60, 190, 90], a, &map.to_screen, pic);
     }
     let id = egui::Id::new("brush-overlay");
     let resp = ui.interact(pic, id, Sense::click_and_drag());
@@ -447,11 +430,20 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
         app.ui.status = "Stroke cancelled: nothing was drawn".to_string();
         released = false;
     }
+    // The stroke just committed stays on screen until the engine's frame with it arrives.
+    let committed_id = id.with("committed");
+    let committed: Option<Committed> = ui.data(|dd| dd.get_temp(committed_id));
+    if let Some(c) = committed {
+        let arrived = app.program_picture().is_some_and(|k| k.revision >= c.revision);
+        if arrived || ui.input(|i| i.time) - c.time > COMMITTED_TIMEOUT_S || c.clip != clip.0 {
+            ui.data_mut(|dd| dd.remove::<Committed>(committed_id));
+        } else {
+            paint_stroke_preview(&painter, "brush-committed", &c.stroke, &map.to_screen, pic);
+            ui.ctx().request_repaint();
+        }
+    }
     if let Some(l) = live.as_ref() {
-        let b = &app.ui.brush;
-        let brush = if l.eraser { Brush::Eraser } else { b.brush };
-        let c = if brush == Brush::Eraser { Color32::from_white_alpha(120) } else { color32(b.color, 1.0) };
-        paint_stroke(&painter, &map, brush, b.size, &l.stroke.points, c);
+        paint_stroke_preview(&painter, "brush-live", &live_stroke(&app.ui.brush, l), &map.to_screen, pic);
         ui.ctx().request_repaint();
     }
     // The stroke ends on the pen-up sample, or when the UI says the button is up (no sample seen).
@@ -478,7 +470,10 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
             "points": l.stroke.points,
         });
         let params = json!({"clip": l.clip, "cel": b.cel_mode.param(), "stroke": stroke});
+        let shown = live_stroke(&b, &l);
         run(app, "drawing.addStroke", params);
+        let c = Committed { clip: l.clip, stroke: shown, revision: app.session.revision, time: ui.input(|i| i.time) };
+        ui.data_mut(|dd| dd.insert_temp(committed_id, c));
     }
     ui.data_mut(|dd| {
         if let Some(l) = live {
