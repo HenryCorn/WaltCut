@@ -15,6 +15,8 @@
 //! with ffmpeg into `target/fixtures/playback/` on first use (see `fixtures.rs`); sections whose
 //! fixtures cannot be made are skipped. See `docs/performance.md`.
 
+mod drawing;
+mod drawing_ui;
 mod fixtures;
 #[allow(dead_code)]
 mod playback;
@@ -25,7 +27,7 @@ use std::process::Command;
 
 use serde_json::{Value, json};
 
-pub const SECTIONS: &[&str] = &["decode", "seek", "playback", "scrub", "timeline", "export", "project"];
+pub const SECTIONS: &[&str] = &["decode", "seek", "playback", "scrub", "timeline", "export", "project", "drawing"];
 
 #[derive(Clone)]
 pub struct Opts {
@@ -90,6 +92,7 @@ fn run_section(name: &str, o: &Opts) -> Value {
         "timeline" => sections::timeline(o),
         "export" => sections::export(o),
         "project" => sections::project(o),
+        "drawing" => drawing::drawing(o),
         _ => panic!("unknown section {name} (one of {})", SECTIONS.join(", ")),
     };
     json!({"section": name, "rows": rows, "wall_s": t0.elapsed().as_secs_f64(), "load_before": load0, "load_after": playback::load_avg()})
@@ -236,6 +239,17 @@ pub fn section_markdown(v: &Value) -> String {
     let mut s = format!("### {name}\n\n");
     if let Some(e) = v.get("error") {
         s += &format!("failed: {e}\n");
+        return s;
+    }
+    if name == "drawing" {
+        s += &drawing::markdown(&rows);
+        if let Some(m) = v.get("peak_rss_mb") {
+            s += &format!(
+                "\npeak RSS of the whole section (all workloads) {:.0} MB; section wall {:.0} s\n",
+                m.as_f64().unwrap_or(0.0),
+                v["wall_s"].as_f64().unwrap_or(0.0)
+            );
+        }
         return s;
     }
     let (cols, prec): (&[(&str, &str)], usize) = match name {

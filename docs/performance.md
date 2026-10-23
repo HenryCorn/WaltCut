@@ -24,6 +24,140 @@ the before/after comparison relies on. Each milestone below alternated base / af
 each); the most load-independent figure is the decoder's own cycle count (`proc_pid_rusage`
 instructions and cycles of a process, all threads summed).
 
+## Drawing workload baselines (#70)
+
+Measured 2026-10-23 on an Apple M4 Pro (12 cores, 24 GB, macOS 15 / Darwin 24.6) with the
+unmodified `origin/main` (commit `7940273c`) release build. **The machine was shared**: the load
+average was 4–10 during the headless runs (see the `load` column of the JSON), so wall-clock
+figures are upper bounds and only comparable with runs made under similar load; the min–max over
+three repeats is shown to make that visible. Not measured: anything on a real pen tablet (#5), and
+pen-to-photon latency, which needs a camera.
+
+**Workloads** (fixed seed, nothing committed; `crates/ui-egui/examples/bench/drawing.rs`): a
+1920×1080 drawing clip over a 20 s 1080p H.264 reference clip, strokes cycling Pen / Pencil /
+Marker with every tenth an Eraser:
+
+| name | unique cels | strokes per cel | samples per stroke | held for | samples in total |
+|---|---|---|---|---|---|
+| small | 12 | 20 | 40 | 2 frames | 9 600 |
+| medium | 48 | 150 | 120 | 2 frames | 864 000 |
+| stress | 96 | 1 500 | 200 | 1 frame | 28 800 000 |
+
+### Headless suite
+
+```sh
+cargo xtask bench --sections drawing --only small --repeat 3 --label drawing-small   # also medium, stress
+cargo xtask bench --sections drawing --only stress/play --repeat 1                    # one phase in its own process
+WALTCUT_BENCH_SAVE=<dir> cargo run --release -p waltcut-ui-egui --example bench -- --section drawing --only small/raster   # also saves the workload as a project
+```
+
+Median (min–max) of three repeats:
+
+| measurement | small | medium | stress |
+|---|---|---|---|
+| Rasterise one 1080p cel on the CPU, warm (ms) | 2.0 (2.0–2.0) | 40.8 (40.8–40.9) | 635 (627–642) |
+| … first call (ms) | 2.3 (2.3–2.9) | 40.6 (40.1–45.7) | 627 (626–638) |
+| Pen-up: `drawing.addStroke` of 150 samples (ms) | 0.03 (0.03–0.03) | 1.1 (1.0–1.2) | 31.5 (28.9–33.4) |
+| Pen-up until the exact frame is ready (ms) | 12.1 (10.5–12.2) | 54.2 (54.2–58.5) | 683 (680–684) |
+| Undo of that stroke (ms) | 0.00 (0.00–0.00) | 0.00 (0.00–0.00) | 0.00 (0.00–0.01) |
+| Random seek until the exact frame is shown, p50 (ms) | 103 (98–105) | 151 (146–155) | 726 (721–733) |
+| … p95 (ms) | 160 (159–177) | 208 (207–213) | 788 (788–793) |
+| Playhead drag stops until its frame is shown, p50 (ms) | 39.1 (37.8–39.2) | 64.2 (55.4–71.5) | 790 (789–803) |
+| Frames shown during a 24-frame playhead drag (%) | 0.00 (0.00–0.00) | 3.6 (3.1–3.6) | 3.1 (3.1–3.1) |
+| Playback at full resolution: frames dropped (%) | 0.00 (0.00–0.52) | 0.00 (0.00–0.52) | 95.8 (95.3–97.4) |
+| … frame job service time, p50 (ms) | 7.5 (7.3–7.6) | 49.5 (49.1–49.6) | 680 (678–683) |
+| … p95 (ms) | 14.5 (13.8–14.6) | 56.6 (55.3–57.3) | 700 (698–702) |
+| UI frame (update + tessellation), Brush tool, onion skin on (ms) | 0.60 (0.60–0.60) | 4.2 (3.9–4.3) | 87.4 (84.2–87.8) |
+| … onion skin off (ms) | 0.49 (0.49–0.49) | 1.0 (0.9–1.2) | 36.2 (30.6–36.4) |
+| … while a 600-sample stroke is drawn (ms) | 0.62 (0.62–0.62) | 4.2 (4.1–4.2) | 86.6 (86.5–88.3) |
+| … p95 (ms) | 0.66 (0.65–0.69) | 5.0 (4.8–5.2) | 92.2 (89.8–94.3) |
+
+| peak RSS (MB), phase in its own process | small | medium | stress |
+|---|---|---|---|
+| cel rasterisation only | 76 | 90 | 472 |
+| 20 pen-up trials (5 for stress) | 1105 | 1301 | 1631 |
+| scrubbing | 1676 | 1804 | 2238 |
+| playback | 1825 | 1828 | 1534 |
+| Brush tool UI frames | 310 | 745 | 2607 |
+
+How the rows are measured: *rasterise* is `waltcut_render::drawing::render_strokes` on one
+cel; *pen-up* is `drawing.addStroke` (parse, edit, undo snapshot), then the time until the frame
+server returns the exact frame at the new revision; *scrub* and *playback* are the frame
+scheduler of the existing `scrub` and `playback` sections with the drawing clip in the
+sequence; the *UI frame* is the whole app under `egui_kittest` (layout, the egui painter that
+draws the onion skins and the live stroke, tessellation; the wgpu draw is not included) at a
+cel with a neighbour on each side.
+
+### Native app
+
+`tools/bench-drawing-native.py --project <saved workload>` drives the running desktop app over the
+control channel (a fresh app per workload, hardware decoding on, the Program monitor at 1/2
+resolution as the app chose it):
+
+| measurement | small | medium | stress |
+|---|---|---|---|
+| Open the project (`file.open`), s | 0.0 | 0.6 | 42.0 |
+| App RSS after opening (MB) | 130 | 212 | 1312 |
+| `drawing.addStroke` round trip over the control channel, p50 (ms) | 0.7 | 8.2 | 145.7 |
+| … max (ms) | 2 | 138 | 4571 |
+| App UI frame time at the end of a synthetic 120-step drag (ms) | 2.1 | 6.4 | 110.6 |
+| Playback 8 s at 1/2 resolution: frames shown / dropped | 200 / 0 | 200 / 0 | 64 / 127 |
+| … audio callbacks / underruns / minimum lead (ms) | 717 / 0 / 167 | 716 / 0 / 167 | 691 / 0 / 167 |
+| … frame render time p50 / p95 (ms) | 2.0 / 9.7 | 17.9 / 32.3 | 249.4 / 457.0 |
+| … CPU seconds used while playing | 10.7 | 13.8 | 57.8 |
+| … peak app RSS (MB) | 2577 | 2563 | 5849 |
+
+A synthetic drag sends one pointer event per UI frame, so the frame time at its end is the cost of
+a frame with a live stroke; it is not pen latency.
+
+### Where the time and memory go
+
+* **Cel rasterisation dominates frames with drawing.** A frame's service time is the cel's
+  rasterisation (≈ 2 µs per stroke sample here: 2 ms, 41 ms and 635 ms per cel) plus a few ms of
+  decode and composition; the reference video's decode is 0–8 ms per frame job (hardware
+  decoding) in every row. Playback keeps up with *small* and *medium* (the prefetching frame workers hide the
+  41 ms) and drops 96 % of the frames with *stress*, whose frames take 680 ms.
+* **Onion skins are the UI cost.** The egui painter draws every stroke of both neighbouring cels
+  as segments on every frame: with onion skin on, a UI frame costs 0.6 / 4.2 / 87 ms, and 0.5 / 1.0
+  / 36 ms with it off (*stress*: 538 000 shapes per frame). A live stroke adds nothing
+  measurable (600 samples = 1 200 shapes). Drawing with the *stress* project in the native app
+  runs at ≈ 110 ms per frame.
+* **The off-onion cost of *stress* (36 ms) is a copy.** `panels/drawing.rs::target` clones the whole
+  `Drawing` (every cel's strokes) on every UI frame while the Brush tool is active, to read one cel;
+  at 28.8 M samples that is ≈ 350 MB per frame. The clone is avoidable (the item holds an
+  `Arc<Drawing>`).
+* **Pen-up costs a copy of the drawing too.** `drawing.addStroke` takes 0.03 / 1.1 / 31.5 ms because
+  the edit makes the item's `Arc<Drawing>` unique while the undo snapshot still shares it, which
+  clones every cel. It grows with the whole drawing, not with the cel or the stroke. Undo is a
+  pointer swap (< 0.01 ms). After the commit, the exact frame arrives 10 / 53 / 650 ms later, which is
+  one cel rasterisation; until then the live stroke is gone and the old picture is shown.
+* **Memory.** The frame-plan cache sits at its 1 GiB budget (`frames.cache.planMB` 1073 for 69
+  plans, ≈ 15.5 MB each) in every workload after a few seconds of playback, so the app's RSS is
+  2.5 GB for *small* and *medium* against 0.5–0.7 GB for the reference clip alone in the headless
+  suite. *Stress* adds the drawing itself (a 28.8 M-sample drawing is ≈ 350 MB in memory,
+  1.2 GB as a project file, 42 s to open) and its rasterised canvases: 5.8 GB at the peak.
+* **Audio.** 0 underruns and a 167 ms minimum lead in all three workloads, even with 66 % of the
+  video frames dropped: drawing load does not disturb the audio mixer.
+
+### Attainable budgets and proposal
+
+Budgets that the numbers support on this machine (they are workload-specific, not universal):
+live drawing needs a UI frame under ≈ 8 ms (120 Hz) and a pen-up under ≈ 16 ms; playback at 24 fps
+needs a cel under ≈ 40 ms for the prefetch to hold. *Small* meets all of them with room to spare. *Medium* meets the UI budget (4.2 ms with onion skin on) and
+the pen-up budget (1.1 ms); its 41 ms cel is at the playback limit and plays without drops only
+because six frame workers prefetch. *Stress* misses every budget by 10×–80×.
+
+Focused proposal, in order of benefit per effort (each needs its own issue; none is started here):
+
+1. Hold an `Arc<Drawing>` instead of cloning it every UI frame in the Brush tool (removes the
+   36 ms floor of *stress*), and avoid the whole-drawing clone on `drawing.addStroke` (a persistent
+   cel list, or `Arc` per cel, so an edit clones one cel).
+2. Cache each cel's raster (the epic's #71) and draw onion skins from it instead of re-painting
+   every stroke; invalidate by cel.
+3. Keep the committed stroke visible between pen-up and the arrival of the new frame (#55).
+4. Bound the frame-plan cache by the size of its layers, not 1 GiB of 15 MB plans, if lower
+   memory matters.
+
 ## Memory of clips on a timeline (MEM1–MEM3)
 
 Measured on the desktop release build with `footprint`, `heap` and `malloc_history`

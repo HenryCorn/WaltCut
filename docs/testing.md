@@ -272,12 +272,12 @@ engine behaviour without a window.
 | Coding-tool coverage of the fixtures | `cargo test --release -p waltcut-h264 --test conformance coverage_report -- --ignored --nocapture` (same for `hevc`) |
 | **Whole-app suite**: decode fps per codec, playback, scrubbing, timeline UI, export, project save/open, peak RSS | `cargo xtask bench` ([performance.md](performance.md)) |
 
-`cargo xtask bench` (the example `crates/ui-egui/examples/bench/`) runs six sections, each in its
+`cargo xtask bench` (the example `crates/ui-egui/examples/bench/`) runs seven sections, each in its
 own process under `/usr/bin/time` so peak RSS is per section: `decode` (every frame of 1080p and
 2160p H.264, HEVC, VP9, AV1 and ProRes through the media stack), `playback` (the scenarios below),
 `scrub` (random seeks and playhead drags: time until the exact frame is on screen), `timeline`
 (the real app under `egui_kittest` with a 1000-clip / 20-track sequence: update, tessellation and
-wgpu render ms per frame), `export` (H.264 + AAC and ProRes) and `project` (save / open 5000 clips).
+wgpu render ms per frame), `export` (H.264 + AAC and ProRes), `project` (save / open 5000 clips) and `drawing` (small / medium / stress drawing workloads over reference video: cel rasterisation, pen-up, scrub, playback, Brush-tool UI frames; `--only <workload>[/<phase>]`; `tools/bench-drawing-native.py` adds the running app's audio and dropped-frame counters; results in [performance.md](performance.md)).
 Options: `--sections decode,scrub`, `--only <substring>` (fixture or scenario), `--repeat N`,
 `--quick`, `--cpu`, `--hw auto|off` (Settings ▸ Playback ▸ Hardware decoding; default `auto`, as the app), `--label NAME` (output `target/bench/bench-<label>.{json,md}`),
 `--section NAME --json FILE` (one section in-process, e.g. under a profiler). Fixtures are made

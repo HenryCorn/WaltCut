@@ -325,13 +325,13 @@ pub fn big_sequence(s: &mut Session, item: ItemId, name: &str, seed: u64) -> (It
 
 // ------------------------------------------------------------------------------------ timeline UI
 
-struct Ui {
-    harness: egui_kittest::Harness<'static, waltcut_ui_egui::WaltCutApp>,
-    tx: std::sync::mpsc::Sender<waltcut_ui_egui::control::ControlRequest>,
+pub struct Ui {
+    pub harness: egui_kittest::Harness<'static, waltcut_ui_egui::WaltCutApp>,
+    pub tx: std::sync::mpsc::Sender<waltcut_ui_egui::control::ControlRequest>,
 }
 
 impl Ui {
-    fn frame(&mut self) {
+    pub fn frame(&mut self) {
         let ctx = self.harness.ctx.clone();
         let mut raw = std::mem::take(self.harness.input_mut());
         eframe::App::raw_input_hook(self.harness.state_mut(), &ctx, &mut raw);
@@ -339,7 +339,7 @@ impl Ui {
         self.harness.step();
     }
 
-    fn call(&mut self, method: &str, params: Value) -> Value {
+    pub fn call(&mut self, method: &str, params: Value) -> Value {
         let (req, reply) = waltcut_ui_egui::control::ControlRequest::new(method, params.clone());
         self.tx.send(req).expect("control");
         for _ in 0..600 {
