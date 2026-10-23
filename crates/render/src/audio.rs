@@ -1,6 +1,5 @@
 //! Retained mono/stereo soundtrack playback and waveform helpers.
 
-use waltcut_audio_dsp::channels::{self as channels, Layout, Mixdown};
 use waltcut_frame::AudioBuffer;
 use waltcut_project::{Project, Sequence, TrackItem};
 use waltcut_time::{Tick, TimeRange};
@@ -10,25 +9,6 @@ use crate::{MAX_NEST_DEPTH, SourceProvider};
 /// Mix the enabled, unmuted audio tracks to stereo. Track order does not affect the sum.
 pub fn mix_sequence(project: &Project, seq: &Sequence, start: i64, frames: usize, sources: &dyn SourceProvider) -> AudioBuffer {
     mix_sequence_at(project, seq, start, frames, sources, 0)
-}
-
-pub fn mix_sequence_layout(
-    project: &Project,
-    seq: &Sequence,
-    start: i64,
-    frames: usize,
-    sources: &dyn SourceProvider,
-    layout: Layout,
-    mixdown: Mixdown,
-) -> AudioBuffer {
-    to_layout(mix_sequence(project, seq, start, frames, sources), layout, mixdown)
-}
-
-pub fn to_layout(buffer: AudioBuffer, layout: Layout, mixdown: Mixdown) -> AudioBuffer {
-    if buffer.channels.len() == layout.channels() {
-        return buffer;
-    }
-    AudioBuffer { sample_rate: buffer.sample_rate, channels: channels::convert_owned(buffer.channels, layout, mixdown) }
 }
 
 fn mix_sequence_at(project: &Project, seq: &Sequence, start: i64, frames: usize, sources: &dyn SourceProvider, depth: u32) -> AudioBuffer {

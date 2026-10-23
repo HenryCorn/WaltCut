@@ -1,5 +1,5 @@
 //! M6.5 export settings: image sequences, audio-only formats, frame size / rate / scaling,
-//! loudness normalization, two-pass and CBR H.264, the video limiter, overlays, metadata and the
+//! two-pass and CBR H.264, the video limiter, overlays, metadata and the
 //! QuickTime multiplexer. ffprobe / ffmpeg are used only as external test oracles.
 
 use std::path::{Path, PathBuf};
@@ -263,17 +263,17 @@ fn image_sequences_keep_alpha_when_asked() {
 fn wav_and_aiff_audio_only() {
     let (p, seq, m) = matte([0.0, 0.0, 0.0, 1.0], 64, 36, Some(-6.0));
     let dir = Scratch::new("audio");
-    // WAV, 24-bit mono at 44.1 kHz
+    // WAV, 24-bit stereo at 44.1 kHz
     let wav = dir.path("a.wav");
     let mut s = ExportSettings { format: Format::Wav, path: wav.clone(), ..Default::default() };
-    s.audio = AudioSettings { sample_rate: Some(44_100), channels: 1, bits: 24, ..Default::default() };
+    s.audio = AudioSettings { sample_rate: Some(44_100), bits: 24, ..Default::default() };
     s.range = Some(TimeRange::new(Tick::ZERO, Tick(TICKS_PER_SECOND / 2)));
     export(&p, seq, &s, &m, &Progress::default()).unwrap();
     let b = std::fs::read(&wav).unwrap();
-    assert_eq!(u16::from_le_bytes([b[22], b[23]]), 1, "mono");
+    assert_eq!(u16::from_le_bytes([b[22], b[23]]), 2, "stereo");
     assert_eq!(u32::from_le_bytes(b[24..28].try_into().unwrap()), 44_100);
     assert_eq!(u16::from_le_bytes([b[34], b[35]]), 24);
-    assert_eq!(u32::from_le_bytes(b[40..44].try_into().unwrap()), 22_050 * 3, "0.5 s of 24-bit mono");
+    assert_eq!(u32::from_le_bytes(b[40..44].try_into().unwrap()), 22_050 * 2 * 3, "0.5 s of 24-bit stereo");
     // AIFF, 16-bit stereo at the sequence rate
     let aif = dir.path("a.aif");
     let mut s = ExportSettings { format: Format::Aiff, path: aif.clone(), ..Default::default() };
@@ -340,23 +340,25 @@ fn aac_audio_writes_m4a_and_adts() {
         assert!((d - 1.0).abs() < 0.03, "duration {d}");
     }
 
-    // .aac: raw ADTS, mono 44.1 kHz at 128 kbps
+    // .aac: raw ADTS, stereo 44.1 kHz at 128 kbps
     let adts = dir.path("a.aac");
     let mut s = ExportSettings { format: Format::Aac, path: adts.clone(), range, ..Default::default() };
-    s.audio = AudioSettings { sample_rate: Some(44_100), channels: 1, bitrate_kbps: 128, ..Default::default() };
+    s.audio = AudioSettings { sample_rate: Some(44_100), bitrate_kbps: 128, ..Default::default() };
     export(&p, seq, &s, &m, &Progress::default()).unwrap();
     let b = std::fs::read(&adts).unwrap();
-    // AAC-LC 44.1 kHz (index 4) mono: 00010 0100 0001 000
-    let mut dec = waltcut_aac::Decoder::new(&[0x12, 0x08]).unwrap();
-    let (mut pos, mut units, mut pcm) = (0usize, 0usize, vec![Vec::new()]);
+    // AAC-LC 44.1 kHz (index 4) stereo: 00010 0100 0010 000
+    let mut dec = waltcut_aac::Decoder::new(&[0x12, 0x10]).unwrap();
+    let (mut pos, mut units, mut pcm) = (0usize, 0usize, vec![Vec::new(), Vec::new()]);
     while pos < b.len() {
         let h = &b[pos..pos + 7];
         assert_eq!((h[0], h[1] & 0xF6), (0xFF, 0xF0), "ADTS sync at {pos}");
         assert_eq!(h[1] & 0x01, 1, "no CRC");
-        assert_eq!(((h[2] >> 2) & 0x0F, ((h[2] & 1) << 2) | (h[3] >> 6)), (4, 1), "44.1 kHz mono");
+        assert_eq!(((h[2] >> 2) & 0x0F, ((h[2] & 1) << 2) | (h[3] >> 6)), (4, 2), "44.1 kHz stereo");
         let len = ((h[3] as usize & 0x03) << 11) | ((h[4] as usize) << 3) | (h[5] as usize >> 5);
         assert!(len > 7 && pos + len <= b.len(), "frame length {len} at {pos}");
-        pcm[0].extend(dec.decode(&b[pos + 7..pos + len]).unwrap().swap_remove(0));
+        for (plane, decoded) in pcm.iter_mut().zip(dec.decode(&b[pos + 7..pos + len]).unwrap()) {
+            plane.extend(decoded);
+        }
         pos += len;
         units += 1;
     }
@@ -367,7 +369,7 @@ fn aac_audio_writes_m4a_and_adts() {
         let st = &j["streams"][0];
         assert_eq!(st["codec_name"], "aac");
         assert_eq!(st["sample_rate"], "44100");
-        assert_eq!(st["channels"], 1);
+        assert_eq!(st["channels"], 2);
     }
     if let Some(ffmpeg) = waltcut_testkit::ffmpeg_or_skip("AAC Audio decode") {
         for f in [&m4a, &adts] {
@@ -441,7 +443,7 @@ fn flac_is_lossless_against_wav() {
     let (p, seq, m) = matte([0.0, 0.0, 0.0, 1.0], 64, 36, Some(-6.0));
     let dir = Scratch::new("flac");
     let range = Some(TimeRange::new(Tick::ZERO, Tick(3 * TICKS_PER_SECOND / 2)));
-    let audio = AudioSettings { channels: 2, bits: 24, ..Default::default() };
+    let audio = AudioSettings { bits: 24, ..Default::default() };
     let (wav, flac) = (dir.path("a.wav"), dir.path("a.flac"));
     let w = ExportSettings { format: Format::Wav, path: wav.clone(), range, audio: audio.clone(), ..Default::default() };
     export(&p, seq, &w, &m, &Progress::default()).unwrap();
@@ -638,59 +640,6 @@ fn frame_size_rate_and_scaling() {
     let src = waltcut_codecs::open_bytes("fill.mov", bytes).unwrap();
     let f = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 2))).unwrap().to_rgba8();
     assert!(f[(5 * 200 + 100) * 4] > 200, "filled to the top edge");
-}
-
-/// Integrated loudness of planar audio.
-fn lufs(planar: &[Vec<f32>], sr: u32) -> (f64, f64) {
-    let refs: Vec<&[f32]> = planar.iter().map(Vec::as_slice).collect();
-    let s = waltcut_audio_dsp::loudness::measure(&refs, sr as f64);
-    (s.integrated_lufs, s.true_peak_dbtp)
-}
-
-fn read_wav16(path: &str) -> Vec<Vec<f32>> {
-    let b = std::fs::read(path).unwrap();
-    let ch = u16::from_le_bytes([b[22], b[23]]) as usize;
-    let data = &b[44..];
-    let mut out = vec![Vec::new(); ch];
-    for (i, s) in data.as_chunks::<2>().0.iter().enumerate() {
-        out[i % ch].push(i16::from_le_bytes([s[0], s[1]]) as f32 / 32768.0);
-    }
-    out
-}
-
-#[test]
-fn loudness_normalization_hits_target_and_true_peak() {
-    let (p, seq, m) = matte([0.0, 0.0, 0.0, 1.0], 64, 36, Some(-6.0));
-    let dir = Scratch::new("loud");
-    for target in [-23.0, -16.0, -14.0] {
-        let path = dir.path(&format!("n{}.wav", -target as i32));
-        let mut s = ExportSettings { format: Format::Wav, path: path.clone(), ..Default::default() };
-        s.effects.loudness = LoudnessNormalization { enabled: true, target_lufs: target, true_peak_dbtp: -1.0 };
-        let prog = Progress::default();
-        export(&p, seq, &s, &m, &prog).unwrap();
-        let (i, tp) = lufs(&read_wav16(&path), 48_000);
-        assert!((i - target).abs() < 0.5, "target {target}: measured {i:.2} LUFS");
-        assert!(tp <= -0.9, "true peak {tp:.2} dBTP");
-        let rep = prog.loudness.lock().unwrap().unwrap();
-        assert!((rep.measured_lufs + rep.gain_db - target).abs() < 0.1, "unlimited tone needs no correction");
-    }
-    // a target the peaks cannot reach: the limiter holds the true-peak ceiling
-    let path = dir.path("hot.wav");
-    let mut s = ExportSettings { format: Format::Wav, path: path.clone(), ..Default::default() };
-    s.effects.loudness = LoudnessNormalization { enabled: true, target_lufs: -3.0, true_peak_dbtp: -3.0 };
-    export(&p, seq, &s, &m, &Progress::default()).unwrap();
-    let (_, tp) = lufs(&read_wav16(&path), 48_000);
-    assert!(tp <= -2.8, "limited true peak {tp:.2} dBTP");
-    // and through the stepped H.264 + AAC path, decoded by our AAC decoder
-    let path = dir.path("loud.mp4");
-    let mut s = ExportSettings { format: Format::H264, path: path.clone(), ..Default::default() };
-    s.effects.loudness = LoudnessNormalization { enabled: true, target_lufs: -20.0, true_peak_dbtp: -1.0 };
-    export(&p, seq, &s, &m, &Progress::default()).unwrap();
-    let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-    let src = waltcut_codecs::open_bytes("loud.mp4", bytes).unwrap();
-    let a = src.audio(4800, 38_400, 48_000).unwrap();
-    let (i, _) = lufs(&a.channels, 48_000);
-    assert!((i + 20.0).abs() < 0.5, "AAC: {i:.2} LUFS");
 }
 
 #[test]
@@ -1058,85 +1007,6 @@ fn gpu_rendering_is_off_by_default() {
     assert_eq!(auto.gpu_rendering, crate::GpuRendering::Auto);
 }
 
-/// Brief large peaks over a quiet bed exercise loudness lost during limiter release.
-struct CrestSource(waltcut_media::SharedSource, Arc<std::sync::atomic::AtomicUsize>);
-impl MediaSource for CrestSource {
-    fn info(&self) -> &waltcut_media::MediaInfo {
-        self.0.info()
-    }
-    fn video_frame(&self, req: FrameRequest) -> waltcut_media::Result<Arc<waltcut_frame::VideoFrame>> {
-        self.0.video_frame(req)
-    }
-    fn audio(&self, start: i64, frames: usize, sample_rate: u32) -> waltcut_media::Result<waltcut_frame::AudioBuffer> {
-        self.1.fetch_add(1, Ordering::Relaxed);
-        let samples: Vec<f32> = (0..frames)
-            .map(|i| {
-                let at = start + i as i64;
-                let phase = at.rem_euclid(sample_rate as i64 / 4);
-                let amplitude = if phase < sample_rate as i64 / 500 { 0.9 } else { 0.08 };
-                amplitude * (std::f32::consts::TAU * 1000.0 * at as f32 / sample_rate as f32).sin()
-            })
-            .collect();
-        Ok(waltcut_frame::AudioBuffer { sample_rate, channels: vec![samples.clone(), samples] })
-    }
-}
-
-#[test]
-fn loudness_normalization_corrects_limiter_loss_and_bounds_impossible_targets() {
-    use std::cell::Cell;
-    let (p, seq, mut sources) = matte([0.0, 0.0, 0.0, 1.0], 64, 36, Some(-6.0));
-    let reads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    for source in sources.0.values_mut() {
-        *source = Arc::new(CrestSource(source.clone(), reads.clone()));
-    }
-    let range = TimeRange::new(Tick::ZERO, Tick(TICKS_PER_SECOND));
-    let mut settings = ExportSettings::default();
-    settings.effects.loudness = LoudnessNormalization { enabled: true, target_lufs: -14.0, true_peak_dbtp: -2.0 };
-    for target in [-14.0, 2.0] {
-        settings.effects.loudness.target_lufs = target;
-        let mut audio = audio_out::AudioOut::new(p.clone(), seq, &settings, range).unwrap();
-        let chunks = Cell::new(0);
-        audio
-            .measure(&settings, &sources, &|| {
-                chunks.set(chunks.get() + 1);
-                false
-            })
-            .unwrap();
-        let report = audio.loudness.unwrap();
-        let result = audio.rest(&sources).unwrap();
-        let (integrated, peak) = lufs(&result, 48_000);
-        eprintln!("target {target}: output {integrated:.3} LUFS, {peak:.3} dBTP, gain {:.3}, chunks {}", report.gain_db, chunks.get());
-        assert!(chunks.get() <= 5, "one raw pass plus at most four limited trials");
-        assert_eq!(result[0].len(), 48_000, "measuring must rewind output and limiter latency");
-        assert!(peak <= -1.8, "limiting must remain enabled: {peak}");
-        if target == -14.0 {
-            assert!((integrated - target).abs() < 0.15, "achieved {integrated}");
-            assert!(report.gain_db > target - report.measured_lufs + 0.3, "fixture must require limiter correction");
-        } else {
-            assert!(integrated < target - 1.0, "impossible target sacrifices loudness, not peak ceiling");
-        }
-    }
-    // Cancel after raw measurement and one limited trial, before further refinement.
-    // Record source reads at cancellation to prove no further mixing occurs.
-    let mut audio = audio_out::AudioOut::new(p, seq, &settings, range).unwrap();
-    let chunks = Cell::new(0);
-    let reads_at_cancel = Cell::new(None);
-    let cancel = || {
-        chunks.set(chunks.get() + 1);
-        if chunks.get() > 2 {
-            reads_at_cancel.set(Some(reads.load(Ordering::Relaxed)));
-            true
-        } else {
-            false
-        }
-    };
-    assert!(matches!(audio.measure(&settings, &sources, &cancel), Err(ExportError::Cancelled)));
-    assert_eq!(chunks.get(), 3);
-    assert_eq!(reads_at_cancel.get(), Some(reads.load(Ordering::Relaxed)));
-}
-
-/// 32-bit integer and float audio in every container that takes them, read back by ffprobe (an
-/// external oracle) and, where FilmCraft imports the format, by FilmCraft's own readers.
 #[test]
 fn thirty_two_bit_audio_in_every_container() {
     let (p, seq, m) = matte([0.0, 0.0, 0.0, 1.0], 64, 36, Some(-6.0));

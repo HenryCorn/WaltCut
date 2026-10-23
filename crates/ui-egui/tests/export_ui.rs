@@ -172,10 +172,8 @@ fn export_mode_settings_and_summary() {
     assert_eq!(d.app().ui.export.preset, "Custom");
     assert!(d.app().ui.export.settings.max_render_quality);
     // Effects section widgets
-    assert!(d.has("export.effects.loudness") && d.has("export.effects.timecodeOverlay"));
-    d.click("export.effects.loudness");
-    assert!(d.app().ui.export.settings.effects.loudness.enabled);
-    assert!(d.has("export.effects.loudness.target"));
+    assert!(!d.has("export.effects.loudness"));
+    assert!(d.has("export.effects.timecodeOverlay"));
     d.snapshot("export-mode");
 }
 

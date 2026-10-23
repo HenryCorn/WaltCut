@@ -1,29 +1,27 @@
 # waltcut-audio-dsp
 
-Dependency-free, safe Rust DSP at layer **L1**. Audio is planar `f32`. Implementations are
-clean-room from public standards (ITU-R BS.1770-4, EBU R128 / Tech 3341 / Tech 3342, ITU-R BS.775),
-the RBJ biquad cookbook and textbook phase-vocoder/resampling techniques.
+Small, dependency-free, safe Rust helpers for live playback at layer **L1**. The UI uses
+`resample::StreamResampler` for device-rate conversion in normal playback and shuttle; shuttle
+also uses `PitchShifter` with the private STFT/FFT implementation to preserve pitch. These are
+low-level playback helpers shared by two live paths, not an export effects system.
 
 ## Reduction status (#23)
 
-**DRAFT IMPLEMENTATION — native macOS acceptance pending.** The advanced audio-effect registry,
-catalogue processors, graphical-editor response APIs, filter-design module and mixer-only 5.1
-panner are deleted. No effect registry or compatibility shell remains. Music-retiming, sync and
-Essential Sound processing were removed in preceding stacked cuts.
+**DRAFT IMPLEMENTATION — native macOS acceptance pending.** Export loudness measurement,
+normalisation and true-peak limiting, channel-layout conversion, source-monitor multichannel
+mixdown, and their DSP modules have been deleted. The soundtrack is stereo: multichannel sources
+use the selected first mono/stereo pair (default first two channels), without a surround mix or
+surround output path. Export has no channel-layout setting and writes the retained stereo mix.
 
-This crate still has actual production callers:
+Static Audio Gain and intrinsic Volume/keyframes remain implemented in the renderer; they do not
+use this crate. The crate remains only because playback-rate conversion and pitch-preserving
+shuttle processing are live, distinct DSP paths.
 
-| Module/API | Retained caller |
-|---|---|
-| `resample::StreamResampler` | device-rate playback and shuttle |
-| `PitchShifter`, private `stft`, `fft` | pitch-preserving shuttle |
-| `LoudnessMeter`, `normalize_gain_db`, `Limiter` | export loudness measurement, gain correction, true-peak limiting and remeasurement |
-| `channels` | actual output-layout conversion and separate Source-monitor multichannel mixdown |
-| `biquad`, `oversample`, `Smoothed` | dependencies of retained loudness/limiter/pitch processing |
+## Tests
 
-Export loudness and shared channel conversion remain for a later #23 slice. Six-channel export
-converts the stereo soundtrack to L/R plus four silent channels; it is not surround mixing.
-Do not delete playback rate conversion or shuttle pitch correction with those later cuts.
+- Resampler tests cover continuous fractional phase, arbitrary callback blocks and rate changes.
+- Pitch-shifter tests cover octave shifts and delayed identity.
+- Platform-independent tests: `cargo test -p waltcut-audio-dsp --quiet`.
 
 `effects::effect_tests` checks every effect: neutral settings are (delayed) identity, output is
 deterministic and latency constant (impulse lands at `latency()`), plus a level / frequency-response

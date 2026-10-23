@@ -16,7 +16,6 @@ waltcut-color = { workspace = true }
 waltcut-media = { workspace = true }
 waltcut-project = { workspace = true }
 waltcut-render = { workspace = true }
-waltcut-audio-dsp = { workspace = true }
 waltcut-geom = { workspace = true }
 waltcut-text = { workspace = true }
 waltcut-isobmff = { workspace = true }

@@ -40,7 +40,7 @@ impl Pace {
         while self.readings.len() > 2 && self.readings.get(1).is_some_and(|(t, _)| now.saturating_duration_since(*t) >= WINDOW) {
             self.readings.pop_front();
         }
-        // an idle start (a loudness pass, a slow seek) is not the job's speed: measure from the last
+        // an idle start (a slow seek) is not the job's speed: measure from the last
         // reading before it moved, not from a baseline that makes the job look slow for a whole window
         if let Some(first) = self.readings.front().map(|r| r.1)
             && let Some(moved) = self.readings.iter().position(|(_, d)| *d != first)
@@ -105,7 +105,7 @@ mod tests {
         assert_eq!(eta(&[], 100), None);
         assert_eq!(eta(&[(0.0, 0)], 100), None, "one reading");
         assert_eq!(eta(&[(0.0, 0), (0.5, 20)], 100), None, "less than a second of readings");
-        assert_eq!(eta(&[(0.0, 5), (2.0, 5)], 100), None, "nothing done in two seconds (a loudness pass, a seek)");
+        assert_eq!(eta(&[(0.0, 5), (2.0, 5)], 100), None, "nothing done in two seconds (a seek)");
         // then, once frames flow
         assert!(eta(&[(0.0, 0), (2.0, 0), (3.0, 30)], 100).is_some());
     }
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn an_idle_start_does_not_hold_the_estimate_back() {
-        // 20 s with nothing done (a loudness pass), then 50 units a second for 3 s: the pace is 50 a
+        // 20 s with nothing done (a slow seek), then 50 units a second for 3 s: the pace is 50 a
         // second, not what a 15 s window that is mostly idle would say
         let mut r: Vec<(f64, u64)> = (0..=133).map(|i| (i as f64 * 0.15, 0)).collect();
         let t = r.last().unwrap().0;

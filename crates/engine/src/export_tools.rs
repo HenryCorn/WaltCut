@@ -209,14 +209,11 @@ pub fn settings_from_params(s: &Session, p: &Value, cmd: &str) -> Result<(Option
     }
     if let Some(patch) = p.get("settings").filter(|v| v.is_object()) {
         let mut v = serde_json::to_value(&settings).map_err(|e| EngineError::Other(e.to_string()))?;
-        merge(&mut v, patch);
-        settings = serde_json::from_value(v).map_err(|e| bad(cmd, format!("settings: {e}")))?;
-        // serde ignores keys it doesn't know, so a misspelt or misplaced key (a flat parameter
-        // such as `loudnessLufs` put inside `settings`) would silently do nothing.
-        let known = serde_json::to_value(&settings).map_err(|e| EngineError::Other(e.to_string()))?;
-        if let Some(path) = unknown_key(&known, patch, "") {
+        if let Some(path) = unknown_key(&v, patch, "") {
             return Err(bad(cmd, format!("settings: unknown key `{path}` (see export.presets.get for the settings' keys)")));
         }
+        merge(&mut v, patch);
+        settings = serde_json::from_value(v).map_err(|e| bad(cmd, format!("settings: {e}")))?;
     }
     // flat overrides (the original file.exportMedia parameters and a few common ones)
     if let Some(f) = str_p(p, "format") {
@@ -308,10 +305,6 @@ pub fn settings_from_params(s: &Session, p: &Value, cmd: &str) -> Result<(Option
     }
     if let Some(v) = p.get("fps") {
         settings.frame_rate = Some(parse_rate(v).ok_or_else(|| bad(cmd, "fps: a number (29.97) or \"num/den\""))?);
-    }
-    if let Some(v) = f64_p(p, "loudnessLufs") {
-        settings.effects.loudness.enabled = true;
-        settings.effects.loudness.target_lufs = v;
     }
     settings.validate().map_err(|e| bad(cmd, e.to_string()))?;
     Ok((preset, settings))

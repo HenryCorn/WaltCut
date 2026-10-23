@@ -114,13 +114,12 @@ fn wav_resolve_honours_explicit_sample_rates() {
 #[test]
 fn nested_camel_case_settings_are_honoured() {
     let mut s = demo();
-    let camel = json!({"audio":{"sampleRate":96000}, "effects":{"loudness":{"enabled":true, "targetLufs":-16}}});
-    let snake = json!({"audio":{"sample_rate":96000}, "effects":{"loudness":{"enabled":true, "target_lufs":-16}}});
+    let camel = json!({"audio":{"sampleRate":96000}});
+    let snake = json!({"audio":{"sample_rate":96000}});
     let camel = s.execute("export.resolve", json!({"format":"wav", "settings":camel})).unwrap();
     let snake = s.execute("export.resolve", json!({"format":"wav", "settings":snake})).unwrap();
     assert_eq!(camel["output"]["sampleRate"], 96000);
     assert_eq!(camel["settings"]["audio"]["sample_rate"], 96000);
-    assert_eq!(camel["settings"]["effects"]["loudness"]["target_lufs"], -16.0);
     assert_eq!(camel["settings"], snake["settings"]);
 }
 
@@ -716,20 +715,24 @@ fn default_export_dir_never_needs_a_real_filesystem() {
 
 #[test]
 fn unknown_settings_keys_are_errors_not_ignored() {
-    // A flat parameter put inside `settings` used to be dropped without a word: the export ran
-    // without loudness normalization. A misspelt nested key was dropped the same way.
+    // Removed loudness settings and unsupported channel layouts cannot silently succeed.
     let s = demo();
     let err = crate::export_tools::settings_from_params(&s, &json!({"format": "h264", "settings": {"loudnessLufs": -14}}), "file.exportMedia").unwrap_err();
     assert!(err.to_string().contains("`loudnessLufs`"), "{err}");
     let err = crate::export_tools::settings_from_params(&s, &json!({"settings": {"effects": {"loudness": {"targetLoudness": -14}}}}), "file.exportMedia")
         .unwrap_err();
-    assert!(err.to_string().contains("`effects.loudness.targetLoudness`"), "{err}");
-    // Both spellings of a snake_case field are known (#531), and null sets nothing.
-    for key in ["target_lufs", "targetLufs"] {
-        let (_, ok) =
-            crate::export_tools::settings_from_params(&s, &json!({"settings": {"effects": {"loudness": {"enabled": true, key: -14}}}}), "file.exportMedia")
-                .unwrap();
-        assert!(ok.effects.loudness.enabled);
-        assert_eq!(ok.effects.loudness.target_lufs, -14.0, "{key}");
-    }
+    assert!(err.to_string().contains("loudness"), "{err}");
+    let err = crate::export_tools::settings_from_params(&s, &json!({"settings": {"audio": {"channels": 6}}}), "file.exportMedia").unwrap_err();
+    assert!(err.to_string().contains("`audio.channels`"), "{err}");
+    assert!(
+        serde_json::from_value::<waltcut_export::ExportSettings>(json!({"format": "h264", "audio": {"channels": 6}})).is_err(),
+        "stale channel settings in a saved preset must not be silently ignored"
+    );
+    assert!(
+        serde_json::from_value::<waltcut_export::ExportSettings>(json!({"format": "h264", "effects": {"loudness": {"targetLufs": -14}}})).is_err(),
+        "stale loudness settings in a saved preset must not be silently ignored"
+    );
+    let serialized = serde_json::to_value(waltcut_export::ExportSettings::default()).unwrap();
+    assert!(serialized["effects"].get("loudness").is_none());
+    assert!(serialized["audio"].get("channels").is_none());
 }

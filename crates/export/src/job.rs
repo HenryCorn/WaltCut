@@ -4,8 +4,7 @@
 //! end) per call, so a host without threads (the web app) can run an export a slice at a time
 //! between UI frames; [`crate::export`] simply loops it on a worker thread.
 //!
-//! Before the first batch, loudness normalization (when enabled) measures the export range. A
-//! two-pass VBR H.264 export renders and analyses every frame once (first pass, nothing written),
+//! A two-pass VBR H.264 export renders and analyses every frame once (first pass, nothing written),
 //! then encodes for real with the first pass's statistics.
 //!
 //! When a source's bytes are not available yet (asynchronous web reads mark
@@ -167,8 +166,6 @@ pub struct Exporter {
     venc: Box<dyn VideoEncoder>,
     aenc: Option<Box<dyn AudioEncoder>>,
     audio: Option<AudioOut>,
-    /// The loudness pass ran (or is not needed).
-    measured: bool,
     /// The first pass of a two-pass encode is running.
     first_pass: bool,
     /// Encoded video packets not written yet (the current [`INTERLEAVE`] group).
@@ -263,7 +260,6 @@ impl Exporter {
             (Some(a), AudioCodec::Flac) => Some(Box::new(crate::FlacAudio::new(a.sr, a.channels as u32, &settings)?)),
             _ => None,
         };
-        let measured = !settings.effects.loudness.enabled || audio.is_none();
         Ok(Self {
             pipe,
             f0,
@@ -278,7 +274,6 @@ impl Exporter {
             venc,
             aenc,
             audio,
-            measured,
             first_pass: two_pass,
             queued: Vec::new(),
             mux: None,
@@ -444,23 +439,6 @@ impl Exporter {
             return Err(ExportError::Cancelled);
         }
         let _ = waltcut_media::pending::take();
-        if !self.measured {
-            if !self.settings.part_of_batch {
-                progress.set_status("Measuring loudness");
-            }
-            let a = self.audio.as_mut().ok_or_else(|| ExportError::Encode("internal: the audio pipeline was not created".into()))?;
-            let settings = &self.settings;
-            timed(Stage::Loudness, || a.measure(settings, sources, &|| progress.cancel.load(Ordering::Relaxed)))?;
-            if waltcut_media::pending::take() {
-                return Ok(Step::Pending);
-            }
-            *progress.loudness.lock().unwrap_or_else(|e| e.into_inner()) = a.loudness;
-            self.measured = true;
-            if !self.settings.part_of_batch {
-                progress.set_status(format!("Exporting {} frames ({})", self.frames(), self.settings.format.label()));
-            }
-            return Ok(Step::Progress);
-        }
         if self.next < self.f1 {
             return self.step_batch(sources, progress);
         }

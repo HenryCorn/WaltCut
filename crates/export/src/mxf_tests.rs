@@ -63,7 +63,7 @@ fn settings(format: Format, codec: MxfVideoCodec, path: &str) -> ExportSettings 
         format,
         path: path.into(),
         mxf_video_codec: codec,
-        audio: AudioSettings { bits: 24, sample_rate: Some(48_000), channels: 2, ..Default::default() },
+        audio: AudioSettings { bits: 24, sample_rate: Some(48_000), ..Default::default() },
         ..Default::default()
     }
 }

@@ -121,7 +121,7 @@ opt-level = 3
 [profile.dev.package.waltcut-flac]
 opt-level = 3
 
-# Audio effects: realtime-factor tests and long convolution / spectral runs.
+# Shuttle pitch correction and streaming playback resampling.
 [profile.dev.package.waltcut-audio-dsp]
 opt-level = 3
 

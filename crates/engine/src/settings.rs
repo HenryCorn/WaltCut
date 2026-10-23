@@ -663,10 +663,9 @@ pub struct TimelinePrefs {
     pub auto_scroll: String,
     /// "Timeline Mouse Scrolling": `vertical` | `horizontal`.
     pub mouse_scrolling: String,
-    /// Default Audio Tracks per media type: `useFile` | `mono` | `stereo` | `5.1` | `adaptive`.
+    /// Default Audio Tracks per media type: `useFile` | `mono` | `stereo`.
     pub mono_media_tracks: String,
     pub stereo_media_tracks: String,
-    pub surround_media_tracks: String,
     pub multichannel_mono_media_tracks: String,
     pub focus_timeline_on_edit: bool,
     pub snap_playhead: bool,
@@ -690,7 +689,6 @@ impl Default for TimelinePrefs {
             mouse_scrolling: "vertical".into(),
             mono_media_tracks: "useFile".into(),
             stereo_media_tracks: "useFile".into(),
-            surround_media_tracks: "useFile".into(),
             multichannel_mono_media_tracks: "useFile".into(),
             focus_timeline_on_edit: false,
             snap_playhead: true,
@@ -861,7 +859,6 @@ pub const UI_SCALES: &[(&str, &str)] = &[
 ];
 pub const DARK_THEMES: &[(&str, &str)] = &[("darkest", "Darkest"), ("dark", "Dark")];
 pub const LIGHT_THEMES: &[(&str, &str)] = &[("light", "Light")];
-const MIXDOWN: &[(&str, &str)] = &[("front", "Front Only"), ("frontRear", "Front + Rear"), ("frontLfe", "Front + LFE"), ("frontRearLfe", "Front + Rear + LFE")];
 const AUDITION: &[(&str, &str)] = &[("scratch", "Scratch disk location for Captured Audio"), ("nextToMedia", "Next to original media files")];
 const BUFFERS: &[(&str, &str)] = &[("64", "64"), ("128", "128"), ("256", "256"), ("512", "512"), ("1024", "1024"), ("2048", "2048"), ("4096", "4096")];
 const RATES: &[(&str, &str)] = &[("44100", "44100"), ("48000", "48000"), ("88200", "88200"), ("96000", "96000")];
@@ -893,7 +890,7 @@ const CACHE_MGMT: &[(&str, &str)] = &[
 const AUTO_SCROLL: &[(&str, &str)] = &[("noScroll", "No Scroll"), ("pageScroll", "Page Scroll"), ("smoothScroll", "Smooth Scroll")];
 const MOUSE_SCROLL: &[(&str, &str)] = &[("vertical", "Vertical"), ("horizontal", "Horizontal")];
 const HW_DECODE: &[(&str, &str)] = &[("auto", "Auto"), ("off", "Off")];
-const TRACKS: &[(&str, &str)] = &[("useFile", "Use File"), ("mono", "Mono"), ("stereo", "Stereo"), ("5.1", "5.1"), ("adaptive", "Adaptive")];
+const TRACKS: &[(&str, &str)] = &[("useFile", "Use File"), ("mono", "Mono"), ("stereo", "Stereo")];
 pub const DURATION_UNITS: &[(&str, &str)] = &[("frames", "Frames"), ("seconds", "Seconds")];
 
 /// The Settings categories in Premiere's order (Adobe-cloud-only ones are left out; Plugins is a
@@ -959,9 +956,7 @@ static CATEGORIES: &[Category] = &[
         id: "audio",
         title: "Audio",
         rows: &[
-            f("audio.mixdownType", "5.1 Mixdown Type", Kind::Choice(MIXDOWN), true),
             f("audio.largeVolumeAdjustment", "Large Volume Adjustment", float(0.0, 96.0, 0, "dB"), true),
-            b("audio.sumToMonoInSource", "Sum multichannel outputs to mono in Source Monitor", false),
             b("audio.scrubAudio", "Play audio while scrubbing in Source and Program Monitors", false),
             b("audio.maintainPitchShuttling", "Maintain pitch while shuttling", false),
             b("audio.generateWaveformsOnImport", "Generate waveforms automatically during import", false),
@@ -1179,7 +1174,6 @@ static CATEGORIES: &[Category] = &[
                 &[
                     f("timeline.monoMediaTracks", "Mono Media", Kind::Choice(TRACKS), false),
                     f("timeline.stereoMediaTracks", "Stereo Media", Kind::Choice(TRACKS), false),
-                    f("timeline.surroundMediaTracks", "5.1 Media", Kind::Choice(TRACKS), false),
                     f("timeline.multichannelMonoMediaTracks", "Multichannel Mono Media", Kind::Choice(TRACKS), false),
                 ],
             ),

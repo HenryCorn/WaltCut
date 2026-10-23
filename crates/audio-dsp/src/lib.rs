@@ -1,12 +1,7 @@
-//! Playback resampling/pitch correction, output channel conversion and export loudness DSP.
+//! Playback resampling and pitch-preserving shuttle processing.
 //!
-//! * [`loudness`] — ITU-R BS.1770-4 / EBU R128 loudness meter (momentary, short-term,
-//!   integrated, loudness range, sample peak, true peak) and the loudness-normalisation helper.
-//! * [`PitchShifter`] — pitch-preserving shuttle playback.
-//! * [`Limiter`] — true-peak limiting for export loudness normalisation.
-//! * [`biquad`] — RBJ-cookbook biquads (TDF-II) with analytic magnitude response.
-//! * [`resample`] — streaming, block-invariant rate conversion for playback on a device at another rate.
-//! * [`channels`] — channel layouts, ITU-R BS.775 output conversion and source-monitor mixdown.
+//! `PitchShifter` and `resample::StreamResampler` are low-level helpers shared by playback and
+//! shuttle code. This crate intentionally contains no export processing or channel-layout policy.
 //!
 //! Conventions: audio is **planar f32** (`&mut [&mut [f32]]`, one slice per channel, all the same
 //! length). `process` never allocates; all buffers are sized at construction. Parameters may be
@@ -17,30 +12,17 @@
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
-pub mod biquad;
-pub mod channels;
 pub mod fft;
-mod limiter;
-pub mod loudness;
-pub mod oversample;
 mod pitch;
 pub mod resample;
-mod smooth;
 mod stft;
 
-pub use limiter::Limiter;
-pub use loudness::{LoudnessMeter, normalize_gain_db};
 pub use pitch::PitchShifter;
-pub use smooth::Smoothed;
 
 /// Unit of a parameter value (for display and control construction).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Unit {
-    Decibels,
-    Milliseconds,
     Semitones,
-    /// Boolean toggle: 0 = off, 1 = on.
-    Toggle,
 }
 
 /// Static description of one effect parameter.
@@ -54,22 +36,12 @@ pub struct ParamSpec {
     pub max: f32,
     pub default: f32,
     pub unit: Unit,
-    /// Hint that the control should be logarithmic (frequencies, times).
-    pub log_scale: bool,
 }
 
 impl ParamSpec {
     /// A continuous (linear) parameter.
     pub const fn new(id: &'static str, name: &'static str, min: f32, max: f32, default: f32, unit: Unit) -> Self {
-        ParamSpec { id, name, min, max, default, unit, log_scale: false }
-    }
-    /// A continuous parameter best shown on a logarithmic control.
-    pub const fn log(id: &'static str, name: &'static str, min: f32, max: f32, default: f32, unit: Unit) -> Self {
-        ParamSpec { id, name, min, max, default, unit, log_scale: true }
-    }
-    /// An on/off toggle.
-    pub const fn toggle(id: &'static str, name: &'static str, default: bool) -> Self {
-        ParamSpec { id, name, min: 0.0, max: 1.0, default: if default { 1.0 } else { 0.0 }, unit: Unit::Toggle, log_scale: false }
+        ParamSpec { id, name, min, max, default, unit }
     }
     /// Clamp (and for toggles, round) a value into this parameter's domain.
     /// NaN maps to the default.
@@ -77,11 +49,7 @@ impl ParamSpec {
         if v.is_nan() {
             return self.default;
         }
-        let v = v.clamp(self.min, self.max);
-        match self.unit {
-            Unit::Toggle => v.round(),
-            _ => v,
-        }
+        v.clamp(self.min, self.max)
     }
 }
 
@@ -146,9 +114,6 @@ impl ParamValues {
         debug_assert!(self.get(id).is_some(), "unknown parameter {id}");
         self.get(id).unwrap_or(0.0)
     }
-    pub(crate) fn on(&self, id: &str) -> bool {
-        self.v(id) >= 0.5
-    }
 }
 
 /// Generates the id/params/set_param/param methods of [`AudioEffect`] for a struct with a
@@ -176,24 +141,6 @@ macro_rules! param_plumbing {
 }
 pub(crate) use param_plumbing;
 
-/// Decibels → linear amplitude.
-#[inline]
-pub fn db_to_gain(db: f32) -> f32 {
-    10f32.powf(db / 20.0)
-}
-
-/// Linear amplitude → decibels (−inf for 0).
-#[inline]
-pub fn gain_to_db(g: f32) -> f32 {
-    20.0 * g.abs().log10()
-}
-
-/// Flush tiny values to zero (denormal protection for recursive state).
-#[inline(always)]
-pub(crate) fn flush(x: f64) -> f64 {
-    if x.abs() < 1e-30 { 0.0 } else { x }
-}
-
 /// Common block length of planar channels.
 #[inline]
 pub(crate) fn block_len(channels: &[&mut [f32]]) -> usize {
@@ -202,26 +149,6 @@ pub(crate) fn block_len(channels: &[&mut [f32]]) -> usize {
 
 #[cfg(test)]
 pub(crate) mod testutil {
-    /// Tiny deterministic PRNG (xorshift64*) for tests.
-    pub struct Rng(u64);
-    impl Rng {
-        pub fn new(seed: u64) -> Self {
-            Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1)
-        }
-        pub fn next_u64(&mut self) -> u64 {
-            let mut x = self.0;
-            x ^= x >> 12;
-            x ^= x << 25;
-            x ^= x >> 27;
-            self.0 = x;
-            x.wrapping_mul(0x2545_F491_4F6C_DD1D)
-        }
-        /// Uniform in [-1, 1).
-        pub fn uniform(&mut self) -> f32 {
-            ((self.next_u64() >> 40) as f32 / (1u64 << 24) as f32) * 2.0 - 1.0
-        }
-    }
-
     pub fn sine(freq: f64, amp: f64, sr: f64, n: usize, phase: f64) -> Vec<f32> {
         (0..n).map(|i| (amp * (2.0 * std::f64::consts::PI * freq * i as f64 / sr + phase).sin()) as f32).collect()
     }

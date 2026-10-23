@@ -16,7 +16,6 @@ waltcut-color = { workspace = true }
 waltcut-frame = { workspace = true }
 waltcut-media = { workspace = true }
 waltcut-project = { workspace = true }
-waltcut-audio-dsp = { workspace = true }
 waltcut-text = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

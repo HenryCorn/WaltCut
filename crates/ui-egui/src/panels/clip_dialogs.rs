@@ -223,16 +223,12 @@ fn format_name(f: AudioChannels) -> &'static str {
     match f {
         AudioChannels::Mono => "mono",
         AudioChannels::Stereo => "stereo",
-        AudioChannels::Surround51 => "5.1",
-        AudioChannels::Adaptive => "adaptive",
     }
 }
 
 fn format_of(name: &str) -> AudioChannels {
     match name {
         "mono" => AudioChannels::Mono,
-        "5.1" => AudioChannels::Surround51,
-        "adaptive" => AudioChannels::Adaptive,
         _ => AudioChannels::Stereo,
     }
 }
