@@ -217,7 +217,7 @@ fn track_fx_editor_from_the_mixer_slot() {
     let mut d = Driver::demo();
     d.exec("mixer.addInsert", json!({"strip": "A1", "effect": "multiband_compressor"}));
     d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
-    d.ok("ui.panel.show", json!({"panel": "Essential Sound"}));
+    d.ok("ui.panel.show", json!({"panel": "Audio Track Mixer"}));
     d.frames(3);
     d.click("mixer.showEffects");
     d.click("mixer.A1.fx.0");
