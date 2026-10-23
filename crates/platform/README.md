@@ -26,8 +26,13 @@ let availability = waltcut_platform::register();
 - Hardware decoding Off declines before session creation. `perf.stats` → `decode.hardware`
   retains backend/frame/session/decline/fallback diagnostics. The public API is safe, failures are
   results, callbacks contain panics, and unsafe FFI blocks keep their safety comments.
-- `pen.rs` retains pressure/proximity input used by the drawing brushes; export reduction does not
-  remove or replace this input path.
+- `pen.rs` retains pen input used by the drawing brushes; export reduction does not remove or
+  replace this input path. An `NSEvent` local monitor turns every mouse/pen event into a
+  `PenSample` (position in window points with a top-left origin, pressure, the event's monotonic
+  time, phase) in a bounded queue (`QUEUE_CAPACITY` = 4096) that the UI drains once per frame. The
+  monitor reads events and passes them on untouched; the only `unsafe` is the AppKit calls, each
+  with a `// SAFETY:` comment. Overflow drops the oldest moves first and is counted; the queue's
+  logic is plain Rust with unit tests. Real tablet fidelity is checked by hand (issue #5).
 
 ## Export boundary
 

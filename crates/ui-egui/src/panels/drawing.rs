@@ -14,6 +14,7 @@ use waltcut_geom::{Affine, Vec2};
 use waltcut_project::drawing::{Brush, Drawing, Stroke};
 use waltcut_project::{ClipId, TrackItem};
 
+use super::drawing_input::{FrameInput, PenPhase, PenSample, PenStats, Sample, Source, StrokeBuilder, frame_samples};
 use crate::WaltCutApp;
 
 /// What a stroke on a frame that does not start a cel draws into.
@@ -62,6 +63,9 @@ pub struct BrushSettings {
     pub onion_opacity: f32,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
+    /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
+    #[serde(skip_deserializing)]
+    pub pen: PenStats,
 }
 
 impl Default for BrushSettings {
@@ -75,18 +79,23 @@ impl Default for BrushSettings {
             onion: true,
             onion_opacity: 0.35,
             tween_step: 2,
+            pen: PenStats::default(),
         }
     }
 }
 
-/// The stroke being drawn: canvas-space samples.
+/// The stroke being drawn.
 #[derive(Clone, Debug, Default)]
 struct Live {
     clip: u64,
-    points: Vec<[f32; 3]>,
+    stroke: StrokeBuilder,
     /// Drawn with the pen's barrel (secondary) button: erases whatever the brush is.
     eraser: bool,
 }
+
+/// Samples of a press that has not become a stroke (yet): the press, and the moves after it, until
+/// the canvas decides the press belongs to it. Bounded, newest replacing the last when full.
+const MAX_PENDING: usize = 512;
 
 /// Picture ↔ drawing canvas mapping for one clip at the playhead.
 struct Mapping {
@@ -187,6 +196,79 @@ fn pressure(app: &WaltCutApp, ui: &egui::Ui) -> f32 {
         })
     })
     .unwrap_or(1.0)
+}
+
+/// UI clock in nanoseconds.
+fn now_ns(ui: &egui::Ui) -> u64 {
+    let t = ui.input(|i| i.time);
+    if t.is_finite() && t > 0.0 { (t * 1e9) as u64 } else { 0 }
+}
+
+/// The frame's pointer samples (see `drawing_input`), updating the input diagnostics.
+fn frame_input(app: &mut WaltCutApp, ui: &egui::Ui, was_down: bool) -> Vec<Sample> {
+    let mut platform: Vec<PenSample> = Vec::new();
+    // The host queues pointer events whatever tool is active. When the Brush tool was not drawn on
+    // the frame before (another tool, a dialog), what is queued is old: drop it and its loss count.
+    let frame = ui.ctx().cumulative_frame_nr();
+    let key = egui::Id::new("brush-last-input-frame");
+    let stale = ui.data(|d| d.get_temp::<u64>(key)).is_none_or(|last| frame.saturating_sub(last) > 2);
+    ui.data_mut(|d| d.insert_temp(key, frame));
+    if let Some(f) = app.hooks.pen_samples.as_mut() {
+        let r = f(&mut platform);
+        if stale {
+            platform.clear();
+        } else {
+            let st = &mut app.ui.brush.pen;
+            st.queue_dropped += r.dropped;
+            st.invalid += r.invalid;
+        }
+    }
+    let events: Vec<(Pos2, Option<bool>)> = ui.input(|i| {
+        i.events
+            .iter()
+            .filter_map(|e| match e {
+                egui::Event::PointerMoved(p) => Some((*p, None)),
+                egui::Event::PointerButton { pos, button: egui::PointerButton::Primary | egui::PointerButton::Secondary, pressed, .. } => {
+                    Some((*pos, Some(*pressed)))
+                }
+                _ => None,
+            })
+            .collect()
+    });
+    let input = FrameInput {
+        platform: &platform,
+        events: &events,
+        was_down,
+        pointer_now: ui.input(|i| i.pointer.latest_pos()),
+        zoom: ui.ctx().zoom_factor(),
+        fallback_pressure: pressure(app, ui),
+        now_ns: now_ns(ui),
+    };
+    let (samples, source) = frame_samples(&input);
+    let st = &mut app.ui.brush.pen;
+    if source == Source::PenFallback {
+        st.position_mismatches += 1;
+    }
+    if !samples.is_empty() {
+        st.source = source;
+    }
+    samples
+}
+
+/// Add a sample to the live stroke. Returns whether it ended the stroke (the pen came up).
+fn feed(l: &mut Live, s: &Sample, map: &Mapping) -> bool {
+    let canvas = map.canvas(s.pos);
+    match s.phase {
+        PenPhase::Up => {
+            l.stroke.finish(s, canvas);
+            true
+        }
+        PenPhase::Down | PenPhase::Move => {
+            l.stroke.push(s, canvas);
+            false
+        }
+        PenPhase::Hover => false,
+    }
 }
 
 fn run(app: &mut WaltCutApp, cmd: &str, p: Value) {
@@ -291,62 +373,123 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
         }
     }
     let live_id = id.with("live");
+    let pending_id = id.with("pending");
     let mut live: Option<Live> = ui.data(|dd| dd.get_temp(live_id));
-    let pointer = |ui: &egui::Ui| ui.input(|i| i.pointer.interact_pos());
+    let mut pending: Vec<Sample> = ui.data(|dd| dd.get_temp(pending_id)).unwrap_or_default();
     // the pen's lower barrel button reaches the app as the secondary button: it erases
     let secondary = ui.input(|i| i.pointer.button_down(egui::PointerButton::Secondary));
-    let starting = resp.drag_started_by(egui::PointerButton::Primary) || resp.drag_started_by(egui::PointerButton::Secondary);
-    if starting || (resp.is_pointer_button_down_on() && live.is_none() && !ui.input(|i| i.pointer.middle_down())) {
-        let start = ui.input(|i| i.pointer.press_origin()).or_else(|| pointer(ui));
-        if let Some(p) = start.filter(|p| !bar.contains(*p)) {
-            let (x, y) = map.canvas(p);
-            live = Some(Live { clip: clip.0, points: vec![[x, y, pressure(app, ui)]], eraser: secondary });
-        }
-    }
-    if let Some(l) = live.as_mut() {
-        if resp.is_pointer_button_down_on() || resp.dragged() {
-            // every pointer sample of this frame, not only the latest, so fast strokes stay smooth
-            let pr = pressure(app, ui);
-            let moves: Vec<Pos2> = ui.input(|i| {
-                i.events
-                    .iter()
-                    .filter_map(|e| match e {
-                        egui::Event::PointerMoved(p) => Some(*p),
-                        _ => None,
-                    })
-                    .collect()
-            });
-            for p in moves {
-                let (x, y) = map.canvas(p);
-                let far = l.points.last().is_none_or(|q| (q[0] - x).hypot(q[1] - y) * map.scale >= 0.75);
-                if far && l.points.len() < waltcut_project::drawing::MAX_STROKE_POINTS {
-                    l.points.push([x, y, pr]);
+    let middle = ui.input(|i| i.pointer.middle_down());
+    let begin_wanted = resp.drag_started_by(egui::PointerButton::Primary)
+        || resp.drag_started_by(egui::PointerButton::Secondary)
+        || resp.clicked_by(egui::PointerButton::Primary)
+        || resp.clicked_by(egui::PointerButton::Secondary)
+        || (resp.is_pointer_button_down_on() && live.is_none() && !middle);
+    // Every pointer sample of the frame, in order, with the pressure it was made at.
+    let stream = frame_input(app, ui, live.is_some());
+    // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
+    let cancelled =
+        ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
+    let mut released = false;
+    for s in stream {
+        if let Some(l) = live.as_mut() {
+            released |= feed(l, &s, &map);
+        } else {
+            match s.phase {
+                PenPhase::Down => {
+                    pending.clear();
+                    pending.push(s);
+                }
+                _ if pending.is_empty() => {}
+                _ => {
+                    if pending.len() >= MAX_PENDING {
+                        if let Some(last) = pending.last_mut() {
+                            *last = s;
+                        }
+                    } else {
+                        pending.push(s);
+                    }
                 }
             }
-            let b = &app.ui.brush;
-            let brush = if l.eraser { Brush::Eraser } else { b.brush };
-            let c = if brush == Brush::Eraser { Color32::from_white_alpha(120) } else { color32(b.color, 1.0) };
-            paint_stroke(&painter, &map, brush, b.size, &l.points, c);
-            ui.ctx().request_repaint();
-        } else {
-            // released: commit the stroke
-            let b = app.ui.brush.clone();
-            let stroke = json!({
-                "brush": if l.eraser { Brush::Eraser.label() } else { b.brush.label() },
-                "color": b.color,
-                "size": b.size,
-                "points": l.points,
-            });
-            let params = json!({"clip": l.clip, "cel": b.cel_mode.param(), "stroke": stroke});
-            live = None;
-            run(app, "drawing.addStroke", params);
         }
+        if released {
+            break;
+        }
+    }
+    if live.is_none() {
+        let ended = pending.last().is_some_and(|s| s.phase == PenPhase::Up);
+        let start = ui.input(|i| i.pointer.press_origin()).or_else(|| ui.input(|i| i.pointer.interact_pos()));
+        if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && pic.contains(p)) {
+            let mut l = Live { clip: clip.0, stroke: StrokeBuilder::default(), eraser: secondary };
+            let mut samples = std::mem::take(&mut pending);
+            if samples.first().is_none_or(|s| s.phase != PenPhase::Down) {
+                // the press itself was not seen (no hook, or a drag that began elsewhere): start where it was pressed
+                if let Some(p) = start {
+                    samples.insert(0, Sample { t_ns: now_ns(ui), pos: p, pressure: pressure(app, ui), phase: PenPhase::Down });
+                }
+            }
+            for s in samples {
+                released |= feed(&mut l, &s, &map);
+                if released {
+                    break;
+                }
+            }
+            live = Some(l);
+        } else if ended || !ui.input(|i| i.pointer.any_down()) {
+            // a press that is over and was not ours
+            pending.clear();
+        }
+    }
+    if cancelled && let Some(l) = live.take() {
+        let st = &mut app.ui.brush.pen;
+        st.cancelled += 1;
+        st.samples += l.stroke.received;
+        st.decimated += l.stroke.decimated;
+        app.ui.status = "Stroke cancelled: nothing was drawn".to_string();
+        released = false;
+    }
+    if let Some(l) = live.as_ref() {
+        let b = &app.ui.brush;
+        let brush = if l.eraser { Brush::Eraser } else { b.brush };
+        let c = if brush == Brush::Eraser { Color32::from_white_alpha(120) } else { color32(b.color, 1.0) };
+        paint_stroke(&painter, &map, brush, b.size, &l.stroke.points, c);
+        ui.ctx().request_repaint();
+    }
+    // The stroke ends on the pen-up sample, or when the UI says the button is up (no sample seen).
+    if live.is_some() && (released || !(resp.is_pointer_button_down_on() || resp.dragged())) {
+        let l = live.take().unwrap_or_default();
+        let b = app.ui.brush.clone();
+        let st = &mut app.ui.brush.pen;
+        st.samples += l.stroke.received;
+        st.decimated += l.stroke.decimated;
+        st.truncated += u64::from(l.stroke.truncated > 0);
+        st.last_stroke_points = l.stroke.points.len() as u64;
+        st.last_stroke_ms = l.stroke.duration_ms();
+        st.last_stroke_hz = if st.last_stroke_ms > 0.0 { (st.last_stroke_points.saturating_sub(1)) as f64 * 1000.0 / st.last_stroke_ms } else { 0.0 };
+        if l.stroke.truncated > 0 {
+            app.ui.status = format!(
+                "Stroke reached the {} sample limit: its end follows the pen but detail in between was lost",
+                waltcut_project::drawing::MAX_STROKE_POINTS
+            );
+        }
+        let stroke = json!({
+            "brush": if l.eraser { Brush::Eraser.label() } else { b.brush.label() },
+            "color": b.color,
+            "size": b.size,
+            "points": l.stroke.points,
+        });
+        let params = json!({"clip": l.clip, "cel": b.cel_mode.param(), "stroke": stroke});
+        run(app, "drawing.addStroke", params);
     }
     ui.data_mut(|dd| {
         if let Some(l) = live {
             dd.insert_temp(live_id, l);
         } else {
             dd.remove::<Live>(live_id);
+        }
+        if pending.is_empty() {
+            dd.remove::<Vec<Sample>>(pending_id);
+        } else {
+            dd.insert_temp(pending_id, pending);
         }
     });
     // which cel is showing, bottom-left

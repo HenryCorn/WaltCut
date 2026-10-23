@@ -287,6 +287,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         app.hooks.clipboard_media = Some(Box::new(clipboard_media));
         if waltcut_platform::pen::install_pen_monitor() {
             app.hooks.pen_pressure = Some(Box::new(waltcut_platform::pen::pen_pressure));
+            app.hooks.pen_samples = Some(Box::new(pen_samples));
         }
         app.hooks.raise_without_focus = Some(Box::new(|| {
             window_raise::raise_without_focus();
@@ -387,6 +388,28 @@ fn agent_event_loop(agent: bool) -> Option<eframe::EventLoopBuilderHook> {
             b.with_activate_ignoring_other_apps(false);
         })
     })
+}
+
+/// The platform's queued pen samples as the UI's (the UI crate knows no OS).
+fn pen_samples(out: &mut Vec<waltcut_ui_egui::panels::drawing_input::PenSample>) -> waltcut_ui_egui::panels::drawing_input::PenQueueReport {
+    use waltcut_platform::pen::PenPhase as P;
+    use waltcut_ui_egui::panels::drawing_input::{PenPhase, PenQueueReport, PenSample};
+    let mut raw = Vec::new();
+    let r = waltcut_platform::pen::drain_samples(&mut raw);
+    out.extend(raw.into_iter().map(|s| PenSample {
+        t_ns: s.t_ns,
+        x: s.x,
+        y: s.y,
+        pressure: s.pressure,
+        phase: match s.phase {
+            P::Down => PenPhase::Down,
+            P::Move => PenPhase::Move,
+            P::Up => PenPhase::Up,
+            P::Hover => PenPhase::Hover,
+        },
+        tablet: s.tablet,
+    }));
+    PenQueueReport { dropped: r.dropped, invalid: r.invalid }
 }
 
 #[cfg(test)]

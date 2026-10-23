@@ -35,7 +35,8 @@ objc2-core-media = "0.3.2"
 objc2-core-video = "0.3.2"
 objc2-video-toolbox = "0.3.2"
 # Tablet pen pressure (`pen`): an NSEvent local monitor. Both already in the lockfile through winit.
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSEvent", "block2"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSEvent", "NSResponder", "NSView", "NSWindow", "block2"] }
+objc2 = "0.6.5"
 block2 = "0.6.2"
 
 [dev-dependencies]
