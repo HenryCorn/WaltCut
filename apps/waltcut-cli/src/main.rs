@@ -33,7 +33,7 @@ macro_rules! out {
 mod args;
 mod probe;
 
-use args::{Args, parse_value};
+use args::Args;
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicBool, Ordering};
 use waltcut_automation::BridgeClient;
@@ -74,23 +74,18 @@ SUBCOMMANDS
   describe <id>                 one command as JSON (menu, shortcut, params, enabled now)
   inspect [project|sequence]    project tree or active sequence as JSON (default: both)
   import <file>...              import media into the project
-  export <out> [--preset name] [--format f] [--range r] [--start s --end s] [--settings json]
-         [--gpu-rendering auto|off]
-         [--scale f] [--quality 0-100] [--no-audio] [--queue] [--allow-offline]
-                                export the active sequence and wait for it to finish: with an
-                                export preset (`export --list-presets`; built-in or the user's), or
-                                a format (h264|hevc|prores|mjpeg|png|tiff|bmp|gif|wav|aiff|aac, guessed
-                                from the extension); --range entire|inOut|workArea, or a custom
-                                range in seconds; --settings is ExportSettings JSON merged over the
-                                preset; --scale renders at a fraction of the frame size (0.5 =
-                                half); --quality 0-100 for the formats that take one; --no-audio
-                                leaves the sound out; --queue adds to the export queue and runs it
-                                instead. Offline media (missing, made offline, unreadable) renders
-                                as placeholder frames: the export then lists it in `offlineMedia`,
-                                warns on stderr and exits 1, unless --allow-offline accepts it
-  export --list-presets [query] list export presets (name, category, format) as JSON
-  render --seconds S --out f.png [--scale 0.5] [--allow-offline]
-                                render one Program frame to PNG (offline media: as for export)
+  export <out> [--format h264|prores|png] [--range entire|inOut|workArea]
+         [--start seconds --end seconds] [--overwrite] [--allow-offline]
+                                export one sequence and wait for its job: H.264 + AAC MP4,
+                                ProRes 4444 MOV with alpha and stereo PCM, or PNG sequence with
+                                alpha. Format is guessed from .mp4/.mov/.png. Output size and rate
+                                follow the sequence. PNG sequences need unused filenames.
+                                Existing movies require explicit --overwrite; a failed/cancelled
+                                export leaves them untouched. Offline media renders placeholders,
+                                warns on stderr and exits 1 unless --allow-offline accepts it.
+  render --seconds S --out f.png|f.jpg [--overwrite] [--allow-offline]
+                                save one full-resolution Program frame via file.exportFrame;
+                                PNG keeps alpha, JPEG flattens over black (offline media: as above)
   probe <media> [--image-sequence]
                                 media info as JSON, with MPEG transport/program stream and BWF details; with
                                 --image-sequence <media> is the first numbered still of a sequence
@@ -105,8 +100,6 @@ OPTIONS
   --save                        save the project back to --project when done
   --save-as <p.fcproj>          save the project to this path when done
   --bridge <127.0.0.1:PORT>     send commands to the running app (`filmcraft --control PORT`)
-  --data-dir <dir>              FilmCraft data directory for user export presets (headless;
-                                default: the app's data directory)
   --keep-going                  `run`: report failing lines and continue
   --compact                     one-line JSON output
 
@@ -148,6 +141,9 @@ enum Backend {
 
 impl Backend {
     fn open(a: &Args) -> Self {
+        if a.opt("--project").is_some() && a.flag("--demo") {
+            usage("choose --project or --demo, not both");
+        }
         if let Some(addr) = a.opt("--bridge") {
             if a.opt("--project").is_some() || a.flag("--demo") {
                 usage("--bridge drives the running app; open projects there (exec file.open path=…)");
@@ -155,10 +151,6 @@ impl Backend {
             return Backend::Bridge(BridgeClient::new(addr).unwrap_or_else(|e| usage(e)));
         }
         let mut s = Session::default();
-        // user export presets (and other per-user libraries) from the data directory
-        if let Some(dir) = a.opt("--data-dir").map(std::path::PathBuf::from).or_else(waltcut_engine::autosave::default_data_dir) {
-            s.export_presets.set_dir(&dir);
-        }
         if let Some(p) = a.opt("--project") {
             if let Err(e) = s.execute("file.open", json!({"path": p})) {
                 fail(e);
@@ -204,20 +196,14 @@ fn print(a: &Args, v: &Value) {
 fn format_for(path: &str) -> Option<&'static str> {
     let ext = path.rsplit_once('.')?.1.to_ascii_lowercase();
     Some(match ext.as_str() {
-        "mp4" | "m4v" => "h264",
+        "mp4" => "h264",
         "mov" => "prores",
         "png" => "png",
-        "gif" => "gif",
-        "wav" => "wav",
-        "tif" | "tiff" => "tiff",
-        "bmp" => "bmp",
-        "aif" | "aiff" => "aiff",
-        "m4a" | "aac" => "aac",
         _ => return None,
     })
 }
 
-/// OS hardware video decoders (VideoToolbox on macOS, Media Foundation on Windows) in front of our
+/// OS hardware video decoders (VideoToolbox on macOS) in front of our
 /// own, as in the desktop app. Also what `mcp` and the headless commands decode with.
 /// The GPU export frame renderer (waltcut-gpu's off-screen compositor behind waltcut-export's
 /// frame-renderer hook): exports with GPU rendering Auto composite on the GPU and fall back to the
@@ -335,6 +321,9 @@ async fn cli() {
         }
         "exec" => {
             let id = a.pos(1).unwrap_or_else(|| usage("exec <id> [key=value ...]"));
+            if matches!(id, "file.exportMedia" | "file.exportFrame" | "export.quick") {
+                a.check_options(&["--project", "--bridge", "--save-as"], &["--demo", "--compact", "--save"]).unwrap_or_else(|e| usage(e));
+            }
             let params = a.params_from(2).unwrap_or_else(|e| usage(e));
             let mut b = Backend::open(&a);
             match b.exec(id, params).await {
@@ -344,6 +333,7 @@ async fn cli() {
             b.finish(&a).await;
         }
         "run" => {
+            a.check_options(&["--project", "--bridge", "--save-as"], &["--demo", "--compact", "--save", "--keep-going"]).unwrap_or_else(|e| usage(e));
             let script = a.pos(1).unwrap_or_else(|| usage("run <script.jsonl | ->"));
             let text = if script == "-" {
                 std::io::read_to_string(std::io::stdin()).unwrap_or_else(|e| fail(e))
@@ -396,59 +386,24 @@ async fn cli() {
             b.finish(&a).await;
         }
         "export" => {
-            if a.flag("--list-presets") {
-                let mut b = Backend::open(&a);
-                let q = a.pos(1).map(|q| json!({"query": q})).unwrap_or(json!({}));
-                match b.exec("export.presets.list", q).await {
-                    Ok(v) => print(&a, &v["presets"]),
-                    Err(e) => fail(format!("export: {e}")),
-                }
-                return;
+            a.check_options(&["--project", "--bridge", "--format", "--range", "--start", "--end"], &["--demo", "--compact", "--overwrite", "--allow-offline"])
+                .unwrap_or_else(|e| usage(e));
+            if a.positionals.len() != 2 {
+                usage("export <out> [--format h264|prores|png]");
             }
-            let out = a.pos(1).unwrap_or_else(|| usage("export <out> [--preset name | --format f]"));
-            let mut p = json!({"path": out, "wait": true});
-            match (a.opt("--preset"), a.opt("--format")) {
-                (Some(preset), f) => {
-                    p["preset"] = json!(preset);
-                    if let Some(f) = f {
-                        p["format"] = json!(f);
-                    }
-                }
-                (None, f) => {
-                    let format = f.or_else(|| format_for(out)).unwrap_or_else(|| usage("export: give --preset or --format (unknown extension)"));
-                    p["format"] = json!(format);
-                }
+            let out = a.pos(1).unwrap_or_else(|| usage("export needs a destination"));
+            let format = a
+                .opt("--format")
+                .or_else(|| format_for(out))
+                .unwrap_or_else(|| usage("export supports .mp4, .mov or .png; give --format for an extensionless path"));
+            let mut p = json!({"path": out, "format": format, "wait": true, "overwrite": a.flag("--overwrite")});
+            if let Some(range) = a.opt("--range") {
+                p["range"] = json!(range);
             }
-            for (k, key) in [("--scale", "scale"), ("--quality", "quality")] {
-                if let Some(v) = a.opt(k) {
-                    p[key] = parse_value(v);
-                }
-            }
-            if let Some(r) = a.opt("--range") {
-                p["range"] = json!(r);
-            }
-            set_custom_bounds(&mut p, a.opt("--start"), a.opt("--end"));
-            if let Some(js) = a.opt("--settings") {
-                p["settings"] = serde_json::from_str(js).unwrap_or_else(|e| usage(format!("--settings: {e}")));
-            }
-            if a.flag("--no-audio") {
-                p["audio"] = json!(false);
-            }
-            if let Some(v) = a.opt("--gpu-rendering") {
-                p["gpuRendering"] = json!(v); // off | auto (validated by the export command)
-            }
+            set_custom_bounds(&mut p, a.opt("--start"), a.opt("--end")).unwrap_or_else(|e| usage(e));
             let mut b = Backend::open(&a);
             let t0 = std::time::Instant::now();
-            let r = if a.flag("--queue") {
-                let mut q = p.clone();
-                q["start"] = json!(true);
-                b.exec("export.queue.add", q).await.and_then(|v| {
-                    let failed: Vec<&Value> = v["items"].as_array().map(|i| i.iter().filter(|x| x["status"] != "done").collect()).unwrap_or_default();
-                    if failed.is_empty() { Ok(v) } else { Err(format!("queue: {}", Value::Array(failed.into_iter().cloned().collect()))) }
-                })
-            } else {
-                b.exec("file.exportMedia", p).await
-            };
+            let r = b.exec("file.exportMedia", p).await;
             match r {
                 Ok(v) => {
                     print(&a, &v);
@@ -460,25 +415,32 @@ async fn cli() {
             }
         }
         "render" => {
-            if a.opt("--bridge").is_some() {
-                usage("render is headless; with --bridge use the MCP `render_frame` tool or `exec` ui commands");
+            a.check_options(&["--project", "--bridge", "--seconds", "--out"], &["--demo", "--compact", "--overwrite", "--allow-offline"])
+                .unwrap_or_else(|e| usage(e));
+            if a.positionals.len() != 1 {
+                usage("render --seconds S --out frame.png|frame.jpg");
             }
-            let Backend::Local(mut s) = Backend::open(&a) else { usage("render is headless") };
             let secs: f64 = finite_opt(&a, "--seconds").unwrap_or(0.0);
-            let scale: f32 = finite_opt(&a, "--scale").unwrap_or(1.0);
+            let time = render_time(secs).unwrap_or_else(|e| usage(e));
             let out = a.opt("--out").unwrap_or("frame.png");
-            s.set_playhead(waltcut_time::Tick::from_seconds_f64(secs));
+            let extension = std::path::Path::new(out).extension().and_then(|s| s.to_str()).unwrap_or_default().to_ascii_lowercase();
+            let format = match extension.as_str() {
+                "png" => "png",
+                "jpg" | "jpeg" => "jpeg",
+                _ => usage("render destination must end in .png, .jpg or .jpeg"),
+            };
+            let mut backend = Backend::open(&a);
             let t0 = std::time::Instant::now();
-            let (img, offline) = render_at_playhead(&s, scale).unwrap_or_else(|e| fail(e));
-            let dt = t0.elapsed();
-            let png = waltcut_automation::png_rgba(img.w as u32, img.h as u32, img.over_black_rgba8(), 0).unwrap_or_else(|e| fail(e));
-            std::fs::write(out, png).unwrap_or_else(|e| fail(format!("{out}: {e}")));
-            let offline: Vec<Value> = offline.iter().filter_map(|o| serde_json::to_value(o).ok()).collect();
-            check_offline(&a, &offline, &format!("render: {out}"));
-            diag(format_args!("rendered {}x{} in {:.1} ms → {out}", img.w, img.h, dt.as_secs_f64() * 1000.0));
+            let result = backend
+                .exec("file.exportFrame", json!({"path":out,"format":format,"time":time.0,"overwrite":a.flag("--overwrite")}))
+                .await
+                .unwrap_or_else(|e| fail(format!("render: {e}")));
+            print(&a, &result);
+            check_offline(&a, &offline_media(&result), &format!("render: {out}"));
+            diag(format_args!("rendered {}x{} in {:.1} ms → {out}", result["width"], result["height"], t0.elapsed().as_secs_f64() * 1000.0));
         }
         "mcp" => {
-            if let Some(opt) = a.unknown_opt(&["--bridge", "--project", "--demo", "--data-dir"]) {
+            if let Some(opt) = a.unknown_opt(&["--bridge", "--project", "--demo"]) {
                 usage(format!("unknown mcp option `{opt}`"));
             }
             let server = match a.opt("--bridge") {
@@ -496,35 +458,13 @@ async fn cli() {
     }
 }
 
-/// The files an export wrote, from its result: `path` of a direct export, or each queued item's
-/// `path` (the format may have changed the extension).
-/// `requested` when the result names none.
+/// The destination returned by the direct export command (which may add an extension).
 fn written_paths(result: &Value, requested: &str) -> Vec<String> {
-    let paths: Vec<String> = match result.get("path").and_then(Value::as_str) {
-        Some(p) => vec![p.to_string()],
-        None => result
-            .get("items")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|i| i.get("path").and_then(Value::as_str))
-            .map(str::to_string)
-            .collect(),
-    };
-    if paths.is_empty() { vec![requested.to_string()] } else { paths }
+    vec![result.get("path").and_then(Value::as_str).unwrap_or(requested).to_string()]
 }
 
-/// The offline items an export result reports (`offlineMedia` of a direct export, or of each
-/// queued item), once each.
 fn offline_media(result: &Value) -> Vec<Value> {
-    let lists = std::iter::once(result).chain(result.get("items").and_then(Value::as_array).into_iter().flatten());
-    let mut out: Vec<Value> = Vec::new();
-    for o in lists.filter_map(|r| r.get("offlineMedia").and_then(Value::as_array)).flatten() {
-        if !out.iter().any(|x| x.get("item") == o.get("item")) {
-            out.push(o.clone());
-        }
-    }
-    out
+    result.get("offlineMedia").and_then(Value::as_array).cloned().unwrap_or_default()
 }
 
 /// One stderr line per offline item that rendered as placeholder frames (#1054).
@@ -560,39 +500,51 @@ fn finite_opt<T: std::str::FromStr + Copy + Into<f64>>(a: &Args, name: &str) -> 
     }
 }
 
-/// The active sequence at the playhead with the offline items it drew, or the reason it cannot be
-/// rendered (no sequence, bad scale).
-fn render_at_playhead(s: &Session, scale: f32) -> Result<(waltcut_engine::render::Image, Vec<waltcut_engine::media_pool::OfflineMedia>), String> {
-    s.try_render_program_with_offline_at(scale, s.playhead()).map_err(|e| e.to_string())
+/// Validate still-frame seconds before converting to exact timeline time.
+fn render_time(seconds: f64) -> Result<waltcut_time::Tick, String> {
+    if !seconds.is_finite() || seconds < 0.0 || seconds > waltcut_time::Tick::MAX.seconds() {
+        return Err("--seconds must be finite, non-negative and within supported time bounds".into());
+    }
+    let tick = waltcut_time::Tick::from_seconds_f64(seconds);
+    if tick > waltcut_time::Tick::MAX {
+        return Err("--seconds exceeds supported time bounds after rounding".into());
+    }
+    Ok(tick)
 }
 
-/// `--start` / `--end` ask for a custom range. A lone bound is forwarded too, so the engine reports the missing one
-/// instead of the export silently running over the whole sequence.
-fn set_custom_bounds(p: &mut Value, start: Option<&str>, end: Option<&str>) {
-    if start.is_none() && end.is_none() {
-        return;
+fn set_custom_bounds(p: &mut Value, start: Option<&str>, end: Option<&str>) -> Result<(), String> {
+    let (start, end) = match (start, end) {
+        (None, None) => return Ok(()),
+        (Some(start), Some(end)) => (start, end),
+        _ => return Err("provide both --start and --end for a custom export range".into()),
+    };
+    if p.get("range").is_some_and(|value| value != "custom") {
+        return Err("--start/--end cannot be combined with a non-custom --range".into());
+    }
+    let parse = |text: &str, name: &str| {
+        text.parse::<f64>()
+            .ok()
+            .filter(|value| value.is_finite() && *value >= 0.0 && *value <= waltcut_time::Tick::MAX.seconds())
+            .ok_or_else(|| format!("{name} must be finite, non-negative seconds within supported bounds"))
+    };
+    let (start, end) = (parse(start, "--start")?, parse(end, "--end")?);
+    if end <= start {
+        return Err("--end must be after --start".into());
     }
     p["range"] = json!("custom");
-    if let Some(s0) = start {
-        p["startSeconds"] = parse_value(s0);
-    }
-    if let Some(s1) = end {
-        p["endSeconds"] = parse_value(s1);
-    }
+    p["startSeconds"] = json!(start);
+    p["endSeconds"] = json!(end);
+    Ok(())
 }
 
 #[cfg(test)]
 mod format_tests {
     #[test]
-    fn render_reports_the_real_reason() {
-        let mut s = waltcut_engine::Session::default();
-        assert!(super::render_at_playhead(&s, 0.5).unwrap_err().contains("sequence"));
-        s.execute("file.newSequence", serde_json::json!({"width": 16, "height": 16})).unwrap();
-        for scale in [0.0, -1.0, f32::NAN] {
-            let e = super::render_at_playhead(&s, scale).unwrap_err();
-            assert!(e.contains("finite and positive"), "{e}");
+    fn render_time_rejects_hostile_seconds_before_tick_conversion() {
+        for seconds in [-1.0, f64::NAN, f64::INFINITY, f64::MAX] {
+            assert!(super::render_time(seconds).is_err());
         }
-        assert_eq!(super::render_at_playhead(&s, 0.5).unwrap().0.w, 8);
+        assert_eq!(super::render_time(0.25).unwrap(), waltcut_time::FrameRate::FPS_24.tick_of(6));
     }
 
     /// The CLI (and MCP / headless runs, which share its entry point) registers the hardware
@@ -614,7 +566,7 @@ mod format_tests {
                 Err(std::io::ErrorKind::BrokenPipe.into())
             }
         }
-        super::write_diag(&mut Closed, format_args!("exported {}", "a.wav"));
+        super::write_diag(&mut Closed, format_args!("exported {}", "a.mov"));
         let mut ok = Vec::new();
         super::write_diag(&mut ok, format_args!("hi"));
         assert_eq!(ok, b"hi\n");
@@ -623,41 +575,38 @@ mod format_tests {
     #[test]
     fn export_message_names_the_written_files() {
         use serde_json::json;
-        let direct = json!({"job": 1, "path": "out-prores.mp4.mov", "result": {"path": "out-prores.mp4.mov"}});
-        assert_eq!(super::written_paths(&direct, "out-prores.mp4"), ["out-prores.mp4.mov"]);
-        let queued = json!({"added": [1, 2], "items": [{"path": "a.mp4.mov"}, {"path": "b.wav"}]});
-        assert_eq!(super::written_paths(&queued, "a.mp4"), ["a.mp4.mov", "b.wav"]);
+        let direct = json!({"job": 1, "path": "out-prores.mov", "result": {"path": "out-prores.mov"}});
+        assert_eq!(super::written_paths(&direct, "out-prores"), ["out-prores.mov"]);
         assert_eq!(super::written_paths(&json!({}), "x.mov"), ["x.mov"]);
-        assert_eq!(super::written_paths(&json!({"items": []}), "x.mov"), ["x.mov"]);
     }
 
     #[test]
-    fn offline_media_from_direct_and_queued_results() {
+    fn offline_media_from_direct_results() {
         use serde_json::json;
         let a = json!({"item": 8, "name": "a.mp4", "path": "/m/a.mp4", "status": "missing", "error": ""});
         let b = json!({"item": 9, "name": "b.mov", "path": "/m/b.mov", "status": "offline", "error": ""});
         assert_eq!(super::offline_media(&json!({"path": "x.mp4", "offlineMedia": [a]})), std::slice::from_ref(&a));
-        let queued = json!({"items": [{"offlineMedia": [a, b]}, {"offlineMedia": [a]}, {"offlineMedia": []}]});
-        assert_eq!(super::offline_media(&queued), [a.clone(), b.clone()]);
         assert!(super::offline_media(&json!({"path": "x.mp4"})).is_empty());
         let w = super::offline_warning(&[a, b]);
         assert!(w.contains("2 offline media item(s)") && w.contains("item 8 a.mp4 (missing): /m/a.mp4") && w.contains("item 9 b.mov (offline)"), "{w}");
     }
 
     #[test]
-    fn export_lone_bound_is_forwarded_as_custom_range() {
+    fn export_custom_bounds_are_explicit_and_never_ignore_a_conflicting_range() {
         use serde_json::json;
         let mut p = json!({});
-        super::set_custom_bounds(&mut p, Some("0.25"), None);
-        assert_eq!(p["range"], "custom");
-        assert_eq!(p["startSeconds"], 0.25);
-        assert!(p.get("endSeconds").is_none());
-        let mut p = json!({});
-        super::set_custom_bounds(&mut p, None, Some("0.25"));
+        assert!(super::set_custom_bounds(&mut p, Some("0.25"), None).is_err());
+        assert!(super::set_custom_bounds(&mut p, None, Some("0.25")).is_err());
+        super::set_custom_bounds(&mut p, Some("0"), Some("0.25")).unwrap();
         assert_eq!(p["range"], "custom");
         assert_eq!(p["endSeconds"], 0.25);
+        assert_eq!(p["startSeconds"], 0.0);
+        for (start, end) in [("NaN", "1"), ("0", "inf"), ("-1", "1"), ("1", "0"), ("0", "0"), ("0", "1e300")] {
+            assert!(super::set_custom_bounds(&mut json!({}), Some(start), Some(end)).is_err());
+        }
+        assert!(super::set_custom_bounds(&mut json!({"range":"entire"}), Some("0"), Some("1")).is_err());
         let mut p = json!({});
-        super::set_custom_bounds(&mut p, None, None);
+        super::set_custom_bounds(&mut p, None, None).unwrap();
         assert!(p.get("range").is_none());
     }
 

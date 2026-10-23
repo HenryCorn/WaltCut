@@ -5,7 +5,7 @@ use super::*;
 use crate::tests::project;
 
 fn tmp(name: &str) -> String {
-    let d = std::env::temp_dir().join(format!("fc-export-det-{}", std::process::id()));
+    let d = waltcut_testkit::fixtures::workspace_root().join("target").join(format!("fc-export-det-{}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d.join(name).to_string_lossy().to_string()
 }
@@ -19,7 +19,7 @@ fn export_with_cores(threads: usize, settings: &ExportSettings) -> Vec<u8> {
     std::fs::read(&settings.path).unwrap()
 }
 
-/// Export a step at a time with `batch` frames per step (the web app uses 1).
+/// Export a step at a time with `batch` frames per step.
 fn export_stepped(batch: i64, settings: &ExportSettings) -> Vec<u8> {
     let (p, seq, m) = project();
     let prog = Progress::default();
@@ -32,7 +32,7 @@ fn export_stepped(batch: i64, settings: &ExportSettings) -> Vec<u8> {
 #[test]
 fn same_file_whatever_the_core_count() {
     // 24 frames: one full interleave group and a partial one
-    for (format, ext) in [(Format::ProRes, "mov"), (Format::H264, "mp4"), (Format::Mjpeg, "mov")] {
+    for (format, ext) in [(Format::ProRes, "mov"), (Format::H264, "mp4")] {
         let settings = |name: &str| ExportSettings { format, path: tmp(&format!("{name}.{ext}")), ..Default::default() };
         let reference = export_with_cores(2, &settings(&format!("{}-2", format.id())));
         for threads in [3, 5, 16] {
@@ -84,8 +84,10 @@ fn h264_slices_follow_the_frame_size_not_the_cores() {
     // 4096 lines = 256 macroblock rows: one slice per four rows on every machine, also on machines
     // with fewer than 64 cores (the encoder's default caps the slices at the core count)
     let path = tmp("tall.mp4");
-    let s = ExportSettings { format: Format::H264, path: path.clone(), frame_size: Some((64, 4096)), include_audio: false, ..Default::default() };
-    let (p, seq, m) = project();
+    let s = ExportSettings { format: Format::H264, path: path.clone(), include_audio: false, ..Default::default() };
+    let (mut p, seq, m) = project();
+    let settings = &mut Arc::make_mut(&mut p).sequence_mut(seq).unwrap().settings;
+    (settings.width, settings.height) = (64, 4096);
     export(&p, seq, &s, &m, &Progress::default()).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     let file = waltcut_isobmff::open(bytes.as_slice()).unwrap();
@@ -127,7 +129,7 @@ fn export_overlapped(threads: usize, batch: i64, overlap: bool, settings: &Expor
 
 #[test]
 fn rendering_ahead_does_not_change_the_file() {
-    for (format, ext) in [(Format::ProRes, "mov"), (Format::H264, "mp4"), (Format::Mjpeg, "mov")] {
+    for (format, ext) in [(Format::ProRes, "mov"), (Format::H264, "mp4")] {
         let settings = |name: &str| ExportSettings { format, path: tmp(&format!("{name}.{ext}")), ..Default::default() };
         let (reference, ahead) = export_overlapped(3, 7, false, &settings(&format!("ov-{}-off", format.id())));
         assert_eq!(ahead, 0, "{}: overlap is off", format.label());
@@ -138,28 +140,6 @@ fn rendering_ahead_does_not_change_the_file() {
             assert!(reference == other, "{}: rendering ahead ({threads} cores, {batch} per step) gives a different file", format.label());
         }
     }
-}
-
-#[test]
-fn rendering_ahead_in_a_two_pass_export() {
-    let settings = |name: &str| ExportSettings {
-        format: Format::H264,
-        path: tmp(name),
-        bitrate_mode: BitrateMode::Vbr2Pass,
-        bitrate_kbps: 2000,
-        include_audio: false,
-        ..Default::default()
-    };
-    let (reference, _) = export_overlapped(3, 5, false, &settings("2pass-off.mp4"));
-    let (other, ahead) = export_overlapped(3, 5, true, &settings("2pass-on.mp4"));
-    assert!(ahead > 0);
-    assert!(reference == other, "two-pass: rendering ahead gives a different file");
-    // the whole export, with audio, through `export`: both passes counted once
-    let prog = Progress::default();
-    let (p, seq, m) = project();
-    pool(4).install(|| export(&p, seq, &ExportSettings { include_audio: true, ..settings("2pass-all.mp4") }, &m, &prog)).unwrap();
-    assert_eq!(prog.total.load(Ordering::Relaxed), 48);
-    assert_eq!(prog.done.load(Ordering::Relaxed), 48);
 }
 
 #[test]
@@ -192,7 +172,7 @@ fn hdr_with_audio_is_the_same_file_when_the_memory_budget_caps_the_batch() {
             })
         };
         let (reference, _) = run(&format!("hdrcap-{}-ref", format.id()), 16, false, None);
-        // 320 x 180 HDR frames are 691 200 bytes: a budget of six of them lets two batches of three be in
+        // A budget of six HDR frames lets two batches of three be in
         // flight, so a batch of 16 is cut to 3 and the interleave cut at frame 16 falls in a prefetched batch
         let budget = 6 * frame_bytes_for_test();
         let (capped, ahead) = run(&format!("hdrcap-{}-3", format.id()), 16, true, Some(budget));
@@ -207,12 +187,12 @@ fn hdr_with_audio_is_the_same_file_when_the_memory_budget_caps_the_batch() {
     }
 }
 
-/// Bytes of one HDR frame of the test project (320 x 180, three f32 per pixel).
+/// Bytes of one HDR frame (RGB floats plus RGBA8 carrying the separate alpha).
 fn frame_bytes_for_test() -> u64 {
-    320 * 180 * 12
+    320 * 180 * 16
 }
 
-/// A provider that answers like an asynchronous (web) reader whose bytes have not arrived yet for
+/// A provider that answers like an asynchronous reader whose bytes have not arrived yet for
 /// the calls numbered in `loading` (marks pending, offers no source), and can be told to panic.
 struct Flaky<'a> {
     inner: &'a SourceMap,
@@ -242,8 +222,25 @@ impl SourceProvider for Flaky<'_> {
 }
 
 #[test]
+fn png_sequence_never_writes_an_incomplete_frame() {
+    let (project, seq, sources) = project();
+    let flaky = Flaky::new(&sources, 0..usize::MAX);
+    let settings = ExportSettings {
+        format: Format::PngSequence,
+        path: tmp("pending-png.png"),
+        range: Some(TimeRange::new(Tick::ZERO, FrameRate::FPS_24.tick_of(1))),
+        ..Default::default()
+    };
+    let progress = Progress::default();
+    assert!(matches!(export(&project, seq, &settings, &flaky, &progress), Err(ExportError::Io(_))));
+    assert!(!std::path::Path::new(&image_sequence_path(&settings.path, 0, 1)).exists());
+    assert_eq!(progress.done.load(Ordering::Relaxed), 0);
+    assert!(!progress.finished.load(Ordering::Relaxed));
+}
+
+#[test]
 fn a_batch_rendered_ahead_with_missing_media_is_never_encoded() {
-    let settings = |name: &str| ExportSettings { format: Format::Mjpeg, path: tmp(name), include_audio: false, ..Default::default() };
+    let settings = |name: &str| ExportSettings { format: Format::ProRes, path: tmp(name), include_audio: false, ..Default::default() };
     let (reference, _) = export_overlapped(3, 3, false, &settings("pending-ref.mov"));
     let (p, seq, m) = project();
     let flaky = Flaky::new(&m, 5..70);
@@ -276,7 +273,7 @@ fn a_batch_rendered_ahead_with_missing_media_is_never_encoded() {
 
 #[test]
 fn cancelling_drops_the_batch_rendered_ahead() {
-    let s = ExportSettings { format: Format::Mjpeg, path: tmp("cancel.mov"), ..Default::default() };
+    let s = ExportSettings { format: Format::ProRes, path: tmp("cancel.mov"), ..Default::default() };
     let (p, seq, m) = project();
     pool(3).install(|| {
         let prog = Progress::default();
@@ -294,7 +291,7 @@ fn cancelling_drops_the_batch_rendered_ahead() {
 
 #[test]
 fn a_panic_while_rendering_ahead_is_an_error() {
-    let s = ExportSettings { format: Format::Mjpeg, path: tmp("panic.mov"), include_audio: false, ..Default::default() };
+    let s = ExportSettings { format: Format::ProRes, path: tmp("panic.mov"), include_audio: false, ..Default::default() };
     let (p, seq, m) = project();
     let flaky = Flaky::new(&m, 0..0);
     pool(3).install(|| {

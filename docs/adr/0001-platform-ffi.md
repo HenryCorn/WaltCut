@@ -4,6 +4,16 @@
   [AGENTS.md](../../AGENTS.md) §0 item 3 and the craftrules never-crash standard)
 - **Issue:** #30 (hardware acceleration)
 
+## Current WaltCut scope
+
+The historical decisions/addenda below are retained as engineering history. #29 removed the
+non-macOS targets. **#25 IMPLEMENTATION DRAFTED** deletes the remaining VideoToolbox hardware
+encoders and export encoder/probe registries; the encoding addenda are superseded for the current
+product, not supported output contracts. Retained exports use built-in Rust H.264/AAC and
+ProRes 4444 encoders. The VideoToolbox **decoder**, safe hybrid fallback, import formats and tablet
+pressure path remain. Native import/output fixture verification, real iPhone acceptance, full CI
+and animation-flow visual acceptance are pending, not claimed passing.
+
 ## Context
 
 FilmCraft is pure Rust and the workspace sets `unsafe_code = "forbid"`. Every codec has a

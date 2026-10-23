@@ -36,7 +36,7 @@ pub struct CommandSpec {
 }
 
 macro_rules! cmd {
-    ($id:literal, $label:literal, [$($m:literal),*], $sc:expr, $params:literal, $en:expr, $run:expr) => {
+    ($id:literal, $label:literal, [$($m:literal),*], $sc:expr, $params:expr, $en:expr, $run:expr) => {
         CommandSpec { id: $id, label: $label, menu: &[$($m),*], shortcut: $sc, params: $params, enabled: $en, run: $run, journal: true }
     };
 }
@@ -1437,15 +1437,7 @@ fn build() -> Vec<CommandSpec> {
             s.set_prefs(next).map_err(|e| EngineError::Other(format!("saving preferences: {e}")))?;
             Ok(s.prefs.to_value())
         }),
-        cmd!(
-            "file.exportMedia",
-            "Media…",
-            ["File", "Export"],
-            None,
-            r#"{"path":str,"preset":str?,"settings":ExportSettings?,"format":"h264|hevc|prores|mjpeg|png|tiff|bmp|jpg|tga|dpx|exr|gif|wav|aiff|aac"?,"audioCodec":"auto|aac|pcm"?,"width":u32?,"height":u32?,"fps":f64?,"bitrateKbps":u32?,"bitrateMode":"cbr|vbr1Pass|vbr2Pass|crf"?,"crf":0..51=23,"hardwareEncoding":"off|auto"?,"scale":f32=1,"audio":bool=true,"quality":0..100,"alpha":bool=false,"exrCompression":"none|rle|zips|zip"?,"proresProfile":"proxy|lt|standard|hq|4444|4444xq"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startSeconds":f64?,"endSeconds":f64?,"wait":bool=false}"#,
-            has_seq,
-            crate::export_tools::export_media
-        ),
+        cmd!("file.exportMedia", "Media…", ["File", "Export"], None, crate::export_tools::EXPORT_PARAMS, has_seq, crate::export_tools::export_media),
         query!("jobs.list", "List Jobs", "{}", |s, _| Ok(Value::Array(s.jobs.iter().map(|j| crate::export_tools::job_json(s, j)).collect()))),
         query!("perf.stats", "Performance Statistics", "{}", |s, _| Ok(crate::perf::stats(s))),
         cmd!("jobs.cancel", "Cancel Job", [], None, r#"{"job":id}"#, always, |s, p| {

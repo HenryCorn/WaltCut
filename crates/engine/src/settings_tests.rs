@@ -18,6 +18,27 @@ fn demo() -> Session {
     s
 }
 
+#[test]
+fn interface_language_is_not_a_preference() {
+    let mut s = Session::default();
+    assert!(settings::field("general.interfaceLanguage").is_none());
+    assert!(s.prefs.get("general.interfaceLanguage").is_none());
+    assert!(s.execute("prefs.set", json!({"key": "general.interfaceLanguage", "value": "ja"})).is_err());
+}
+
+#[test]
+fn removed_export_queue_and_encoder_preferences_are_not_hidden_settings() {
+    let mut session = Session::default();
+    let before = session.prefs.to_value();
+    for key in ["media.proresHardwareEncoding", "playback.pauseEncoderQueue"] {
+        assert!(settings::field(key).is_none(), "{key}");
+        assert!(session.prefs.get(key).is_none(), "{key}");
+        assert!(session.execute("prefs.set", json!({"key":key,"value":true})).is_err(), "{key}");
+        assert!(session.execute("prefs.set", json!({"values":{key:false}})).is_err(), "{key}");
+    }
+    assert_eq!(session.prefs.to_value(), before);
+}
+
 fn set(s: &mut Session, key: &str, value: Value) {
     s.execute("prefs.set", json!({"key": key, "value": value})).unwrap_or_else(|e| panic!("{key}: {e}"));
 }

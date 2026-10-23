@@ -78,7 +78,7 @@ fn session() -> Session {
 }
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("fc-export-menu-{name}-{}", std::process::id()));
+    let d = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("fc-export-menu-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d
@@ -120,15 +120,55 @@ fn cancelling_the_save_panel_writes_nothing_and_reports_no_error() {
 
 #[test]
 fn media_from_the_menu_opens_the_export_mode() {
-    let mut d = Driver::new(session(), None, Asked::default());
+    let mut session = Session::default();
+    session.execute("file.newSequence", json!({"width":32,"height":18,"fps":24})).unwrap();
+    let mut d = Driver::new(session, None, Asked::default());
     assert_eq!(d.harness.state().ui.mode, Mode::Edit);
     d.ok("ui.menu.invoke", json!({"id": "file.exportMedia"}));
     d.frames(2);
     assert_eq!(d.harness.state().ui.mode, Mode::Export);
     // with a path it still exports directly, as scripts and the CLI use it
-    let out = tmp("media").join("direct.wav");
-    let r = d.ok("ui.menu.invoke", json!({"id": "file.exportMedia", "params": {"path": out.to_string_lossy(), "format": "wav", "wait": true}}));
+    let directory = tmp("media");
+    let out = directory.join("direct.mov");
+    let r = d.ok("ui.menu.invoke", json!({"id": "file.exportMedia", "params": {"path": out.to_string_lossy(), "format": "prores", "range":"custom","startFrame":0,"endFrame":2,"wait": true}}));
     assert!(out.metadata().is_ok_and(|m| m.len() > 0), "{r}");
+    assert_eq!(r["result"]["frames"], 2);
+    drop(d);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn menu_routing_never_hides_unsupported_export_parameters_in_a_dialog() {
+    let directory = tmp("invalid");
+    let mut session = session();
+    session.path = Some(directory.join("project.fcproj").to_string_lossy().into_owned());
+    let before = session.project.clone();
+    let mut d = Driver::new(session, None, Asked::default());
+    for (command, params) in [
+        ("file.exportMedia", json!({"format":"wav"})),
+        ("file.exportMedia", json!({"preset":"old"})),
+        ("file.exportMedia", json!({"settings":{}})),
+        ("file.exportMedia", json!({"queue":true})),
+        ("file.exportMedia", Value::Null),
+        ("file.exportFrame", json!({"format":"tiff"})),
+        ("file.exportFrame", json!({"format":"bmp"})),
+        ("file.exportFrame", json!({"quality":95})),
+        ("file.exportFrame", json!({"depth":32})),
+        ("file.exportFrame", json!({"target":"program","item":1})),
+        ("file.exportFrame", json!({"monitor":"unknown"})),
+        ("file.exportFrame", json!({"monitor":"source","target":"program"})),
+    ] {
+        let response = d.call("ui.menu.invoke", json!({"id":command,"params":params}));
+        assert_eq!(response["ok"], false, "{command} {params}: {response}");
+        d.frames(2);
+        assert_eq!(d.harness.state().ui.mode, Mode::Edit);
+        assert!(!d.harness.state().auto.elements.iter().any(|element| element.id == "exportFrame.name"));
+        assert!(d.harness.state().session.jobs.is_empty());
+        assert_eq!(*d.harness.state().session.project, *before);
+    }
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 0);
+    drop(d);
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]

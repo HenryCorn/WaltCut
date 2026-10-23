@@ -1273,7 +1273,7 @@ fn automate_to_sequence(s: &mut Session, p: &Value) -> Result<Value> {
 /// the GPU adapter.
 pub fn system_report() -> Value {
     let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-    let formats: Vec<Value> = waltcut_export::Format::ALL.iter().map(|f| json!({"format": f.label(), "available": waltcut_export::available(*f)})).collect();
+    let formats: Vec<Value> = waltcut_export::Format::ALL.iter().map(|f| json!({"format": f.label(), "available": true})).collect();
     json!({
         "app": format!("FilmCraft {}", env!("CARGO_PKG_VERSION")),
         "os": std::env::consts::OS,

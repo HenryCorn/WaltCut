@@ -223,7 +223,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if (apply || replace) && !close {
         let mut stem = clean(&d.name);
         let lower = stem.to_ascii_lowercase();
-        for suffix in [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"] {
+        for suffix in [".png", ".jpg", ".jpeg"] {
             if lower.ends_with(suffix) {
                 stem.truncate(stem.len().saturating_sub(suffix.len()));
                 break;
@@ -246,12 +246,15 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             d.replace = Some(path.clone());
         }
         if allowed {
-            let mut params =
-                json!({"path":path,"format":ext,"depth":d.depth,"import":d.import,"target":if d.target.source{"source"}else{"program"},"time":d.target.time.0});
+            let mut params = json!({"path":path,"format":ext,"depth":d.depth,"import":d.import,"overwrite":replace,"target":if d.target.source{"source"}else{"program"},"time":d.target.time.0});
             params[if d.target.source { "item" } else { "sequence" }] = json!(d.target.item.0);
             match app.session.execute("file.exportFrame", params) {
                 Ok(result) => {
                     app.ui.status = format!("Exported frame to {}", result["path"].as_str().unwrap_or_default());
+                    let offline = result["offlineMedia"].as_array().map_or(0, Vec::len);
+                    if offline > 0 {
+                        app.ui.status.push_str(&format!("; warning: {offline} offline item(s) rendered as placeholders"));
+                    }
                     ctx.data_mut(|m| m.insert_temp(egui::Id::new("frame-export-folder"), d.folder.clone()));
                     close = true;
                 }

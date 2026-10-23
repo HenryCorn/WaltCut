@@ -228,6 +228,13 @@ stream is cut into blocks (there are tests for this).
    {...}, "reverse": bool}` and edited with `sequence.setTransition`; `effects.list {"folder":
    "Video Transitions/Wipe", "detail": true}` lists it with its parameters.
 
+The remaining #25 export simplification is **IMPLEMENTATION DRAFTED**. Delivery is limited to
+H.264 + AAC MP4, alpha ProRes 4444 MOV, alpha PNG sequences and PNG/JPEG stills. Do not restore
+queue/preset models, advanced delivery settings, hardware encoding or ignored compatibility keys.
+The one export worker must remain owned, cancellable, joined on shutdown and panic-contained;
+staged output must preserve existing destinations and source/project files on failure/cancel.
+See [the export contract](../crates/export/README.md) and [pending native acceptance](testing.md#25-native-acceptance-still-required).
+
 ### A codec or container crate
 
 1. **Spec first.** Work only from the public specification (ITU-T, ISO/IEC, IETF RFCs, SMPTE,

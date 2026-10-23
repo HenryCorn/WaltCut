@@ -1,19 +1,14 @@
-//! Step-wise export of encoded-video formats (H.264 MP4/MOV, ProRes / Motion-JPEG MOV).
+//! Step-wise export of H.264 + AAC MP4 and alpha ProRes 4444 MOV.
 //!
 //! [`Exporter::step`] renders, encodes and muxes one batch of frames (plus the audio up to its
-//! end) per call, so a host without threads (the web app) can run an export a slice at a time
-//! between UI frames; [`crate::export`] simply loops it on a worker thread.
+//! end) per call; [`crate::export`] loops it on the engine's owned worker thread.
 //!
-//! A two-pass VBR H.264 export renders and analyses every frame once (first pass, nothing written),
-//! then encodes for real with the first pass's statistics.
+//! When [`waltcut_media::pending`] reports unavailable video bytes, the batch is rendered again:
+//! nothing is encoded from incomplete frames. Unavailable audio is an error, not a successful
+//! output with missing samples.
 //!
-//! When a source's bytes are not available yet (asynchronous web reads mark
-//! [`waltcut_media::pending`]), the video batch is rendered again on the next call: nothing is encoded
-//! from frames with missing media. Known, pre-existing web issue (TODO, separate fix): the audio pull
-//! has already advanced its position when it hits a pending source, so a retried group loses its audio.
-//!
-//! The file does not depend on how many frames a step renders (one per core natively, one on the
-//! web): packets go to the muxer in fixed groups of [`INTERLEAVE`] output frames, each followed by
+//! The file does not depend on how many frames a step renders: packets go to the muxer in fixed
+//! groups of [`INTERLEAVE`] output frames, each followed by
 //! the audio up to its end, so the same project and settings give the same bytes on any machine.
 //!
 //! # Overlapping render and encode
@@ -29,19 +24,14 @@
 //!   are encoded in order, and the audio / mux interleave still follows [`INTERLEAVE`] groups, so
 //!   the file is identical with or without overlap, on any core count and for any step size
 //!   (`determinism_tests`).
-//! * **The encode side stays on the thread that called [`Exporter::step`].** Encoders (hardware
-//!   ones in particular) may be tied to a thread, and the exporter need not be `Send`; only the
+//! * **The encode side stays on the thread that called [`Exporter::step`].** Only the
 //!   render of the next batch moves to the pool. It needs no `&mut` access to the exporter: it
 //!   holds an `Arc<Pipeline>` and the source provider.
-//! * **Pending media.** [`waltcut_media::pending`] is a thread-local flag, set by web readers
-//!   (whose export never overlaps: wasm has no threads, so [`Exporter::overlapping`] is false and
-//!   every step is the sequential render-then-encode of before). The render of a batch takes the
+//! * **Pending media.** [`waltcut_media::pending`] is a thread-local flag. The render of a batch takes the
 //!   flag after every frame, on whatever thread drew it, and a batch that saw it is discarded:
 //!   a prefetched batch that hit pending is dropped and rendered again by the next step, and
-//!   nothing is ever encoded from it. The audio pull checks the flag on the encoding thread right
-//!   after pulling, before a frame is encoded (the batch is then not encoded; its audio is not
-//!   recovered, see the known issue above) and the prefetched batch is dropped too, because the step
-//!   did not advance `next`.
+//!   nothing is ever encoded from it. The audio pull checks the flag on the encoding thread and
+//!   fails the export explicitly; transactional engine staging protects the destination.
 //! * **Cancellation** is checked at the start of every step, which drops the prefetched frames;
 //!   the prefetch is not started once it is set.
 //! * **Panics.** The prefetch runs under `catch_unwind` and becomes an [`ExportError`]; a panic of
@@ -50,10 +40,9 @@
 //!   [`IN_FLIGHT_BUDGET`]: `2 * batch * frame_bytes <= budget`, at least one frame
 //!   ([`overlap_batch`]). A batch never grows over what it was without overlap, so the peak is the
 //!   old peak plus at most the finished frames of the batch being encoded (half the budget,
-//!   256 MiB); a 4K HDR export (100 MB a frame) runs 2-frame batches and 4K SDR 8-frame ones instead of 16. Frames are
+//!   256 MiB); a 4K HDR export (RGBA plus RGB floats, about 127 MiB/frame) runs 2-frame batches
+//!   and 4K SDR 8-frame ones instead of 16. Sequential batches respect the same byte budget. Frames are
 //!   dropped as soon as they are encoded.
-//! * **Two-pass** exports overlap in the analysis pass (encode only) and in the real pass; the
-//!   prefetch never runs past the end of a pass.
 //! * **Timers.** `Render` and `Encode` are wall times of work that now runs at the same time, so
 //!   their sum may exceed the export's wall time; `Wait` is the time the encoding side then spent
 //!   waiting for the render (large: render-bound; near zero: encode-bound).
@@ -70,10 +59,9 @@ use waltcut_time::FrameRate;
 
 use crate::audio_out::AudioOut;
 use crate::pipeline::Pipeline;
-use crate::settings::{AudioCodec, BitrateMode};
 use crate::{
-    AudioEncoder, ColorSignal, EncodedPacket, EncoderFrame, ExportError, ExportSettings, Format, H264Pass, Out, Progress, Report, Result, Stage, VideoEncoder,
-    audio_factories, export_range, frame_span, note_stage, timed, video_factories,
+    AudioEncoder, ColorSignal, EncodedPacket, EncoderFrame, ExportError, ExportSettings, Format, Out, Progress, Report, Result, Stage, VideoEncoder,
+    aac_factory, export_range, frame_span, h264_factory, note_stage, prores_factory, timed,
 };
 
 /// Output frames per interleaved group: the video packets of these frames, then the audio up to
@@ -88,9 +76,9 @@ pub const IN_FLIGHT_BUDGET: u64 = 1 << 29;
 /// One rendered picture: straight RGBA8, or for HDR exports the encoded R'G'B' floats.
 type Frame = (Vec<u8>, Vec<f32>);
 
-/// Bytes of one [`Frame`] of a `w` x `h` export (RGBA8, or three f32 per pixel for HDR).
+/// Bytes of one [`Frame`] of a `w` x `h` export (RGBA8, plus three f32 per pixel for HDR).
 pub(crate) fn frame_bytes(w: u32, h: u32, hdr: bool) -> u64 {
-    u64::from(w).saturating_mul(u64::from(h)).saturating_mul(if hdr { 12 } else { 4 })
+    u64::from(w).saturating_mul(u64::from(h)).saturating_mul(if hdr { 16 } else { 4 })
 }
 
 /// Frames per batch when two batches are in flight: `batch` (what a sequential export would use),
@@ -126,13 +114,6 @@ fn render_batch(pipe: &Pipeline, f: i64, end: i64, sources: &dyn SourceProvider)
     (!pending.load(Ordering::Relaxed)).then_some(frames)
 }
 
-/// What encoding a batch came to.
-enum Encoded {
-    Done,
-    /// Audio media was not ready: nothing was encoded, run the batch again.
-    Pending,
-}
-
 /// What one [`Exporter::step`] did.
 #[derive(Debug)]
 pub enum Step {
@@ -165,8 +146,6 @@ pub struct Exporter {
     venc: Box<dyn VideoEncoder>,
     aenc: Option<Box<dyn AudioEncoder>>,
     audio: Option<AudioOut>,
-    /// The first pass of a two-pass encode is running.
-    first_pass: bool,
     /// Encoded video packets not written yet (the current [`INTERLEAVE`] group).
     queued: Vec<EncodedPacket>,
     /// Created after the first group was encoded (encoders may finalise their codec config then).
@@ -178,28 +157,21 @@ pub struct Exporter {
 
 /// Whether [`Exporter`] handles a format.
 pub fn stepped(format: Format) -> bool {
-    matches!(format, Format::H264 | Format::Hevc | Format::Av1 | Format::ProRes | Format::Mjpeg)
+    matches!(format, Format::H264 | Format::ProRes)
 }
 
 /// Whether an export is HDR: an HDR working space, SDR not asked for, and a format whose encoder
-/// writes HDR (`hdr_available` says so for H.265, which has no built-in encoder).
-pub(crate) fn hdr_output(working_hdr: bool, sdr: bool, format: Format, hdr_available: impl Fn(Format) -> bool) -> bool {
-    working_hdr
-        && !sdr
-        && match format {
-            Format::H264 | Format::ProRes => true,
-            Format::Hevc => hdr_available(Format::Hevc),
-            _ => false,
-        }
+/// writes HDR unless an internal preview explicitly asks for SDR.
+pub(crate) fn hdr_output(working_hdr: bool, sdr: bool) -> bool {
+    working_hdr && !sdr
 }
 
 fn make_venc(settings: &ExportSettings, w: u32, h: u32, rate: FrameRate) -> Result<Box<dyn VideoEncoder>> {
-    video_factories()
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .iter()
-        .find_map(|fac| fac(settings.video_format(), w, h, rate, settings))
-        .ok_or_else(|| ExportError::Unsupported(format!("{} encoder not available yet", settings.video_format().label())))?
+    match settings.format {
+        Format::H264 => h264_factory(w, h, rate, settings),
+        Format::ProRes => prores_factory(w, h, rate, settings),
+        Format::PngSequence => Err(ExportError::Unsupported("PNG is written as an image sequence".into())),
+    }
 }
 
 impl Exporter {
@@ -214,41 +186,31 @@ impl Exporter {
         }
         settings.validate()?;
         let q = project.sequence(seq).ok_or(ExportError::NoSequence)?;
-        // HDR sequences export HDR (H.264 / ProRes, and H.265 where a registered encoder
-        // writes Main 10) unless SDR is asked for; elsewhere H.265 is tone-mapped 8-bit SDR
+        // HDR sequences retain their working colour; internal render previews request SDR.
         let pipe = q.settings.color;
-        let hdr_out = hdr_output(pipe.working.is_hdr(), settings.sdr, settings.video_format(), crate::hdr_available);
+        let hdr_out = hdr_output(pipe.working.is_hdr(), settings.sdr);
         let mut settings = settings.clone();
         settings.signal = match (hdr_out, pipe.working) {
             (true, waltcut_color::WorkingSpace::Rec2100Pq) => ColorSignal::PQ,
             (true, _) => ColorSignal::HLG,
             _ => ColorSignal::default(),
         };
-        // bake the derived bitrate / keyframe values in for the encoder factories
-        let r = settings.resolve(q.settings.width, q.settings.height, q.settings.frame_rate, q.settings.sample_rate);
-        settings.bitrate_kbps = r.target_kbps;
-        settings.max_bitrate_kbps = Some(r.max_kbps);
-        settings.keyframe_distance = Some(r.keyint);
-        settings.adaptive_bitrate = None;
-        let two_pass = settings.video_format() == Format::H264 && settings.bitrate_mode == BitrateMode::Vbr2Pass;
-        settings.h264_pass = if two_pass { H264Pass::First } else { H264Pass::Single };
         let range = export_range(&project, seq, &settings)?;
         let pipe = Arc::new(Pipeline::new(project.clone(), seq, &settings, hdr_out)?);
         let (f0, f1) = frame_span(pipe.rate, range);
-        let nframes = (f1 - f0) as u64;
+        let nframes = u64::try_from(f1 - f0).map_err(|_| ExportError::Unsupported("invalid frame count".into()))?;
+        if !(1..=1_000_000).contains(&nframes) {
+            return Err(ExportError::Unsupported("export must contain 1..1000000 frames".into()));
+        }
         if !settings.part_of_batch {
-            progress.total.store(nframes * if two_pass { 2 } else { 1 }, Ordering::Relaxed);
+            progress.total.store(nframes, Ordering::Relaxed);
             progress.set_status(format!("Exporting {} frames ({})", nframes, settings.format.label()));
         }
         let venc = make_venc(&settings, pipe.w, pipe.h, pipe.rate)?;
-        let brand = if settings.format.is_mp4_with(settings.multiplexer) { Brand::Mp4 } else { Brand::Mov };
+        let brand = if settings.format == Format::H264 { Brand::Mp4 } else { Brand::Mov };
         let audio = if settings.has_audio() { Some(AudioOut::new(project.clone(), seq, &settings, range)?) } else { None };
-        let aenc: Option<Box<dyn AudioEncoder>> = match (&audio, settings.audio_codec()) {
-            (Some(a), AudioCodec::Aac) => {
-                let found =
-                    audio_factories().read().unwrap_or_else(|e| e.into_inner()).iter().find_map(|f| f(settings.format, a.sr, a.channels as u32, &settings));
-                Some(found.ok_or_else(|| ExportError::Unsupported("AAC encoder not available".into()))??)
-            }
+        let aenc: Option<Box<dyn AudioEncoder>> = match (&audio, settings.format) {
+            (Some(a), Format::H264) => Some(aac_factory(a.sr)?),
             _ => None,
         };
         Ok(Self {
@@ -265,7 +227,6 @@ impl Exporter {
             venc,
             aenc,
             audio,
-            first_pass: two_pass,
             queued: Vec::new(),
             mux: None,
             vt: 0,
@@ -281,13 +242,13 @@ impl Exporter {
     }
 
     /// Requested frames per [`Self::step`] (default: one per core), capped by GPU renderer
-    /// capacity and the overlap memory budget. 1 keeps web UI frames short.
+    /// capacity and the memory budget.
     pub fn set_batch(&mut self, n: i64) {
         self.batch = n.max(1);
     }
 
-    /// Render the next batch while encoding the current one (the default natively; the web, with
-    /// no threads, never does). Off gives the sequential render-then-encode; the file is the same.
+    /// Render the next batch while encoding the current one. Off gives sequential
+    /// render-then-encode; the file is the same.
     pub fn set_overlap(&mut self, on: bool) {
         self.overlap = on;
         if !on {
@@ -302,7 +263,7 @@ impl Exporter {
     }
 
     /// Whether steps overlap rendering with encoding now: switched on, a pool with more than one
-    /// thread, and not on wasm.
+    /// thread.
     pub fn overlapping(&self) -> bool {
         self.overlap && rayon::current_num_threads() > 1
     }
@@ -320,7 +281,8 @@ impl Exporter {
     /// Frames in the next batch, bounded before Rayon can steal nested frame tasks.
     fn batch_len(&self) -> i64 {
         let batch = self.pipe.render_batch_limit(self.batch);
-        if self.overlapping() { overlap_batch(batch, frame_bytes(self.pipe.w, self.pipe.h, self.pipe.hdr_out), self.budget) } else { batch }
+        let budget = if self.overlapping() { self.budget } else { self.budget.saturating_mul(2) };
+        overlap_batch(batch, frame_bytes(self.pipe.w, self.pipe.h, self.pipe.hdr_out), budget)
     }
 
     fn sample_at_frame(&self, f: i64, sr: u32) -> i64 {
@@ -344,12 +306,28 @@ impl Exporter {
             None => {
                 // little-endian, like the track's `lpcm` / `sowt` description says
                 let mut pcm = Vec::new();
-                crate::pcm::encode(crate::pcm::PcmContainer::Wav, &crate::audio_out::interleave(&buf), self.settings.audio.sample_format(), &mut pcm);
+                crate::pcm::encode(&crate::audio_out::interleave(&buf), &mut pcm);
                 mux.write_sample(at, WriteSample { data: &pcm, duration: n as u32, composition_offset: 0, is_sync: true })
                     .map_err(|e| ExportError::Io(e.to_string()))?;
             }
         }
         Ok(())
+    }
+
+    fn write_audio_until(&mut self, until: i64, sources: &dyn SourceProvider, progress: &Progress) -> Result<()> {
+        loop {
+            if progress.cancel.load(Ordering::Relaxed) {
+                return Err(ExportError::Cancelled);
+            }
+            let planar = self.audio.as_mut().and_then(|a| a.pull(until, sources));
+            if waltcut_media::pending::take() {
+                return Err(ExportError::Io("audio media is still loading".into()));
+            }
+            if planar.is_none() {
+                return Ok(());
+            }
+            self.write_audio(planar)?;
+        }
     }
 
     fn write_video(&mut self, packets: Vec<EncodedPacket>) -> Result<()> {
@@ -365,7 +343,7 @@ impl Exporter {
     fn open_mux(&mut self) -> Result<()> {
         let file = Out::create(&self.settings)?;
         let mut opts = WriterOptions::new(self.brand);
-        opts.metadata = self.settings.metadata.udta();
+        opts.metadata = vec![("©too".into(), format!("FilmCraft {}", env!("CARGO_PKG_VERSION")))];
         let mut mux = Mp4Writer::new(file, opts).map_err(|e| ExportError::Io(e.to_string()))?;
         let mut vcfg = TrackConfig::new(self.venc.sample_entry(), self.venc.timescale());
         vcfg.media_start = self.venc.media_start();
@@ -378,15 +356,7 @@ impl Exporter {
                 Some(mux.add_track(c).map_err(|e| ExportError::Io(e.to_string()))?)
             }
             (Some(a), None) => {
-                let f = self.settings.audio.sample_format();
-                let pcm = PcmConfig {
-                    bits: f.bits() as _,
-                    float: f.is_float(),
-                    big_endian: false,
-                    signed: true,
-                    channels: a.channels as _,
-                    sample_rate: a.sr as f64,
-                };
+                let pcm = PcmConfig { bits: 32, float: true, big_endian: false, signed: true, channels: a.channels as _, sample_rate: a.sr as f64 };
                 Some(mux.add_track(TrackConfig::new(SampleEntry::pcm(pcm), a.sr)).map_err(|e| ExportError::Io(e.to_string()))?)
             }
         };
@@ -405,28 +375,16 @@ impl Exporter {
             return self.step_batch(sources, progress);
         }
         self.ahead = None;
-        if self.first_pass {
-            // end of the analysis pass: encode for real with its statistics
-            let _ = self.venc.flush()?;
-            let stats = self.venc.pass_stats().ok_or_else(|| ExportError::Encode("two-pass statistics missing".into()))?;
-            self.settings.h264_pass = H264Pass::Second(stats);
-            self.venc = make_venc(&self.settings, self.pipe.w, self.pipe.h, self.pipe.rate)?;
-            self.first_pass = false;
-            self.next = self.f0;
-            return Ok(Step::Progress);
-        }
         let finishing = std::time::Instant::now();
-        let mixed = self.audio.as_mut().and_then(|a| a.rest(sources));
-        if waltcut_media::pending::take() {
-            return Ok(Step::Pending);
-        }
         if self.mux.is_none() {
             self.open_mux()?;
         }
         let mut tail = std::mem::take(&mut self.queued);
         tail.extend(self.venc.flush()?);
         self.write_video(tail)?;
-        self.write_audio(mixed)?;
+        if let Some(end) = self.audio.as_ref().map(|a| a.end) {
+            self.write_audio_until(end, sources, progress)?;
+        }
         if let (Some(at), Some(a)) = (self.at, self.aenc.as_mut()) {
             let mux = self.mux.as_mut().ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?;
             for au in a.flush()? {
@@ -440,7 +398,7 @@ impl Exporter {
             .ok_or_else(|| ExportError::Encode("internal: the container writer was not created".into()))?
             .finish()
             .map_err(|e| ExportError::Io(e.to_string()))?;
-        let bytes = w.finish(&self.settings)?;
+        let bytes = w.finish()?;
         note_stage(Stage::Finish, finishing.elapsed());
         let secs = self.t0.elapsed().as_secs_f64();
         let nframes = self.frames();
@@ -472,13 +430,11 @@ impl Exporter {
         let plan =
             (end < self.f1 && self.overlapping() && !progress.cancel.load(Ordering::Relaxed)).then(|| (end, end.saturating_add(self.batch_len()).min(self.f1)));
         let Some((a, b)) = plan else {
-            return match self.encode_batch(f, frames, sources)? {
-                Encoded::Pending => Ok(Step::Pending),
-                Encoded::Done => {
-                    progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
-                    self.next = end;
-                    Ok(Step::Progress)
-                }
+            self.encode_batch(f, frames, sources, progress)?;
+            return {
+                progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
+                self.next = end;
+                Ok(Step::Progress)
             };
         };
         let pipe = self.pipe.clone();
@@ -488,7 +444,7 @@ impl Exporter {
             s.spawn(|_| {
                 slot = Some(catch_unwind(AssertUnwindSafe(|| timed(Stage::Render, || render_batch(&pipe, a, b, sources)))));
             });
-            let r = self.encode_batch(f, frames, sources);
+            let r = self.encode_batch(f, frames, sources, progress);
             encode_done = Some(std::time::Instant::now());
             r
         });
@@ -496,52 +452,30 @@ impl Exporter {
         if let Some(t) = encode_done {
             note_stage(Stage::Wait, t.elapsed());
         }
-        match encoded? {
-            Encoded::Pending => Ok(Step::Pending),
-            Encoded::Done => {
-                self.overlapped_steps += 1;
-                progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
-                self.next = end;
-                match slot {
-                    Some(Ok(Some(frames))) => self.ahead = Some(Ahead { first: a, frames }),
-                    // a source was not ready: the next step renders this batch again
-                    Some(Ok(None)) | None => {}
-                    Some(Err(_)) => return Err(ExportError::Encode("internal error while rendering a frame (the panic was logged by the panic hook)".into())),
-                }
-                Ok(Step::Progress)
+        encoded?;
+        {
+            self.overlapped_steps += 1;
+            progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
+            self.next = end;
+            match slot {
+                Some(Ok(Some(frames))) => self.ahead = Some(Ahead { first: a, frames }),
+                // a source was not ready: the next step renders this batch again
+                Some(Ok(None)) | None => {}
+                Some(Err(_)) => return Err(ExportError::Encode("internal error while rendering a frame (the panic was logged by the panic hook)".into())),
             }
+            Ok(Step::Progress)
         }
     }
 
-    /// Encode the rendered frames `f..` (the analysis pass of a two-pass export only encodes), mux
-    /// them with their audio, and drop each frame as soon as it is encoded.
-    fn encode_batch(&mut self, f: i64, frames: Vec<Frame>, sources: &dyn SourceProvider) -> Result<Encoded> {
-        if self.first_pass {
-            for (k, frame) in frames.into_iter().enumerate() {
-                timed(Stage::Encode, || self.encode(std::slice::from_ref(&frame), f + k as i64))?;
-            }
-            return Ok(Encoded::Done);
-        }
+    /// Encode the rendered frames `f..`, mux them with their audio, and drop each frame as soon
+    /// as it is encoded.
+    fn encode_batch(&mut self, f: i64, frames: Vec<Frame>, sources: &dyn SourceProvider, progress: &Progress) -> Result<()> {
         let end = f.saturating_add(i64::try_from(frames.len()).unwrap_or(0));
-        // the audio of every interleave group that ends in this batch, mixed before encoding so a
-        // pending source stops the step before any frame of the batch is encoded (the audio position has
-        // already moved though: known web issue, see the module docs)
         let cuts: Vec<i64> = (f + 1..=end).filter(|&g| (g - self.f0) % INTERLEAVE == 0).collect();
-        let mut mixed = Vec::with_capacity(cuts.len());
-        if let Some(sr) = self.audio.as_ref().map(|a| a.sr) {
-            let t = std::time::Instant::now();
-            for &g in &cuts {
-                let until = self.sample_at_frame(g, sr);
-                mixed.push(self.audio.as_mut().and_then(|a| a.pull(until, sources)));
-            }
-            note_stage(Stage::Audio, t.elapsed());
-        }
-        // taken right here, on the thread that pulled, before other work can touch the flag
-        if waltcut_media::pending::take() {
-            return Ok(Encoded::Pending);
-        }
-        let mut mixed = mixed.into_iter();
         for (k, frame) in frames.into_iter().enumerate() {
+            if progress.cancel.load(Ordering::Relaxed) {
+                return Err(ExportError::Cancelled);
+            }
             let fi = f + k as i64;
             let packets = timed(Stage::Encode, || self.encode(std::slice::from_ref(&frame), fi))?;
             self.queued.extend(packets);
@@ -553,11 +487,13 @@ impl Exporter {
                     let packets = std::mem::take(&mut self.queued);
                     self.write_video(packets)
                 })?;
-                let pcm = mixed.next().flatten();
-                timed(Stage::Audio, || self.write_audio(pcm))?;
+                if let Some(sr) = self.audio.as_ref().map(|a| a.sr) {
+                    let until = self.sample_at_frame(fi + 1, sr);
+                    timed(Stage::Audio, || self.write_audio_until(until, sources, progress))?;
+                }
             }
         }
-        Ok(Encoded::Done)
+        Ok(())
     }
 
     fn encode(&mut self, frames: &[(Vec<u8>, Vec<f32>)], f: i64) -> Result<Vec<EncodedPacket>> {
@@ -583,9 +519,24 @@ mod tests {
     const MIB: u64 = 1 << 20;
 
     #[test]
+    fn sequential_batches_respect_the_memory_budget_even_for_hostile_requests() {
+        let (project, seq, _) = crate::tests::project();
+        let mut export = Exporter::new(project, seq, &ExportSettings::default(), &Progress::default()).unwrap();
+        export.set_overlap(false);
+        let bytes = frame_bytes(export.pipe.w, export.pipe.h, false);
+        export.set_budget(2 * bytes);
+        for request in [16, i64::MAX] {
+            export.set_batch(request);
+            assert_eq!(export.batch_len(), 2, "request {request} must not allocate an oversized batch");
+        }
+        export.set_batch(i64::MIN);
+        assert_eq!(export.batch_len(), 1);
+    }
+
+    #[test]
     fn frame_bytes_by_format() {
         assert_eq!(frame_bytes(1920, 1080, false), 1920 * 1080 * 4);
-        assert_eq!(frame_bytes(3840, 2160, true), 3840 * 2160 * 12);
+        assert_eq!(frame_bytes(3840, 2160, true), 3840 * 2160 * 16);
         assert_eq!(frame_bytes(u32::MAX, u32::MAX, true), u64::MAX, "saturates");
         assert_eq!(frame_bytes(0, 1080, false), 0);
     }
@@ -596,7 +547,7 @@ mod tests {
         // 1080p keeps the full 16 frames, 4K SDR (33 MB a frame) 8 + 8 in flight (2 x 8 x 33 MB = 512 MiB)
         assert_eq!(overlap_batch(16, frame_bytes(1920, 1080, false), budget), 16);
         assert_eq!(overlap_batch(16, frame_bytes(3840, 2160, false), budget), 8);
-        // 4K HDR (100 MB a frame): 256 MiB per batch is 2 frames, not 16
+        // 4K HDR (RGBA plus RGB floats): 256 MiB per batch is 2 frames, not 16.
         let hdr4k = frame_bytes(3840, 2160, true);
         let n = overlap_batch(16, hdr4k, budget);
         assert_eq!(n, 2);

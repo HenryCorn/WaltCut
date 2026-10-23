@@ -1,184 +1,128 @@
-//! HDR plumbing shared by hardware encoders: the 10-bit 4:2:0 converter, the HDR probe registry, the
-//! decision whether an export is HDR, and the one definition of the HDR10 static metadata.
+//! Colour signalling and alpha shared by the retained built-in movie outputs.
 use super::*;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-const BT2020: (f32, f32) = (0.2627, 0.0593);
-
-fn convert(rgb: &[f32], w: usize, h: usize) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
-    let (mut y, mut u, mut v) = (Vec::new(), Vec::new(), Vec::new());
-    rgbf_to_yuv420_10(rgb, w, h, BT2020.0, BT2020.1, &mut y, &mut u, &mut v).unwrap();
-    (y, u, v)
-}
-
-fn flat(w: usize, h: usize, px: [f32; 3]) -> Vec<f32> {
-    px.iter().copied().cycle().take(w * h * 3).collect()
+#[test]
+fn working_hdr_is_retained_unless_an_internal_preview_requests_sdr() {
+    assert!(crate::job::hdr_output(true, false));
+    assert!(!crate::job::hdr_output(false, false));
+    assert!(!crate::job::hdr_output(true, true));
 }
 
 #[test]
-fn black_white_and_grey_have_the_limited_range_codes() {
-    for (px, code) in [([0.0; 3], 64u16), ([1.0; 3], 940), ([0.5; 3], 502)] {
-        let (y, u, v) = convert(&flat(4, 4, px), 4, 4);
-        assert!(y.iter().all(|c| *c == code), "{px:?}: {y:?}");
-        assert!(u.iter().chain(&v).all(|c| *c == 512), "{px:?}: neutral chroma");
-        assert_eq!((y.len(), u.len(), v.len()), (16, 4, 4));
+fn hdr_colour_floats_keep_the_separate_rgba_alpha() {
+    let rgba = [255, 0, 0, 128, 0, 255, 0, 0];
+    let rgb = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+    let (mut y, mut cb, mut cr, mut alpha) = ([0; 2], [0; 2], [0; 2], [0; 2]);
+    to_yuv444_10(&rgba, Some(&rgb), 2, 1, 0.2627, 0.0593, &mut y, &mut cb, &mut cr, Some(&mut alpha));
+    assert_eq!(alpha, [514, 0]);
+    assert!(y.iter().all(|v| *v > 64));
+}
+
+#[test]
+fn hdr_prores_keeps_straight_colour_at_partial_and_zero_alpha() {
+    use waltcut_color::{ColorPipeline, WorkingSpace};
+    use waltcut_media::generators::GeneratorSource;
+    use waltcut_media::{FrameRequest, Generator};
+    use waltcut_project::{ItemKind, MediaRef};
+    use waltcut_render::Image;
+
+    let directory = waltcut_testkit::fixtures::workspace_root().join("target").join(format!("export-hdr-alpha-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    for working in [WorkingSpace::Rec2100Pq, WorkingSpace::Rec2100Hlg] {
+        let (mut encoded_reference, mut decoded_reference) = (None, None);
+        for alpha in [1.0, 0.5, 0.0] {
+            let (mut project, seq, mut sources) = crate::tests::project();
+            let p = Arc::make_mut(&mut project);
+            p.sequence_mut(seq).unwrap().settings.color = ColorPipeline { working, ..ColorPipeline::REC709 };
+            let item = p.sequence(seq).unwrap().video_tracks[0].items[0].item;
+            let source =
+                GeneratorSource::new(Generator::ColorMatte { color: [1.0, 0.0, 0.0, alpha] }, 320, 180, FrameRate::FPS_24, FrameRate::FPS_24.tick_of(2));
+            if let ItemKind::Media(media) = &mut p.item_mut(item).unwrap().kind {
+                media.media = MediaRef::Generator(source.generator.clone());
+            }
+            sources.0.insert(item, Arc::new(source));
+            let path = directory.join(format!("{}-{alpha}.mov", working.id()));
+            let settings = ExportSettings {
+                format: Format::ProRes,
+                path: path.to_string_lossy().into_owned(),
+                range: Some(TimeRange::new(Tick::ZERO, FrameRate::FPS_24.tick_of(1))),
+                include_audio: false,
+                ..Default::default()
+            };
+            let pipe = crate::pipeline::Pipeline::new(project.clone(), seq, &settings, true).unwrap();
+            let (rgba, rgb) = pipe.frame(0, &sources);
+            assert!(rgba[3].abs_diff((alpha * 255.0).round() as u8) <= 1, "alpha {alpha} -> {}", rgba[3]);
+            if alpha > 0.0 {
+                let reference = encoded_reference.get_or_insert([rgb[0], rgb[1], rgb[2]]);
+                for (actual, expected) in rgb[..3].iter().zip(reference.iter()) {
+                    assert!((actual - expected).abs() < 1e-6, "{} alpha={alpha}: HDR colour must be straight before encoding", working.id());
+                }
+            } else {
+                assert!(rgb[..3].iter().all(|v| v.abs() < 1e-6), "transparent HDR pixels must not divide by zero");
+            }
+            let report = export(&project, seq, &settings, &sources, &Progress::default()).unwrap();
+            assert_eq!(report.frames, 1);
+            let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
+            let file = waltcut_isobmff::open(bytes.clone()).unwrap();
+            let track = &file.tracks[file.track_of_kind(waltcut_isobmff::TrackKind::Video).unwrap()];
+            assert_eq!(track.samples.len(), 1);
+            assert_eq!(track.entries[0].format.0, *b"ap4h");
+            let source = waltcut_codecs::open_bytes("alpha.mov", bytes).unwrap();
+            let frame = source.video_frame(FrameRequest::full(Tick::ZERO)).unwrap();
+            let decoded = waltcut_render::colorman::decode(&Project::new("roundtrip"), ItemId(0), &frame, 1, &ColorPipeline::REC709);
+            let premul = decoded.get(160, 90);
+            let pixel = Image::unpremul(premul);
+            assert!((premul[3] - alpha).abs() < 0.01, "{}: {premul:?}", working.id());
+            if alpha > 0.0 {
+                let reference = decoded_reference.get_or_insert(pixel);
+                for (actual, expected) in pixel[..3].iter().zip(&reference[..3]) {
+                    assert!((actual - expected).abs() < 0.02, "{} alpha={alpha}: {pixel:?} != {reference:?}", working.id());
+                }
+            }
+        }
     }
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]
-fn bt2020_primaries_have_exact_codes() {
-    // (R', G', B') -> (Y, Cb, Cr) with the BT.2020 non-constant-luminance matrix, 10-bit limited range
-    for (px, want) in [
-        ([1.0, 0.0, 0.0], (294u16, 387u16, 960u16)),
-        ([0.0, 1.0, 0.0], (658, 189, 100)),
-        ([0.0, 0.0, 1.0], (116, 960, 476)),
-        ([1.0, 0.5, 0.0], (591, 225, 754)),
-    ] {
-        let (y, u, v) = convert(&flat(2, 2, px), 2, 2);
-        assert_eq!((y[0], u[0], v[0]), want, "{px:?}");
-    }
-}
-
-#[test]
-fn out_of_range_and_non_finite_values_clamp_instead_of_wrapping() {
-    // above 1, below 0 and infinities clamp to the legal range; NaN counts as 0 (black, not code 0)
-    let mut px = vec![0.0f32; 4 * 3];
-    px[..3].copy_from_slice(&[2.0, 2.0, 2.0]);
-    px[3..6].copy_from_slice(&[-1.0, -5.0, -0.5]);
-    px[6..9].copy_from_slice(&[f32::INFINITY, f32::INFINITY, f32::INFINITY]);
-    px[9..].copy_from_slice(&[f32::NAN, f32::NEG_INFINITY, f32::NAN]);
-    let (y, u, v) = convert(&px, 4, 1);
-    assert_eq!(y, vec![940, 64, 940, 64]);
-    assert!(u.iter().chain(&v).all(|c| (64..=960).contains(c)), "{u:?} {v:?}");
-    // all NaN: black
-    let (y, u, v) = convert(&[f32::NAN; 2 * 2 * 3], 2, 2);
-    assert_eq!((y, u, v), (vec![64; 4], vec![512], vec![512]));
-}
-
-#[test]
-fn odd_sizes_average_the_pixels_they_have() {
-    // 3x3: the chroma planes are 2x2; the right column and bottom row average one or two pixels
-    let (y, u, v) = convert(&flat(3, 3, [1.0, 0.0, 0.0]), 3, 3);
-    assert_eq!((y.len(), u.len(), v.len()), (9, 4, 4));
-    assert!(y.iter().all(|c| *c == 294) && u.iter().all(|c| *c == 387) && v.iter().all(|c| *c == 960));
-    // 1x1
-    let (y, u, v) = convert(&[0.0, 0.0, 1.0], 1, 1);
-    assert_eq!((y, u, v), (vec![116], vec![960], vec![476]));
-    // chroma is the mean over the 2x2 block: red and blue pixels give the mean of their Cb and Cr
-    let rgb = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
-    let (y, u, v) = convert(&rgb, 2, 2);
-    assert_eq!(y, vec![294, 116, 294, 116]);
-    assert_eq!((u[0], v[0]), ((387u16 + 960) / 2, (960u16 + 476) / 2));
-}
-
-#[test]
-fn a_ramp_has_every_code_a_10_bit_picture_can_have() {
-    // a smooth horizontal ramp: 877 distinct luma codes in 64..=940, far more than 8 bits hold
-    let w = 1024usize;
-    let rgb: Vec<f32> = (0..w).flat_map(|x| [x as f32 / (w - 1) as f32; 3]).collect();
-    let (y, _, _) = convert(&rgb, w, 1);
-    let mut codes: Vec<u16> = y.clone();
-    codes.dedup();
-    assert_eq!((y[0], y[w - 1]), (64, 940));
-    assert_eq!(codes.len(), 877, "{} distinct codes", codes.len());
-    assert!(y.windows(2).all(|p| p[0] <= p[1]));
-}
-
-#[test]
-fn hostile_input_is_an_error_not_a_panic() {
-    let (mut y, mut u, mut v) = (Vec::new(), Vec::new(), Vec::new());
-    let mut run = |rgb: &[f32], w: usize, h: usize| rgbf_to_yuv420_10(rgb, w, h, 0.2627, 0.0593, &mut y, &mut u, &mut v);
-    assert!(run(&[], 0, 0).is_err());
-    assert!(run(&[0.0; 3], 0, 1).is_err());
-    assert!(run(&[0.0; 3], 1, 0).is_err());
-    assert!(run(&[0.0; 11], 2, 2).is_err(), "short");
-    assert!(run(&[0.0; 13], 2, 2).is_err(), "long");
-    assert!(run(&[0.0; 6], 2, 2).is_err());
-    assert!(run(&[0.0; 3], usize::MAX, 2).is_err(), "w*h overflows");
-    assert!(run(&[0.0; 3], usize::MAX / 2, 3).is_err(), "w*h*3 overflows");
-    assert!(run(&[0.0; 3], 1 << 40, 1 << 40).is_err());
-}
-
-#[test]
-fn the_hdr_probe_registry_follows_its_probes() {
-    static HERE: AtomicBool = AtomicBool::new(false);
-    fn probe() -> bool {
-        HERE.load(Ordering::SeqCst)
-    }
-    // a format nothing registered a probe for is never HDR; registering twice is harmless
-    assert!(!hdr_available(Format::ProRes));
-    register_hdr_probe(Format::ProRes, probe);
-    register_hdr_probe(Format::ProRes, probe);
-    assert!(!hdr_available(Format::ProRes));
-    HERE.store(true, Ordering::SeqCst);
-    assert!(hdr_available(Format::ProRes));
-    assert!(!hdr_available(Format::Mjpeg), "probes are per format");
-    HERE.store(false, Ordering::SeqCst);
-    assert!(!hdr_available(Format::ProRes));
-}
-
-#[test]
-fn which_exports_are_hdr() {
-    use crate::job::hdr_output;
-    let never = |_: Format| false;
-    let hevc_only = |f: Format| f == Format::Hevc;
-    // H.264 and ProRes follow the working space, whatever the probes say
-    for f in [Format::H264, Format::ProRes] {
-        assert!(hdr_output(true, false, f, never), "{f:?}");
-        assert!(!hdr_output(false, false, f, hevc_only), "{f:?}: SDR working space");
-        assert!(!hdr_output(true, true, f, hevc_only), "{f:?}: SDR asked for");
-    }
-    // H.265 only where a registered encoder writes HDR
-    assert!(!hdr_output(true, false, Format::Hevc, never), "no probe: tone-mapped SDR, as with VideoToolbox");
-    assert!(hdr_output(true, false, Format::Hevc, hevc_only));
-    assert!(!hdr_output(true, true, Format::Hevc, hevc_only), "settings.sdr forces SDR");
-    assert!(!hdr_output(false, false, Format::Hevc, hevc_only));
-    // formats without HDR output
-    assert!(!hdr_output(true, false, Format::Mjpeg, |_| true));
-}
-
-#[test]
-fn only_pq_has_static_metadata_and_it_is_what_h264_writes() {
+fn only_pq_has_static_metadata_and_it_is_what_the_container_writes() {
     assert!(ColorSignal::HLG.static_metadata().is_none());
     assert!(ColorSignal::default().static_metadata().is_none());
     let (md, cll) = ColorSignal::PQ.static_metadata().unwrap();
     assert_eq!(cll, (0, 0));
     assert_eq!(md, waltcut_isobmff::MasteringDisplay::bt2020(1000.0, 0.0001));
     assert_eq!(md.to_bytes().len(), 24);
-    // the box on the sample entry is the same value
-    let mut e = waltcut_isobmff::SampleEntry::hevc(Default::default(), 64, 64);
-    ColorSignal::PQ.apply_to(&mut e, false);
-    let v = e.video.as_ref().unwrap();
-    assert_eq!((v.mastering_display, v.content_light), (Some(md), Some((0, 0))));
-    let mut e = waltcut_isobmff::SampleEntry::hevc(Default::default(), 64, 64);
-    ColorSignal::HLG.apply_to(&mut e, false);
-    let v = e.video.as_ref().unwrap();
-    assert!(v.color.is_some() && v.mastering_display.is_none() && v.content_light.is_none());
+    let mut entry = waltcut_isobmff::SampleEntry::prores(waltcut_isobmff::FourCc(*b"ap4h"), 64, 64);
+    ColorSignal::PQ.apply_to(&mut entry, true);
+    let video = entry.video.as_ref().unwrap();
+    assert_eq!((video.mastering_display, video.content_light), (Some(md), Some((0, 0))));
+    let mut entry = waltcut_isobmff::SampleEntry::prores(waltcut_isobmff::FourCc(*b"ap4h"), 64, 64);
+    ColorSignal::HLG.apply_to(&mut entry, true);
+    let video = entry.video.as_ref().unwrap();
+    assert!(video.color.is_some() && video.mastering_display.is_none() && video.content_light.is_none());
 }
 
-/// Remove emulation-prevention bytes (`00 00 03` -> `00 00`).
-fn unescape(b: &[u8]) -> Vec<u8> {
+fn unescape(bytes: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
     let mut zeros = 0;
-    for &x in b {
-        if zeros >= 2 && x == 3 {
+    for &byte in bytes {
+        if zeros >= 2 && byte == 3 {
             zeros = 0;
             continue;
         }
-        zeros = if x == 0 { zeros + 1 } else { 0 };
-        out.push(x);
+        zeros = if byte == 0 { zeros + 1 } else { 0 };
+        out.push(byte);
     }
     out
 }
 
 #[test]
-fn the_software_h264_sei_is_the_static_metadata_laid_out_as_messages() {
-    let s = ExportSettings { format: Format::H264, signal: ColorSignal::PQ, ..Default::default() };
-    let mut enc = h264_factory(Format::H264, 64, 64, FrameRate::FPS_24, &s).unwrap().unwrap();
+fn software_h264_sei_contains_the_same_static_metadata() {
+    let settings = ExportSettings { format: Format::H264, signal: ColorSignal::PQ, ..Default::default() };
+    let mut encoder = h264_factory(64, 64, FrameRate::FPS_24, &settings).unwrap();
     let rgb = vec![0.5f32; 64 * 64 * 3];
-    let mut packets = enc.encode(&EncoderFrame { width: 64, height: 64, rgba: &[], hdr: Some(&rgb), index: 0 }).unwrap();
-    packets.extend(enc.flush().unwrap());
-    // find the SEI NAL unit (type 6) of the length-prefixed first access unit
+    let mut packets = encoder.encode(&EncoderFrame { width: 64, height: 64, rgba: &[], hdr: Some(&rgb), index: 0 }).unwrap();
+    packets.extend(encoder.flush().unwrap());
     let data = &packets[0].data;
     let (mut pos, mut sei) = (0usize, None);
     while let Some(len) = data.get(pos..pos + 4) {
@@ -189,27 +133,25 @@ fn the_software_h264_sei_is_the_static_metadata_laid_out_as_messages() {
         }
         pos += 4 + n;
     }
-    let sei = sei.expect("an SEI NAL unit in the first access unit");
     let (md, (cll, fall)) = ColorSignal::PQ.static_metadata().unwrap();
-    let mut want = vec![137u8, 24];
-    want.extend(md.to_bytes());
-    want.extend([144u8, 4]);
-    want.extend(cll.to_be_bytes());
-    want.extend(fall.to_be_bytes());
-    want.push(0x80);
-    assert_eq!(sei, want);
+    let mut expected = vec![137u8, 24];
+    expected.extend(md.to_bytes());
+    expected.extend([144u8, 4]);
+    expected.extend(cll.to_be_bytes());
+    expected.extend(fall.to_be_bytes());
+    expected.push(0x80);
+    assert_eq!(sei.expect("SEI NAL in the first access unit"), expected);
 }
 
-/// #2142: SDR gets its `colr` box as well (nclc in MOV, nclx in MP4), and no HDR metadata.
 #[test]
 fn sdr_gets_a_colr_box_and_no_hdr_metadata() {
-    let mut e = waltcut_isobmff::SampleEntry::prores(waltcut_isobmff::FourCc(*b"apch"), 64, 64);
-    ColorSignal::default().apply_to(&mut e, true);
-    let v = e.video.as_ref().unwrap();
-    assert_eq!(v.color, Some(waltcut_isobmff::ColorInfo::Nclc { primaries: 1, transfer: 1, matrix: 1 }));
-    assert!(v.mastering_display.is_none() && v.content_light.is_none());
-    let mut e = waltcut_isobmff::SampleEntry::hevc(Default::default(), 64, 64);
-    ColorSignal::default().apply_to(&mut e, false);
-    let v = e.video.as_ref().unwrap();
-    assert_eq!(v.color, Some(waltcut_isobmff::ColorInfo::Nclx { primaries: 1, transfer: 1, matrix: 1, full_range: false }));
+    let mut entry = waltcut_isobmff::SampleEntry::prores(waltcut_isobmff::FourCc(*b"ap4h"), 64, 64);
+    ColorSignal::default().apply_to(&mut entry, true);
+    let video = entry.video.as_ref().unwrap();
+    assert_eq!(video.color, Some(waltcut_isobmff::ColorInfo::Nclc { primaries: 1, transfer: 1, matrix: 1 }));
+    assert!(video.mastering_display.is_none() && video.content_light.is_none());
+    let avcc = waltcut_isobmff::AvcConfig::new(Vec::new(), Vec::new(), 4);
+    let mut entry = waltcut_isobmff::SampleEntry::avc(avcc, 64, 64);
+    ColorSignal::default().apply_to(&mut entry, false);
+    assert_eq!(entry.video.unwrap().color, Some(waltcut_isobmff::ColorInfo::Nclx { primaries: 1, transfer: 1, matrix: 1, full_range: false }));
 }

@@ -42,21 +42,27 @@ pub(crate) fn project() -> (Arc<Project>, ItemId, SourceMap) {
 }
 
 fn tmp(name: &str) -> String {
-    let d = std::env::temp_dir().join(format!("fc-export-{}", std::process::id()));
+    let d = waltcut_testkit::fixtures::workspace_root().join("target").join(format!("fc-export-{}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d.join(name).to_string_lossy().to_string()
 }
 
 #[test]
-fn mjpeg_mov_roundtrip() {
+fn h264_aac_mp4_roundtrip() {
     let (p, seq, m) = project();
-    let path = tmp("out.mov");
+    let path = tmp("out.mp4");
     let prog = Progress::default();
-    let r = export(&p, seq, &ExportSettings { format: Format::Mjpeg, path: path.clone(), ..Default::default() }, &m, &prog).unwrap();
+    let r = export(&p, seq, &ExportSettings { format: Format::H264, path: path.clone(), ..Default::default() }, &m, &prog).unwrap();
     assert_eq!(r.frames, 24);
     assert!(prog.finished.load(Ordering::Relaxed));
     let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-    let src = waltcut_codecs::open_bytes("out.mov", bytes).unwrap();
+    let file = waltcut_isobmff::open(bytes.clone()).unwrap();
+    let vt = file.track_of_kind(waltcut_isobmff::TrackKind::Video).unwrap();
+    let at = file.track_of_kind(waltcut_isobmff::TrackKind::Audio).unwrap();
+    assert_eq!(file.tracks[vt].samples.len(), 24);
+    assert_eq!(file.tracks[vt].entries[0].format.0, *b"avc1");
+    assert_eq!(file.tracks[at].entries[0].format.0, *b"mp4a");
+    let src = waltcut_codecs::open_bytes("out.mp4", bytes).unwrap();
     let info = src.info();
     assert_eq!(info.video.as_ref().unwrap().width, 320);
     assert!((info.duration.seconds() - 1.0).abs() < 0.05, "{}", info.duration.seconds());
@@ -65,52 +71,35 @@ fn mjpeg_mov_roundtrip() {
     let a = src.audio(0, 24_000, 48_000).unwrap();
     let pk = a.peaks()[0];
     assert!((pk - 0.5).abs() < 0.05, "tone at -6 dB: {pk}");
-    if let Some(ffprobe) = waltcut_testkit::ffprobe_or_skip("export mjpeg frame count") {
+    if let Some(ffprobe) = waltcut_testkit::ffprobe_or_skip("export H.264 frame count") {
         let out = std::process::Command::new(ffprobe)
             .args(["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", &path])
             .output()
             .unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
         assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "24");
     }
 }
 
 #[test]
-fn wav_png_gif() {
+fn png_sequence_has_exact_exclusive_end_frame_count() {
     let (p, seq, m) = project();
-    for (fmt, name) in [(Format::Wav, "a.wav"), (Format::Gif, "a.gif"), (Format::PngSequence, "seq.png")] {
-        let path = tmp(name);
-        let prog = Progress::default();
-        let mut s = ExportSettings { format: fmt, path: path.clone(), scale: 0.5, ..Default::default() };
-        s.range = Some(TimeRange::new(Tick::ZERO, FrameRate::FPS_24.tick_of(6)));
-        let r = export(&p, seq, &s, &m, &prog).unwrap();
-        assert!(r.bytes > 0, "{fmt:?}");
+    let s = ExportSettings {
+        format: Format::PngSequence,
+        path: tmp("seq.png"),
+        range: Some(TimeRange::new(FrameRate::FPS_24.tick_of(3), FrameRate::FPS_24.tick_of(6))),
+        ..Default::default()
+    };
+    let r = export(&p, seq, &s, &m, &Progress::default()).unwrap();
+    assert_eq!(r.frames, 6);
+    assert!(r.bytes > 0);
+    for frame in 0..6 {
+        let bytes = std::fs::read(image_sequence_path(&s.path, frame, 6)).unwrap();
+        let image = image::load_from_memory(&bytes).unwrap();
+        assert_eq!((image.width(), image.height()), (320, 180));
     }
     assert!(std::path::Path::new(&tmp("seq005.png")).exists());
-}
-
-/// GIF delays are whole centiseconds (#854): at 24 fps they alternate 4/4/5 cs so a second of
-/// frames lasts 1000 ms, not 24 × 40 ms = 960 ms.
-#[test]
-fn gif_frame_delays_add_up_to_the_duration() {
-    let d: Vec<u16> = (0..6).map(|i| gif_delay_cs(FrameRate::FPS_24, i)).collect();
-    assert_eq!(d, [4, 4, 5, 4, 4, 4]);
-    let ntsc: u64 = (0..30).map(|i| u64::from(gif_delay_cs(FrameRate::FPS_29_97, i))).sum();
-    assert_eq!(ntsc, 100, "30 frames at 29.97 fps last 1.001 s");
-    // hostile rates neither panic nor overflow
-    assert_eq!(gif_delay_cs(FrameRate { num: 0, den: 0 }, 3), 0);
-    let _ = gif_delay_cs(FrameRate { num: 1, den: i64::MAX }, i64::MAX);
-
-    let (p, seq, m) = project();
-    let path = tmp("timing.gif");
-    let mut s = ExportSettings { format: Format::Gif, path: path.clone(), scale: 0.25, ..Default::default() };
-    s.range = Some(TimeRange::new(Tick::ZERO, FrameRate::FPS_24.tick_of(24)));
-    export(&p, seq, &s, &m, &Progress::default()).unwrap();
-    use image::AnimationDecoder;
-    let dec = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(std::fs::read(&path).unwrap())).unwrap();
-    let frames = dec.into_frames().collect_frames().unwrap();
-    assert_eq!(frames.len(), 24);
-    let ms: u32 = frames.iter().map(|f| f.delay().numer_denom_ms()).map(|(n, d)| n / d.max(1)).sum();
-    assert_eq!(ms, 1000);
+    assert!(!std::path::Path::new(&tmp("seq006.png")).exists());
 }
 
 #[test]
@@ -120,7 +109,7 @@ fn prores_export_roundtrip() {
     export(&p, seq, &ExportSettings { format: Format::ProRes, path: path.clone(), ..Default::default() }, &m, &Progress::default()).unwrap();
     let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
     let src = waltcut_codecs::open_bytes("pr.mov", bytes).unwrap();
-    assert!(src.info().video.as_ref().unwrap().codec.contains("ProRes 422 HQ"));
+    assert!(src.info().video.as_ref().unwrap().codec.contains("ProRes 4444"));
     let f = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 3))).unwrap().to_rgba8();
     assert!(f[0] > 240 && f[1] < 15 && f[2] < 15, "{:?}", &f[..4]);
 }
@@ -145,26 +134,10 @@ fn sdr_exports_carry_a_colr_box() {
     }
 }
 
-/// ProRes 4444 / 4444 XQ export (#342): 4:4:4 frames under the `ap4h` / `ap4x` codes, and with
-/// Include Alpha Channel the picture's alpha survives instead of being flattened over black.
+/// Both retained alpha outputs always preserve straight alpha, without a delivery toggle.
 #[test]
 fn prores_4444_export_roundtrip() {
     let (p, seq, m) = project();
-    for (profile, label) in [("4444", "ProRes 4444"), ("4444xq", "ProRes 4444 XQ")] {
-        let path = tmp(&format!("pr_{profile}.mov"));
-        let s = ExportSettings { format: Format::ProRes, path: path.clone(), prores_profile: profile.into(), ..Default::default() };
-        export(&p, seq, &s, &m, &Progress::default()).unwrap();
-        let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-        let src = waltcut_codecs::open_bytes("pr.mov", bytes).unwrap();
-        let codec = src.info().video.as_ref().unwrap().codec.clone();
-        assert!(codec.contains(label), "{profile}: {codec}");
-        let f = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 3))).unwrap();
-        assert!(f.format_label().contains("4:4:4"), "{profile}: {}", f.format_label());
-        let px = f.to_rgba8();
-        assert!(px[0] > 240 && px[1] < 15 && px[2] < 15 && px[3] == 255, "{profile}: {:?}", &px[..4]);
-    }
-
-    // a half-transparent matte keeps its alpha with Include Alpha Channel, and only then
     let mut p = (*p).clone();
     let half = GeneratorSource::new(Generator::ColorMatte { color: [1.0, 0.0, 0.0, 0.5] }, 320, 180, FrameRate::FPS_24, Tick(2 * TICKS_PER_SECOND));
     let item = p.sequence(seq).unwrap().video_tracks[0].items[0].item;
@@ -174,18 +147,32 @@ fn prores_4444_export_roundtrip() {
     let mut m = m;
     m.0.insert(item, Arc::new(half));
     let p = Arc::new(p);
-    for alpha in [true, false] {
-        let path = tmp(&format!("pr_4444_alpha_{alpha}.mov"));
-        let s = ExportSettings { format: Format::ProRes, path: path.clone(), prores_profile: "4444".into(), alpha, ..Default::default() };
-        assert!(s.keeps_alpha() == alpha);
-        export(&p, seq, &s, &m, &Progress::default()).unwrap();
-        let bytes: Arc<[u8]> = std::fs::read(&path).unwrap().into();
-        let src = waltcut_codecs::open_bytes("pr.mov", bytes).unwrap();
-        let px = src.video_frame(FrameRequest::full(Tick(TICKS_PER_SECOND / 3))).unwrap().to_rgba8();
-        if alpha {
-            assert!((px[3] as i32 - 128).abs() <= 3, "alpha kept: {:?}", &px[..4]);
+    for (format, name) in [(Format::ProRes, "half-alpha.mov"), (Format::PngSequence, "half-alpha.png")] {
+        let s = ExportSettings { format, path: tmp(name), range: Some(TimeRange::new(Tick::ZERO, FrameRate::FPS_24.tick_of(6))), ..Default::default() };
+        assert!(s.keeps_alpha());
+        let result = export(&p, seq, &s, &m, &Progress::default()).unwrap();
+        assert_eq!(result.frames, 6);
+        if format == Format::ProRes {
+            let bytes: Arc<[u8]> = std::fs::read(&s.path).unwrap().into();
+            let file = waltcut_isobmff::open(bytes.clone()).unwrap();
+            let track = &file.tracks[file.track_of_kind(waltcut_isobmff::TrackKind::Video).unwrap()];
+            assert_eq!(track.entries[0].format.0, *b"ap4h");
+            assert_eq!(track.samples.len(), 6);
+            let src = waltcut_codecs::open_bytes("half-alpha.mov", bytes).unwrap();
+            for i in 0..6 {
+                let frame = src.video_frame(FrameRequest::full(FrameRate::FPS_24.tick_of(i))).unwrap();
+                assert!(frame.format_label().contains("4:4:4"));
+                let px = frame.to_rgba8();
+                assert!(px[0] > 240 && px[1] < 15 && (i32::from(px[3]) - 128).abs() <= 3, "{:?}", &px[..4]);
+            }
         } else {
-            assert_eq!(px[3], 255, "flattened: {:?}", &px[..4]);
+            for i in 0..6 {
+                let bytes = std::fs::read(image_sequence_path(&s.path, i, 6)).unwrap();
+                let image = image::load_from_memory(&bytes).unwrap().to_rgba8();
+                let px = image.get_pixel(0, 0).0;
+                assert!(px[..3] == [255, 0, 0] && px[3].abs_diff(128) <= 1, "half alpha kept: {px:?}");
+            }
+            assert!(!std::path::Path::new(&image_sequence_path(&s.path, 6, 6)).exists());
         }
     }
 }

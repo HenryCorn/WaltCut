@@ -1,5 +1,5 @@
 //! Test media made with our own encoders (no ffmpeg needed): short movies of the procedural demo
-//! scenes, written to temporary folders.
+//! scenes, written under the workspace target directory.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -14,13 +14,13 @@ use crate::Session;
 
 pub fn tmp_dir(name: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let d = std::env::temp_dir().join(format!("filmcraft-{name}-{}-{nanos}", std::process::id()));
+    let d = waltcut_testkit::workspace_root().join("target").join(format!("filmcraft-{name}-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }
 
 /// Write a `frames`-frame `w`×`h` 24 fps movie of a demo scene (with its audio) to `path`.
-/// `.mov` = ProRes 422 HQ + PCM, `.mp4` = H.264 + AAC.
+/// `.mov` = ProRes 4444 + float PCM, `.mp4` = H.264 + AAC.
 pub fn make_movie(path: &Path, scene: DemoScene, w: u32, h: u32, frames: i64) {
     let rate = FrameRate::FPS_24;
     let dur = rate.tick_of(frames);
@@ -49,7 +49,7 @@ pub fn make_movie(path: &Path, scene: DemoScene, w: u32, h: u32, frames: i64) {
     q.video_tracks[0].items.push(v);
     q.audio_tracks[0].items.push(a);
     let fmt = if path.extension().is_some_and(|e| e == "mp4") { waltcut_export::Format::H264 } else { waltcut_export::Format::ProRes };
-    let settings = waltcut_export::ExportSettings { format: fmt, path: path.to_string_lossy().into_owned(), bitrate_kbps: 4000, ..Default::default() };
+    let settings = waltcut_export::ExportSettings { format: fmt, path: path.to_string_lossy().into_owned(), ..Default::default() };
     let shared: waltcut_media::SharedSource = Arc::new(src);
     let provider = move |id: ItemId| (id == item).then(|| shared.clone());
     waltcut_export::export(&Arc::new(p), seq, &settings, &provider, &Default::default()).unwrap();

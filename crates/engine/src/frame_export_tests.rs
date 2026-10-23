@@ -24,7 +24,7 @@ fn session() -> (Session, ItemId) {
 #[test]
 fn frame_export_selects_the_correct_monitor_time_and_original_media() {
     let (mut s, item) = session();
-    let dir = std::env::temp_dir().join(format!("fc-frame-original-{}", std::process::id()));
+    let dir = waltcut_testkit::workspace_root().join("target").join(format!("fc-frame-original-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     s.state.source_playhead = FrameRate::FPS_24.tick_of(20);
     s.set_playhead(FrameRate::FPS_24.tick_of(35));
@@ -53,7 +53,7 @@ fn frame_export_selects_the_correct_monitor_time_and_original_media() {
 fn source_frame_export_works_without_an_active_sequence_and_rejects_bad_params() {
     let (mut s, item) = session();
     s.state.active_sequence = None;
-    let path = std::env::temp_dir().join(format!("fc-source-frame-{}.png", std::process::id()));
+    let path = waltcut_testkit::workspace_root().join("target").join(format!("fc-source-frame-{}.png", std::process::id()));
     let r = s.execute("file.exportFrame", json!({"target":"source","path":path.to_string_lossy()})).unwrap();
     assert_eq!(r["width"], 128);
     assert!(s.execute("file.exportFrame", json!({"path":path.to_string_lossy()})).is_err());
@@ -66,6 +66,13 @@ fn source_frame_export_works_without_an_active_sequence_and_rejects_bad_params()
         json!({"target":"source","format":false}),
         json!({"target":"source","import":"yes"}),
         json!({"target":"source","path":""}),
+        json!({"target":"source","format":"tiff"}),
+        json!({"target":"source","format":"bmp"}),
+        json!({"target":"source","settings":null}),
+        json!({"target":"source","quality":95}),
+        json!({"target":"source","overwrite":"yes"}),
+        json!({"target":"source","depth":u64::MAX}),
+        json!({"target":"source","time":i64::MAX}),
     ] {
         assert!(s.execute("file.exportFrame", params.clone()).is_err(), "{params}");
     }
@@ -81,10 +88,11 @@ fn frame_export_snapshots_are_independent_of_later_monitor_selection() {
     let target = keyboard::frame_export_target(&s, &json!({"target":"source"})).unwrap();
     s.state.source_item = None;
     s.state.source_playhead = Tick::ZERO;
-    let path = std::env::temp_dir().join(format!("fc-captured-frame-{}.bmp", std::process::id()));
-    let r = s.execute("file.exportFrame", json!({"target":"source","item":item.0,"time":target.time.0,"format":"bmp","path":path.to_string_lossy()})).unwrap();
+    let path = waltcut_testkit::workspace_root().join("target").join(format!("fc-captured-frame-{}.jpg", std::process::id()));
+    let r = s.execute("file.exportFrame", json!({"target":"source","item":item.0,"time":target.time.0,"format":"jpeg","path":path.to_string_lossy()})).unwrap();
     assert_eq!(r["time"], json!(target.time.0));
-    assert_eq!(&std::fs::read(&path).unwrap()[..2], b"BM");
+    let image = image::load_from_memory(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!((image.width(), image.height()), (128, 72));
     std::fs::remove_file(path).unwrap();
     let seq = s.state.active_sequence.unwrap();
     Arc::make_mut(&mut s.project).sequence_mut(seq).unwrap().settings.frame_rate = FrameRate { num: 1, den: i64::MAX };
@@ -113,7 +121,7 @@ fn a_frame_still_loading_is_reported_not_saved_blank() {
     let (mut s, item) = session();
     let generator = s.media.cached(item).unwrap();
     s.media.insert(item, Arc::new(Loading(generator.info().clone())));
-    let dir = std::env::temp_dir().join(format!("fc-frame-loading-{}", std::process::id()));
+    let dir = waltcut_testkit::workspace_root().join("target").join(format!("fc-frame-loading-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     for target in ["program", "source"] {
         let path = dir.join(format!("{target}.png"));
@@ -136,7 +144,7 @@ fn a_frame_still_loading_is_reported_not_saved_blank() {
 fn an_earlier_deferred_read_does_not_fail_the_export() {
     let (mut s, _) = session();
     waltcut_media::pending::mark();
-    let path = std::env::temp_dir().join(format!("fc-frame-stale-pending-{}.png", std::process::id()));
+    let path = waltcut_testkit::workspace_root().join("target").join(format!("fc-frame-stale-pending-{}.png", std::process::id()));
     s.execute("file.exportFrame", json!({"target":"program","path":path.to_string_lossy()})).unwrap();
     assert!(!waltcut_media::pending::is_set());
     std::fs::remove_file(path).unwrap();

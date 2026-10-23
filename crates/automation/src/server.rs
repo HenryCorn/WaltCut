@@ -903,16 +903,27 @@ mod tests {
 
     /// docs/agents.md § Long exports: a blocking export reports `notifications/progress` for its
     /// token (none without one), answers `ping` meanwhile, and `notifications/cancelled` stops
-    /// it, deletes the partial file and sends no response.
+    /// it, removes owned staging files and sends no response.
     #[tokio::test(flavor = "multi_thread")]
     async fn export_progress_and_cancel() {
-        let dir = std::env::temp_dir().join(format!("filmcraft-mcp-progress-{}", std::process::id()));
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .unwrap()
+            .join("target")
+            .join(format!("filmcraft-mcp-progress-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let mut c = Client::start(demo());
+        let mut session = demo();
+        let seq = session.state.active_sequence.unwrap();
+        let q = Arc::make_mut(&mut session.project).sequence_mut(seq).unwrap();
+        q.settings.width = 640;
+        q.settings.height = 360;
+        let mut c = Client::start(session);
         c.init().await;
         let export = |id: u64, name: &str, token: Option<Value>, seconds: f64| {
             let path = dir.join(name).to_string_lossy().to_string();
-            let params = json!({"path": path, "format": "h264", "width": 640, "height": 360, "audio": false, "range": "custom", "startSeconds": 0, "endSeconds": seconds, "wait": true});
+            let params = json!({"path": path, "format": "h264", "range": "custom", "startSeconds": 0, "endSeconds": seconds, "wait": true});
             let mut call =
                 json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"command_run","arguments":{"id":"file.exportMedia","params":params}}});
             if let Some(t) = token {
@@ -975,22 +986,37 @@ mod tests {
         }
         c.send(r#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":4}}"#).await;
         let t0 = std::time::Instant::now();
-        while dir.join("b.mp4").exists() || t0.elapsed() < std::time::Duration::from_millis(500) {
-            assert!(t0.elapsed().as_secs() < 30, "partial file still there");
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        }
-        c.send(r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"command_run","arguments":{"id":"jobs.list"}}}"#).await;
-        let m = loop {
-            let m = c.next().await;
-            assert_ne!(m["id"], 4, "no response for a cancelled request: {m}");
-            if m["id"] == 5 {
-                break m;
+        let jobs = loop {
+            assert!(t0.elapsed().as_secs() < 30, "cancelled worker did not finish");
+            c.send(r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"command_run","arguments":{"id":"jobs.list"}}}"#).await;
+            let m = loop {
+                let m = c.next().await;
+                assert_ne!(m["id"], 4, "no response for a cancelled request: {m}");
+                if m["id"] == 5 {
+                    break m;
+                }
+            };
+            let jobs: Value = serde_json::from_str(m["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+            if jobs.as_array().and_then(|a| a.last()).is_some_and(|job| job["finished"] == true) {
+                break jobs;
             }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         };
-        let jobs: Value = serde_json::from_str(m["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
         let last = jobs.as_array().and_then(|a| a.last()).cloned().unwrap_or_default();
         assert_eq!(last["result"]["error"], "cancelled", "{jobs}");
         assert!(!dir.join("b.mp4").exists());
+        assert!(!std::fs::read_dir(&dir).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().starts_with(".filmcraft-export-")));
+        c.send(&export(6, "after-cancel.mp4", None, 0.05)).await;
+        let response = loop {
+            let response = c.next().await;
+            assert_ne!(response["id"], 4, "no response for the cancelled request");
+            if response["id"] == 6 {
+                break response;
+            }
+        };
+        assert_eq!(response["id"], 6, "{response}");
+        assert_eq!(response["result"]["isError"], false, "{response}");
+        assert!(dir.join("after-cancel.mp4").exists(), "the worker slot was reaped and can be reused");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

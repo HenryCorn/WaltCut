@@ -222,7 +222,9 @@ fn export_names_the_offline_media_it_rendered() {
         .execute("file.exportMedia", json!({"path": out("b.png"), "format": "png", "range": "custom", "startSeconds": 0.6, "endSeconds": 0.65, "wait": true}))
         .unwrap();
     assert_eq!(r["offlineMedia"], json!([]), "{r}");
-    let r = s.execute("file.exportMedia", json!({"path": out("all.wav"), "format": "wav", "wait": true})).unwrap();
+    let r = s
+        .execute("file.exportMedia", json!({"path": out("all.mov"), "format": "prores", "range": "custom", "startSeconds": 0, "endSeconds": 0.2, "wait": true}))
+        .unwrap();
     let off = r["offlineMedia"].as_array().unwrap();
     assert_eq!(off.len(), 1, "{r}");
     assert_eq!(off[0]["item"], json!(items[0].0));
@@ -239,14 +241,6 @@ fn export_names_the_offline_media_it_rendered() {
         Some(vec![(json!(items[1].0), json!("offline"))]),
         "{r}"
     );
-    // the queue reports it per item
-    let r = s
-        .execute(
-            "export.queue.add",
-            json!({"path": out("q.png"), "format": "png", "range": "custom", "startSeconds": 0.6, "endSeconds": 0.65, "start": true, "wait": true}),
-        )
-        .unwrap();
-    assert_eq!(r["items"][0]["offlineMedia"][0]["status"], json!("offline"), "{r}");
     // one rendered frame
     let (_, off) = s.try_render_program_with_offline_at(0.5, s.sequence_rate().tick_of(3)).unwrap();
     assert_eq!(off.iter().map(|o| (o.item, o.status)).collect::<Vec<_>>(), [(items[0].0, "missing")]);
@@ -263,8 +257,11 @@ fn jobs_list_reports_an_exports_offline_media() {
     let (path, items) = saved_project(&root);
     std::fs::remove_file(root.join("Media/b.mov")).unwrap();
     let mut s = open(&path);
-    let out = root.join("all.wav").to_string_lossy().into_owned();
-    let job = s.execute("file.exportMedia", json!({"path": out, "format": "wav", "wait": true})).unwrap()["job"].clone();
+    let out = root.join("all.mov").to_string_lossy().into_owned();
+    let job = s
+        .execute("file.exportMedia", json!({"path": out, "format": "prores", "range": "custom", "startSeconds": 0.6, "endSeconds": 0.8, "wait": true}))
+        .unwrap()["job"]
+        .clone();
     let jobs = s.execute("jobs.list", json!({})).unwrap();
     let j = jobs.as_array().unwrap().iter().find(|j| j["id"] == job).unwrap();
     assert_eq!(j["offlineMedia"][0]["item"], json!(items[1].0), "{j}");

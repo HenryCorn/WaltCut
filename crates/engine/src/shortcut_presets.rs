@@ -150,7 +150,6 @@ pub const EXTRA_KEYS: &[Entry] = &[
     // Keyboard parity (M3.12): commands that only have a key
     ("file.close", "Cmd+W", ""),
     ("file.closeProject", "Cmd+Shift+W", ""),
-    ("export.queue.add", "Alt+Shift+M", ""),
     ("file.mediaProperties", "Cmd+Shift+H", ""),
     ("edit.pasteAttributes", "Cmd+Alt+V", ""),
     ("edit.find", "Cmd+F", ""),

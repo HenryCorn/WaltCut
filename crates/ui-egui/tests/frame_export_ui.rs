@@ -90,9 +90,9 @@ fn both_camera_buttons_open_the_dialog_and_cancel_writes_nothing() {
 fn program_export_ignores_source_focus_and_imports_the_saved_still() {
     let mut h = harness();
     h.state_mut().ui.focused = PanelKind::Source;
-    let folder = std::env::temp_dir().join(format!("fc-program-frame-ui-{}", std::process::id()));
+    let folder = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("fc-program-frame-ui-{}", std::process::id()));
     std::fs::create_dir_all(&folder).unwrap();
-    let path = folder.join("Program clip.bmp");
+    let path = folder.join("Program clip.png");
     let out = folder.clone();
     h.state_mut().hooks.pick_folder = Some(Box::new(move || Some(out.to_string_lossy().into_owned())));
     let ctx = h.ctx.clone();
@@ -100,15 +100,16 @@ fn program_export_ignores_source_focus_and_imports_the_saved_still() {
     step(&mut h);
     let before = h.state().session.project.items.len();
     click(&mut h, "exportFrame.format");
-    click(&mut h, "exportFrame.format.bmp");
+    click(&mut h, "exportFrame.format.png");
     click(&mut h, "exportFrame.browse");
     click(&mut h, "exportFrame.import");
     click(&mut h, "exportFrame.export");
     assert!(path.exists(), "{}", h.state().ui.status);
     assert_eq!(h.state().session.project.items.len(), before + 1);
     let bytes = std::fs::read(&path).unwrap();
-    assert_eq!(i32::from_le_bytes(bytes[18..22].try_into().unwrap()), 128);
-    assert_eq!(i32::from_le_bytes(bytes[22..26].try_into().unwrap()).abs(), 72);
+    let image = image::load_from_memory(&bytes).unwrap().to_rgba8();
+    assert_eq!(image.dimensions(), (128, 72));
+    assert!(image.pixels().all(|pixel| pixel[3] == 0), "the empty Program sequence keeps its transparent canvas");
     assert!(!has(&h, "exportFrame.name"));
     drop(h);
     std::fs::remove_file(path).unwrap();
@@ -120,7 +121,7 @@ fn focused_source_command_captures_the_frame_and_save_cancel_keeps_the_dialog() 
     let mut h = harness();
     h.state_mut().ui.focused = PanelKind::Source;
     h.state_mut().session.state.source_playhead = FrameRate::FPS_24.tick_of(12);
-    let expected_path = std::env::temp_dir().join(format!("fc-source-frame-ui-{}.expected.png", std::process::id()));
+    let expected_path = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("fc-source-frame-ui-{}.expected.png", std::process::id()));
     h.state_mut().session.execute("file.exportFrame", json!({"target":"source","path":expected_path.to_string_lossy()})).unwrap();
     let expected = std::fs::read(&expected_path).unwrap();
     std::fs::remove_file(expected_path).unwrap();
@@ -131,7 +132,7 @@ fn focused_source_command_captures_the_frame_and_save_cancel_keeps_the_dialog() 
     h.state_mut().hooks.pick_folder = Some(Box::new(|| None));
     click(&mut h, "exportFrame.browse");
     assert!(has(&h, "exportFrame.name"));
-    let folder = std::env::temp_dir().join(format!("fc-source-frame-ui-{}", std::process::id()));
+    let folder = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("fc-source-frame-ui-{}", std::process::id()));
     std::fs::create_dir_all(&folder).unwrap();
     let path = folder.join("Source clip.png");
     let out = folder.clone();
@@ -154,7 +155,7 @@ fn depth_dropdown_is_format_aware_and_existing_files_require_confirmation() {
     step(&mut h);
     click(&mut h, "exportFrame.depth");
     click(&mut h, "exportFrame.depth.16");
-    let folder = std::env::temp_dir().join(format!("fc-frame-depth-ui-{}", std::process::id()));
+    let folder = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("fc-frame-depth-ui-{}", std::process::id()));
     std::fs::create_dir_all(&folder).unwrap();
     let path = folder.join("Source clip.png");
     std::fs::write(&path, b"keep me").unwrap();
@@ -216,8 +217,8 @@ fn white_header_moves_both_dialogs_and_controls_still_work() {
         assert!((moved[0] - header[0] - 120.0).abs() < 2.0 && (moved[1] - header[1] - 60.0).abs() < 2.0, "{monitor}: {header:?} -> {moved:?}");
         assert_eq!(h.state().auto.elements.iter().find(|e| e.id == "exportFrame.name").unwrap().label, name);
         click(&mut h, "exportFrame.format");
-        click(&mut h, "exportFrame.format.bmp");
-        assert_eq!(h.state().auto.elements.iter().find(|e| e.id == "exportFrame.format").unwrap().label, "BMP");
+        click(&mut h, "exportFrame.format.jpg");
+        assert_eq!(h.state().auto.elements.iter().find(|e| e.id == "exportFrame.format").unwrap().label, "JPEG");
         click(&mut h, "exportFrame.close");
         assert!(!has(&h, "exportFrame.name"));
     }
@@ -271,7 +272,9 @@ fn clicking_outside_dismisses_without_export_and_dropdowns_stay_open() {
         click(&mut h, &format!("{monitor}.transport.exportFrame"));
         click(&mut h, "exportFrame.format");
         assert!(has(&h, "exportFrame.name"));
-        click(&mut h, "exportFrame.format.tiff");
+        assert!(!has(&h, "exportFrame.format.tiff"));
+        assert!(!has(&h, "exportFrame.format.bmp"));
+        click(&mut h, "exportFrame.format.png");
         click(&mut h, "exportFrame.depth");
         click(&mut h, "exportFrame.depth.16");
         assert!(has(&h, "exportFrame.name"));

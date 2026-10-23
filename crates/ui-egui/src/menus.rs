@@ -163,11 +163,21 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         object.insert("target".into(), json!("source"));
     }
     if id == "file.exportFrame" {
+        let monitor = params.as_object_mut().ok_or("command parameters must be an object")?.remove("monitor");
+        if let Some(monitor) = monitor {
+            if !matches!(monitor.as_str(), Some("source" | "program")) {
+                return Err("monitor must be source or program".into());
+            }
+            if params.get("target").is_some_and(|target| target != &monitor) {
+                return Err("monitor and target must name the same monitor".into());
+            }
+            params["target"] = monitor;
+        }
         if params.get("target").is_none() {
             let source = targets_source(app, &params);
             params.as_object_mut().ok_or("command parameters must be an object")?.insert("target".into(), json!(if source { "source" } else { "program" }));
         }
-        if params.get("path").is_none() {
+        if params.as_object().is_some_and(|object| object.keys().all(|key| ["target", "item", "sequence", "time"].contains(&key.as_str()))) {
             return crate::panels::frame_export::open(app, ctx, &params);
         }
     }
@@ -370,7 +380,7 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             return Ok(Value::Null);
         }
         // File ▸ Export ▸ Media… opens the Export mode, like ⌘M (#382); with a path it exports directly.
-        "file.exportMedia" if params.get("path").is_none() => {
+        "file.exportMedia" if params.as_object().is_some_and(|object| object.is_empty()) => {
             waltcut_engine::find_command(id).map_or(Ok(()), |c| (c.enabled)(&app.session))?;
             app.ui.mode = Mode::Export;
             return Ok(json!({"mode": "export"}));

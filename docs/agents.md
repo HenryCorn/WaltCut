@@ -14,7 +14,8 @@ FilmCraft from an agent. Part 2 covers developing WaltCut as an agent.
 | Headless | `filmcraft-cli mcp --demo` or `--project p.fcproj` (neither = empty project) | an in-process engine session, no window |
 | Bridge | `filmcraft-cli mcp --bridge 127.0.0.1:9876` | the running desktop app started with `filmcraft --control 9876` |
 
-Headless mode also takes `--data-dir DIR` (user presets). Any other option is rejected (exit 2):
+Headless MCP accepts only `--demo` or `--project`, and bridge MCP accepts `--bridge`.
+Other options are rejected (exit 2):
 there are no folder-confinement flags such as `--automation-read-root`, so the server can read
 and write wherever the user can.
 
@@ -100,32 +101,61 @@ driven one app can drive the others.
 
 ### Long exports: progress and cancellation
 
-`command_run {"id": "file.exportMedia", "params": {…, "wait": true}}` in headless mode blocks until
+`command_run {"id": "file.exportMedia", "params": {…, "wait": true}}` (or `export.quick`) blocks until
 the file is written. It uses the MCP progress and cancellation utilities, so a client can show
 progress and stop it:
 
 - The export runs as the same background job `jobs.list` shows. The session is locked only for short
   polls, so other requests (`ping`, `doc_inspect`, `jobs.list`, …) are answered while it encodes.
-- `file.exportMedia` with `wait: true`, an export job in `jobs.list` and each `export.queue.list`
-  item carry `offlineMedia`: the offline items the export drew the placeholder for (see §2b), `[]`
+- Waited media/quick exports and export jobs in `jobs.list` carry
+  `offlineMedia`: the offline items the export drew the placeholder for (see §2b), `[]`
   when none. The export itself still succeeds; deciding what to do about it is up to the caller.
-- Every job in `jobs.list`, and every encoding item of `export.queue.list`, carries `etaSeconds`: the
+- Every job in `jobs.list` carries `etaSeconds`: the
   time left at the job's speed over the last 15 seconds, `null` until a second of progress has been
   measured (a seek) and once it is done. The app shows it as `37% · 2:05 left` in the
-  status bar, the Export queue and the Progress panel.
+  status bar and Progress diagnostics.
 - With `"_meta": {"progressToken": T}` on the `tools/call`, the server sends
   `notifications/progress` `{progressToken: T, progress: <frames done>, total: <frames>, message:
   <job status>}` at most every 100 ms while frames advance. Without a token it sends none.
 - `notifications/cancelled` for the request stops the encode at the next batch (`jobs.cancel`),
-  deletes the partial output (the movie, or the frames written so far) and sends
-  no response, as the MCP cancellation utility asks.
+  waits for worker completion and discards its owned staging/partial sequence files, without
+  deleting a pre-existing destination or another writer's replacement. The MCP utility sends no
+  response for the cancelled request. An inability to confirm cancellation is an error, never a
+  successful result.
 - Without `wait` the command returns `{job, path, poll: "jobs.list", cancel: "jobs.cancel"}` at
   once: poll `jobs.list` for the job's `progress`, `etaSeconds`, `finished` and `result`, and stop it
-  with `jobs.cancel` (`export.queue.list` lists the Export Queue only, not direct exports, #1544). Other exports (`file.exportFrame`, …) finish quickly and
+  with `jobs.cancel`. A second export start fails while this worker is active; there is no queue or
+  backlog. Finished history is bounded and the session cancels/joins its worker on shutdown.
+  `file.exportFrame` finishes synchronously and
   ignore the token.
 - Bridge mode works the same way: the export runs as an app job (the app stays responsive and shows
   "Exporting… NN%" in its status bar) and the call returns when it is written, however long it
   takes. `filmcraft-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
+
+### Retained output contract (#25 draft)
+
+Media outputs are only **H.264 + AAC MP4**, **ProRes 4444 MOV with alpha** (stereo float PCM), and
+**PNG sequence with alpha**; `file.exportFrame` writes **PNG/JPEG**. Export and Quick Export share
+the simple destination/format/range controls. Unknown arguments, removed formats, queue/preset
+commands and advanced delivery settings are errors, not ignored compatibility options.
+
+```sh
+filmcraft-cli --project p.fcproj export movie.mp4 --start 0 --end 0.25
+filmcraft-cli --project p.fcproj export alpha.mov --format prores --range inOut
+filmcraft-cli --project p.fcproj export frames.png --format png --start 0 --end 0.25
+filmcraft-cli --project p.fcproj render --seconds 0.25 --out frame.png
+```
+
+Media range bounds must be paired; custom ends are exclusive. An explicit non-custom range cannot
+be combined with start/end. Destination extensions must match. Movies/stills require `--overwrite`
+for replacement; PNG sequences require unused names even with an overwrite request. CLI `render`
+dispatches `file.exportFrame` at full resolution, without a scale override, and also works through
+the bridge. Offline output is named in the result and warned about; CLI exits 1 unless
+`--allow-offline` accepts placeholders. See [the command reference](control-protocol.md#export).
+
+**IMPLEMENTATION DRAFTED**: native retained-import fixtures, every retained output round trip,
+actual callback/MOV samples, real iPhone manual acceptance, full CI and animation-flow screenshot
+are pending. No real iPhone file has been checked; #25 is not complete, accepted or merged.
 
 ## 2. Control channel
 

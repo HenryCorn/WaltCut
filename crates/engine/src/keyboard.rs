@@ -514,7 +514,7 @@ fn has_graphic(s: &Session) -> std::result::Result<(), String> {
 // ------------------------------------------------------------------ export frame, poster frame
 
 fn sanitize(name: &str) -> String {
-    name.chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect()
+    name.chars().take(200).map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect()
 }
 
 /// A monitor frame captured when Export Frame opens. Export uses the original media.
@@ -537,6 +537,9 @@ pub fn frame_export_target(s: &Session, p: &Value) -> Result<FrameExportTarget> 
         Some(Value::String(t)) if t == "source" => true,
         _ => return Err(bad(CMD, "target must be source or program")),
     };
+    if p.get(if source { "sequence" } else { "item" }).is_some() {
+        return Err(bad(CMD, "use item only with target=source, or sequence with target=program"));
+    }
     let key = if source { "item" } else { "sequence" };
     let item = match p.get(key) {
         Some(v) => waltcut_project::ItemId(v.as_u64().ok_or_else(|| bad(CMD, format!("{key} must be an item id")))?),
@@ -545,10 +548,10 @@ pub fn frame_export_target(s: &Session, p: &Value) -> Result<FrameExportTarget> 
     };
     let pi = s.project.item(item).ok_or_else(|| bad(CMD, "the requested item is unavailable"))?;
     let (width, height) = s.project.source_size(item).ok_or_else(|| bad(CMD, "the requested Source clip has no video frame"))?;
-    waltcut_project::validate_frame_size(width, height).map_err(|e| bad(CMD, e.to_string()))?;
+    waltcut_export::validate_output_size(width, height).map_err(|e| bad(CMD, e.to_string()))?;
     let (rate, current, bounds) = if source {
         let v = crate::clip_ops::source_view(s, item).ok_or_else(|| bad(CMD, "Source clip is unavailable"))?;
-        if v.start.0 < 0 || v.end <= v.start {
+        if v.start.0 < 0 || v.end <= v.start || v.end > Tick::MAX {
             return Err(bad(CMD, "Source clip has invalid bounds"));
         }
         (v.rate, s.state.source_playhead, Some((v.start, v.end)))
@@ -560,8 +563,9 @@ pub fn frame_export_target(s: &Session, p: &Value) -> Result<FrameExportTarget> 
         None => current,
         Some(v) => Tick(v.as_i64().ok_or_else(|| bad(CMD, "time must be integer ticks"))?),
     };
-    if rate.num <= 0 || rate.den <= 0 || requested.0 < 0 {
-        return Err(bad(CMD, "frame rate must be positive and time non-negative"));
+    waltcut_project::SequenceSettings { width, height, frame_rate: rate, ..Default::default() }.validate().map_err(|e| bad(CMD, e))?;
+    if requested.0 < 0 || requested > Tick::MAX {
+        return Err(bad(CMD, "frame time must be non-negative and within supported bounds"));
     }
     let invalid = || bad(CMD, "frame time exceeds the supported range");
     let unit = i128::from(waltcut_time::TICKS_PER_SECOND).checked_mul(i128::from(rate.den)).ok_or_else(invalid)?;
@@ -581,6 +585,8 @@ pub fn frame_export_target(s: &Session, p: &Value) -> Result<FrameExportTarget> 
 
 /// Export the captured Source or Program frame as a full-resolution SDR still.
 fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
+    crate::export_tools::checked_keys(p, &["target", "item", "sequence", "time", "path", "format", "depth", "import", "overwrite"], "file.exportFrame")?;
+    let overwrite = crate::export_tools::bool_param(p, "overwrite", "file.exportFrame")?;
     let target = frame_export_target(s, p)?;
     let fmt = match p.get("format") {
         None => "png".to_string(),
@@ -593,7 +599,7 @@ fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
             .map_err(|_| bad("file.exportFrame", "depth must be 8 or 16"))?,
     };
     if !matches!(depth, 8 | 16) || (depth == 16 && !format.supports_16()) {
-        return Err(bad("file.exportFrame", "16-bit output requires PNG or TIFF; JPEG and BMP require 8-bit output"));
+        return Err(bad("file.exportFrame", "16-bit output requires PNG; JPEG requires 8-bit output"));
     }
     let import = match p.get("import") {
         None => false,
@@ -613,10 +619,21 @@ fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
             candidate.ok_or_else(|| bad("file.exportFrame", "choose a path: all default still names already exist"))?
         }
     };
-    let provider = s.media.provider(s.project.clone(), s.services.clone());
-    // On the web a frame can still be decoding (WebCodecs) or its bytes loading (Blob reads): the
-    // render then leaves that clip out, so saving it would pass a blank or partial picture off as
-    // the requested frame (#228). Report it instead and write nothing; a later call succeeds.
+    if path.len() > 4096 || path.contains('\0') {
+        return Err(bad("file.exportFrame", "resolved path must be at most 4096 bytes and contain no NUL"));
+    }
+    crate::export_tools::protect_source(s, &path)?;
+    let ext = std::path::Path::new(&path).extension().and_then(|e| e.to_str()).unwrap_or_default();
+    if !(ext.eq_ignore_ascii_case(format.extension()) || format == StillFormat::Jpeg && ext.eq_ignore_ascii_case("jpeg")) {
+        return Err(bad("file.exportFrame", "destination extension must match the PNG/JPEG format"));
+    }
+    match s.services.file_size(&path) {
+        Ok(_) if !overwrite => return Err(bad("file.exportFrame", "destination exists; pass overwrite=true to replace it")),
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(EngineError::Other(format!("{path}: {e}"))),
+        _ => {}
+    }
+    let provider = s.media.provider(s.project.clone(), s.services.clone()).recording();
+    // Never save a temporarily incomplete render as the requested frame.
     let _ = waltcut_media::pending::take();
     let img = if target.source {
         waltcut_render::render_item(&s.project, target.item, target.time, 1.0, &provider)
@@ -633,9 +650,26 @@ fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
         u32::try_from(img.h).map_err(|_| bad("file.exportFrame", "image height exceeds limits"))?,
     );
     let bytes = waltcut_export::still::encode(&img, format, depth).map_err(|e| EngineError::Other(e.to_string()))?;
-    s.services.write_file(&path, &bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+    let write = || -> std::io::Result<()> {
+        use std::io::Write;
+        let mut output = crate::export_output::ExportOutput::new(std::path::Path::new(&path), None, overwrite)?;
+        let result = (|| -> std::io::Result<()> {
+            let mut file = std::fs::File::create(output.staged_path())?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            drop(file);
+            output.commit(&std::sync::atomic::AtomicBool::new(false))
+        })();
+        match (result, output.cleanup()) {
+            (result, Ok(())) => result,
+            (Ok(()), Err(cleanup)) => Err(cleanup),
+            (Err(error), Err(cleanup)) => Err(std::io::Error::other(format!("{error}; {cleanup}"))),
+        }
+    };
+    write().map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     let mut out =
         json!({"path": path, "width": w, "height": h, "depth": depth, "target": if target.source { "source" } else { "program" }, "time": target.time.0});
+    out["offlineMedia"] = serde_json::to_value(provider.offline_used()).map_err(|e| EngineError::Other(format!("cannot report exported frame media: {e}")))?;
     if import {
         out["import"] = s.execute("file.import", json!({"paths": [path]}))?;
     }
@@ -776,7 +810,7 @@ pub fn commands() -> Vec<CommandSpec> {
             "file.exportFrame",
             "Export Frame",
             None,
-            r#"{"path":str?,"format":"png|jpeg|tiff|bmp"?,"depth":8|16?,"import":bool?,"target":"source|program"?,"item":id?,"sequence":id?,"time":ticks?}"#,
+            r#"{"path":str?,"format":"png|jpeg"?,"depth":8|16?,"import":bool?,"overwrite":bool=false,"target":"source|program"?,"item":id?,"sequence":id?,"time":ticks?}"#,
             always,
             export_frame,
         ),

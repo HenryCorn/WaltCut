@@ -4,32 +4,22 @@
 //! then encoded and muxed in order; audio is mixed per batch and interleaved. Progress and cancel
 //! are shared atomics so the UI (Export mode, header progress) and MCP can observe/cancel jobs.
 //!
-//! Video encoders implement [`VideoEncoder`]; codec crates register theirs with
-//! [`register_encoder`] (H.264, ProRes …). Built in: Motion-JPEG (MOV), PNG / TIFF / BMP / JPEG /
-//! Targa / DPX / OpenEXR sequences, GIF, WAV and AIFF.
-//!
-//! [`ExportSettings`] carries every Export-mode setting (frame size, rate, bitrate encoding, audio
-//! format, multiplexer, effects, metadata) as serde data; [`presets`] defines the
-//! built-in presets.
+//! Retained outputs: H.264 + AAC MP4, ProRes 4444 MOV with straight alpha and stereo PCM,
+//! PNG sequences with alpha, and PNG/JPEG still frames. Output geometry and timing follow the
+//! sequence; there are no delivery presets, overlays or encoder choices.
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
 use std::io::Write;
 
-mod aac_out;
 mod audio_out;
-mod deflate;
 mod job;
 mod pace;
 mod pcm;
 mod pipeline;
-pub mod presets;
-mod raster;
 pub mod settings;
 pub mod still;
 pub use job::{Exporter, Step, stepped};
-pub use pcm::{image_sequence_path, write_aiff, write_wav};
-pub use pipeline::limit_rgba8;
-pub use presets::{ExportPreset, builtin_presets};
+pub use pcm::image_sequence_path;
 pub use settings::*;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
@@ -59,378 +49,117 @@ pub type Result<T> = std::result::Result<T, ExportError>;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Format {
-    /// MPEG-4 (or QuickTime, see [`Multiplexer`]), H.264 video + AAC audio.
     #[default]
-    #[serde(rename = "h264", alias = "H264")]
+    #[serde(rename = "h264")]
     H264,
-    /// MPEG-4 (or QuickTime, see [`Multiplexer`]), H.265 / HEVC Main (8-bit) video + AAC audio. There is no
-    /// built-in encoder: a platform hardware encoder registers one ([`register_encoder`]) and says so
-    /// with [`register_format_probe`]; [`available`] is false without it. HDR sequences export as HDR
-    /// (Main 10, PQ / HLG) only where an encoder also says so with [`register_hdr_probe`]
-    /// ([`hdr_available`]); elsewhere they are tone-mapped to SDR.
-    #[serde(rename = "hevc", alias = "Hevc")]
-    Hevc,
-    /// MPEG-4, AV1 Main (8-bit) video + AAC audio. Like H.265 it has no built-in encoder: offered
-    /// where a hardware encoder registers one.
-    #[serde(rename = "av1", alias = "Av1")]
-    Av1,
-    /// QuickTime, Apple ProRes 422 (HQ unless the settings pick another flavour) + PCM.
-    #[serde(rename = "prores", alias = "ProRes")]
+    #[serde(rename = "prores")]
     ProRes,
-    /// QuickTime, Motion-JPEG + PCM.
-    #[serde(rename = "mjpeg", alias = "Mjpeg")]
-    Mjpeg,
-    /// Numbered PNG stills ([`image_sequence_path`]).
-    #[serde(rename = "png", alias = "PngSequence")]
+    #[serde(rename = "png")]
     PngSequence,
-    /// Numbered TIFF stills.
-    #[serde(rename = "tiff", alias = "TiffSequence")]
-    TiffSequence,
-    /// Numbered BMP stills.
-    #[serde(rename = "bmp", alias = "BmpSequence")]
-    BmpSequence,
-    /// Numbered JPEG stills (baseline, [`ExportSettings::quality`]).
-    #[serde(rename = "jpg", alias = "JpegSequence")]
-    JpegSequence,
-    /// Numbered Targa stills (uncompressed, 24-bit, or 32-bit with [`ExportSettings::alpha`]).
-    #[serde(rename = "tga", alias = "TgaSequence")]
-    TgaSequence,
-    /// Numbered DPX stills (SMPTE ST 268, 10-bit RGB, BT.709).
-    #[serde(rename = "dpx", alias = "DpxSequence")]
-    DpxSequence,
-    /// Numbered OpenEXR stills (half-float scene-linear RGB, RGBA with [`ExportSettings::alpha`]).
-    #[serde(rename = "exr", alias = "ExrSequence")]
-    ExrSequence,
-    #[serde(rename = "gif", alias = "Gif")]
-    Gif,
-    #[serde(rename = "wav", alias = "Wav")]
-    Wav,
-    #[serde(rename = "aiff", alias = "Aiff")]
-    Aiff,
-    /// AAC Audio: the mix alone, AAC-LC in an MPEG-4 audio file (`.m4a`), or a raw ADTS stream when
-    /// the path ends in `.aac`.
-    #[serde(rename = "aac", alias = "Aac")]
-    Aac,
 }
 
 impl Format {
-    pub fn from_name(s: &str) -> Option<Format> {
-        Some(match s.to_ascii_lowercase().replace([' ', '-', '_', '.'], "").as_str() {
-            "h264" | "mp4" | "avc" | "m4v" => Format::H264,
-            "hevc" | "h265" | "hvc1" | "hev1" | "x265" => Format::Hevc,
-            "av1" | "av01" => Format::Av1,
-            "prores" | "mov" | "appleprores" => Format::ProRes,
-            "mjpeg" | "motionjpeg" | "jpeg" => Format::Mjpeg,
-            "png" | "pngsequence" => Format::PngSequence,
-            "tif" | "tiff" | "tiffsequence" => Format::TiffSequence,
-            "bmp" | "bmpsequence" => Format::BmpSequence,
-            // "jpeg" alone stays Motion-JPEG (QuickTime), as it always was
-            "jpg" | "jpgsequence" | "jpegsequence" => Format::JpegSequence,
-            "tga" | "targa" | "tgasequence" | "targasequence" => Format::TgaSequence,
-            "dpx" | "dpxsequence" => Format::DpxSequence,
-            "exr" | "openexr" | "exrsequence" | "openexrsequence" => Format::ExrSequence,
-            "gif" | "animatedgif" => Format::Gif,
-            "wav" | "waveform" | "waveformaudio" => Format::Wav,
-            "aif" | "aiff" | "aifc" => Format::Aiff,
-            "aac" | "aacaudio" | "m4a" | "adts" => Format::Aac,
-            _ => return None,
-        })
+    pub const ALL: [Self; 3] = [Self::H264, Self::ProRes, Self::PngSequence];
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "h264" | "mp4" => Some(Self::H264),
+            "prores" | "prores4444" | "mov" => Some(Self::ProRes),
+            "png" => Some(Self::PngSequence),
+            _ => None,
+        }
     }
-    /// Stable id, as accepted by [`Format::from_name`] and used in serialized settings.
+
     pub fn id(self) -> &'static str {
         match self {
-            Format::H264 => "h264",
-            Format::Hevc => "hevc",
-            Format::Av1 => "av1",
-            Format::ProRes => "prores",
-            Format::Mjpeg => "mjpeg",
-            Format::PngSequence => "png",
-            Format::TiffSequence => "tiff",
-            Format::BmpSequence => "bmp",
-            Format::JpegSequence => "jpg",
-            Format::TgaSequence => "tga",
-            Format::DpxSequence => "dpx",
-            Format::ExrSequence => "exr",
-            Format::Gif => "gif",
-            Format::Wav => "wav",
-            Format::Aiff => "aiff",
-            Format::Aac => "aac",
+            Self::H264 => "h264",
+            Self::ProRes => "prores",
+            Self::PngSequence => "png",
         }
     }
+
     pub fn extension(self) -> &'static str {
         match self {
-            Format::H264 | Format::Hevc | Format::Av1 => "mp4",
-            Format::ProRes | Format::Mjpeg => "mov",
-            Format::PngSequence => "png",
-            Format::TiffSequence => "tif",
-            Format::BmpSequence => "bmp",
-            Format::JpegSequence => "jpg",
-            Format::TgaSequence => "tga",
-            Format::DpxSequence => "dpx",
-            Format::ExrSequence => "exr",
-            Format::Gif => "gif",
-            Format::Wav => "wav",
-            Format::Aiff => "aif",
-            Format::Aac => "m4a",
+            Self::H264 => "mp4",
+            Self::ProRes => "mov",
+            Self::PngSequence => "png",
         }
     }
+
     pub fn label(self) -> &'static str {
         match self {
-            Format::H264 => "H.264",
-            Format::Hevc => "H.265 (HEVC)",
-            Format::Av1 => "AV1",
-            Format::ProRes => "Apple ProRes",
-            Format::Mjpeg => "QuickTime (Motion JPEG)",
-            Format::PngSequence => "PNG",
-            Format::TiffSequence => "TIFF",
-            Format::BmpSequence => "BMP",
-            Format::JpegSequence => "JPEG",
-            Format::TgaSequence => "Targa",
-            Format::DpxSequence => "DPX",
-            Format::ExrSequence => "OpenEXR",
-            Format::Gif => "Animated GIF",
-            Format::Wav => "Waveform Audio",
-            Format::Aiff => "AIFF",
-            Format::Aac => "AAC Audio",
+            Self::H264 => "H.264 + AAC MP4",
+            Self::ProRes => "ProRes 4444 MOV (alpha)",
+            Self::PngSequence => "PNG sequence (alpha)",
         }
     }
-    /// Numbered stills, one per frame ([`image_sequence_path`]).
+
     pub fn is_image_sequence(self) -> bool {
-        matches!(
-            self,
-            Format::PngSequence
-                | Format::TiffSequence
-                | Format::BmpSequence
-                | Format::JpegSequence
-                | Format::TgaSequence
-                | Format::DpxSequence
-                | Format::ExrSequence
-        )
+        self == Self::PngSequence
     }
-    /// Whether the crate carries an encoder for the format; the others need one registered at runtime
-    /// ([`register_format_probe`]).
-    pub fn has_builtin_encoder(self) -> bool {
-        !matches!(self, Format::Hevc | Format::Av1)
-    }
-    /// Sound without picture: Waveform Audio, AIFF and AAC Audio.
-    pub fn is_audio_only(self) -> bool {
-        matches!(self, Format::Wav | Format::Aiff | Format::Aac)
-    }
-    /// H.264 or H.265: MPEG-4 (or QuickTime) with AAC audio, set up with the same bitrate controls.
-    pub fn is_h26x(self) -> bool {
-        matches!(self, Format::H264 | Format::Hevc)
-    }
-    /// A bitrate-controlled MPEG-4 video format with AAC audio: H.264, H.265 or AV1 (MPEG-4 only).
-    pub fn is_mp4_video(self) -> bool {
-        matches!(self, Format::H264 | Format::Hevc | Format::Av1)
-    }
-    /// Whether the file is MPEG-4 rather than QuickTime for `mux`.
-    pub fn is_mp4_with(self, mux: Multiplexer) -> bool {
-        self == Format::Av1 || (self.is_h26x() && mux == Multiplexer::Mp4)
-    }
-    pub const ALL: [Format; 16] = [
-        Format::H264,
-        Format::Hevc,
-        Format::Av1,
-        Format::ProRes,
-        Format::Mjpeg,
-        Format::PngSequence,
-        Format::TiffSequence,
-        Format::BmpSequence,
-        Format::JpegSequence,
-        Format::TgaSequence,
-        Format::DpxSequence,
-        Format::ExrSequence,
-        Format::Gif,
-        Format::Wav,
-        Format::Aiff,
-        Format::Aac,
-    ];
 }
 
-/// Two-pass state of an H.264 export (set by the exporter, not by callers).
-#[derive(Clone, Debug, Default)]
-pub enum H264Pass {
-    #[default]
-    Single,
-    First,
-    Second(waltcut_h264enc::PassStats),
-}
-
-/// Every Export-mode setting. Serialized in camelCase; every field is optional on input.
+/// Destination, retained format and exact timeline range. Other fields belong to internal
+/// render-preview jobs or the registered compositor, never to command parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExportSettings {
     pub format: Format,
     pub path: String,
-    /// Timeline range (default: In/Out if set, else the whole sequence).
     pub range: Option<TimeRange>,
-    /// Output scale (1.0 = sequence frame size).
-    pub scale: f32,
-    pub include_audio: bool,
-    /// Quality 0–100 for lossy codecs (Motion-JPEG, JPEG sequences).
-    pub quality: u8,
-    /// Target video bitrate (kbps) for bitrate-driven encoders.
-    pub bitrate_kbps: u32,
-    /// This export is one part of a larger job (render previews): the caller owns
-    /// `progress.total`, `finished` and the final status; this call only adds to `done`.
-    #[serde(default)]
-    pub part_of_batch: bool,
-    /// ProRes flavour: `proxy`, `lt`, `standard`, `hq`, `4444` or `4444xq` (empty = HQ).
-    #[serde(default)]
-    pub prores_profile: String,
-    /// Encode display-referred SDR (Rec. 709, tone mapped) even when the sequence works in
-    /// Rec. 2100 PQ/HLG. Otherwise H.264 and ProRes exports of an HDR sequence are encoded in the
-    /// sequence's HDR space and signal it (VUI / `colr` / `mdcv` / `clli` / SEI).
-    #[serde(default)]
-    pub sdr: bool,
-    /// Keep the alpha channel in PNG, TIFF, Targa and OpenEXR sequences and ProRes 4444 / 4444 XQ
-    /// QuickTime movies (straight alpha, Premiere's "Include Alpha Channel"; OpenEXR stores it
-    /// premultiplied, as the format defines). Off, every frame is flattened over black (#160).
-    /// Other formats ignore it.
-    #[serde(default)]
-    pub alpha: bool,
-    /// Compression of OpenEXR sequences (uncompressed unless set); other formats ignore it.
-    #[serde(default)]
-    pub exr_compression: ExrCompression,
-    /// Output frame size (None = Match Source: the sequence size times `scale`).
-    pub frame_size: Option<(u32, u32)>,
-    /// Output frame rate (None = Match Source).
-    pub frame_rate: Option<FrameRate>,
-    /// How the picture fills a frame of another aspect ratio.
-    pub scaling: Scaling,
-    /// Pixel aspect ratio (None = square pixels). Signalled in the H.264 VUI.
-    pub pixel_aspect: Option<(u32, u32)>,
-    pub field_order: FieldOrder,
-    pub h264_profile: H264Profile,
-    /// H.264 level × 10 (41 = 4.1); None = the lowest level that fits. A level below what the
-    /// stream needs is raised.
-    pub h264_level: Option<u8>,
-    pub bitrate_mode: BitrateMode,
-    /// Constant rate factor of [`BitrateMode::Crf`], 0 (best) to 51 (smallest); 23 by default,
-    /// 18 is visually near-lossless.
-    #[serde(default = "default_crf")]
-    pub crf: f32,
-    /// May H.264 be encoded by the system's hardware encoder (VideoToolbox on macOS, NVENC on
-    /// Windows)? Off unless asked for: hardware output depends on the machine, so it is not
-    /// byte-reproducible like the built-in encoder's (`determinism_tests`).
-    #[serde(default)]
-    pub hardware_encoding: HardwareEncoding,
-    /// Composite the exported frames on the GPU instead of the CPU reference renderer (Export ▸
-    /// GPU rendering: Auto / Off, Off by default). Off = the CPU reference renderer exactly.
-    #[serde(default)]
-    pub gpu_rendering: GpuRendering,
-    /// VBR maximum bitrate (None = 1.5 × target).
-    pub max_bitrate_kbps: Option<u32>,
-    /// Adaptive bitrate (the Match Source presets): bits per pixel per frame; replaces
-    /// `bitrate_kbps` with `width × height × fps × bpp / 1000`.
-    pub adaptive_bitrate: Option<f32>,
-    /// Frames between keyframes (None = 2 seconds).
-    pub keyframe_distance: Option<u32>,
-    /// Render at Maximum Depth. FilmCraft always composites in 32-bit float, so this changes
-    /// nothing; it is kept so presets round-trip.
-    pub render_at_max_depth: bool,
-    /// Use Maximum Render Quality: render at full size and scale with an area filter.
-    pub max_render_quality: bool,
-    pub audio: AudioSettings,
-    pub multiplexer: Multiplexer,
-    pub effects: ExportEffects,
-    pub metadata: ExportMetadata,
-    /// Two-pass state (set by the exporter).
     #[serde(skip)]
-    pub h264_pass: H264Pass,
-    /// Colour signalling chosen by [`export`] for the encoders (not set by callers).
+    pub scale: f32,
+    #[serde(skip)]
+    pub include_audio: bool,
+    #[serde(skip)]
+    pub part_of_batch: bool,
+    #[serde(skip)]
+    pub sdr: bool,
+    #[serde(skip)]
+    pub gpu_rendering: GpuRendering,
     #[serde(skip)]
     pub signal: ColorSignal,
-    /// Encode into memory and hand each finished file (path, bytes) to this sink instead of
-    /// writing `path` (hosts without a filesystem: the web app offers the file as a download).
-    #[serde(skip)]
-    pub sink: Option<OutputSink>,
 }
 
-/// Receives in-memory export output: `(path, bytes)` per finished file.
-#[derive(Clone)]
-pub struct OutputSink(pub Arc<dyn Fn(&str, Vec<u8>) -> std::io::Result<()> + Send + Sync>);
-
-impl std::fmt::Debug for OutputSink {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("OutputSink")
-    }
-}
-
-/// How an audio-only export codes its samples.
-enum AudioWriter {
-    Pcm(pcm::PcmContainer),
-}
-
-/// An export's output file: on disk, or in memory for an [`OutputSink`].
-enum Out {
-    File(std::io::BufWriter<std::fs::File>),
-    Mem(std::io::Cursor<Vec<u8>>),
-}
+/// Buffered disk output. User exports write inside the engine's owned staging directory.
+struct Out(std::io::BufWriter<std::fs::File>);
 
 impl Out {
-    fn create(settings: &ExportSettings) -> Result<Out> {
-        Out::create_path(settings, &settings.path)
+    fn create(settings: &ExportSettings) -> Result<Self> {
+        let file = std::fs::File::create(&settings.path).map_err(|e| ExportError::Io(format!("{}: {e}", settings.path)))?;
+        Ok(Self(std::io::BufWriter::new(file)))
     }
 
-    /// An output file at `path`.
-    fn create_path(settings: &ExportSettings, path: &str) -> Result<Out> {
-        if settings.sink.is_some() {
-            return Ok(Out::Mem(std::io::Cursor::new(Vec::new())));
-        }
-        let f = std::fs::File::create(path).map_err(|e| ExportError::Io(format!("{path}: {e}")))?;
-        Ok(Out::File(std::io::BufWriter::new(f)))
-    }
-
-    /// Flush (and hand in-memory output to the sink); returns the file size.
-    fn finish(self, settings: &ExportSettings) -> Result<u64> {
-        self.finish_path(settings, &settings.path)
-    }
-
-    fn finish_path(self, settings: &ExportSettings, path: &str) -> Result<u64> {
-        match self {
-            Out::File(mut w) => {
-                w.flush().map_err(|e| ExportError::Io(e.to_string()))?;
-                Ok(std::fs::metadata(path).map(|m| m.len()).unwrap_or(0))
-            }
-            Out::Mem(c) => write_output(settings, path, c.into_inner()),
-        }
+    fn finish(mut self) -> Result<u64> {
+        self.0.flush().map_err(|e| ExportError::Io(e.to_string()))?;
+        self.0.get_ref().sync_all().map_err(|e| ExportError::Io(e.to_string()))?;
+        self.0.get_ref().metadata().map(|m| m.len()).map_err(|e| ExportError::Io(e.to_string()))
     }
 }
 
-/// Write one finished output file (to the sink when there is one); returns its size.
-fn write_output(settings: &ExportSettings, path: &str, data: Vec<u8>) -> Result<u64> {
+fn write_output(path: &str, data: Vec<u8>) -> Result<u64> {
     let n = data.len() as u64;
-    match &settings.sink {
-        Some(sink) => (sink.0)(path, data),
-        None => std::fs::write(path, &data),
-    }
-    .map_err(|e| ExportError::Io(e.to_string()))?;
+    let write = || -> std::io::Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        file.write_all(&data)?;
+        file.sync_all()
+    };
+    write().map_err(|e| ExportError::Io(format!("{path}: {e}")))?;
     Ok(n)
 }
 
 impl Write for Out {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self {
-            Out::File(w) => w.write(buf),
-            Out::Mem(w) => w.write(buf),
-        }
+        self.0.write(buf)
     }
     fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            Out::File(w) => w.flush(),
-            Out::Mem(w) => w.flush(),
-        }
+        self.0.flush()
     }
 }
 
 impl std::io::Seek for Out {
     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
-        match self {
-            Out::File(w) => w.seek(pos),
-            Out::Mem(w) => w.seek(pos),
-        }
+        self.0.seek(pos)
     }
 }
 
@@ -492,105 +221,32 @@ impl Default for ExportSettings {
             range: None,
             scale: 1.0,
             include_audio: true,
-            quality: 90,
-            bitrate_kbps: 20_000,
             part_of_batch: false,
-            prores_profile: String::new(),
             sdr: false,
-            alpha: false,
-            exr_compression: ExrCompression::None,
-            frame_size: None,
-            frame_rate: None,
-            scaling: Scaling::default(),
-            pixel_aspect: None,
-            field_order: FieldOrder::Progressive,
-            h264_profile: H264Profile::High,
-            h264_level: None,
-            bitrate_mode: BitrateMode::default(),
-            crf: DEFAULT_CRF,
-            hardware_encoding: HardwareEncoding::default(),
             gpu_rendering: GpuRendering::Off,
-            max_bitrate_kbps: None,
-            adaptive_bitrate: None,
-            keyframe_distance: None,
-            render_at_max_depth: false,
-            max_render_quality: false,
-            audio: AudioSettings::default(),
-            multiplexer: Multiplexer::Mp4,
-            effects: ExportEffects::default(),
-            metadata: ExportMetadata::default(),
-            h264_pass: H264Pass::Single,
             signal: ColorSignal::default(),
-            sink: None,
         }
     }
 }
 
-/// [`ExportSettings::crf`] of new settings and of settings saved before it existed.
-pub const DEFAULT_CRF: f32 = 23.0;
-
-fn default_crf() -> f32 {
-    DEFAULT_CRF
-}
-
 impl ExportSettings {
-    /// Reject settings the encoders cannot honour.
     pub fn validate(&self) -> Result<()> {
         if let Some(range) = self.range {
             validate_range(range)?;
         }
-        if !self.scale.is_finite() || self.scale <= 0.0 {
-            return Err(ExportError::Unsupported("output scale must be finite and positive".into()));
-        }
-        if let Some((width, height)) = self.frame_size {
-            waltcut_project::validate_frame_size(width, height).map_err(ExportError::Unsupported)?;
-        }
-        if let Some(rate) = self.frame_rate
-            && (rate.num <= 0
-                || rate.den <= 0
-                || rate.as_f64() > 1000.0
-                || rate.num > i64::from(u32::MAX)
-                || rate.den > i64::from(u32::MAX)
-                || (i128::from(waltcut_time::TICKS_PER_SECOND) * i128::from(rate.den) / i128::from(rate.num.max(1))) > i128::from(Tick::MAX.0))
-        {
-            return Err(ExportError::Unsupported("output frame rate must be positive and at most 1000 fps".into()));
-        }
-        if self.audio.sample_rate.is_some_and(|rate| rate == 0 || rate > 384_000) {
-            return Err(ExportError::Unsupported("output sample rate must be between 1 and 384000 Hz".into()));
-        }
-        if self.audio.float && self.audio.bits != 32 {
-            return Err(ExportError::Unsupported("floating-point audio is 32-bit: set the sample size to 32".into()));
-        }
-        let sample_format = self.audio.sample_format();
-        if (self.has_audio() || self.format.is_audio_only()) && self.audio_codec() != AudioCodec::Aac && !self.supports_sample_format(sample_format) {
-            let codec = self.format.label();
-            return Err(ExportError::Unsupported(format!("{codec} audio has no {} samples: choose 16, 24 or 32 bit", sample_format.label())));
-        }
-        if self.field_order != FieldOrder::Progressive && self.has_video() {
-            return Err(ExportError::Unsupported(format!("{} field order: FilmCraft's encoders write progressive frames", self.field_order.label())));
-        }
-        if self.effects.image_overlay.enabled && self.effects.image_overlay.path.trim().is_empty() {
-            return Err(ExportError::Unsupported("image overlay: no image file chosen".into()));
-        }
-        if self.format == Format::Hevc && self.bitrate_mode == BitrateMode::Vbr2Pass {
-            return Err(ExportError::Unsupported("H.265 export has no two-pass mode: choose CBR or VBR, 1 pass".into()));
-        }
-        if self.format == Format::Av1 && self.bitrate_mode == BitrateMode::Vbr2Pass {
-            return Err(ExportError::Unsupported("AV1 export has no two-pass mode: choose CBR or VBR, 1 pass".into()));
-        }
-        if self.bitrate_mode == BitrateMode::Crf {
-            if self.format == Format::Hevc {
-                return Err(ExportError::Unsupported("H.265 export has no CRF mode: choose CBR or VBR, 1 pass".into()));
-            }
-            if self.format == Format::Av1 {
-                return Err(ExportError::Unsupported("AV1 export has no CRF mode: choose CBR or VBR, 1 pass".into()));
-            }
-            if !self.crf.is_finite() || !(0.0..=51.0).contains(&self.crf) {
-                return Err(ExportError::Unsupported("CRF must be between 0 and 51".into()));
-            }
+        if !self.scale.is_finite() || !(0.01..=4.0).contains(&self.scale) {
+            return Err(ExportError::Unsupported("render scale must be finite and between 0.01 and 4".into()));
         }
         Ok(())
     }
+}
+
+/// Bound working images before any compositor or encoder allocation (up to 4K square).
+pub fn validate_output_size(width: u32, height: u32) -> Result<()> {
+    if width == 0 || height == 0 || width > 8192 || height > 8192 || u64::from(width) * u64::from(height) > 16_777_216 {
+        return Err(ExportError::Unsupported("export dimensions must be positive, at most 8192 per side and 16777216 pixels total".into()));
+    }
+    Ok(())
 }
 
 /// Shared progress/cancel state of an export job.
@@ -644,7 +300,7 @@ pub struct Report {
 }
 
 /// A packet produced by a video encoder.
-pub struct EncodedPacket {
+struct EncodedPacket {
     pub data: Vec<u8>,
     pub key: bool,
     /// Duration in encoder timescale units.
@@ -655,7 +311,7 @@ pub struct EncodedPacket {
 
 /// Input picture for encoders: straight sRGB RGBA8 (encoders convert to their own YUV), or for
 /// HDR exports the encoded R'G'B' (PQ/HLG, BT.2020; 3 floats per pixel, 0..1) in `hdr`.
-pub struct EncoderFrame<'a> {
+struct EncoderFrame<'a> {
     pub width: u32,
     pub height: u32,
     pub rgba: &'a [u8],
@@ -663,7 +319,29 @@ pub struct EncoderFrame<'a> {
     pub index: u64,
 }
 
-pub trait VideoEncoder: Send {
+fn validate_encoder_geometry(width: u32, height: u32, rate: FrameRate) -> Result<()> {
+    validate_output_size(width, height)?;
+    waltcut_project::SequenceSettings { width, height, frame_rate: rate, ..Default::default() }.validate().map_err(ExportError::Unsupported)
+}
+
+fn validate_encoder_frame(frame: &EncoderFrame, width: u32, height: u32, alpha: bool) -> Result<()> {
+    validate_output_size(frame.width, frame.height)?;
+    if (frame.width, frame.height) != (width, height) || frame.index > 1_000_000 {
+        return Err(ExportError::Unsupported("encoder frame dimensions or index do not match the export".into()));
+    }
+    let pixels = usize::try_from(u64::from(width) * u64::from(height)).map_err(|_| ExportError::Unsupported("encoder frame is too large".into()))?;
+    if (alpha || frame.hdr.is_none()) && pixels.checked_mul(4) != Some(frame.rgba.len()) {
+        return Err(ExportError::Unsupported("encoder frame RGBA buffer length does not match its dimensions".into()));
+    }
+    if let Some(rgb) = frame.hdr
+        && (pixels.checked_mul(3) != Some(rgb.len()) || rgb.iter().any(|v| !v.is_finite()))
+    {
+        return Err(ExportError::Unsupported("encoder frame HDR buffer is malformed or non-finite".into()));
+    }
+    Ok(())
+}
+
+trait VideoEncoder: Send {
     /// MP4/MOV sample entry (codec config) — may only be complete after the first frame.
     fn sample_entry(&self) -> SampleEntry;
     fn timescale(&self) -> u32;
@@ -673,14 +351,10 @@ pub trait VideoEncoder: Send {
     fn media_start(&self) -> Option<i64> {
         None
     }
-    /// First-pass statistics of a two-pass encode (H.264).
-    fn pass_stats(&self) -> Option<waltcut_h264enc::PassStats> {
-        None
-    }
 }
 
-/// Audio encoder (AAC) plugged in by codec crates; PCM is built in.
-pub trait AudioEncoder: Send {
+/// Fixed built-in AAC adapter; MOV PCM is written directly.
+trait AudioEncoder: Send {
     fn sample_entry(&self) -> SampleEntry;
     fn encode(&mut self, planar: &[Vec<f32>]) -> Result<Vec<Vec<u8>>>;
     fn flush(&mut self) -> Result<Vec<Vec<u8>>>;
@@ -688,53 +362,6 @@ pub trait AudioEncoder: Send {
     fn priming(&self) -> u32;
     /// Samples per access unit (1024 for AAC).
     fn frame_size(&self) -> u32;
-}
-
-pub type EncoderFactory = fn(format: Format, width: u32, height: u32, rate: FrameRate, settings: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>>;
-pub type AudioEncoderFactory = fn(format: Format, sample_rate: u32, channels: u32, settings: &ExportSettings) -> Option<Result<Box<dyn AudioEncoder>>>;
-
-fn video_factories() -> &'static RwLock<Vec<EncoderFactory>> {
-    static F: OnceLock<RwLock<Vec<EncoderFactory>>> = OnceLock::new();
-    F.get_or_init(|| RwLock::new(vec![h264_factory, prores_factory, mjpeg_factory]))
-}
-fn audio_factories() -> &'static RwLock<Vec<AudioEncoderFactory>> {
-    static F: OnceLock<RwLock<Vec<AudioEncoderFactory>>> = OnceLock::new();
-    F.get_or_init(|| RwLock::new(vec![aac_factory]))
-}
-
-/// Hardware encoder counters (`perf.stats` `export.hardware`): pictures encoded by hardware
-/// encoders, encoders created, and requests a hardware encoder declined (the software encoder
-/// took them).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct HwEncodeStats {
-    pub frames: u64,
-    pub sessions: u64,
-    pub declined: u64,
-}
-
-static HW_FRAMES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-static HW_SESSIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-static HW_DECLINED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-/// The hardware encoder counters so far.
-pub fn hw_encode_stats() -> HwEncodeStats {
-    use std::sync::atomic::Ordering::Relaxed;
-    HwEncodeStats { frames: HW_FRAMES.load(Relaxed), sessions: HW_SESSIONS.load(Relaxed), declined: HW_DECLINED.load(Relaxed) }
-}
-
-/// A hardware encoder encoded a picture.
-pub fn note_hw_encode_frame() {
-    HW_FRAMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// A hardware encoder was created.
-pub fn note_hw_encode_session() {
-    HW_SESSIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// A hardware encoder declined a request (the software encoder takes it).
-pub fn note_hw_encode_declined() {
-    HW_DECLINED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// The stages of an export whose wall time [`stage_times`] adds up (`perf.stats` `export.stages`). The
@@ -791,8 +418,8 @@ pub fn stage_times() -> Vec<(Stage, u64)> {
     Stage::ALL.iter().map(|s| (*s, STAGE_NS.get(*s as usize).map_or(0, |a| a.load(std::sync::atomic::Ordering::Relaxed)))).collect()
 }
 
-/// Add `d` to a stage's wall time (also for encoders outside this crate: [`Stage::Convert`]).
-pub fn note_stage(stage: Stage, d: std::time::Duration) {
+/// Add `d` to a stage's wall time.
+fn note_stage(stage: Stage, d: std::time::Duration) {
     if let Some(a) = STAGE_NS.get(stage as usize) {
         a.fetch_add(u64::try_from(d.as_nanos()).unwrap_or(u64::MAX), std::sync::atomic::Ordering::Relaxed);
     }
@@ -804,20 +431,6 @@ pub fn timed<T>(stage: Stage, f: impl FnOnce() -> T) -> T {
     let r = f();
     note_stage(stage, t.elapsed());
     r
-}
-
-/// Register a video encoder factory (tried before the built-in ones and those registered earlier).
-/// Registering the same factory twice is harmless.
-pub fn register_encoder(f: EncoderFactory) {
-    let mut g = video_factories().write().unwrap_or_else(|e| e.into_inner());
-    if !g.iter().any(|x| std::ptr::fn_addr_eq(*x, f)) {
-        g.insert(0, f);
-    }
-}
-
-/// Whether `f` is among the registered video encoder factories (startup diagnostics, tests).
-pub fn encoder_registered(f: EncoderFactory) -> bool {
-    video_factories().read().unwrap_or_else(|e| e.into_inner()).iter().any(|x| std::ptr::fn_addr_eq(*x, f))
 }
 
 /// Renders one export frame on something other than the CPU reference renderer — today the GPU
@@ -912,89 +525,6 @@ pub struct GpuRenderStats {
 pub fn gpu_render_stats() -> GpuRenderStats {
     GpuRenderStats { frames: GPU_FRAMES.load(Ordering::Relaxed), fallbacks: GPU_FALLBACKS.load(Ordering::Relaxed) }
 }
-pub fn register_audio_encoder(f: AudioEncoderFactory) {
-    audio_factories().write().unwrap_or_else(|e| e.into_inner()).insert(0, f);
-}
-
-type FormatProbe = (Format, fn() -> bool);
-
-fn format_probes() -> &'static RwLock<Vec<FormatProbe>> {
-    static P: OnceLock<RwLock<Vec<FormatProbe>>> = OnceLock::new();
-    P.get_or_init(|| RwLock::new(Vec::new()))
-}
-
-/// Say how to find out whether the encoder of a format without a built-in one ([`Format::has_builtin_encoder`])
-/// works on this machine: `probe` runs when [`available`] asks (it should cache its answer).
-/// Registering the same probe twice is harmless.
-pub fn register_format_probe(format: Format, probe: fn() -> bool) {
-    let mut g = format_probes().write().unwrap_or_else(|e| e.into_inner());
-    if !g.iter().any(|(f, p)| *f == format && std::ptr::fn_addr_eq(*p, probe)) {
-        g.push((format, probe));
-    }
-}
-
-fn hdr_probes() -> &'static RwLock<Vec<FormatProbe>> {
-    static P: OnceLock<RwLock<Vec<FormatProbe>>> = OnceLock::new();
-    P.get_or_init(|| RwLock::new(Vec::new()))
-}
-
-/// Say how to find out whether the registered encoder of `format` can write HDR (PQ / HLG) on this
-/// machine: `probe` runs when [`hdr_available`] asks (it should cache its answer). Only H.265 needs
-/// one: its encoders are hardware-only and not all of them take 10-bit pictures, so an HDR sequence
-/// exports as tone-mapped SDR unless a probe says otherwise. Registering the same probe twice is harmless.
-pub fn register_hdr_probe(format: Format, probe: fn() -> bool) {
-    let mut g = hdr_probes().write().unwrap_or_else(|e| e.into_inner());
-    if !g.iter().any(|(f, p)| *f == format && std::ptr::fn_addr_eq(*p, probe)) {
-        g.push((format, probe));
-    }
-}
-
-/// Whether a registered probe says the encoder of `format` writes HDR here (false without one).
-pub fn hdr_available(format: Format) -> bool {
-    // the probes run outside the lock: one may take a while
-    let probes: Vec<fn() -> bool> = hdr_probes().read().unwrap_or_else(|e| e.into_inner()).iter().filter(|(f, _)| *f == format).map(|(_, p)| *p).collect();
-    probes.into_iter().any(|p| p())
-}
-
-/// Whether a format can currently be exported: it has a built-in encoder, or a registered probe
-/// says its encoder works here.
-pub fn available(format: Format) -> bool {
-    if !Format::ALL.contains(&format) {
-        return false;
-    }
-    format.has_builtin_encoder() || format_probes().read().unwrap_or_else(|e| e.into_inner()).iter().any(|(f, probe)| *f == format && probe())
-}
-
-struct MjpegEncoder {
-    w: u16,
-    h: u16,
-    quality: u8,
-    rate: FrameRate,
-}
-
-impl VideoEncoder for MjpegEncoder {
-    fn sample_entry(&self) -> SampleEntry {
-        SampleEntry::jpeg(self.w, self.h)
-    }
-    fn timescale(&self) -> u32 {
-        self.rate.num as u32
-    }
-    fn encode(&mut self, f: &EncoderFrame) -> Result<Vec<EncodedPacket>> {
-        let rgb: Vec<u8> = f.rgba.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
-        let mut out = Vec::new();
-        let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, self.quality);
-        enc.encode(&rgb, f.width, f.height, image::ExtendedColorType::Rgb8).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(vec![EncodedPacket { data: out, key: true, duration: self.rate.den as u32, composition_offset: 0 }])
-    }
-    fn flush(&mut self) -> Result<Vec<EncodedPacket>> {
-        Ok(Vec::new())
-    }
-}
-
-fn mjpeg_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>> {
-    (format == Format::Mjpeg).then(|| Ok(Box::new(MjpegEncoder { w: w as u16, h: h as u16, quality: s.quality.clamp(1, 100), rate }) as Box<dyn VideoEncoder>))
-}
-
 /// AAC-LC (our encoder), 320 kbps stereo by default.
 struct AacEncoder {
     enc: waltcut_aac::Encoder,
@@ -1007,12 +537,7 @@ impl AudioEncoder for AacEncoder {
         SampleEntry::aac(self.enc.audio_specific_config(), self.channels, self.rate)
     }
     fn encode(&mut self, planar: &[Vec<f32>]) -> Result<Vec<Vec<u8>>> {
-        let refs: Vec<&[f32]> = if planar.len() == 6 {
-            // ours: L, R, C, LFE, Ls, Rs → AAC channel configuration 6: C, L, R, Ls, Rs, LFE
-            [2usize, 0, 1, 4, 5, 3].iter().map(|&c| planar[c].as_slice()).collect()
-        } else {
-            planar.iter().map(Vec::as_slice).collect()
-        };
+        let refs: Vec<&[f32]> = planar.iter().map(Vec::as_slice).collect();
         Ok(self.enc.encode(&refs))
     }
     fn flush(&mut self) -> Result<Vec<Vec<u8>>> {
@@ -1026,24 +551,23 @@ impl AudioEncoder for AacEncoder {
     }
 }
 
-fn aac_factory(_format: Format, sample_rate: u32, channels: u32, s: &ExportSettings) -> Option<Result<Box<dyn AudioEncoder>>> {
+fn aac_factory(sample_rate: u32) -> Result<Box<dyn AudioEncoder>> {
+    if !(1..=384_000).contains(&sample_rate) {
+        return Err(ExportError::Unsupported("AAC sample rate must be between 1 and 384000 Hz".into()));
+    }
+    let channels = 2;
     // AAC caps a frame at 6144 bits per channel (ISO/IEC 14496-3 §4.5.3.2): 6 bits per sample, so
     // 264.6 kbps for stereo at 22.05 kHz; a higher setting is capped instead of refused
     let max = (6 * sample_rate as u64 * channels.max(1) as u64).min(u32::MAX as u64) as u32;
-    let bps = (s.audio.bitrate_kbps.clamp(32, 512) * 1000).min(max);
-    Some(
-        waltcut_aac::Encoder::new(waltcut_aac::EncoderConfig::cbr(sample_rate, channels as usize, bps))
-            .map(|enc| Box::new(AacEncoder { enc, rate: sample_rate, channels }) as Box<dyn AudioEncoder>)
-            .map_err(|e| ExportError::Encode(e.to_string())),
-    )
+    let bps = 320_000.min(max);
+    waltcut_aac::Encoder::new(waltcut_aac::EncoderConfig::cbr(sample_rate, channels as usize, bps))
+        .map(|enc| Box::new(AacEncoder { enc, rate: sample_rate, channels }) as Box<dyn AudioEncoder>)
+        .map_err(|e| ExportError::Encode(e.to_string()))
 }
 
-/// ProRes 422 encoder (HQ unless the settings pick another flavour): sRGB/709 RGBA8 → 10-bit limited-range BT.709 4:2:2.
+/// ProRes 4444 encoder: straight alpha plus 10-bit limited-range picture.
 struct ProResEncoder {
     enc: waltcut_prores::Encoder,
-    profile: waltcut_prores::Profile,
-    /// Code the frames' alpha channel (4444 profiles with Include Alpha Channel).
-    alpha: bool,
     w: u32,
     h: u32,
     rate: FrameRate,
@@ -1052,7 +576,7 @@ struct ProResEncoder {
 
 impl VideoEncoder for ProResEncoder {
     fn sample_entry(&self) -> SampleEntry {
-        let mut e = SampleEntry::prores(waltcut_isobmff::FourCc(self.profile.fourcc()), self.w as u16, self.h as u16);
+        let mut e = SampleEntry::prores(waltcut_isobmff::FourCc(*b"ap4h"), self.w as u16, self.h as u16);
         self.signal.apply_to(&mut e, true);
         e
     }
@@ -1060,19 +584,12 @@ impl VideoEncoder for ProResEncoder {
         self.rate.num as u32
     }
     fn encode(&mut self, f: &EncoderFrame) -> Result<Vec<EncodedPacket>> {
-        let chroma = self.profile.chroma();
-        let mut fr = waltcut_prores::Frame::new(f.width, f.height, chroma, 10, self.alpha);
+        validate_encoder_frame(f, self.w, self.h, true)?;
+        let mut fr = waltcut_prores::Frame::new(f.width, f.height, waltcut_prores::Profile::P4444.chroma(), 10, true);
         let (w, h) = (f.width as usize, f.height as usize);
-        timed(Stage::Convert, || match (chroma, f.hdr) {
-            (waltcut_prores::ChromaFormat::Yuv444, hdr) => {
-                let (kr, kb) = if hdr.is_some() { self.signal.kr_kb() } else { (0.2126, 0.0722) };
-                to_yuv444_10(f.rgba, hdr, w, h, kr, kb, &mut fr.y, &mut fr.cb, &mut fr.cr, fr.alpha.as_deref_mut())
-            }
-            (_, Some(rgb)) => {
-                let (kr, kb) = self.signal.kr_kb();
-                rgbf_to_yuv422_10(rgb, w, h, kr, kb, &mut fr.y, &mut fr.cb, &mut fr.cr)
-            }
-            (_, None) => rgba_to_yuv422_10(f.rgba, w, h, &mut fr.y, &mut fr.cb, &mut fr.cr),
+        timed(Stage::Convert, || {
+            let (kr, kb) = if f.hdr.is_some() { self.signal.kr_kb() } else { (0.2126, 0.0722) };
+            to_yuv444_10(f.rgba, f.hdr, w, h, kr, kb, &mut fr.y, &mut fr.cb, &mut fr.cr, fr.alpha.as_deref_mut())
         });
         let data = self.enc.encode(&fr).map_err(|e| ExportError::Encode(e.to_string()))?;
         Ok(vec![EncodedPacket { data, key: true, duration: self.rate.den as u32, composition_offset: 0 }])
@@ -1084,9 +601,9 @@ impl VideoEncoder for ProResEncoder {
 
 /// Limited-range 10-bit 4:4:4 with matrix (Kr, Kb) from straight RGBA8, or from encoded R'G'B'
 /// floats (3 per pixel) when `hdr` is given. `alpha` (full range, 0 = transparent) takes the
-/// RGBA8 alpha; it stays opaque for float input, which carries none.
+/// RGBA8 alpha, including for HDR floats, which carry only colour.
 #[allow(clippy::too_many_arguments)]
-pub fn to_yuv444_10(
+fn to_yuv444_10(
     rgba: &[u8],
     hdr: Option<&[f32]>,
     w: usize,
@@ -1116,95 +633,27 @@ pub fn to_yuv444_10(
             *crv = (512.0 + 896.0 * (r - yy) / sr).round().clamp(4.0, 1019.0) as u16;
         }
     });
-    if let (Some(a), None) = (alpha, hdr) {
+    if let Some(a) = alpha {
         for (i, dst) in a.iter_mut().enumerate().take(n) {
             *dst = rgba.get(i * 4 + 3).map_or(1023, |&v| ((v as u32 * 1023 + 127) / 255) as u16);
         }
     }
 }
 
-/// BT.709 limited-range 10-bit 4:2:2 from straight RGBA8 (chroma averaged horizontally).
-pub fn rgba_to_yuv422_10(rgba: &[u8], w: usize, h: usize, y: &mut [u16], cb: &mut [u16], cr: &mut [u16]) {
-    let cw = w.div_ceil(2);
-    debug_assert!(y.len() >= w * h && rgba.len() >= w * h * 4);
-    y.par_chunks_mut(w).zip(cb.par_chunks_mut(cw).zip(cr.par_chunks_mut(cw))).enumerate().for_each(|(row, (yr, (cbr, crr)))| {
-        let src = &rgba[row * w * 4..(row + 1) * w * 4];
-        let mut us = vec![0f32; w];
-        let mut vs = vec![0f32; w];
-        for x in 0..w {
-            let (r, g, b) = (src[x * 4] as f32 / 255.0, src[x * 4 + 1] as f32 / 255.0, src[x * 4 + 2] as f32 / 255.0);
-            let yy = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            yr[x] = (64.0 + 876.0 * yy).round().clamp(4.0, 1019.0) as u16;
-            us[x] = (b - yy) / 1.8556;
-            vs[x] = (r - yy) / 1.5748;
-        }
-        for cx in 0..cw {
-            let a = cx * 2;
-            let b2 = (a + 1).min(w - 1);
-            let u = (us[a] + us[b2]) * 0.5;
-            let v = (vs[a] + vs[b2]) * 0.5;
-            cbr[cx] = (512.0 + 896.0 * u).round().clamp(4.0, 1019.0) as u16;
-            crr[cx] = (512.0 + 896.0 * v).round().clamp(4.0, 1019.0) as u16;
-        }
-    });
-}
-
-/// The ProRes profile named by [`ExportSettings::prores_profile`].
-pub fn prores_profile(name: &str) -> waltcut_prores::Profile {
-    use waltcut_prores::Profile;
-    match name.to_ascii_lowercase().as_str() {
-        "proxy" => Profile::Proxy,
-        "lt" => Profile::Lt,
-        "standard" | "422" => Profile::Standard,
-        "4444" => Profile::P4444,
-        "4444xq" | "4444 xq" | "4444-xq" | "xq" => Profile::P4444Xq,
-        _ => Profile::Hq,
+fn prores_factory(w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Result<Box<dyn VideoEncoder>> {
+    validate_encoder_geometry(w, h, rate)?;
+    let profile = waltcut_prores::Profile::P4444;
+    let mut cfg = waltcut_prores::EncoderConfig::new(profile, w, h);
+    if s.signal.is_hdr() {
+        cfg.color = waltcut_prores::ColorInfo { primaries: s.signal.primaries, transfer: s.signal.transfer, matrix: s.signal.matrix };
     }
-}
-
-/// Limited-range 10-bit 4:2:2 from encoded R'G'B' floats with matrix (Kr, Kb).
-#[allow(clippy::too_many_arguments)]
-pub fn rgbf_to_yuv422_10(rgb: &[f32], w: usize, h: usize, kr: f32, kb: f32, y: &mut [u16], cb: &mut [u16], cr: &mut [u16]) {
-    let cw = w.div_ceil(2);
-    debug_assert!(rgb.len() >= w * h * 3 && y.len() >= w * h);
-    let kg = 1.0 - kr - kb;
-    let (sb, sr) = (2.0 * (1.0 - kb), 2.0 * (1.0 - kr));
-    y.par_chunks_mut(w).zip(cb.par_chunks_mut(cw).zip(cr.par_chunks_mut(cw))).enumerate().for_each(|(row, (yr, (cbr, crr)))| {
-        let src = &rgb[row * w * 3..(row + 1) * w * 3];
-        let mut us = vec![0f32; w];
-        let mut vs = vec![0f32; w];
-        for x in 0..w {
-            let (r, g, b) = (src[x * 3], src[x * 3 + 1], src[x * 3 + 2]);
-            let yy = kr * r + kg * g + kb * b;
-            yr[x] = (64.0 + 876.0 * yy).round().clamp(4.0, 1019.0) as u16;
-            us[x] = (b - yy) / sb;
-            vs[x] = (r - yy) / sr;
-        }
-        for cx in 0..cw {
-            let a = cx * 2;
-            let b2 = (a + 1).min(w - 1);
-            cbr[cx] = (512.0 + 896.0 * (us[a] + us[b2]) * 0.5).round().clamp(4.0, 1019.0) as u16;
-            crr[cx] = (512.0 + 896.0 * (vs[a] + vs[b2]) * 0.5).round().clamp(4.0, 1019.0) as u16;
-        }
-    });
-}
-
-fn prores_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>> {
-    (format == Format::ProRes).then(|| {
-        let profile = prores_profile(&s.prores_profile);
-        let mut cfg = waltcut_prores::EncoderConfig::new(profile, w, h);
-        if s.signal.is_hdr() {
-            cfg.color = waltcut_prores::ColorInfo { primaries: s.signal.primaries, transfer: s.signal.transfer, matrix: s.signal.matrix };
-        }
-        let alpha = s.keeps_alpha();
-        cfg.encode_alpha = alpha;
-        let enc = waltcut_prores::Encoder::with_config(cfg);
-        Ok(Box::new(ProResEncoder { enc, profile, alpha, w, h, rate, signal: s.signal }) as Box<dyn VideoEncoder>)
-    })
+    cfg.encode_alpha = true;
+    let enc = waltcut_prores::Encoder::with_config(cfg);
+    Ok(Box::new(ProResEncoder { enc, w, h, rate, signal: s.signal }) as Box<dyn VideoEncoder>)
 }
 
 /// H.264 High (our encoder): sRGB/709 RGBA8 → 8-bit limited-range BT.709 4:2:0, VBR at the
-/// requested bitrate, length-prefixed samples with the `avcC` in the sample entry.
+/// fixed delivery bitrate, length-prefixed samples with the `avcC` in the sample entry.
 struct H264Encoder {
     enc: waltcut_h264enc::Encoder,
     w: u32,
@@ -1217,9 +666,16 @@ struct H264Encoder {
 }
 
 impl H264Encoder {
-    fn packets(&self, ps: Vec<waltcut_h264enc::Packet>) -> Vec<EncodedPacket> {
+    fn packets(&self, ps: Vec<waltcut_h264enc::Packet>) -> Result<Vec<EncodedPacket>> {
         ps.into_iter()
-            .map(|p| EncodedPacket { data: p.data, key: p.keyframe, duration: self.rate.den as u32, composition_offset: (p.pts - p.dts) as i32 })
+            .map(|p| {
+                let composition_offset = p
+                    .pts
+                    .checked_sub(p.dts)
+                    .and_then(|offset| i32::try_from(offset).ok())
+                    .ok_or_else(|| ExportError::Unsupported("encoded presentation offset exceeds the container range".into()))?;
+                Ok(EncodedPacket { data: p.data, key: p.keyframe, duration: self.rate.den as u32, composition_offset })
+            })
             .collect()
     }
 }
@@ -1238,6 +694,7 @@ impl VideoEncoder for H264Encoder {
         self.rate.num as u32
     }
     fn encode(&mut self, f: &EncoderFrame) -> Result<Vec<EncodedPacket>> {
+        validate_encoder_frame(f, self.w, self.h, false)?;
         timed(Stage::Convert, || match f.hdr {
             Some(rgb) => {
                 let (kr, kb) = self.signal.kr_kb();
@@ -1247,24 +704,25 @@ impl VideoEncoder for H264Encoder {
         });
         let cw = (f.width as usize).div_ceil(2);
         let frame = waltcut_h264enc::YuvFrame { y: &self.y, u: &self.u, v: &self.v, y_stride: f.width as usize, uv_stride: cw };
-        let ps = self.enc.try_encode(&frame, f.index as i64 * self.rate.den).map_err(|e| ExportError::Encode(e.to_string()))?;
-        Ok(self.packets(ps))
+        let timestamp = i64::try_from(f.index)
+            .ok()
+            .and_then(|i| i.checked_mul(self.rate.den))
+            .ok_or_else(|| ExportError::Unsupported("encoder frame timestamp overflows".into()))?;
+        let ps = self.enc.try_encode(&frame, timestamp).map_err(|e| ExportError::Encode(e.to_string()))?;
+        self.packets(ps)
     }
     fn flush(&mut self) -> Result<Vec<EncodedPacket>> {
         let ps = self.enc.flush();
-        Ok(self.packets(ps))
+        self.packets(ps)
     }
     fn media_start(&self) -> Option<i64> {
         // With B-frames the first DTS is one frame before the first PTS.
         (self.enc.delay() > 0).then_some(self.rate.den)
     }
-    fn pass_stats(&self) -> Option<waltcut_h264enc::PassStats> {
-        self.enc.pass_stats()
-    }
 }
 
 /// BT.709 limited-range 8-bit 4:2:0 from straight RGBA8 (2×2 chroma average).
-pub fn rgba_to_yuv420_8(rgba: &[u8], w: usize, h: usize, y: &mut Vec<u8>, u: &mut Vec<u8>, v: &mut Vec<u8>) {
+fn rgba_to_yuv420_8(rgba: &[u8], w: usize, h: usize, y: &mut Vec<u8>, u: &mut Vec<u8>, v: &mut Vec<u8>) {
     let (cw, ch) = (w.div_ceil(2), h.div_ceil(2));
     y.resize(w * h, 0);
     u.resize(cw * ch, 0);
@@ -1295,7 +753,7 @@ pub fn rgba_to_yuv420_8(rgba: &[u8], w: usize, h: usize, y: &mut Vec<u8>, u: &mu
 
 /// Limited-range 8-bit 4:2:0 from encoded R'G'B' floats with matrix (Kr, Kb).
 #[allow(clippy::too_many_arguments)]
-pub fn rgbf_to_yuv420_8(rgb: &[f32], w: usize, h: usize, kr: f32, kb: f32, y: &mut Vec<u8>, u: &mut Vec<u8>, v: &mut Vec<u8>) {
+fn rgbf_to_yuv420_8(rgb: &[f32], w: usize, h: usize, kr: f32, kb: f32, y: &mut Vec<u8>, u: &mut Vec<u8>, v: &mut Vec<u8>) {
     let (cw, ch) = (w.div_ceil(2), h.div_ceil(2));
     let kg = 1.0 - kr - kb;
     let (sb, sr) = (2.0 * (1.0 - kb), 2.0 * (1.0 - kr));
@@ -1326,59 +784,6 @@ pub fn rgbf_to_yuv420_8(rgb: &[f32], w: usize, h: usize, kr: f32, kb: f32, y: &m
     });
 }
 
-/// Limited-range 10-bit 4:2:0 (code values 0..1023, not MSB-aligned) from encoded R'G'B' floats with
-/// matrix (Kr, Kb): Y = 64 + 876·Y', C = 512 + 896·C, chroma averaged over each 2x2 block (one pixel
-/// or pair at an odd edge). `rgb` is 3 floats per pixel; NaN counts as 0, infinities and
-/// out-of-range values clamp to 0..1 first, and codes clamp to 4..1019 like [`rgbf_to_yuv422_10`]
-/// (so black is 64, peak white 940 and the chroma of any colour stays within 64..960).
-/// The planes are resized to `w * h` and `ceil(w / 2) * ceil(h / 2)`. A `rgb` slice of the wrong
-/// length, a zero size or a size whose arithmetic overflows is an error.
-#[allow(clippy::too_many_arguments)]
-pub fn rgbf_to_yuv420_10(rgb: &[f32], w: usize, h: usize, kr: f32, kb: f32, y: &mut Vec<u16>, u: &mut Vec<u16>, v: &mut Vec<u16>) -> Result<()> {
-    let bad = || ExportError::Encode(format!("a {w}x{h} HDR picture needs w*h*3 floats, got {}", rgb.len()));
-    let px = w.checked_mul(h).ok_or_else(bad)?;
-    if w == 0 || h == 0 || px.checked_mul(3) != Some(rgb.len()) {
-        return Err(bad());
-    }
-    let (cw, ch) = (w.div_ceil(2), h.div_ceil(2));
-    let kg = 1.0 - kr - kb;
-    let (sb, sr) = (2.0 * (1.0 - kb), 2.0 * (1.0 - kr));
-    y.clear();
-    y.resize(px, 0);
-    u.clear();
-    u.resize(cw * ch, 0);
-    v.clear();
-    v.resize(cw * ch, 0);
-    let unit = |x: f32| if x.is_nan() { 0.0 } else { x.clamp(0.0, 1.0) };
-    let code = |x: f32| x.round().clamp(4.0, 1019.0) as u16;
-    y.par_chunks_mut(w * 2).zip(u.par_chunks_mut(cw).zip(v.par_chunks_mut(cw))).enumerate().for_each(|(cy, (yr, (ur, vr)))| {
-        let rows = yr.len() / w;
-        let mut us = vec![0f32; cw];
-        let mut vs = vec![0f32; cw];
-        let mut cnt = vec![0f32; cw];
-        for (dy, yrow) in yr.chunks_exact_mut(w).enumerate().take(rows) {
-            let row = cy * 2 + dy;
-            let Some(src) = rgb.get(row * w * 3..(row + 1) * w * 3) else { continue };
-            for (x, (&[r, g, b], yo)) in src.as_chunks::<3>().0.iter().zip(yrow.iter_mut()).enumerate() {
-                let (r, g, b) = (unit(r), unit(g), unit(b));
-                let yy = kr * r + kg * g + kb * b;
-                *yo = code(64.0 + 876.0 * yy);
-                if let (Some(a), Some(c), Some(n)) = (us.get_mut(x / 2), vs.get_mut(x / 2), cnt.get_mut(x / 2)) {
-                    *a += (b - yy) / sb;
-                    *c += (r - yy) / sr;
-                    *n += 1.0;
-                }
-            }
-        }
-        for (cx, (uo, vo)) in ur.iter_mut().zip(vr.iter_mut()).enumerate() {
-            let n = cnt.get(cx).copied().unwrap_or(1.0).max(1.0);
-            *uo = code(512.0 + 896.0 * us.get(cx).copied().unwrap_or(0.0) / n);
-            *vo = code(512.0 + 896.0 * vs.get(cx).copied().unwrap_or(0.0) / n);
-        }
-    });
-    Ok(())
-}
-
 /// Slices per H.264 picture: one per four macroblock rows. The encoder's default follows the core
 /// count, which would make the stream (and every decoded picture) depend on the machine; this is
 /// what it picks on a machine with enough cores.
@@ -1386,37 +791,15 @@ pub(crate) fn h264_slices(height: u32) -> usize {
     (height.div_ceil(16) as usize).div_ceil(4).max(1)
 }
 
-fn h264_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Option<Result<Box<dyn VideoEncoder>>> {
-    if format != Format::H264 {
-        return None;
-    }
+fn h264_factory(w: u32, h: u32, rate: FrameRate, s: &ExportSettings) -> Result<Box<dyn VideoEncoder>> {
+    validate_encoder_geometry(w, h, rate)?;
     let mut cfg = waltcut_h264enc::EncoderConfig::new(w, h, rate.num as u32, rate.den as u32);
     cfg.format = waltcut_h264enc::PacketFormat::LengthPrefixed;
     cfg.aud = false;
-    cfg.keyint = s.keyframe_distance.filter(|k| *k > 0).unwrap_or_else(|| (rate.num as f64 / rate.den as f64 * 2.0).round().max(1.0) as u32);
+    cfg.keyint = (rate.as_f64() * 2.0).round().max(1.0) as u32;
     cfg.slices = h264_slices(h);
-    let kbps = s.bitrate_kbps.max(100);
-    let max = s.max_bitrate_kbps.filter(|m| *m >= kbps).unwrap_or_else(|| (u64::from(kbps) * 3 / 2).min(u64::from(u32::MAX)) as u32);
-    cfg.rate = match s.bitrate_mode {
-        BitrateMode::Cbr => waltcut_h264enc::RateControl::Cbr { kbps },
-        // the encoder clamps to 0..=51; a NaN from a hand-edited preset becomes the default
-        BitrateMode::Crf => waltcut_h264enc::RateControl::Crf(if s.crf.is_finite() { s.crf } else { DEFAULT_CRF }),
-        _ => waltcut_h264enc::RateControl::Vbr { target_kbps: kbps, max_kbps: max },
-    };
-    cfg.pass = match &s.h264_pass {
-        H264Pass::Single => waltcut_h264enc::Pass::Single,
-        H264Pass::First => waltcut_h264enc::Pass::First,
-        H264Pass::Second(st) => waltcut_h264enc::Pass::Second(st.clone()),
-    };
-    cfg.profile = match s.h264_profile {
-        H264Profile::Baseline => waltcut_h264enc::Profile::Baseline,
-        H264Profile::Main => waltcut_h264enc::Profile::Main,
-        H264Profile::High => waltcut_h264enc::Profile::High,
-    };
-    cfg.level = s.h264_level;
-    if let Some((n, d)) = s.pixel_aspect {
-        cfg.sar = (n.clamp(1, 65535) as u16, d.clamp(1, 65535) as u16);
-    }
+    cfg.rate = waltcut_h264enc::RateControl::Vbr { target_kbps: 20_000, max_kbps: 30_000 };
+    cfg.profile = waltcut_h264enc::Profile::High;
     if s.signal.is_hdr() {
         cfg.color = waltcut_h264enc::ColorConfig { primaries: s.signal.primaries, transfer: s.signal.transfer, matrix: s.signal.matrix, full_range: false };
         if let Some((md, cll)) = s.signal.static_metadata() {
@@ -1426,11 +809,9 @@ fn h264_factory(format: Format, w: u32, h: u32, rate: FrameRate, s: &ExportSetti
             cfg.content_light = Some(cll);
         }
     }
-    Some(
-        waltcut_h264enc::Encoder::new(cfg)
-            .map(|enc| Box::new(H264Encoder { enc, w, h, rate, y: Vec::new(), u: Vec::new(), v: Vec::new(), signal: s.signal }) as Box<dyn VideoEncoder>)
-            .map_err(|e| ExportError::Encode(e.to_string())),
-    )
+    waltcut_h264enc::Encoder::new(cfg)
+        .map(|enc| Box::new(H264Encoder { enc, w, h, rate, y: Vec::new(), u: Vec::new(), v: Vec::new(), signal: s.signal }) as Box<dyn VideoEncoder>)
+        .map_err(|e| ExportError::Encode(e.to_string()))
 }
 
 /// The range to export (settings → In/Out → whole sequence).
@@ -1456,8 +837,14 @@ pub fn export_range(project: &Project, seq: ItemId, settings: &ExportSettings) -
 
 /// Validate input time before frame/sample conversion or any `TimeRange::end` arithmetic.
 pub fn validate_range(range: TimeRange) -> Result<()> {
-    if range.start.0 < 0 || range.duration.0 <= 0 || range.start.0.checked_add(range.duration.0).is_none_or(|end| end > Tick::MAX.0) {
-        return Err(ExportError::Unsupported("export range must start at or after zero, have positive duration and end within supported time bounds".into()));
+    if range.start.0 < 0
+        || range.duration.0 <= 0
+        || range.duration.0 > 86_400 * waltcut_time::TICKS_PER_SECOND
+        || range.start.0.checked_add(range.duration.0).is_none_or(|end| end > Tick::MAX.0)
+    {
+        return Err(ExportError::Unsupported(
+            "export range must start at or after zero, last at most 24 hours with positive duration and end within supported time bounds".into(),
+        ));
     }
     Ok(())
 }
@@ -1469,85 +856,17 @@ pub fn frame_span(rate: FrameRate, range: TimeRange) -> (i64, i64) {
     (f0, f1.max(f0))
 }
 
-/// The delay of the `i`th GIF frame (from the start of the export) in centiseconds, the unit GIF
-/// stores. Each frame runs from its rounded start time to the next frame's, so the delays add up
-/// to the exact duration (24 fps: 4, 4, 5, 4, 4, 4 cs …) instead of every frame truncating
-/// 4.17 cs to 4 cs and the animation playing 4 % fast (#854).
-fn gif_delay_cs(rate: FrameRate, i: i64) -> u16 {
-    let num = i128::from(rate.num.max(1));
-    let den = i128::from(rate.den.max(0));
-    // start of frame `k` in centiseconds, rounded half up
-    let at = |k: i64| i128::from(k.max(0)).saturating_mul(200).saturating_mul(den).saturating_add(num) / num.saturating_mul(2);
-    let cs = at(i.saturating_add(1)).saturating_sub(at(i));
-    u16::try_from(cs.clamp(0, i128::from(u16::MAX))).unwrap_or(u16::MAX)
-}
-
-/// An in-memory writer that stays reachable after the encoder that owns a clone is dropped.
-#[derive(Clone, Default)]
-struct SharedBuf(Arc<Mutex<Vec<u8>>>);
-
-impl Write for SharedBuf {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap_or_else(|e| e.into_inner()).extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-/// Encode straight sRGB RGBA8 pixels as a PNG file (thumbnails, previews).
+/// Encode straight sRGB RGBA8 pixels as PNG, preserving alpha.
 pub fn encode_png(rgba: Vec<u8>, w: u32, h: u32) -> Result<Vec<u8>> {
-    encode_still(Format::PngSequence, rgba, w, h, false)
-}
-
-/// Encode one still of an image sequence (also Export Frame). PNG always carries the alpha
-/// channel it is given; `alpha` keeps it in TIFF, Targa and OpenEXR too, which are otherwise written
-/// as RGB.
-/// JPEG uses the default export quality ([`encode_still_with_quality`] picks another).
-pub fn encode_still(format: Format, rgba: Vec<u8>, w: u32, h: u32, alpha: bool) -> Result<Vec<u8>> {
-    encode_still_with_quality(format, rgba, w, h, alpha, ExportSettings::default().quality)
-}
-
-/// [`encode_still`] with the JPEG quality (1–100; ignored by the lossless formats).
-pub fn encode_still_with_quality(format: Format, rgba: Vec<u8>, w: u32, h: u32, alpha: bool, quality: u8) -> Result<Vec<u8>> {
-    encode_still_with(format, rgba, w, h, alpha, quality, ExrCompression::None)
-}
-
-/// [`encode_still_with_quality`] with the OpenEXR compression (ignored by the other formats).
-pub fn encode_still_with(format: Format, rgba: Vec<u8>, w: u32, h: u32, alpha: bool, quality: u8, exr: ExrCompression) -> Result<Vec<u8>> {
-    let enc = |e: image::ImageError| ExportError::Encode(e.to_string());
-    let mut out = std::io::Cursor::new(Vec::new());
-    match format {
-        Format::JpegSequence => {
-            let rgb = raster::rgb(&rgba, w, h)?;
-            image::ImageEncoder::write_image(
-                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality.clamp(1, 100)),
-                &rgb,
-                w,
-                h,
-                image::ExtendedColorType::Rgb8,
-            )
-            .map_err(enc)?
-        }
-        Format::TgaSequence => return raster::tga(&rgba, w, h, alpha),
-        Format::DpxSequence => return raster::dpx(&rgba, w, h),
-        Format::ExrSequence => return raster::exr(&rgba, w, h, alpha, exr),
-        Format::PngSequence => {
-            image::ImageEncoder::write_image(image::codecs::png::PngEncoder::new(&mut out), &rgba, w, h, image::ExtendedColorType::Rgba8).map_err(enc)?
-        }
-        Format::TiffSequence | Format::BmpSequence => {
-            let img = image::RgbaImage::from_raw(w, h, rgba).ok_or_else(|| ExportError::Encode("frame size".into()))?;
-            let f = if format == Format::TiffSequence { image::ImageFormat::Tiff } else { image::ImageFormat::Bmp };
-            if alpha && format == Format::TiffSequence {
-                img.write_to(&mut out, f).map_err(enc)?
-            } else {
-                image::DynamicImage::ImageRgba8(img).to_rgb8().write_to(&mut out, f).map_err(enc)?
-            }
-        }
-        _ => return Err(ExportError::Unsupported(format!("{} is not an image sequence", format.label()))),
+    validate_output_size(w, h)?;
+    let expected = (w as usize).checked_mul(h as usize).and_then(|n| n.checked_mul(4));
+    if expected != Some(rgba.len()) {
+        return Err(ExportError::Encode("PNG pixel buffer does not match its dimensions".into()));
     }
-    Ok(out.into_inner())
+    let mut out = Vec::new();
+    image::ImageEncoder::write_image(image::codecs::png::PngEncoder::new(&mut out), &rgba, w, h, image::ExtendedColorType::Rgba8)
+        .map_err(|e| ExportError::Encode(e.to_string()))?;
+    Ok(out)
 }
 
 /// Run an export (blocking; call from a worker thread).
@@ -1559,7 +878,7 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
             match ex.step(sources, progress)? {
                 Step::Progress => {}
                 Step::Done(r) => return Ok(r),
-                // only asynchronous (web) sources defer; a blocking export cannot wait for them
+                // A blocking export cannot wait for asynchronous source data.
                 Step::Pending => return Err(ExportError::Io("media data is still loading; run the export as a stepped job".into())),
             }
         }
@@ -1568,120 +887,49 @@ pub fn export(project: &Arc<Project>, seq: ItemId, settings: &ExportSettings, so
     let range = export_range(project, seq, settings)?;
     let cancelled = || progress.cancel.load(Ordering::Relaxed);
     let batch = rayon::current_num_threads().clamp(2, 16) as i64;
-    let (bytes, nframes) = match settings.format {
-        Format::Aac => aac_out::export(project, seq, settings, range, sources, progress)?,
-        Format::Wav | Format::Aiff => {
-            let mut a = audio_out::AudioOut::new(project.clone(), seq, settings, range)?;
-            let (ch, sr, fmt) = (a.channels as u16, a.sr, settings.audio.sample_format());
-            let frames = a.remaining();
-            // the sizes are known up front: refuse an AIFF that cannot hold them before measuring
-            let mut writer = match settings.format {
-                Format::Wav => AudioWriter::Pcm(pcm::PcmContainer::Wav),
-                _ => AudioWriter::Pcm(pcm::PcmContainer::Aiff),
-            };
-            let head = match &writer {
-                AudioWriter::Pcm(c) => pcm::header(*c, ch, sr, fmt, frames).map_err(ExportError::Unsupported)?,
-            };
-            // one second per chunk: memory stays flat however long the range is
-            let chunk = i64::from(sr.max(1));
-            if !settings.part_of_batch {
-                progress.total.store(frames.div_ceil(chunk as u64).max(1), Ordering::Relaxed);
-                progress.set_status(format!("Exporting audio ({})", settings.format.label()));
-            }
-            let mut out = Out::create(settings)?;
-            let io = |e: std::io::Error| ExportError::Io(e.to_string());
-            out.write_all(&head).map_err(io)?;
-            let mut buf = Vec::new();
-            while let Some(planar) = a.pull(a.out.saturating_add(chunk), sources) {
+    let pipe = pipeline::Pipeline::new(project.clone(), seq, settings, false)?;
+    let batch = pipe.render_batch_limit(job::overlap_batch(batch, job::frame_bytes(pipe.w, pipe.h, false), job::IN_FLIGHT_BUDGET));
+    let (f0, f1) = frame_span(pipe.rate, range);
+    let count = u64::try_from(f1 - f0).map_err(|_| ExportError::Unsupported("invalid frame count".into()))?;
+    if !(1..=1_000_000).contains(&count) {
+        return Err(ExportError::Unsupported("export must contain 1..1000000 frames".into()));
+    }
+    if !settings.part_of_batch {
+        progress.total.store(count, Ordering::Relaxed);
+        progress.set_status(format!("Exporting {count} frames ({})", settings.format.label()));
+    }
+    let mut bytes = 0u64;
+    let mut f = f0;
+    while f < f1 {
+        if cancelled() {
+            return Err(ExportError::Cancelled);
+        }
+        let end = f.saturating_add(batch).min(f1);
+        let written: Vec<Result<u64>> = (f..end)
+            .into_par_iter()
+            .map(|fi| {
                 if cancelled() {
                     return Err(ExportError::Cancelled);
                 }
-                buf.clear();
-                match &mut writer {
-                    AudioWriter::Pcm(c) => pcm::encode(*c, &audio_out::interleave(&planar), fmt, &mut buf),
+                let _ = waltcut_media::pending::take();
+                let (rgba, _) = pipe.frame(fi, sources);
+                if waltcut_media::pending::take() {
+                    return Err(ExportError::Io("video media is still loading".into()));
                 }
-                out.write_all(&buf).map_err(io)?;
-                if !settings.part_of_batch {
-                    progress.done.fetch_add(1, Ordering::Relaxed);
-                }
-            }
-            match &mut writer {
-                AudioWriter::Pcm(_) => out.write_all(pcm::pad(frames, ch, fmt)).map_err(io)?,
-            }
-            let n = out.finish(settings)?;
-            if settings.part_of_batch {
-                progress.done.store(1, Ordering::Relaxed);
-            }
-            (n, frames)
-        }
-        f if f.is_image_sequence() || f == Format::Gif => {
-            let pipe = pipeline::Pipeline::new(project.clone(), seq, settings, false)?;
-            let batch = pipe.render_batch_limit(batch);
-            let (f0, f1) = frame_span(pipe.rate, range);
-            let count = (f1 - f0) as u64;
-            let (w, h) = (pipe.w, pipe.h);
-            if !settings.part_of_batch {
-                progress.total.store(count, Ordering::Relaxed);
-                progress.set_status(format!("Exporting {count} frames ({})", settings.format.label()));
-            }
-            let mut total = 0u64;
-            let gif_buf = SharedBuf::default();
-            let mut gif = if settings.format == Format::Gif {
-                let mut enc = image::codecs::gif::GifEncoder::new_with_speed(gif_buf.clone(), 10);
-                enc.set_repeat(image::codecs::gif::Repeat::Infinite).map_err(|e| ExportError::Encode(e.to_string()))?;
-                Some(enc)
-            } else {
-                None
-            };
-            let mut f = f0;
-            while f < f1 {
+                let data = encode_png(rgba, pipe.w, pipe.h)?;
                 if cancelled() {
                     return Err(ExportError::Cancelled);
                 }
-                let end = (f + batch).min(f1);
-                if let Some(enc) = gif.as_mut() {
-                    let frames: Vec<Vec<u8>> = (f..end).into_par_iter().map(|fi| pipe.frame(fi, sources).0).collect();
-                    for (fi, rgba) in (f..end).zip(frames) {
-                        let img = image::RgbaImage::from_raw(w, h, rgba).ok_or_else(|| ExportError::Encode("frame".into()))?;
-                        let delay = image::Delay::from_numer_denom_ms(u32::from(gif_delay_cs(pipe.rate, fi - f0)) * 10, 1);
-                        enc.encode_frame(image::Frame::from_parts(img, 0, 0, delay)).map_err(|e| ExportError::Encode(e.to_string()))?;
-                    }
-                } else {
-                    let written: Vec<Result<u64>> = (f..end)
-                        .into_par_iter()
-                        .map(|fi| {
-                            let data = encode_still_with(
-                                settings.format,
-                                pipe.frame(fi, sources).0,
-                                w,
-                                h,
-                                settings.alpha,
-                                settings.quality,
-                                settings.exr_compression,
-                            )?;
-                            write_output(settings, &pcm::image_sequence_path(&settings.path, (fi - f0) as u64, count), data)
-                        })
-                        .collect();
-                    for r in written {
-                        total += r?;
-                    }
-                }
-                progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
-                f = end;
-            }
-            if let Some(enc) = gif {
-                let buf = gif_buf.clone();
-                drop(enc);
-                let data = std::mem::take(&mut *buf.0.lock().unwrap_or_else(|e| e.into_inner()));
-                total = write_output(settings, &settings.path, data)?;
-            }
-            (total, count)
+                write_output(&image_sequence_path(&settings.path, (fi - f0) as u64, count), data)
+            })
+            .collect();
+        for result in written {
+            bytes = bytes.checked_add(result?).ok_or_else(|| ExportError::Io("output byte count overflow".into()))?;
         }
-        _ => {
-            // Handled by the stepped exporter above; reaching here would be a dispatch bug.
-            return Err(ExportError::Unsupported(format!("{:?} must run as a stepped export", settings.format)));
-        }
-    };
+        progress.done.fetch_add((end - f) as u64, Ordering::Relaxed);
+        f = end;
+    }
+    let nframes = count;
     let secs = t0.elapsed().as_secs_f64();
     if !settings.part_of_batch {
         progress.finished.store(true, Ordering::Relaxed);

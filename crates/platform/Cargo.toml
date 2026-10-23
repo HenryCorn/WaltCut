@@ -1,6 +1,6 @@
 [package]
 name = "waltcut-platform"
-description = "macOS media integration: hardware video decoding and encoding through VideoToolbox, with transparent fallback to the pure-Rust decoders"
+description = "macOS media integration: hardware video decoding through VideoToolbox, with transparent fallback to the pure-Rust decoders"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -24,7 +24,6 @@ undocumented_unsafe_blocks = "deny"
 waltcut-bitstream = { workspace = true }
 waltcut-codecs = { workspace = true }
 waltcut-color = { workspace = true }
-waltcut-export = { workspace = true }
 waltcut-frame = { workspace = true }
 waltcut-h264 = { workspace = true }
 waltcut-hevc = { workspace = true }
@@ -43,5 +42,3 @@ block2 = "0.6.2"
 waltcut-testkit = { workspace = true }
 waltcut-media = { workspace = true }
 waltcut-frame = { workspace = true }
-waltcut-project = { workspace = true }
-waltcut-render = { workspace = true }
