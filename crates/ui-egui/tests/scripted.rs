@@ -224,15 +224,8 @@ fn trim_monitor_buttons_and_dynamic_jkl_trimming() {
     d.exec("trim.selectEditPoint", json!({"clip": clip, "edge": "out", "kind": "roll"}));
     d.frames(3);
     let ids = d.element_ids("trimMonitor.");
-    for id in [
-        "trimMonitor.outgoing",
-        "trimMonitor.incoming",
-        "trimMonitor.outShift",
-        "trimMonitor.inShift",
-        "trimMonitor.forward",
-        "trimMonitor.backwardMany",
-        "trimMonitor.applyTransition",
-    ] {
+    for id in ["trimMonitor.outgoing", "trimMonitor.incoming", "trimMonitor.outShift", "trimMonitor.inShift", "trimMonitor.forward", "trimMonitor.backwardMany"]
+    {
         assert!(ids.iter().any(|x| x == id), "{id} missing from {ids:?}");
     }
     // +1 button rolls the cut one frame

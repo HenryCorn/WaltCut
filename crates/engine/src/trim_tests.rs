@@ -204,11 +204,12 @@ fn trim_monitor_sides_and_shift_counters() {
     // a new selection starts new counters
     s.execute("trim.selectEditPoint", json!({"clip": c[1].0, "edge": "in", "kind": "roll"})).unwrap();
     assert_eq!(s.execute("trim.monitor", json!({})).unwrap()["inShift"], json!(0));
-    // Apply Default Transitions to Selection at the edit point
+    // Apply Default Transitions to Selection at an audio edit point (audio is all that can have one)
+    let a = s.active_sequence().unwrap().audio_tracks[0].items[1].id.0;
+    s.execute("trim.selectEditPoint", json!({"clip": a, "edge": "in", "kind": "roll"})).unwrap();
     let r = s.execute("trim.applyDefaultTransition", json!({})).unwrap();
     assert_eq!(r["transitions"].as_array().unwrap().len(), 1, "{r}");
-    let seq = s.execute("sequence.inspect", json!({})).unwrap();
-    assert!(!seq["video"][0]["transitions"].as_array().unwrap().is_empty());
+    assert!(!s.active_sequence().unwrap().audio_tracks[0].transitions.is_empty());
 }
 
 #[test]

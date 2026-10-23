@@ -160,7 +160,7 @@ fn v1_preferences_migrate_and_bad_values_are_repaired() {
     assert_eq!(p.timeline.auto_scroll, "pageScroll");
     assert_eq!(p.timeline.still_image_unit, "seconds");
     assert_eq!(p.timeline.still_image_duration, 0.01);
-    assert_eq!(p.timeline.audio_transition_duration, 100_000.0);
+    assert_eq!(p.timeline.audio_transition_duration, 3600.0, "seconds: capped at an hour");
     assert_eq!(p.appearance.highlight_color, settings::DEFAULT_HIGHLIGHT);
     assert_eq!(p.memory.frame_cache_mb, 64);
     assert_eq!(p.labels.name(Label::Violet), "Purple-ish");

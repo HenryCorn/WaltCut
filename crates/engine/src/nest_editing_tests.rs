@@ -54,10 +54,15 @@ fn with_the_toggle_on_a_sequence_edits_in_as_one_nest() {
 #[test]
 fn with_the_toggle_off_a_sequence_edits_in_as_its_clips_with_their_transitions() {
     let mut s = demo();
-    let (source, _) = source_and_empty(&mut s);
+    let (source, target) = source_and_empty(&mut s);
+    // the only transitions left are audio ones: give the source one to carry
+    s.execute("sequence.open", json!({"item": source.0})).unwrap();
+    let joined = clips(&s, TrackKind::Audio, 0)[1].id.0;
+    s.execute("sequence.applyAudioTransition", json!({"clip": joined})).unwrap();
+    s.execute("sequence.open", json!({"item": target.0})).unwrap();
     let src = s.project.sequence(source).unwrap().clone();
     let (src_v, src_a) = (src.video_tracks[0].clone(), src.audio_tracks[0].clone());
-    assert!(src_v.items.len() == 3 && !src_v.transitions.is_empty(), "the source has transitions to carry");
+    assert!(src_v.items.len() == 3 && !src_a.transitions.is_empty(), "the source has transitions to carry");
     s.execute("sequence.nestSequences", json!({"on": false})).unwrap();
     let undo = s.history.undo.len();
     let at = s.sequence_rate().tick_of(48);
@@ -80,9 +85,9 @@ fn with_the_toggle_off_a_sequence_edits_in_as_its_clips_with_their_transitions()
     assert!(v.items.iter().zip(&src_v.items).all(|(n, o)| n.link != o.link));
     // the transitions came along, between the copies
     assert_eq!((v.transitions.len(), a.transitions.len()), (src_v.transitions.len(), src_a.transitions.len()));
-    for (new, old) in v.transitions.iter().zip(&src_v.transitions) {
+    for (new, old) in a.transitions.iter().zip(&src_a.transitions) {
         assert_eq!((new.start, new.duration), (old.start + at, old.duration));
-        assert!(new.id != old.id && new.from.is_none_or(|c| v.item(c).is_some()) && new.to.is_none_or(|c| v.item(c).is_some()));
+        assert!(new.id != old.id && new.from.is_none_or(|c| a.item(c).is_some()) && new.to.is_none_or(|c| a.item(c).is_some()));
     }
     // the copies are what is selected, and the source sequence is untouched
     assert_eq!(s.state.selection.len(), v.items.len() + a.items.len());

@@ -889,25 +889,31 @@ fn color_matte_color_changes_and_undoes() {
     assert!(s.execute("project.matteColor", json!({"item": matte, "color": "green"})).is_err());
 }
 
-/// #918: non-ripple Speed/Duration 200% halves a 100-frame clip; a 10-frame fade-out must
-/// move from frames 90–100 to 40–50 (the new clip end), not stay past the clip.
+/// #918: non-ripple Speed/Duration 200% halves the clip; a 10-frame audio fade-out moves with the
+/// clip's end instead of staying past it.
 #[test]
 fn speed_duration_moves_fade_out_to_the_new_clip_end() {
     let mut s = Session::default();
-    s.execute("file.newSequence", json!({"name": "Speed fade", "video": 1, "audio": 0})).unwrap();
+    s.execute("file.newSequence", json!({"name": "Speed fade", "video": 1, "audio": 1})).unwrap();
     let rate = s.sequence_rate();
-    let seconds = rate.tick_of(100).seconds();
-    let matte = s.execute("file.newColorMatte", json!({"color": "#ff0000", "seconds": seconds})).unwrap()["item"].as_u64().unwrap();
-    let c = s.execute("timeline.place", json!({"item": matte, "track": "V1", "seconds": 0.0})).unwrap()["clips"][0].as_u64().unwrap();
+    let tone = s.execute("file.newBarsAndTone", json!({"seconds": rate.tick_of(100).seconds()})).unwrap()["item"].as_u64().unwrap();
+    s.execute("timeline.place", json!({"item": tone, "track": "V1", "seconds": 0.0})).unwrap();
+    let c = s.active_sequence().unwrap().audio_tracks[0].items[0].id.0;
     select(&mut s, &[c]);
-    s.execute("sequence.applyAudioTransition", json!({"edge": "out", "frames": 10})).unwrap();
+    s.execute("sequence.applyAudioTransition", json!({"clip": c, "edge": "out", "frames": 10})).unwrap();
+    let it = clip(&s, c);
+    let (before_start, before_end) = (it.start, it.end());
     let before = s.active_sequence().unwrap().audio_tracks[0].transitions[0].clone();
-    assert_eq!((rate.frame_at(before.start), rate.frame_at(before.end())), (90, 100));
+    assert_eq!((before.end(), rate.frame_at(before.end()) - rate.frame_at(before.start)), (it.end(), 10));
     s.execute("clip.speedDuration", json!({"speed": 200})).unwrap();
     let it = clip(&s, c);
     let fade = &s.active_sequence().unwrap().audio_tracks[0].transitions[0];
-    assert_eq!((rate.frame_at(it.start), rate.frame_at(it.end())), (0, 50));
-    assert_eq!((rate.frame_at(fade.start), rate.frame_at(fade.end())), (40, 50));
+    assert_eq!(rate.frame_at(it.end()) - rate.frame_at(it.start), (rate.frame_at(before_end) - rate.frame_at(before_start)) / 2, "the clip is half as long");
+    assert_eq!(
+        (rate.frame_at(fade.end()), rate.frame_at(fade.end()) - rate.frame_at(fade.start)),
+        (rate.frame_at(it.end()), 10),
+        "the fade ends with the shortened clip"
+    );
     assert_eq!(fade.from, Some(waltcut_project::ClipId(c)));
     assert_eq!(fade.to, None);
 }
