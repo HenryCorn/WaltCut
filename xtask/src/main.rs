@@ -1,7 +1,9 @@
 //! Workspace automation: `cargo xtask <check|layers|ci>`.
 //!
 //! - `layers`: enforces the dependency layering of `docs/architecture.md` §1 (downward-only edges,
-//!   listed same-layer edges, L0 codec crates depend on `bitstream` only, no UI/OS crates below L5).
+//!   listed same-layer edges, L0 codec crates depend on `bitstream` only, no UI/OS crates below L5),
+//!   and the removed-capability deny-list (`denylist.rs`): no deleted crate, module or command family
+//!   comes back.
 //! - `assets`: every asset file (image, icon, font, LUT, audio, video…) has a complete
 //!   `<file>.attribution` sidecar and an entry in `ATTRIBUTION.md` (AGENTS.md §1).
 //! - `fixtures [crate…]`: pre-generate the ffmpeg fixture matrix of the oracle tests (runs each
@@ -12,6 +14,7 @@
 //!   Defaults to origin/main; includes committed changes since the merge base and local changes.
 
 mod check;
+mod denylist;
 mod tidy;
 mod version;
 
@@ -56,7 +59,6 @@ const LAYERS: &[(&str, u8)] = &[
     ("render", 3),
     ("gpu", 3),
     ("golden", 3),
-    ("scopes", 3),
     ("playback", 3),
     ("export", 3),
     ("format", 3),
@@ -81,7 +83,6 @@ const SAME_LAYER: &[(&str, &str)] = &[
     ("playback", "render"),
     ("playback", "gpu"),
     ("export", "render"),
-    ("scopes", "gpu"),
     ("gpu", "render"),
     ("cli", "waltcut"),
 ];
@@ -150,6 +151,13 @@ fn layers() -> Result<(), String> {
             }
         }
     }
+    let texts: Vec<(String, String)> = repo_files()?
+        .into_iter()
+        .filter(|f| f.ends_with(".rs") || f.ends_with("Cargo.toml"))
+        .filter_map(|f| std::fs::read_to_string(&f).ok().map(|text| (f, text)))
+        .collect();
+    let sources: Vec<denylist::Source> = texts.iter().map(|(path, text)| denylist::Source { path, text }).collect();
+    errors.extend(denylist::check(&sources));
     if errors.is_empty() {
         println!("layers: ok");
         Ok(())

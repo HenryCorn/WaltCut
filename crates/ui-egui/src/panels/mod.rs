@@ -18,11 +18,9 @@ pub mod import_mode;
 pub mod keyboard;
 pub mod media_dialogs;
 pub mod menu_dialogs;
-pub mod metadata;
 pub mod misc;
 pub mod monitor;
 pub mod monitor_view;
-pub mod notes;
 pub mod panel_state;
 pub mod presets;
 pub mod project;
@@ -31,7 +29,6 @@ pub mod project_views;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;
-pub mod timecode;
 pub mod timeline;
 pub mod timeline_hit;
 pub mod timeline_volume;
@@ -72,13 +69,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::EssentialGraphics => graphics::properties(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
         PanelKind::Markers => misc::markers(app, ui, rect),
-        PanelKind::Info => misc::info(app, ui, rect),
-        PanelKind::Metadata => metadata::show(app, ui, rect),
-        PanelKind::Timecode => timecode::show(app, ui, rect),
         PanelKind::Events => events::events(app, ui, rect),
         PanelKind::Progress => events::progress(app, ui, rect),
-        PanelKind::ProjectNotes => notes::show(app, ui, rect),
-        other => crate::dock::placeholder(ui, rect, &app.tokens, &tlf!("{panel} — coming in a later milestone", panel = crate::i18n::t(other.title()))),
     }
 }
 

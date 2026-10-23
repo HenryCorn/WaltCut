@@ -294,7 +294,4 @@ pub const PANEL_KEYS: &[Entry] = &[
     ("projectPanel.extendDown", "Shift+Down", "Project"),
     ("projectPanel.extendLeft", "Shift+Left", "Project"),
     ("projectPanel.extendRight", "Shift+Right", "Project"),
-    ("playback.loop", "Cmd+L", "Audio Track Mixer"),
-    ("playback.toggle", "Space", "Metadata"),
-    ("playback.loop", "Cmd+L", "Metadata"),
 ];

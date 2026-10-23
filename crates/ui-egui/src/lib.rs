@@ -833,7 +833,7 @@ impl FilmcraftApp {
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
                 PanelKind::EssentialGraphics | PanelKind::Properties => PanelKind::Program,
-                PanelKind::Source | PanelKind::EffectControls | PanelKind::Metadata | PanelKind::Timecode => PanelKind::Source,
+                PanelKind::Source | PanelKind::EffectControls => PanelKind::Source,
                 _ => PanelKind::Project,
             };
             self.ui.dock.open_near(p, near);
@@ -1626,7 +1626,6 @@ impl FilmcraftApp {
         }
         let ctx = ui.ctx().clone();
         self.auto.begin_frame();
-        panels::metadata::follow_selection(self);
         self.frames.set_context(&ctx);
         self.session.poll_persistence();
         panels::trim_monitor::advance(self, &ctx);
