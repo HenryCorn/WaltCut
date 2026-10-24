@@ -186,6 +186,26 @@ cmd("view.canvasReset", {})
 canvas = call("ui.inspect")["result"]["ui"]["program"]["canvas"]
 check(canvas["rotation"] == 0 and canvas["mirror"] is False and canvas["panHeld"] == "Off", "reset returns to 0°, not mirrored")
 
+print("== guide clip: shown in the preview, left out of exports unless asked")
+cmd("playhead.set", {"frame": 0})
+def still(name, **extra):
+    path = os.path.join(OUT, name)
+    cmd("file.exportFrame", {"path": path, "overwrite": True, **extra})
+    with open(path, "rb") as f:
+        return f.read()
+ordinary = still("guide-ordinary.png")
+cmd("clip.setGuide", {"clips": [drawing], "guide": True})
+guided = still("guide-default.png")
+included = still("guide-included.png", includeGuides=True)
+check(guided != ordinary, "a guide drawing is left out of the default still")
+check(included == ordinary, "includeGuides gives the still of the ordinary clip")
+check(call("ui.inspect")["result"]["playhead"] == 0, "the exports did not move the playhead")
+time.sleep(1.0)
+call("ui.inspect")
+shot("08b-guide-clip-badge")
+cmd("clip.setGuide", {"clips": [drawing], "guide": False})
+check(still("guide-back.png") == ordinary, "an ordinary clip is in the default still again")
+
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})
 call("ui.playback", {"action": "play"})

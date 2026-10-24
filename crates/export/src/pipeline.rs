@@ -128,7 +128,7 @@ impl Pipeline {
         crate::validate_output_size(w, h)?;
         let pipe = q.settings.color;
         let out_tf = hdr_out.then(|| waltcut_color::OutputTransform::new(&pipe, pipe.working.output_space()));
-        let opts = RenderOptions { scale: settings.scale, working_output: hdr_out, ..Default::default() };
+        let opts = RenderOptions { scale: settings.scale, working_output: hdr_out, guides: settings.include_guides, ..Default::default() };
         let renderer = if settings.gpu_rendering == GpuRendering::Off {
             None
         } else {

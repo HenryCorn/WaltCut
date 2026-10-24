@@ -90,6 +90,33 @@ hold a pose for several frames or place a new cel on every frame.
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
+## Guide clips
+
+A **guide** is a reference or tracing clip (a placed picture, a drawing, a graphic) that you see
+while you work but that never ends up in what you deliver. Choose **Clip ▸ Use as Guide**
+(`clip.setGuide {clips?, guide?}`; it flips the selected clips when `guide` is absent). A guide
+clip is a video clip on an unlocked track; audio clips, locked tracks and missing clips are
+refused and nothing changes. It is one undo step, and the Timeline marks the clip with a
+**guide** badge. A guide is not the same as *disabled* (drawn nowhere), *muted* or *locked*, and a
+split keeps it a guide on both halves.
+
+| Output | Guides |
+|---|---|
+| Program monitor, render-cache previews, `render_frame` | **shown** |
+| Still (`file.exportFrame`), PNG sequence and movie (`file.exportMedia`, `export.quick`) | **left out** unless `includeGuides: true` (the Export page's **Include guide clips** switch, off each time) |
+| AI Restyle input (`ai.restyle`) | **left out** unless `includeGuides: true`: the provider is sent the picture a delivery render would give |
+
+This holds inside nested sequences too, and is the same for the app, the CLI and MCP, because
+they all run these commands. With no `includeGuides` a guided project exports exactly like the
+same project with the guide clips removed (tests compare PNG frames and ProRes movies byte for
+byte). The renderer's own default is "no guides" (`RenderOptions::guides`): only the Program
+preview asks for them, so a render nobody thought about cannot carry one.
+
+Saved projects keep the flag as `guide: true` on the clip, written only when set: a project
+without guides is byte for byte what it was, and the schema version is unchanged. A build that
+predates guides refuses a file that has one (unknown field) rather than dropping the flag. Placing
+a picture to trace is covered by the reference-image work (#3); this is the policy it builds on.
+
 Drawing clips are ordinary video clips for timeline placement, so clip motion and opacity can be
 used to position or fade a drawing.
 
@@ -195,7 +222,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

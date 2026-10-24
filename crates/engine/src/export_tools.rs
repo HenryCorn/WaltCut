@@ -12,7 +12,7 @@ use waltcut_time::{TICKS_PER_SECOND, Tick, TimeRange};
 use crate::commands::{CommandSpec, bad, has_seq};
 use crate::{EngineError, Result, Session};
 
-pub const EXPORT_PARAMS: &str = r#"{"path":str,"format":"h264|prores|png"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startTime":ticks?,"endTime":ticks?,"startSeconds":f64?,"endSeconds":f64?,"startFrame":int?,"endFrame":int?,"wait":bool=false,"overwrite":bool=false}"#;
+pub const EXPORT_PARAMS: &str = r#"{"path":str,"format":"h264|prores|png"?,"sequence":id?,"range":"entire|inOut|workArea|custom"?,"startTime":ticks?,"endTime":ticks?,"startSeconds":f64?,"endSeconds":f64?,"startFrame":int?,"endFrame":int?,"wait":bool=false,"overwrite":bool=false,"includeGuides":bool=false}"#;
 
 pub(crate) fn checked_keys(p: &Value, allowed: &[&str], cmd: &str) -> Result<()> {
     let object = p.as_object().ok_or_else(|| bad(cmd, "parameters must be an object"))?;
@@ -261,11 +261,26 @@ fn run_export(s: &mut Session, p: &Value, quick: bool) -> Result<Value> {
     let cmd = if quick { "export.quick" } else { "file.exportMedia" };
     checked_keys(
         p,
-        &["path", "format", "sequence", "range", "startTime", "endTime", "startSeconds", "endSeconds", "startFrame", "endFrame", "wait", "overwrite"],
+        &[
+            "path",
+            "format",
+            "sequence",
+            "range",
+            "startTime",
+            "endTime",
+            "startSeconds",
+            "endSeconds",
+            "startFrame",
+            "endFrame",
+            "wait",
+            "overwrite",
+            "includeGuides",
+        ],
         cmd,
     )?;
     let wait = bool_param(p, "wait", cmd)?;
     let overwrite = bool_param(p, "overwrite", cmd)?;
+    let include_guides = bool_param(p, "includeGuides", cmd)?;
     let seq = sequence_param(s, p, cmd)?;
     let format = match p.get("format") {
         None => Format::H264,
@@ -297,6 +312,7 @@ fn run_export(s: &mut Session, p: &Value, quick: bool) -> Result<Value> {
         path: output.staged_path().to_string_lossy().into_owned(),
         range: Some(range),
         gpu_rendering: waltcut_export::GpuRendering::Auto,
+        include_guides,
         ..Default::default()
     };
     let id = s.jobs.iter().map(|j| j.id).max().unwrap_or(0).checked_add(1).ok_or_else(|| bad(cmd, "job id space exhausted"))?;

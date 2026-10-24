@@ -35,6 +35,14 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
   and with it the real picture size; a file that merely comes back at its old path does not
   change it. `null` anywhere else is a damaged file.
 
+### Additive clip fields
+
+A clip field that is written only when it is set, and that a project without it never contains,
+is added without a schema bump: files that do not use it are unchanged for every build. Today
+that is a clip's `guide: true` (a reference clip left out of delivery renders, see
+[animation.md](animation.md#guide-clips)). A build that does not know the field refuses a file
+that has it, with the unknown-field error below, rather than dropping it on the next save.
+
 ### One schema, no migrations
 
 The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 16, the

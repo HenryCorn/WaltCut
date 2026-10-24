@@ -585,8 +585,13 @@ pub fn frame_export_target(s: &Session, p: &Value) -> Result<FrameExportTarget> 
 
 /// Export the captured Source or Program frame as a full-resolution SDR still.
 fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
-    crate::export_tools::checked_keys(p, &["target", "item", "sequence", "time", "path", "format", "depth", "import", "overwrite"], "file.exportFrame")?;
+    crate::export_tools::checked_keys(
+        p,
+        &["target", "item", "sequence", "time", "path", "format", "depth", "import", "overwrite", "includeGuides"],
+        "file.exportFrame",
+    )?;
     let overwrite = crate::export_tools::bool_param(p, "overwrite", "file.exportFrame")?;
+    let include_guides = crate::export_tools::bool_param(p, "includeGuides", "file.exportFrame")?;
     let target = frame_export_target(s, p)?;
     let fmt = match p.get("format") {
         None => "png".to_string(),
@@ -638,7 +643,7 @@ fn export_frame(s: &mut Session, p: &Value) -> Result<Value> {
     let img = if target.source {
         waltcut_render::render_item(&s.project, target.item, target.time, 1.0, &provider)
     } else {
-        let opts = waltcut_render::RenderOptions { scale: 1.0, ..Default::default() };
+        let opts = waltcut_render::RenderOptions { scale: 1.0, guides: include_guides, ..Default::default() };
         Some(waltcut_render::render_sequence(&s.project, target.item, target.time, opts, &provider))
     };
     if waltcut_media::pending::take() {
@@ -810,7 +815,7 @@ pub fn commands() -> Vec<CommandSpec> {
             "file.exportFrame",
             "Export Frame",
             None,
-            r#"{"path":str?,"format":"png|jpeg"?,"depth":8|16?,"import":bool?,"overwrite":bool=false,"target":"source|program"?,"item":id?,"sequence":id?,"time":ticks?}"#,
+            r#"{"path":str?,"format":"png|jpeg"?,"depth":8|16?,"import":bool?,"overwrite":bool=false,"includeGuides":bool=false,"target":"source|program"?,"item":id?,"sequence":id?,"time":ticks?}"#,
             always,
             export_frame,
         ),

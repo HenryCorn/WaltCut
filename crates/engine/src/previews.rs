@@ -662,6 +662,8 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
                 part_of_batch: true,
                 // previews stand in for the monitor picture: display-referred SDR
                 sdr: true,
+                // a preview file stands in for the monitor, which shows guides
+                include_guides: true,
                 ..Default::default()
             };
             match waltcut_export::export(&project, seq, &settings, &provider, &prog) {

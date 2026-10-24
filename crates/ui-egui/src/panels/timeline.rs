@@ -875,6 +875,16 @@ fn draw_clip(
             if it.enabled { Color32::from_rgb(0xd9, 0xd9, 0xd9) } else { t.text_faint },
         );
     }
+    // guide badge: shown in the preview, left out of exports (not the same as disabled or locked)
+    if it.guide && w > 60.0 {
+        clip_p.text(
+            pos2(body.max.x - if it.has_modified_intrinsics() { 24.0 } else { 6.0 }, body.min.y + 8.5),
+            Align2::RIGHT_CENTER,
+            "guide",
+            egui::FontId::new(10.5, egui::FontFamily::Name("semibold".into())),
+            Color32::from_rgb(0xf2, 0xc9, 0x4c),
+        );
+    }
     // fx badge right-aligned in the header (italic-ish "fx")
     if it.has_modified_intrinsics() && w > 40.0 {
         clip_p.text(
