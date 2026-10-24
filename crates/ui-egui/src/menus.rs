@@ -44,6 +44,12 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
     uic!("drawing.onionSkin", "Onion Skin Settings", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.pinPose", "Pin Pose for Onion Skin", ["Graphics and Titles", "Drawing"], None),
+    uic!("view.canvasRotateRight", "Rotate Canvas Right", ["View", "Drawing View"], Some("Alt+.")),
+    uic!("view.canvasRotateLeft", "Rotate Canvas Left", ["View", "Drawing View"], Some("Alt+,")),
+    uic!("view.canvasRotate", "Set Canvas Rotation", ["View", "Drawing View"], None),
+    uic!("view.canvasMirror", "Mirror Canvas", ["View", "Drawing View"], Some("Alt+M")),
+    uic!("view.canvasPan", "Pan While Held", ["View", "Drawing View"], Some("Alt+H")),
+    uic!("view.canvasReset", "Reset Canvas View", ["View", "Drawing View"], Some("Alt+0")),
     uic!("drawing.retimeOnOnes", "Retime Cels on Ones", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnTwos", "Retime Cels on Twos", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnThrees", "Retime Cels on Threes", ["Graphics and Titles", "Drawing"], None),
@@ -271,6 +277,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         return r;
     }
     if let Some(r) = crate::panels::media_dialogs::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
+    }
+    if let Some(r) = crate::panels::canvas_view::route(app, id, &params) {
         if let Err(e) = &r {
             app.ui.status = e.clone();
         }
@@ -655,7 +667,12 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
     for it in &mut v {
         it.label = crate::i18n::t(&it.label).to_string();
         if it.id.starts_with("view.") {
-            it.checked = crate::panels::monitor_view::checked(app, &it.id).or(crate::panels::menu_dialogs::checked(app, &it.id));
+            it.checked = crate::panels::canvas_view::checked(app, &it.id)
+                .or(crate::panels::monitor_view::checked(app, &it.id))
+                .or(crate::panels::menu_dialogs::checked(app, &it.id));
+            if let Some(doc) = crate::panels::canvas_view::params_doc(&it.id) {
+                it.params = Some(doc.to_string());
+            }
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
         }
         if let Some(doc) = crate::panels::drawing_review::params_doc(&it.id) {

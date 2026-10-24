@@ -2,6 +2,7 @@
 //! effects) is carried in egui temp data so the timeline/monitors can accept drops.
 
 pub mod ai;
+pub mod canvas_view;
 pub mod clip_dialogs;
 pub mod color_dialogs;
 pub mod dialogs;

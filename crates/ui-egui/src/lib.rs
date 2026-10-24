@@ -1373,6 +1373,7 @@ impl WaltCutApp {
 
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
         panels::drawing::release_stale_erase(self, ctx);
+        panels::canvas_view::release_stale_pan(self, ctx);
         panels::drawing_review::release_stale_review(self, ctx);
         let workspaces = (dock::names(&self.workspaces), self.ui.workspace.clone());
         if self.bindings_rev != self.session.shortcuts.revision || workspaces != self.menu_workspaces {
@@ -1479,7 +1480,7 @@ impl WaltCutApp {
                     || id.starts_with("markers.goToSplit"))
             {
                 json!({"target": "source"})
-            } else if matches!(id.as_str(), "drawing.eraseTemporarily" | "drawing.reviewPrevious" | "drawing.reviewNext") {
+            } else if matches!(id.as_str(), "drawing.eraseTemporarily" | "drawing.reviewPrevious" | "drawing.reviewNext" | "view.canvasPan") {
                 // a key press: the hold lasts as long as the key is down
                 json!({"key": true})
             } else {

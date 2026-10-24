@@ -14,6 +14,7 @@ use waltcut_geom::{Affine, Vec2};
 use waltcut_project::drawing::{Brush, Drawing, GhostRole, MAX_ONION_CELS, Stroke};
 use waltcut_project::{ClipId, TrackItem};
 
+use super::canvas_view::{CanvasView, PanHold};
 use super::drawing_input::{FrameInput, PenPhase, PenSample, PenStats, Sample, Source, StrokeBuilder, frame_samples};
 use super::drawing_raster::{SharedSlot, paint_onion, paint_stroke_preview};
 use crate::WaltCutApp;
@@ -420,7 +421,9 @@ struct Mapping {
 }
 
 impl Mapping {
-    fn new(app: &WaltCutApp, item: &TrackItem, pic: Rect, frame: (u32, u32)) -> Option<Mapping> {
+    /// `pic` is the picture's layout rectangle; `turn` is how the monitor shows it (#63), so a
+    /// screen point maps back through the view, then the zoom, then the clip's Motion.
+    fn new(app: &WaltCutApp, item: &TrackItem, pic: Rect, frame: (u32, u32), turn: &CanvasView) -> Option<Mapping> {
         let seq = app.session.active_sequence()?;
         let src = app.session.project.source_size(item.item)?;
         let par = app.session.project.source_par(item.item);
@@ -428,7 +431,8 @@ impl Mapping {
         let motion = waltcut_render::motion_matrix(seq, item, src, par, mt);
         let (sx, sy) = (pic.width() as f64 / frame.0.max(1) as f64, pic.height() as f64 / frame.1.max(1) as f64);
         // canvas → sequence frame (Motion) → picture → screen; `then_apply` applies its argument first
-        let to_screen = Affine::translate(pic.min.x as f64, pic.min.y as f64).then_apply(&Affine::scale(sx, sy)).then_apply(&motion);
+        let layout = Affine::translate(pic.min.x as f64, pic.min.y as f64).then_apply(&Affine::scale(sx, sy)).then_apply(&motion);
+        let to_screen = turn.affine(pic.center()).then_apply(&layout);
         let from_screen = to_screen.inverse()?;
         let scale = to_screen.determinant().abs().sqrt() as f32;
         (scale.is_finite() && scale > 0.0).then_some(Mapping { to_screen, from_screen, scale })
@@ -683,13 +687,18 @@ fn paint_ghosts(app: &WaltCutApp, ui: &mut egui::Ui, painter: &egui::Painter, cl
 }
 
 /// Draw the overlay and handle the Brush tool on the Program monitor picture `pic`.
-pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
+pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect, frame: (u32, u32)) {
+    let turn = app.ui.program.canvas;
+    // what the pen sees: the rectangle that bounds the (possibly turned) picture
+    let pic = turn.bounds(layout_pic);
+    let panning = turn.pan_held != PanHold::Off;
     let tgt = target(app);
-    let bar = options_bar(app, ui, pic, tgt.is_some());
+    // the options bar sits where it does on an upright picture: a turned one is narrow
+    let bar = options_bar(app, ui, layout_pic, tgt.is_some());
     let Some((clip, item, d)) = tgt else {
         return;
     };
-    let Some(map) = Mapping::new(app, &item, pic, frame) else { return };
+    let Some(map) = Mapping::new(app, &item, layout_pic, frame, &turn) else { return };
     let painter = ui.painter().with_clip_rect(pic);
     let f = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
     let f = d.frame_at(f);
@@ -697,9 +706,13 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
         paint_ghosts(app, ui, &painter, clip.0, &d, f, &map.to_screen, pic);
     }
     let id = egui::Id::new("brush-overlay");
-    let resp = ui.interact(pic, id, Sense::click_and_drag());
+    // while the pan is held the drag belongs to the pan, not to a stroke
+    let resp = ui.interact(pic, id, if panning { Sense::hover() } else { Sense::click_and_drag() });
     app.auto.add("program.brush", pic, "brush canvas");
-    if resp.hovered() {
+    if panning {
+        let grabbing = ui.input(|i| i.pointer.primary_down());
+        ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+    } else if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
         // brush outline under the pointer
         if let Some(p) = resp.hover_pos() {
@@ -713,13 +726,16 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
     // the pen's lower barrel button reaches the app as the secondary button: it erases
     let secondary = ui.input(|i| i.pointer.button_down(egui::PointerButton::Secondary));
     let middle = ui.input(|i| i.pointer.middle_down());
-    let begin_wanted = resp.drag_started_by(egui::PointerButton::Primary)
-        || resp.drag_started_by(egui::PointerButton::Secondary)
-        || resp.clicked_by(egui::PointerButton::Primary)
-        || resp.clicked_by(egui::PointerButton::Secondary)
-        || (resp.is_pointer_button_down_on() && live.is_none() && !middle);
+    let begin_wanted = !panning
+        && (resp.drag_started_by(egui::PointerButton::Primary)
+            || resp.drag_started_by(egui::PointerButton::Secondary)
+            || resp.clicked_by(egui::PointerButton::Primary)
+            || resp.clicked_by(egui::PointerButton::Secondary)
+            || (resp.is_pointer_button_down_on() && live.is_none() && !middle));
     // Every pointer sample of the frame, in order, with the pressure it was made at.
     let stream = frame_input(app, ui, live.is_some());
+    // a drag that pans is not a stroke: its pen samples are dropped
+    let stream = if panning && live.is_none() { Vec::new() } else { stream };
     // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
     let cancelled =
         ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
@@ -752,7 +768,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
     if live.is_none() {
         let ended = pending.last().is_some_and(|s| s.phase == PenPhase::Up);
         let start = ui.input(|i| i.pointer.press_origin()).or_else(|| ui.input(|i| i.pointer.interact_pos()));
-        if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && pic.contains(p)) {
+        if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && layout_pic.contains(turn.unshow(layout_pic.center(), p))) {
             let mut l = Live { clip: clip.0, stroke: StrokeBuilder::default(), eraser: secondary || app.ui.brush.erase_held != EraseHold::Off };
             let mut samples = std::mem::take(&mut pending);
             if samples.first().is_none_or(|s| s.phase != PenPhase::Down) {

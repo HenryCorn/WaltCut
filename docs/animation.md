@@ -64,7 +64,29 @@ hold a pose for several frames or place a new cel on every frame.
    until `drawing.reviewEnd`, `active: false`, Escape or focus loss when sent as a command), and
    `ui.inspect` reports `review`. A tablet's express keys or pen buttons can send the same chords
    through the tablet driver, which is how a pen-driven review loop is set up.
-6. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
+6. **Drawing view.** Turn the picture to draw at a comfortable angle (**View ▸ Drawing View**,
+   Brush tool or not). It changes only how the Program monitor *shows* the picture: nothing is
+   added to the project, there is no undo step, clip Motion and artwork are untouched, and no
+   export changes. A stroke lands where the pen is: the pointer is mapped back through the view,
+   the monitor zoom and the clip's Motion. The view is not saved and WaltCut always starts
+   unturned.
+   - `view.canvasRotateRight` / `view.canvasRotateLeft` (`Alt+.` / `Alt+,`, `{degrees?}`, 15° by
+     default) and `view.canvasRotate {degrees}` turn it clockwise-positive, wrapped into
+     (-180, 180]; `view.canvasMirror` (`Alt+M`, `{enabled?}`) flips it left to right before
+     the rotation; `view.canvasReset` (`Alt+0`) returns to the default: 0°, not mirrored, Fit,
+     centred. A turned picture is fitted so all of it stays visible.
+   - **Pan While Held** (`Alt+H`, `view.canvasPan {active?}`) pans a magnified picture with a
+     pen or mouse drag and never draws: held with the key, it lasts as long as the key is down;
+     as a command, until `{active: false}`. It also ends on Escape, when the window loses focus
+     and when another tool is chosen. (The Hand tool and a middle-button drag still pan.)
+   - **Modifier ownership.** `Alt` + a letter is a held drawing aid (`Alt+E` erase, `Alt+H`
+     pan), `Cmd+Alt` + an arrow is pose review. A reference placed under the drawing is moved
+     with its own controls, not with a plain drag on the picture, so it cannot compete with pan.
+   - While the picture is turned or mirrored, safe margins, rulers, guides, the Graphics and
+     Transform handles and the eyedropper are not drawn, because they assume an upright picture;
+     reset the view to use them. `ui.inspect` reports `ui.program.canvas` (`rotation`,
+     `mirror`, `panHeld`).
+7. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
@@ -173,7 +195,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.onionSkin`, `drawing.pinPose` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

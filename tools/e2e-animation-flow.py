@@ -164,6 +164,28 @@ check([(g["role"], g["frame"]) for g in ghosts] == [("loop", 0), ("pin", 8)], f"
 shot("07b-onion-skin-pin-and-loop")
 cmd("drawing.onionSkin", {"before": 1, "after": 1, "opacity": 0.35, "falloff": 0.6, "pin": None, "loop": False})
 
+print("== drawing view: rotate, mirror, draw, pan hold, reset")
+cmd("playhead.set", {"frame": 0})
+strokes_before = cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"]
+strokes_before = cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"]
+cmd("view.canvasRotate", {"degrees": 90})
+cmd("view.canvasMirror", {"enabled": True})
+canvas = call("ui.inspect")["result"]["ui"]["program"]["canvas"]
+check(canvas["rotation"] == 90 and canvas["mirror"] is True, "the view is turned 90° and mirrored")
+rect = [e for e in call("ui.elements", {"prefix": "program.brush"})["result"] if e["id"] == "program.brush"][0]["rect"]
+x, y, w, h = rect
+call("ui.drag", {"from": {"x": x + w * 0.4, "y": y + h * 0.82}, "to": {"x": x + w * 0.6, "y": y + h * 0.92}, "steps": 8})
+time.sleep(0.5)
+strokes_after = cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"]
+check(strokes_after == strokes_before + 1, f"a stroke drawn through the turned view is added")
+shot("08a-drawing-view-turned")
+cmd("view.canvasPan", {"active": True})
+check(call("ui.inspect")["result"]["ui"]["program"]["canvas"]["panHeld"] == "Command", "the pan hold is on")
+cmd("view.canvasPan", {"active": False})
+cmd("view.canvasReset", {})
+canvas = call("ui.inspect")["result"]["ui"]["program"]["canvas"]
+check(canvas["rotation"] == 0 and canvas["mirror"] is False and canvas["panHeld"] == "Off", "reset returns to 0°, not mirrored")
+
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})
 call("ui.playback", {"action": "play"})
