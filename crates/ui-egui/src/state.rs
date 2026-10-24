@@ -319,6 +319,10 @@ pub struct MonitorView {
     /// Snap in Program Monitor: graphic drags snap to guides, the frame edges and centre.
     pub snap: bool,
     pub guides: Vec<Guide>,
+    /// How the Program monitor's picture is turned for drawing (#63). A view setting only; never
+    /// loaded back, so the app starts unturned.
+    #[serde(skip_deserializing)]
+    pub canvas: crate::panels::canvas_view::CanvasView,
 }
 
 impl Default for MonitorView {
@@ -340,6 +344,7 @@ impl Default for MonitorView {
             lock_guides: false,
             snap: true,
             guides: Vec::new(),
+            canvas: Default::default(),
         }
     }
 }

@@ -141,7 +141,7 @@ pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
     let saved_clip = ui.clip_rect();
     ui.set_clip_rect(saved_clip.intersect(if mv.zoom.is_some() { video_area } else { picture_area.expand(12.0) }));
     if show_picture {
-        ui.painter().rect_filled(pic, 0.0, t.monitor_bg);
+        crate::panels::canvas_view::fill_picture(ui.painter(), pic, &mv.canvas, t.monitor_bg);
         let playing = if which == Which::Program { app.playback.playing } else { app.source_playback.clock.playing };
         let res = mv.effective_res(playing);
         // frame pixels per screen pixel along the axis that needs the most of them
@@ -205,9 +205,9 @@ pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
             }
         }
         if let Some(tex) = shown {
-            ui.painter().image(tex, pic, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            crate::panels::canvas_view::paint_picture(ui.painter(), tex, pic, &mv.canvas);
         }
-        if mv.safe_margins {
+        if mv.safe_margins && mv.canvas.is_upright() {
             for (f, c) in [(0.9, Color32::from_white_alpha(120)), (0.8, Color32::from_white_alpha(90))] {
                 let r = Rect::from_center_size(pic.center(), pic.size() * f);
                 ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, c), StrokeKind::Middle);
@@ -240,28 +240,33 @@ pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
         crate::panels::graphics::deselect_on_monitor(app, ui);
     }
     // Click/drag in the picture: the Hand tool pans a magnified picture, otherwise focus.
-    let pic_resp = ui.interact(pic, egui::Id::new((prefix, "pic")), if show_picture { Sense::click_and_drag() } else { Sense::hover() });
-    app.auto.add(&format!("{prefix}.picture"), pic.intersect(video_area), "picture");
+    // a turned picture is hit-tested by the rectangle that bounds it
+    let upright = mv.canvas.is_upright();
+    let hit = mv.canvas.bounds(pic);
+    let pic_resp = ui.interact(hit, egui::Id::new((prefix, "pic")), if show_picture { Sense::click_and_drag() } else { Sense::hover() });
+    app.auto.add(&format!("{prefix}.picture"), hit.intersect(video_area), "picture");
     if show_picture {
         monitor_view::zoom_pan_input(app, ui, which, video_area, pic, display_w, ppp);
     }
     if which == Which::Program && show_picture {
         // an armed eyedropper owns clicks on the picture: the overlays would sit on top and take
         // them (the selected clip's transform handles cover it, #1023)
-        if app.ui.eyedropper.is_some() {
+        if app.ui.eyedropper.is_some() && upright {
             eyedropper(app, ui, &pic_resp, pic, target, rate, time);
         } else if app.ui.tool == crate::state::Tool::Brush {
             crate::panels::drawing::monitor_overlay(app, ui, pic, frame_size);
-        } else {
+        } else if upright {
             crate::panels::graphics::monitor_overlay(app, ui, pic, frame_size);
             crate::panels::transform_handles::monitor_overlay(app, ui, pic, frame_size);
         }
     }
-    if show_picture {
+    if show_picture && upright {
         monitor_view::guides(app, ui, which, video_area, pic, frame_size);
     }
     ui.set_clip_rect(saved_clip);
-    if let Some((top, left)) = ruler_rects {
+    if let Some((top, left)) = ruler_rects
+        && upright
+    {
         monitor_view::rulers(app, ui, which, top, left, video_area, pic, frame_size);
     }
     if which == Which::Source && show_picture && pic_resp.drag_started() && app.ui.tool != crate::state::Tool::Hand {

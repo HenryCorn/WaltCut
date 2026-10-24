@@ -318,7 +318,7 @@ pub fn channel_view(img: &Rgba, mode: DisplayMode) -> Rgba {
 /// The on-screen picture rect: fitted, or magnified about the area centre plus the (clamped) pan.
 pub fn picture_rect(area: Rect, fw: f32, fh: f32, v: &MonitorView, ppp: f32) -> Rect {
     match v.zoom {
-        None => crate::panels::monitor::fit(area, fw, fh),
+        None => v.canvas.fitted(crate::panels::monitor::fit(area, fw, fh), area),
         Some(z) => {
             let size = vec2(fw * z / ppp.max(0.1), fh * z / ppp.max(0.1));
             let max = ((size - area.size()) / 2.0).max(Vec2::ZERO);
@@ -332,6 +332,7 @@ pub fn picture_rect(area: Rect, fw: f32, fh: f32, v: &MonitorView, ppp: f32) -> 
 /// from Fit too, between the zoom menu's 10% and 1600%; a middle-button drag, or a drag with the
 /// Hand tool, pans a magnified picture. `fw` is the picture's width in frame pixels.
 pub fn zoom_pan_input(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, fw: f32, ppp: f32) {
+    // only the Program monitor is turned: the Source monitor's own view is always upright
     let ctx = ui.ctx().clone();
     if ui.rect_contains_pointer(area)
         && let Some(p) = ctx.pointer_hover_pos()
@@ -346,7 +347,7 @@ pub fn zoom_pan_input(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: R
             let k = z / cur;
             // the point of the picture under the pointer stays under it
             let centre = p - (p - pic.center()) * k;
-            let max = ((pic.size() * k - area.size()) / 2.0).max(Vec2::ZERO);
+            let max = ((view(app, w).canvas.bounds(pic).size() * k - area.size()) / 2.0).max(Vec2::ZERO);
             let v = view_mut(app, w);
             v.zoom = Some(z);
             v.pan = [(centre.x - area.center().x).clamp(-max.x, max.x), (centre.y - area.center().y).clamp(-max.y, max.y)];
@@ -366,7 +367,8 @@ pub fn zoom_pan_input(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: R
         ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
         d += moved;
     }
-    if app.ui.tool == Tool::Hand {
+    let pan_hold = w == Which::Program && app.ui.program.canvas.pan_held != crate::panels::canvas_view::PanHold::Off;
+    if app.ui.tool == Tool::Hand || pan_hold {
         let resp = ui.interact(area, egui::Id::new((prefix(w), "pan")), Sense::drag());
         if resp.hovered() || resp.dragged() {
             ui.ctx().set_cursor_icon(if resp.dragged() { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
@@ -374,7 +376,7 @@ pub fn zoom_pan_input(app: &mut WaltCutApp, ui: &mut egui::Ui, w: Which, area: R
         d += resp.drag_delta();
     }
     if d != Vec2::ZERO {
-        let max = ((pic.size() - area.size()) / 2.0).max(Vec2::ZERO);
+        let max = ((view(app, w).canvas.bounds(pic).size() - area.size()) / 2.0).max(Vec2::ZERO);
         let v = view_mut(app, w);
         v.pan = [(v.pan[0] + d.x).clamp(-max.x, max.x), (v.pan[1] + d.y).clamp(-max.y, max.y)];
     }
