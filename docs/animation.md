@@ -17,6 +17,16 @@ hold a pose for several frames or place a new cel on every frame.
    the next cel start. The Timeline shows these exposures in the drawing clip; drag a start marker
    to retime its pose, or drag an exposure end to adjust the hold. Empty cels are explicit blank
    poses; clearing a cel keeps its start, while deleting it lets an earlier pose hold again.
+   Click an exposure (Shift-click to extend) to pick it, then right-click it, or choose **Graphics and
+   Titles ▸ Drawing ▸ Retime Cels on Ones / Twos / Threes**. In the right-click menu, hovering a choice
+   marks in the lane where the cels would land (white marks; the grey line is where a cel stands now)
+   and clicking applies it; Escape or clicking away changes nothing: the picked run of cels is re-spaced one, two or
+   three frames apart from its first cel, every cel keeping its drawing. The last picked cel keeps
+   its own hold and the cels after it move with it, so the rest of the animation keeps its timing;
+   one undo step restores everything. With nothing picked the whole drawing is retimed. The
+   command is `drawing.retimeExposures {frames, on|spacing, ripple?, dryRun?}` (`dryRun` returns the
+   resulting cel starts without editing); a refusal (cels that do not
+   follow each other, a pose that would land past the clip's end) changes nothing.
 4. Enable **Onion skin** to show the neighbouring cels: the previous cel in red and the next in
    green.
 5. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
@@ -128,7 +138,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

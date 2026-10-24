@@ -42,6 +42,9 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.brushSizeUp", "Increase Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+]")),
     uic!("drawing.brushSizeDown", "Decrease Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+[")),
     uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
+    uic!("drawing.retimeOnOnes", "Retime Cels on Ones", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.retimeOnTwos", "Retime Cels on Twos", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.retimeOnThrees", "Retime Cels on Threes", ["Graphics and Titles", "Drawing"], None),
     uic!("view.zoomIn", "Zoom In", ["View"], Some("=")),
     uic!("view.zoomOut", "Zoom Out", ["View"], Some("-")),
     uic!("view.zoomToSequence", "Zoom to Sequence", ["View"], Some("\\")),
@@ -158,6 +161,26 @@ pub fn targets_source(app: &WaltCutApp, params: &Value) -> bool {
 
 /// Execute a UI or engine command by id.
 pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
+    // #60: Retime on Ones/Twos/Threes are the engine's `drawing.retimeExposures` on the picked cels
+    let on = match id {
+        "drawing.retimeOnOnes" => Some("ones"),
+        "drawing.retimeOnTwos" => Some("twos"),
+        "drawing.retimeOnThrees" => Some("threes"),
+        _ => None,
+    };
+    if on.is_some() || id == "drawing.retimeExposures" {
+        let object = params.as_object_mut().ok_or("command parameters must be an object")?;
+        if let Some(on) = on {
+            object.insert("on".into(), json!(on));
+        }
+        crate::panels::timeline::fill_cel_selection(app, &mut params);
+        let result = app.session.execute("drawing.retimeExposures", params).map_err(|e| e.to_string());
+        match &result {
+            Ok(r) => crate::panels::timeline::follow_retime(app, r),
+            Err(e) => app.ui.status = e.clone(),
+        }
+        return result;
+    }
     if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
     }

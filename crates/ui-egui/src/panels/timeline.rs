@@ -40,6 +40,11 @@ pub type PeakKey = (ItemId, usize);
 #[derive(Default)]
 pub struct TlState {
     pub drag: Option<Drag>,
+    /// The drawing cels picked in the exposure lane (#60): the clip and the start frames.
+    pub cel_sel: Option<(ClipId, Vec<i64>)>,
+    /// Where the cel menu's hovered choice would put the cels (#60): the clip and every cel start
+    /// after it. Drawn as ghost marks in the exposure lane; nothing is edited until it is chosen.
+    pub retime_preview: Option<(ClipId, Vec<i64>)>,
     /// What the primary button went down on in the Timeline (#259); see [`Pressed`].
     pub pressed: Option<Pressed>,
     /// A drag or press aborted with Escape; ignores release until the button comes up (#580).
@@ -512,6 +517,7 @@ pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
             draw_clip(app, &ctx, &p, body, it, r.kind, selection.contains(&it.id), &t, rate);
             if r.kind == TrackKind::Video {
                 draw_drawing_exposures(app, &p, body, it, &layout, &t);
+                draw_retime_ghosts(app, &p, body, it, &layout);
             }
             if volume_line {
                 super::timeline_volume::paint(&p, body, it);
@@ -935,6 +941,22 @@ fn drawing_exposure_xs(
     }
 }
 
+/// Ghost marks for the cel starts a previewed retime would add (those not already a cel start).
+fn draw_retime_ghosts(app: &WaltCutApp, p: &egui::Painter, body: Rect, it: &TrackItem, layout: &Layout) {
+    let Some((clip, planned)) = &app.tl.retime_preview else { return };
+    let Some(drawing) = app.session.project.item(it.item).and_then(|item| item.as_drawing()) else { return };
+    if *clip != it.id || body.height() < 24.0 || it.duration <= Tick::ZERO {
+        return;
+    }
+    let lane = Rect::from_min_max(pos2(body.min.x, body.max.y - 14.0), body.max);
+    for frame in planned {
+        if drawing.cel_on(*frame).is_none() {
+            let x = drawing_frame_x(layout, body, it, drawing, *frame);
+            p.line_segment([pos2(x, lane.min.y - 2.0), pos2(x, lane.max.y)], Stroke::new(2.0, Color32::WHITE));
+        }
+    }
+}
+
 fn draw_drawing_exposures(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, it: &TrackItem, layout: &Layout, t: &Tokens) {
     let Some(drawing) = app.session.project.item(it.item).and_then(|item| item.as_drawing()) else { return };
     if drawing.cels.is_empty() || body.height() < 24.0 || body.width() < 8.0 || it.duration <= Tick::ZERO {
@@ -977,7 +999,19 @@ fn draw_drawing_exposures(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, i
         }
         let color = if cel.strokes.is_empty() { Color32::from_gray(58) } else { t.accent.gamma_multiply(0.6) };
         p.rect_filled(exposure, 1.0, color);
-        p.rect_stroke(exposure, 1.0, Stroke::new(1.0, if cel.strokes.is_empty() { t.text_dim } else { t.accent }), StrokeKind::Inside);
+        let picked = app.tl.cel_sel.as_ref().is_some_and(|(c, frames)| *c == it.id && frames.contains(&cel.frame));
+        if picked {
+            p.rect_stroke(exposure, 1.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Inside);
+        } else {
+            p.rect_stroke(exposure, 1.0, Stroke::new(1.0, if cel.strokes.is_empty() { t.text_dim } else { t.accent }), StrokeKind::Inside);
+        }
+        if let Some((clip, planned)) = &app.tl.retime_preview
+            && *clip == it.id
+            && !planned.contains(&cel.frame)
+        {
+            // this cel start would move: mark where it stands now
+            p.line_segment([pos2(bar_start_x, lane.min.y), pos2(bar_start_x, lane.max.y)], Stroke::new(1.0, t.text_dim));
+        }
         let next_frame = drawing.cels.get(i + 1).map(|next| next.frame);
         let label = match next_frame {
             Some(end) if cel.strokes.is_empty() => format!("Blank exposure: frames {} to {}", cel.frame, end),
@@ -1051,6 +1085,80 @@ fn drawing_cel_grab(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2
         }
     }
     None
+}
+
+/// The cel whose exposure is under `pos` in the drawing clip's lane, if any.
+fn cel_under(app: &WaltCutApp, seq: &Sequence, layout: &Layout, clip: ClipId, pos: Pos2) -> Option<i64> {
+    let row = layout.row_at(pos.y)?;
+    let it = seq.track(row.track)?.items.iter().find(|it| it.id == clip && it.duration > Tick::ZERO)?;
+    let x0 = layout.x_of(it.start);
+    let x1 = layout.x_of(it.end());
+    let body = Rect::from_min_max(pos2(x0, row.rect.min.y + 1.0), pos2(x1.max(x0 + 1.0), row.rect.max.y - 1.0));
+    let drawing = app.session.project.item(it.item)?.as_drawing()?;
+    let lane = Rect::from_min_max(pos2(body.min.x, body.max.y - 14.0), body.max);
+    if body.height() < 24.0 || body.width() < 8.0 || !lane.contains(pos) {
+        return None;
+    }
+    let first = drawing.frame_at(it.source_time_at(it.start));
+    let last = drawing.frame_at(it.source_time_at(it.end() - Tick(1)));
+    let (min_frame, max_frame) = (first.min(last), first.max(last));
+    drawing.cels.iter().enumerate().find_map(|(i, cel)| {
+        if cel.frame < min_frame || cel.frame > max_frame {
+            return None;
+        }
+        let (start_x, end_x, ..) = drawing_exposure_xs(layout, body, it, drawing, &drawing.cels, i, first, last)?;
+        (pos.x >= start_x.min(end_x) && pos.x <= start_x.max(end_x)).then_some(cel.frame)
+    })
+}
+
+/// Click an exposure to pick its cel; Shift extends the pick to the cels in between. A click
+/// anywhere else on the clip drops the pick.
+fn pick_cel(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, clip: ClipId, pos: Pos2, extend: bool) {
+    let Some(frame) = cel_under(app, seq, layout, clip, pos) else {
+        app.tl.cel_sel = None;
+        return;
+    };
+    let Some(drawing) = seq.find_item(clip).and_then(|(_, it)| app.session.project.item(it.item)).and_then(|i| i.as_drawing()) else { return };
+    let anchor = match &app.tl.cel_sel {
+        Some((c, frames)) if extend && *c == clip => frames.first().copied(),
+        _ => None,
+    };
+    let (a, b) = (anchor.unwrap_or(frame).min(frame), anchor.unwrap_or(frame).max(frame));
+    app.tl.cel_sel = Some((clip, drawing.cels.iter().map(|c| c.frame).filter(|f| (a..=b).contains(f)).collect()));
+}
+
+/// The `frames` (and `clip`) of a Retime command that names none: the picked cels, else every cel
+/// of the drawing it acts on.
+pub fn fill_cel_selection(app: &WaltCutApp, params: &mut Value) {
+    if params.get("frames").is_some() {
+        return;
+    }
+    let Some(object) = params.as_object_mut() else { return };
+    let picked = app.tl.cel_sel.as_ref().filter(|(c, _)| object.get("clip").and_then(Value::as_u64).is_none_or(|n| n == c.0));
+    let Some(seq) = app.session.active_sequence() else { return };
+    let clip = match picked {
+        Some((c, _)) => Some(*c),
+        None => waltcut_engine::drawing::target_clip(&app.session, &Value::Object(object.clone())),
+    };
+    let Some(drawing) = clip.and_then(|c| seq.find_item(c)).and_then(|(_, it)| app.session.project.item(it.item)).and_then(|i| i.as_drawing()) else { return };
+    let frames: Vec<i64> = match picked {
+        Some((_, frames)) => frames.iter().copied().filter(|f| drawing.cel_on(*f).is_some()).collect(),
+        None => drawing.cels.iter().map(|c| c.frame).collect(),
+    };
+    if let Some(c) = clip {
+        object.entry("clip").or_insert(json!(c.0));
+    }
+    object.insert("frames".into(), json!(frames));
+}
+
+/// After a retime, pick the cels where the run now stands.
+pub fn follow_retime(app: &mut WaltCutApp, result: &Value) {
+    let (Some((_, frames)), Some(spacing)) = (app.tl.cel_sel.as_mut(), result.get("spacing").and_then(Value::as_i64)) else { return };
+    if let Some(anchor) = frames.first().copied() {
+        for (k, f) in frames.iter_mut().enumerate() {
+            *f = anchor + k as i64 * spacing;
+        }
+    }
 }
 
 fn timeline_grab_at(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2, tool: Tool, mods: egui::Modifiers, roll_ripple: bool) -> Grab {
@@ -2112,6 +2220,35 @@ fn edit_point_menu(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, targ
     }
 }
 
+/// The menu of a right-clicked exposure (automation ids `timeline.celMenu.<ones|twos|threes>`):
+/// retime the picked cels. Hovering a choice previews it in the lane; only a click edits.
+fn cel_menu(app: &mut WaltCutApp, ctx: &egui::Context, ui: &mut egui::Ui) {
+    for (key, label, command) in [
+        ("ones", tl!("Retime on Ones"), "drawing.retimeOnOnes"),
+        ("twos", tl!("Retime on Twos"), "drawing.retimeOnTwos"),
+        ("threes", tl!("Retime on Threes"), "drawing.retimeOnThrees"),
+    ] {
+        let r = ui.button(label);
+        app.auto.add(&format!("timeline.celMenu.{key}"), r.rect, label);
+        if r.hovered() {
+            let mut params = json!({"on": key, "dryRun": true});
+            fill_cel_selection(app, &mut params);
+            if let Ok(plan) = app.session.execute("drawing.retimeExposures", params)
+                && let (Some(clip), Some(cels)) = (plan["clip"].as_u64(), plan["cels"].as_array())
+            {
+                app.tl.retime_preview = Some((ClipId(clip), cels.iter().filter_map(Value::as_i64).collect()));
+            }
+            ctx.request_repaint();
+        }
+        if r.clicked() {
+            if let Err(e) = crate::menus::invoke(app, ctx, command, json!({})) {
+                app.ui.status = e;
+            }
+            ui.close();
+        }
+    }
+}
+
 /// The menu of a right-clicked gap: Ripple Delete closes it.
 fn gap_menu(app: &mut WaltCutApp, ctx: &egui::Context, ui: &mut egui::Ui) {
     let label = tl!("Ripple Delete");
@@ -2317,7 +2454,13 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
         let started = match (tool, grab) {
             (_, Grab::CelStart { clip, frame, .. }) if resp.drag_started() => Some(Drag::CelStart { clip, frame, to: frame }),
             (_, Grab::CelEnd { clip, frame, end_frame, .. }) if resp.drag_started() => Some(Drag::CelEnd { clip, frame, end_frame }),
-            (_, Grab::CelStart { .. } | Grab::CelEnd { .. }) => None,
+            (_, Grab::CelStart { clip, .. } | Grab::CelEnd { clip, .. }) => {
+                // the handles cover most of a one-frame exposure, so a click on one picks the cel too
+                if resp.clicked() {
+                    pick_cel(app, seq, layout, clip, p, mods.shift);
+                }
+                None
+            }
             // a middle-button drag pans whatever the tool and whatever it starts on, as in the
             // monitors (#824) and DaVinci Resolve (#1490); only a primary press is kept in
             // `pressed`, so the pan starts from where the button went down
@@ -2410,6 +2553,9 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
                 } else if !sel.contains(&clip) || (mods.alt && resp.clicked()) {
                     // Alt-click isolates one side; Alt-drag keeps the selected group to copy.
                     let _ = app.session.execute("timeline.select", json!({"clips": [clip.0], "linked": !mods.alt}));
+                }
+                if resp.clicked() {
+                    pick_cel(app, seq, layout, clip, p, mods.shift);
                 }
                 if resp.drag_started() {
                     let clips = app.session.state.selection.clone();
@@ -2693,6 +2839,22 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
     let menu_clip_id = egui::Id::new("timeline.clipMenu.clip");
     // right-clicking empty time between clips selects the gap and opens its menu (#648, #668)
     let gap_menu_id = egui::Id::new("timeline.gapMenu.open");
+    // right-clicking a drawing's exposure picks its cel (unless it is already picked) and opens the cel menu (#60)
+    let cel_menu_id = egui::Id::new("timeline.celMenu.open");
+    app.tl.retime_preview = None;
+    if resp.secondary_clicked()
+        && let Some(p) = resp.interact_pointer_pos()
+    {
+        let on_cel = match hit(seq, layout, p) {
+            Hit::Clip { clip, edge: None, .. } => cel_under(app, seq, layout, clip, p).inspect(|frame| {
+                if !app.tl.cel_sel.as_ref().is_some_and(|(c, frames)| *c == clip && frames.contains(frame)) {
+                    pick_cel(app, seq, layout, clip, p, false);
+                }
+            }),
+            _ => None,
+        };
+        ctx.data_mut(|d| d.insert_temp(cel_menu_id, on_cel.is_some()));
+    }
     if resp.secondary_clicked()
         && let Some(p) = resp.interact_pointer_pos()
     {
@@ -2754,6 +2916,10 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
         }
         if ctx.data(|d| d.get_temp::<bool>(gap_menu_id)).unwrap_or(false) {
             gap_menu(app, &ctx, ui);
+            return;
+        }
+        if ctx.data(|d| d.get_temp::<bool>(cel_menu_id)).unwrap_or(false) {
+            cel_menu(app, &ctx, ui);
             return;
         }
         let sel = app.session.state.selection.clone();

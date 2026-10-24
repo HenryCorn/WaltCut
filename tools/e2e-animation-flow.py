@@ -134,6 +134,10 @@ between = cmd("drawing.tween", {"clip": drawing, "frame": 0, "step": 2})
 cmd("drawing.retimeCel", {"clip": drawing, "from": 4, "to": 5})
 cels = {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]}
 check(0 in cels and 2 in cels and 5 in cels and 8 in cels and 4 not in cels and between["cels"] == [2], f"retimed cels at frames {sorted(cels)} and an in-between at {between['cels']}")
+twos = cmd("drawing.retimeExposures", {"clip": drawing, "frames": [0, 2, 5], "on": "twos"})
+check(twos["cels"] == [0, 2, 4, 7], f"cels 0, 2 and 5 retimed on twos give starts {twos['cels']}")
+cmd("edit.undo", {})
+check(sorted(c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]) == [0, 2, 5, 8], "undo restores the cels")
 state = call("ui.inspect")["result"]["ui"]["brush"]
 check(state["onion"] is True, "onion skin is on")
 call("ui.set", {"tool": "Brush"}, quiet=True)

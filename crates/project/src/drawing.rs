@@ -19,6 +19,8 @@ pub const MAX_STROKE_POINTS: usize = 20_000;
 pub const MAX_CEL_STROKES: usize = 5_000;
 /// The most cels one drawing may hold.
 pub const MAX_CELS: usize = 20_000;
+/// The widest spacing `respace_cels` accepts, in frames.
+pub const MAX_SPACING: i64 = 96;
 /// Largest brush diameter in canvas pixels.
 pub const MAX_BRUSH_SIZE: f32 = 1_000.0;
 
@@ -186,6 +188,57 @@ impl Drawing {
     /// Exclusive end of the exposure starting at `f`, if a cel starts there.
     pub fn exposure_end(&self, f: i64, drawing_end: i64) -> Option<i64> {
         self.cel_on(f).map(|i| self.cels.get(i + 1).map_or(drawing_end, |c| c.frame))
+    }
+
+    /// Re-space the run of cels starting on the `selected` frames so each starts `spacing` frames
+    /// after the one before ("ones", "twos", "threes"), the first staying put and every cel keeping
+    /// its strokes. The cels must be consecutive in the drawing. The last one keeps its own hold:
+    /// the cels after the run move by as far as it moved when `ripple`, else the run may not reach
+    /// the next cel. Every start stays in `0..limit`. Nothing changes on an error. Returns how many
+    /// cels moved.
+    pub fn respace_cels(&mut self, selected: &[i64], spacing: i64, ripple: bool, limit: i64) -> Result<usize, String> {
+        if !(1..=MAX_SPACING).contains(&spacing) {
+            return Err(format!("spacing must be 1 to {MAX_SPACING} frames"));
+        }
+        let mut idx = selected.iter().map(|f| self.cel_on(*f).ok_or_else(|| format!("no cel starts on frame {f}"))).collect::<Result<Vec<_>, _>>()?;
+        idx.sort_unstable();
+        idx.dedup();
+        let (Some(&first), Some(&last)) = (idx.first(), idx.last()) else { return Err("select at least one cel".into()) };
+        if last - first + 1 != idx.len() {
+            return Err("the selected cels must follow each other".into());
+        }
+        let anchor = self.cels.get(first).map(|c| c.frame).ok_or("no such cel")?;
+        let old_last = self.cels.get(last).map(|c| c.frame).ok_or("no such cel")?;
+        let steps = i64::try_from(idx.len() - 1).map_err(|_| "too many cels".to_string())?;
+        let new_last = steps.checked_mul(spacing).and_then(|n| n.checked_add(anchor)).ok_or("frame out of range")?;
+        let mut frames: Vec<(usize, i64)> = Vec::with_capacity(self.cels.len().saturating_sub(first));
+        for (k, i) in idx.iter().enumerate() {
+            frames.push((*i, anchor + k as i64 * spacing));
+        }
+        if ripple {
+            let delta = new_last - old_last;
+            for i in last + 1..self.cels.len() {
+                let f = self.cels.get(i).map(|c| c.frame).ok_or("no such cel")?;
+                frames.push((i, f.checked_add(delta).ok_or("frame out of range")?));
+            }
+        } else if let Some(next) = self.cels.get(last + 1)
+            && new_last >= next.frame
+        {
+            return Err(format!("the cels would run into the one on frame {}", next.frame));
+        }
+        if frames.iter().any(|(_, f)| *f < 0 || *f >= limit) {
+            return Err(format!("every cel must start before frame {limit}"));
+        }
+        let mut moved = 0;
+        for (i, f) in frames {
+            if let Some(c) = self.cels.get_mut(i)
+                && c.frame != f
+            {
+                c.frame = f;
+                moved += 1;
+            }
+        }
+        Ok(moved)
     }
 
     /// Move the cel starting at `from` to `to`, preserving its strokes.
@@ -364,6 +417,61 @@ mod tests {
         let before = d.clone();
         for (from, to) in [(5, 8), (2, 6), (2, -1)] {
             assert!(d.retime_cel(from, to).is_err());
+            assert_eq!(d, before);
+        }
+    }
+
+    fn on_ones(frames: &[i64]) -> Drawing {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        for f in frames {
+            let i = d.ensure_cel(*f, false).unwrap();
+            d.cels[i].strokes_mut().push(line(*f as f32, 10.0, 2));
+        }
+        d
+    }
+
+    fn starts(d: &Drawing) -> Vec<i64> {
+        d.cels.iter().map(|c| c.frame).collect()
+    }
+
+    #[test]
+    fn ones_become_twos_and_threes_keeping_strokes_and_rippling_the_rest() {
+        let mut d = on_ones(&[0, 1, 2, 3, 10]);
+        assert_eq!(d.respace_cels(&[0, 1, 2, 3], 2, true, 48).unwrap(), 4);
+        // the last pose of the run keeps its 7-frame hold: the later pose moves with it
+        assert_eq!(starts(&d), vec![0, 2, 4, 6, 13]);
+        assert_eq!(d.cels[2].strokes.first().map(|s| s.points[0].x), Some(2.0));
+        d.respace_cels(&[0, 2, 4, 6], 3, true, 48).unwrap();
+        assert_eq!(starts(&d), vec![0, 3, 6, 9, 16]);
+        d.respace_cels(&[0, 3, 6, 9], 1, true, 48).unwrap();
+        assert_eq!(starts(&d), vec![0, 1, 2, 3, 10]);
+    }
+
+    #[test]
+    fn respacing_without_ripple_stops_at_the_next_cel_and_a_subrange_anchors_at_its_first() {
+        let mut d = on_ones(&[0, 1, 2, 3, 6]);
+        assert!(d.respace_cels(&[0, 1, 2, 3], 2, false, 48).is_err());
+        assert_eq!(starts(&d), vec![0, 1, 2, 3, 6]);
+        let mut d = on_ones(&[0, 1, 2, 6]);
+        assert_eq!(d.respace_cels(&[1, 2], 2, false, 48).unwrap(), 1);
+        assert_eq!(starts(&d), vec![0, 1, 3, 6]);
+    }
+
+    #[test]
+    fn respacing_refuses_bad_selections_and_overflow_without_mutation() {
+        let mut d = on_ones(&[0, 1, 2, 5]);
+        let before = d.clone();
+        for (sel, spacing, ripple, limit) in [
+            (vec![0, 2], 2, true, 48), // not consecutive
+            (vec![7], 2, true, 48),    // no such cel
+            (vec![], 2, true, 48),     // empty
+            (vec![0, 1], 0, true, 48), // no spacing
+            (vec![0, 1], MAX_SPACING + 1, true, 48),
+            (vec![0, 1, 2], 3, true, 8),      // would start past the end
+            (vec![1, 2], i64::MAX, true, 48), // overflow
+            (vec![0, 1], 2, true, 3),         // a later cel would land past the end
+        ] {
+            assert!(d.respace_cels(&sel, spacing, ripple, limit).is_err(), "{sel:?} x{spacing}");
             assert_eq!(d, before);
         }
     }

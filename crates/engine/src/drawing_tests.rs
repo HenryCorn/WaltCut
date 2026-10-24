@@ -174,6 +174,91 @@ fn retiming_rejects_collisions_locked_tracks_and_frames_outside_trimmed_source()
 }
 
 #[test]
+fn exposures_retime_on_twos_and_threes_as_one_undo_step() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    for f in [0, 1, 2, 3] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+        s.execute("drawing.addStroke", json!({"clip": clip.0, "frame": f, "stroke": line(f as f64 * 10.0)})).unwrap();
+    }
+    s.execute("drawing.newCel", json!({"clip": clip.0, "frame": 10})).unwrap();
+    let frames = |s: &mut Session| -> Vec<i64> {
+        s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"].as_array().unwrap().iter().map(|c| c["frame"].as_i64().unwrap()).collect()
+    };
+    let before = s.history.undo.len();
+    let r = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2, 3], "on": "twos"})).unwrap();
+    assert_eq!(r["moved"], 4);
+    assert_eq!(frames(&mut s), vec![0, 2, 4, 6, 13]);
+    assert_eq!(s.history.undo.len(), before + 1);
+    s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 2, 4, 6], "spacing": 3})).unwrap();
+    assert_eq!(frames(&mut s), vec![0, 3, 6, 9, 16]);
+    // the strokes went with their cels
+    let full = s.execute("drawing.inspect", json!({"clip": clip.0, "strokes": true})).unwrap();
+    assert_eq!(full["cels"][2]["strokes"][0]["points"][0]["x"], 20.0);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(frames(&mut s), vec![0, 2, 4, 6, 13]);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(frames(&mut s), vec![0, 1, 2, 3, 10]);
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(frames(&mut s), vec![0, 2, 4, 6, 13]);
+}
+
+#[test]
+fn retiming_exposures_refuses_what_does_not_fit_and_leaves_history_alone() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    for f in [0, 1, 2, 40] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+    }
+    let before = s.history.undo.len();
+    for params in [
+        json!({"clip": clip.0, "frames": [0, 2], "on": "twos"}),     // not consecutive
+        json!({"clip": clip.0, "frames": [0, 1, 2], "on": "fours"}), // unknown spacing
+        json!({"clip": clip.0, "frames": [0, 1, 2], "spacing": 0}),
+        json!({"clip": clip.0, "frames": [0, 1, 2], "spacing": 100}),
+        json!({"clip": clip.0, "frames": [0, 1, 2], "spacing": 9_223_372_036_854_775_807i64}),
+        json!({"clip": clip.0, "frames": [0, 1, 2, 40], "spacing": 20}), // the last would start past the end
+        json!({"clip": clip.0, "frames": [0, 1, 2], "spacing": 20, "ripple": false}), // runs into frame 40
+        json!({"clip": clip.0, "frames": [-4], "on": "twos"}),
+        json!({"clip": clip.0, "frames": "all", "on": "twos"}),
+        json!({"clip": clip.0, "on": "twos"}),
+    ] {
+        assert!(s.execute("drawing.retimeExposures", params.clone()).is_err(), "{params}");
+        assert_eq!(s.history.undo.len(), before, "{params}");
+    }
+    // a dry run reports the result and changes nothing
+    let r = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2], "on": "twos", "dryRun": true})).unwrap();
+    assert_eq!(r["cels"], json!([0, 2, 4, 42]));
+    assert_eq!(r["dryRun"], true);
+    assert_eq!(s.history.undo.len(), before);
+    // already on ones: nothing to do, no undo step
+    s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2], "on": "ones"})).unwrap();
+    assert_eq!(s.history.undo.len(), before);
+}
+
+#[test]
+fn retiming_exposures_respects_the_trimmed_range_and_locked_tracks() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    for f in [0, 4, 6, 8] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+    }
+    s.execute("timeline.trim", json!({"clip": clip.0, "edge": "in", "mode": "regular", "deltaFrames": 4})).unwrap();
+    let before = s.history.undo.len();
+    // frame 0 is trimmed away: not part of what can be retimed
+    assert!(s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 4], "on": "twos"})).is_err());
+    let r = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [4, 6, 8], "on": "threes"})).unwrap();
+    assert_eq!(r["cels"], json!([0, 4, 7, 10]));
+    assert_eq!(s.history.undo.len(), before + 1);
+    let track = s.active_sequence().and_then(|seq| seq.find_item(clip)).map(|(id, _)| id).unwrap();
+    s.execute("timeline.setTrack", json!({"track": track.0, "locked": true})).unwrap();
+    let before = s.history.undo.len();
+    let err = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [4, 7], "on": "twos"})).unwrap_err();
+    assert!(err.to_string().contains("locked"), "{err}");
+    assert_eq!(s.history.undo.len(), before);
+}
+
+#[test]
 fn hostile_parameters_are_refused_not_fatal() {
     let mut s = session();
     assert!(s.execute("drawing.addStroke", json!({"stroke": line(0.0)})).is_err(), "no drawing yet");
