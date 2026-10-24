@@ -223,3 +223,21 @@ fn right_clicking_an_exposure_offers_retimes_that_preview_on_hover_and_apply_on_
     assert_eq!(driver.frames_of_cels(), vec![0, 1, 3, 5, 6]);
     assert!(driver.harness.state().tl.retime_preview.is_none());
 }
+
+#[test]
+fn a_cel_at_the_start_of_a_clip_is_picked_not_swallowed_by_the_clip_edge_zone() {
+    let mut driver = Driver::new();
+    let clip = driver.clip;
+    for frame in 1..4 {
+        driver.call("engine.execute", json!({"command": "drawing.newCel", "params": {"clip": clip, "frame": frame}}));
+    }
+    driver.frames(4);
+
+    // cel 0 sits inside the clip's In-edge zone; a click on it must pick the exposure, not trim the clip
+    let first = driver.centre(&format!("timeline.cel.{clip}.0"));
+    let third = driver.centre(&format!("timeline.cel.{clip}.2"));
+    driver.click(first, false);
+    driver.click(third, true);
+    driver.call("engine.execute", json!({"command": "drawing.retimeOnTwos", "params": {}}));
+    assert_eq!(driver.frames_of_cels(), vec![0, 2, 4, 5, 6]);
+}
