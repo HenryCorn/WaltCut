@@ -42,6 +42,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.brushSizeUp", "Increase Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+]")),
     uic!("drawing.brushSizeDown", "Decrease Brush Size", ["Graphics and Titles", "Drawing"], Some("Alt+[")),
     uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
+    uic!("drawing.onionSkin", "Onion Skin Settings", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.pinPose", "Pin Pose for Onion Skin", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnOnes", "Retime Cels on Ones", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnTwos", "Retime Cels on Twos", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnThrees", "Retime Cels on Threes", ["Graphics and Titles", "Drawing"], None),

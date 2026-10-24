@@ -28,7 +28,27 @@ hold a pose for several frames or place a new cel on every frame.
    resulting cel starts without editing); a refusal (cels that do not
    follow each other, a pose that would land past the clip's end) changes nothing.
 4. Enable **Onion skin** to show the neighbouring cels: the previous cel in red and the next in
-   green.
+   green (one of each by default). The **Onion** menu in the Brush options bar, or
+   `drawing.onionSkin`, sets how many *distinct* cels show on each side (0–4), the opacity of the
+   nearest, how much each farther ghost fades (`falloff`, a fraction of the one before) and how far
+   ghosts take their tint rather than their own colours (`tint`, 1 = fully tinted).
+   - A ghost is one *cel*, never one frame: a pose held for ten frames is one ghost, and a cel
+     whose strokes equal the cel shown (or a nearer ghost) is passed over, since it would only sit
+     on top of it. An explicit blank cel is a pose: it takes its place and shows nothing, so an
+     older drawing does not stand in for it. Erased areas stay empty.
+   - A ghost is never more than 60 % opaque, whatever is set, so it cannot hide the picture or
+     the cel being drawn.
+   - **Pin Pose for Onion Skin** (`drawing.pinPose`, again to unpin; `drawing.onionSkin {pin}`
+     takes a cel's start frame, `"current"` or `null`) keeps one cel in blue wherever the
+     playhead goes; the **First cel (loop start)** option (`loop`) shows the first cel in amber,
+     to match a loop's end against its start. Neither appears twice: a pinned cel that is
+     already a neighbour, the cel shown, or the loop start is shown once. A pin whose cel has
+     been moved or deleted shows nothing until it is pinned again.
+   - The onion skin is a view setting of the Brush tool, saved with the interface state: it
+     adds no undo step, does not mark the project changed, never moves the playhead and is not
+     part of any export. `ui.inspect` lists the ghosts being shown (`ghosts`: role, rank,
+     cel start frame and opacity). Bad settings (a count over 4, an opacity outside 0–1, a pin on
+     a frame with no cel) are refused whole.
 5. Compare poses:
    **Previous Cel / Next Cel** (`Cmd+Alt+,` / `Cmd+Alt+.`, Graphics and Titles ▸ Drawing) move the
    playhead to the previous or next *drawing*: a held pose counts once, a cel trimmed off the clip
@@ -153,7 +173,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.onionSkin`, `drawing.pinPose` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

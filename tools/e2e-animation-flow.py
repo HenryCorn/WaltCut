@@ -151,6 +151,19 @@ check(state["onion"] is True, "onion skin is on")
 call("ui.set", {"tool": "Brush"}, quiet=True)
 shot("07-cels-onion-skin")
 
+print("== onion skin: several cels, a pinned pose and the loop start")
+cmd("playhead.set", {"frame": 5})
+cmd("drawing.onionSkin", {"before": 2, "after": 1, "opacity": 0.5, "falloff": 0.5})
+ghosts = call("ui.inspect")["result"]["ghosts"]
+check(sorted(g["frame"] for g in ghosts) == [0, 2, 8], f"two cels before and one after give ghosts at {[g['frame'] for g in ghosts]}")
+check([g["opacity"] for g in ghosts if g["role"] == "before"] == [0.25, 0.5], "the farther ghost fades")
+cmd("drawing.onionSkin", {"before": 0, "after": 0, "pin": 8, "loop": True})
+cmd("playhead.set", {"frame": 3})
+ghosts = call("ui.inspect")["result"]["ghosts"]
+check([(g["role"], g["frame"]) for g in ghosts] == [("loop", 0), ("pin", 8)], f"the loop start and the pinned pose are the only ghosts ({[(g['role'], g['frame']) for g in ghosts]})")
+shot("07b-onion-skin-pin-and-loop")
+cmd("drawing.onionSkin", {"before": 1, "after": 1, "opacity": 0.35, "falloff": 0.6, "pin": None, "loop": False})
+
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})
 call("ui.playback", {"action": "play"})
