@@ -93,6 +93,16 @@ pub enum Drag {
     Scrub {
         initial: Tick,
     },
+    CelStart {
+        clip: ClipId,
+        frame: i64,
+        to: i64,
+    },
+    CelEnd {
+        clip: ClipId,
+        frame: i64,
+        end_frame: i64,
+    },
     Move {
         clips: Vec<ClipId>,
         grab_tick: Tick,
@@ -500,6 +510,9 @@ pub fn show(app: &mut WaltCutApp, ui: &mut egui::Ui, rect: Rect) {
             let x1 = layout.x_of(start + dur);
             let body = Rect::from_min_max(pos2(x0, r.rect.min.y + 1.0), pos2(x1.max(x0 + 1.0), r.rect.max.y - 1.0));
             draw_clip(app, &ctx, &p, body, it, r.kind, selection.contains(&it.id), &t, rate);
+            if r.kind == TrackKind::Video {
+                draw_drawing_exposures(app, &p, body, it, &layout, &t);
+            }
             if volume_line {
                 super::timeline_volume::paint(&p, body, it);
             }
@@ -888,6 +901,175 @@ fn draw_clip(
         p.rect_stroke(body.shrink(1.0), 0.0, Stroke::new(1.0, Color32::BLACK), StrokeKind::Inside);
         p.rect_stroke(body, 0.0, Stroke::new(2.0, t.clip_selected_border), StrokeKind::Inside);
     }
+}
+
+fn drawing_frame_x(layout: &Layout, body: Rect, it: &TrackItem, d: &waltcut_project::drawing::Drawing, frame: i64) -> f32 {
+    let first = d.frame_at(it.source_time_at(it.start));
+    let last = d.frame_at(it.source_time_at(it.end() - Tick(1)));
+    if first == last {
+        return body.min.x;
+    }
+    let ratio = ((i128::from(frame) - i128::from(first)) as f64 / (i128::from(last) - i128::from(first)) as f64).clamp(0.0, 1.0);
+    let offset = (it.duration.0 as f64 * ratio).round() as i64;
+    layout.x_of(it.start + Tick(offset))
+}
+
+fn drawing_exposure_xs(
+    layout: &Layout,
+    body: Rect,
+    it: &TrackItem,
+    drawing: &waltcut_project::drawing::Drawing,
+    cels: &[waltcut_project::drawing::Cel],
+    index: usize,
+    first: i64,
+    last: i64,
+) -> Option<(f32, f32, f32, f32, f32, bool)> {
+    let cel = cels.get(index)?;
+    let frame_x = drawing_frame_x(layout, body, it, drawing, cel.frame);
+    if first <= last {
+        let end_x = cels.get(index + 1).map_or(body.max.x, |next| drawing_frame_x(layout, body, it, drawing, next.frame));
+        Some((frame_x, end_x, frame_x, end_x, 3.0, false))
+    } else {
+        let start_x = cels.get(index + 1).map_or(body.min.x, |next| drawing_frame_x(layout, body, it, drawing, next.frame));
+        Some((start_x, frame_x, frame_x, start_x, -3.0, true))
+    }
+}
+
+fn draw_drawing_exposures(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, it: &TrackItem, layout: &Layout, t: &Tokens) {
+    let Some(drawing) = app.session.project.item(it.item).and_then(|item| item.as_drawing()) else { return };
+    if drawing.cels.is_empty() || body.height() < 24.0 || body.width() < 8.0 || it.duration <= Tick::ZERO {
+        return;
+    }
+    let lane = Rect::from_min_max(pos2(body.min.x, body.max.y - 14.0), body.max);
+    let first = drawing.frame_at(it.source_time_at(it.start));
+    let last = drawing.frame_at(it.source_time_at(it.end() - Tick(1)));
+    let (min_frame, max_frame) = (first.min(last), first.max(last));
+    for (i, cel) in drawing.cels.iter().enumerate() {
+        if cel.frame < min_frame || cel.frame > max_frame {
+            continue;
+        }
+        let Some((mut bar_start_x, mut bar_end_x, retime_x, mut hold_x, _, reverse)) =
+            drawing_exposure_xs(layout, body, it, drawing, &drawing.cels, i, first, last)
+        else {
+            continue;
+        };
+        if let Some(Drag::CelStart { clip, frame, to }) = &app.tl.drag
+            && *clip == it.id
+            && *frame == cel.frame
+        {
+            let x = drawing_frame_x(layout, body, it, drawing, *to);
+            p.line_segment([pos2(x, lane.min.y), pos2(x, lane.max.y)], Stroke::new(2.0, t.accent));
+        }
+        if let Some(Drag::CelEnd { clip, frame, end_frame }) = &app.tl.drag
+            && *clip == it.id
+            && *frame == cel.frame
+        {
+            hold_x = drawing_frame_x(layout, body, it, drawing, *end_frame);
+            if reverse {
+                bar_start_x = hold_x;
+            } else {
+                bar_end_x = hold_x;
+            }
+        }
+        let exposure = Rect::from_min_max(pos2(bar_start_x, lane.min.y + 1.0), pos2(bar_end_x.max(bar_start_x + 1.0), lane.max.y - 1.0)).intersect(lane);
+        if exposure.width() <= 0.0 {
+            continue;
+        }
+        let color = if cel.strokes.is_empty() { Color32::from_gray(58) } else { t.accent.gamma_multiply(0.6) };
+        p.rect_filled(exposure, 1.0, color);
+        p.rect_stroke(exposure, 1.0, Stroke::new(1.0, if cel.strokes.is_empty() { t.text_dim } else { t.accent }), StrokeKind::Inside);
+        let next_frame = drawing.cels.get(i + 1).map(|next| next.frame);
+        let label = match next_frame {
+            Some(end) if cel.strokes.is_empty() => format!("Blank exposure: frames {} to {}", cel.frame, end),
+            Some(end) => format!("Cel exposure: frames {} to {}", cel.frame, end),
+            None if cel.strokes.is_empty() => format!("Blank exposure from frame {} to clip end", cel.frame),
+            None => format!("Cel exposure from frame {} to clip end", cel.frame),
+        };
+        app.auto.add(&format!("timeline.cel.{}.{}", it.id.0, cel.frame), exposure, &label);
+        let start_handle = Rect::from_center_size(
+            pos2((retime_x + if reverse { -3.0 } else { 3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
+            vec2(6.0, lane.height()),
+        );
+        let end_handle = Rect::from_center_size(
+            pos2((hold_x + if reverse { 3.0 } else { -3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
+            vec2(6.0, lane.height()),
+        );
+        app.auto.add(&format!("timeline.cel.{}.{}.start", it.id.0, cel.frame), start_handle.intersect(body), "Retime cel start");
+        app.auto.add(&format!("timeline.cel.{}.{}.end", it.id.0, cel.frame), end_handle.intersect(body), "Adjust cel hold");
+    }
+}
+
+fn drawing_cel_grab(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Grab> {
+    let row = layout.row_at(pos.y)?;
+    let track = seq.track(row.track)?;
+    for it in &track.items {
+        if it.duration <= Tick::ZERO {
+            continue;
+        }
+        let x0 = layout.x_of(it.start);
+        let x1 = layout.x_of(it.end());
+        let body = Rect::from_min_max(pos2(x0, row.rect.min.y + 1.0), pos2(x1.max(x0 + 1.0), row.rect.max.y - 1.0));
+        if body.height() < 24.0 || body.width() < 8.0 || !body.contains(pos) {
+            continue;
+        }
+        let Some(drawing) = app.session.project.item(it.item).and_then(|item| item.as_drawing()) else { continue };
+        if drawing.cels.is_empty() {
+            continue;
+        }
+        let lane = Rect::from_min_max(pos2(body.min.x, body.max.y - 14.0), body.max);
+        if !lane.contains(pos) {
+            continue;
+        }
+        let first = drawing.frame_at(it.source_time_at(it.start));
+        let last = drawing.frame_at(it.source_time_at(it.end() - Tick(1)));
+        let (min_frame, max_frame) = (first.min(last), first.max(last));
+        for (i, cel) in drawing.cels.iter().enumerate() {
+            if cel.frame < min_frame || cel.frame > max_frame {
+                continue;
+            }
+            let Some((_, _, retime_x, hold_x, _, reverse)) = drawing_exposure_xs(layout, body, it, drawing, &drawing.cels, i, first, last) else {
+                continue;
+            };
+            let start_handle = Rect::from_center_size(
+                pos2((retime_x + if reverse { -3.0 } else { 3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
+                vec2(6.0, lane.height()),
+            );
+            if start_handle.contains(pos) {
+                return Some(Grab::CelStart { track: row.track, clip: it.id, frame: cel.frame });
+            }
+            let end_handle = Rect::from_center_size(
+                pos2((hold_x + if reverse { 3.0 } else { -3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
+                vec2(6.0, lane.height()),
+            );
+            if end_handle.contains(pos) {
+                let end_frame = match drawing.cels.get(i + 1) {
+                    Some(next) => next.frame,
+                    None => max_frame.checked_add(1)?,
+                };
+                return Some(Grab::CelEnd { track: row.track, clip: it.id, frame: cel.frame, end_frame });
+            }
+        }
+    }
+    None
+}
+
+fn timeline_grab_at(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2, tool: Tool, mods: egui::Modifiers, roll_ripple: bool) -> Grab {
+    if tool == Tool::Selection
+        && let Some(grab) = drawing_cel_grab(app, seq, layout, pos)
+    {
+        return grab;
+    }
+    grab_at(seq, layout, pos, tool, mods, roll_ripple)
+}
+
+fn drawing_frame_at_x(app: &WaltCutApp, seq: &Sequence, layout: &Layout, clip: ClipId, x: f32) -> Option<i64> {
+    let (_, it) = seq.find_item(clip)?;
+    if it.duration <= Tick::ZERO {
+        return None;
+    }
+    let drawing = app.session.project.item(it.item)?.as_drawing()?;
+    let time = layout.tick_at(x).clamp(it.start, it.end() - Tick(1));
+    Some(drawing.frame_at(it.source_time_at(time)))
 }
 
 fn draw_waveform(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, it: &TrackItem, col: Color32) {
@@ -1664,10 +1846,12 @@ fn snap_to(app: &mut WaltCutApp, seq: &Sequence, layout: &Layout, t: Tick, exclu
 pub fn hit_json(app: &WaltCutApp, pos: Pos2, mods: egui::Modifiers) -> Value {
     let (Some(layout), Some(seq)) = (app.tl.layout.as_ref(), app.session.active_sequence()) else { return json!({"hit": "none"}) };
     let t = layout.tick_at(pos.x);
-    let grab = grab_at(seq, layout, pos, app.ui.tool, mods, app.session.prefs.trim.selection_tool_roll_ripple);
+    let grab = timeline_grab_at(app, seq, layout, pos, app.ui.tool, mods, app.session.prefs.trim.selection_tool_roll_ripple);
     let kind = match grab {
         Grab::Edge { kind, .. } => json!(kind.name()),
         Grab::Volume { .. } => json!("volume"),
+        Grab::CelStart { .. } => json!("celStart"),
+        Grab::CelEnd { .. } => json!("celHold"),
         Grab::Other(_) => Value::Null,
     };
     match grab.hit() {
@@ -1770,6 +1954,7 @@ fn marquee_clips(seq: &Sequence, layout: &Layout, r: Rect) -> Vec<ClipId> {
 fn drag_is_locked(session: &waltcut_engine::Session, seq: &Sequence, drag: &Drag) -> bool {
     let clips = match drag {
         Drag::Move { clips, track_delta, .. } => return move_is_locked(seq, clips, *track_delta),
+        Drag::CelStart { clip, .. } | Drag::CelEnd { clip, .. } => vec![*clip],
         Drag::Trim { clip, .. } | Drag::Stretch { clip, .. } | Drag::Slip { clip, .. } | Drag::Slide { clip, .. } => vec![*clip],
         Drag::Roll { left, right, .. } => vec![*left, *right],
         _ => return false,
@@ -2014,7 +2199,7 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
         && let Some(p) = ctx.input(|i| i.pointer.press_origin())
     {
         app.tl.cancelled = false;
-        let grab = grab_at(seq, layout, p, tool, mods, roll_ripple);
+        let grab = timeline_grab_at(app, seq, layout, p, tool, mods, roll_ripple);
         // the playhead jumps to a press on the ruler at once, not only once the pointer has moved (#1090)
         if matches!(grab, Grab::Other(Hit::Ruler)) {
             scrub_playhead(app, seq, layout, p, mods.shift);
@@ -2067,7 +2252,7 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
         && let Some(p) = pos
         && area.contains(p)
     {
-        let g = grab_at(seq, layout, p, tool, mods, roll_ripple);
+        let g = timeline_grab_at(app, seq, layout, p, tool, mods, roll_ripple);
         let blocked = tool == Tool::Selection
             && match g.hit() {
                 Hit::Clip { clip, .. } => {
@@ -2086,6 +2271,7 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
             CursorIcon::NotAllowed
         } else {
             match (tool, g) {
+                (_, Grab::CelStart { .. } | Grab::CelEnd { .. }) => CursorIcon::ResizeHorizontal,
                 (_, Grab::Edge { .. }) => CursorIcon::ResizeColumn,
                 (_, Grab::Volume { .. }) => CursorIcon::ResizeVertical,
                 (Tool::Razor, Grab::Other(Hit::Clip { .. })) => CursorIcon::Crosshair,
@@ -2118,7 +2304,7 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
             // a press and release in the same frame is never stored: it happened where egui says
             None => {
                 let Some(p) = resp.interact_pointer_pos() else { return };
-                Pressed { pos: p, tick: layout.tick_at(p.x), grab: grab_at(seq, layout, p, tool, mods, roll_ripple) }
+                Pressed { pos: p, tick: layout.tick_at(p.x), grab: timeline_grab_at(app, seq, layout, p, tool, mods, roll_ripple) }
             }
         };
         let (p, t) = (pressed.pos, pressed.tick);
@@ -2129,6 +2315,9 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
             g => g,
         };
         let started = match (tool, grab) {
+            (_, Grab::CelStart { clip, frame, .. }) if resp.drag_started() => Some(Drag::CelStart { clip, frame, to: frame }),
+            (_, Grab::CelEnd { clip, frame, end_frame, .. }) if resp.drag_started() => Some(Drag::CelEnd { clip, frame, end_frame }),
+            (_, Grab::CelStart { .. } | Grab::CelEnd { .. }) => None,
             // a middle-button drag pans whatever the tool and whatever it starts on, as in the
             // monitors (#824) and DaVinci Resolve (#1490); only a primary press is kept in
             // `pressed`, so the pan starts from where the button went down
@@ -2311,6 +2500,14 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
                 app.session.set_playhead(tt);
                 Some(Drag::Scrub { initial })
             }
+            Drag::CelStart { clip, frame, .. } => {
+                let to = drawing_frame_at_x(app, seq, layout, clip, p.x).unwrap_or(frame);
+                Some(Drag::CelStart { clip, frame, to })
+            }
+            Drag::CelEnd { clip, frame, .. } => {
+                let end_frame = drawing_frame_at_x(app, seq, layout, clip, p.x).unwrap_or(frame);
+                Some(Drag::CelEnd { clip, frame, end_frame })
+            }
             Drag::Pan { last, start_scroll, start_v } => {
                 let dx = p.x - last.x;
                 let v = &mut app.ui.timeline;
@@ -2418,6 +2615,10 @@ fn interact(app: &mut WaltCutApp, ui: &mut egui::Ui, seq: &Sequence, layout: &La
         let cancelled = std::mem::take(&mut app.tl.cancelled);
         if !cancelled && let Some(d) = app.tl.drag.take() {
             let r = match d {
+                Drag::CelStart { clip, frame, to } if frame != to => Some(app.session.execute("drawing.retimeCel", json!({"clip": clip.0, "from": frame, "to": to}))),
+                Drag::CelEnd { clip, frame, end_frame } if frame != end_frame => {
+                    Some(app.session.execute("drawing.setHold", json!({"clip": clip.0, "frame": frame, "endFrame": end_frame})))
+                }
                 Drag::Move { clips, offset, track_delta, new_track, copy, .. } if offset != Tick::ZERO || track_delta != 0 || new_track.is_some() => {
                     // #1104: dropped past the last track, the clips go onto a new one
                     let to = |tid| new_track.map_or_else(|| json!(shift_track(seq, tid, track_delta).unwrap_or(tid).0), |_| json!("new"));

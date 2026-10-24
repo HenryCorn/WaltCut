@@ -116,6 +116,64 @@ fn in_betweens_fill_the_gap_between_cels() {
 }
 
 #[test]
+fn retiming_and_hold_edits_preserve_cels_and_undo_once_each() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    s.execute("drawing.addStroke", json!({"clip": clip.0, "frame": 0, "stroke": line(10.0)})).unwrap();
+    s.execute("drawing.newCel", json!({"clip": clip.0, "frame": 4})).unwrap();
+    s.execute("drawing.addStroke", json!({"clip": clip.0, "frame": 4, "stroke": line(50.0)})).unwrap();
+    s.execute("drawing.newCel", json!({"clip": clip.0, "frame": 8})).unwrap();
+
+    let before_retime = s.history.undo.len();
+    s.execute("drawing.retimeCel", json!({"clip": clip.0, "from": 4, "to": 6})).unwrap();
+    let inspected = s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap();
+    assert_eq!(inspected["cels"], json!([{"frame": 0, "strokes": 1}, {"frame": 6, "strokes": 1}, {"frame": 8, "strokes": 0}]));
+    assert_eq!(s.history.undo.len(), before_retime + 1);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"][1]["frame"], 4);
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"][1]["frame"], 6);
+
+    let before_hold = s.history.undo.len();
+    s.execute("drawing.setHold", json!({"clip": clip.0, "frame": 0, "endFrame": 5})).unwrap();
+    let hold = s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap();
+    assert_eq!(hold["cels"][1]["frame"], 5);
+    assert_eq!(s.history.undo.len(), before_hold + 1);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"][1]["frame"], 6);
+    s.execute("edit.redo", json!({})).unwrap();
+
+    let blank = s.execute("drawing.setHold", json!({"clip": clip.0, "frame": 8, "endFrame": 10})).unwrap();
+    assert_eq!(blank["blank"], true);
+    assert_eq!(s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"][3], json!({"frame": 10, "strokes": 0}));
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"].as_array().map(Vec::len), Some(3));
+}
+
+#[test]
+fn retiming_rejects_collisions_locked_tracks_and_frames_outside_trimmed_source() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    s.execute("drawing.newCel", json!({"clip": clip.0, "frame": 4})).unwrap();
+    let before = s.history.undo.len();
+    for params in [json!({"clip": clip.0, "from": 0, "to": 4}), json!({"clip": clip.0, "from": 0, "to": 48}), json!({"clip": clip.0, "from": 1, "to": 2})] {
+        assert!(s.execute("drawing.retimeCel", params.clone()).is_err(), "{params}");
+        assert_eq!(s.history.undo.len(), before);
+    }
+
+    s.execute("timeline.trim", json!({"clip": clip.0, "edge": "in", "mode": "regular", "deltaFrames": 4})).unwrap();
+    assert!(s.execute("drawing.retimeCel", json!({"clip": clip.0, "from": 0, "to": 2})).is_err());
+    s.execute("drawing.retimeCel", json!({"clip": clip.0, "from": 4, "to": 5})).unwrap();
+
+    let track = s.active_sequence().and_then(|seq| seq.find_item(clip)).map(|(id, _)| id).unwrap();
+    s.execute("timeline.setTrack", json!({"track": track.0, "locked": true})).unwrap();
+    let before = s.history.undo.len();
+    let err = s.execute("drawing.retimeCel", json!({"clip": clip.0, "from": 5, "to": 6})).unwrap_err();
+    assert!(err.to_string().contains("locked"), "{err}");
+    assert_eq!(s.history.undo.len(), before);
+}
+
+#[test]
 fn hostile_parameters_are_refused_not_fatal() {
     let mut s = session();
     assert!(s.execute("drawing.addStroke", json!({"stroke": line(0.0)})).is_err(), "no drawing yet");
