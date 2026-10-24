@@ -8,6 +8,7 @@ pub mod dialogs;
 pub mod drawing;
 pub mod drawing_input;
 pub mod drawing_raster;
+pub mod drawing_review;
 pub mod effect_controls;
 pub mod effects;
 pub mod events;

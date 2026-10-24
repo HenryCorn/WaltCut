@@ -8,7 +8,7 @@
 
 use serde_json::{Value, json};
 use waltcut_project::drawing::{self, Brush, Cel, Drawing, Stroke, StrokePoint};
-use waltcut_project::{ClipId, ItemId, ItemKind, Sequence};
+use waltcut_project::{ClipId, ItemId, ItemKind, Sequence, TrackItem};
 use waltcut_time::Tick;
 
 use crate::commands::{CommandSpec, always, bad, bool_p, f64_p, has_seq, str_p, time_p, u64_p};
@@ -19,6 +19,20 @@ type Enabled = fn(&Session) -> std::result::Result<(), String>;
 
 fn spec(id: &'static str, label: &'static str, menu: &'static [&'static str], params: &'static str, enabled: Enabled, run: Run) -> CommandSpec {
     CommandSpec { id, label, menu, shortcut: None, params, enabled, run, journal: true }
+}
+
+/// A command that only moves the view (the playhead). It is journaled all the same: only journaled
+/// commands can be bound to a key, and replaying a playhead move after a crash is harmless.
+fn view_spec(
+    id: &'static str,
+    label: &'static str,
+    menu: &'static [&'static str],
+    shortcut: &'static str,
+    params: &'static str,
+    enabled: Enabled,
+    run: Run,
+) -> CommandSpec {
+    CommandSpec { id, label, menu, shortcut: Some(shortcut), params, enabled, run, journal: true }
 }
 
 /// The drawing behind a track item, if it is a drawing clip.
@@ -159,6 +173,82 @@ fn retime_exposures(s: &mut Session, p: &Value) -> Result<Value> {
     }
     edit_drawing(s, ID, "Retime Exposures", id, |d| d.respace_cels(&frames, spacing, ripple, limit).map_err(|e| bad(ID, e)))?;
     Ok(json!({"clip": clip.0, "moved": moved, "spacing": spacing, "cels": planned}))
+}
+
+/// Timeline time at which `clip` first shows the drawing cel `cel` on or after its start, for a
+/// frame mapping that only ever moves one way (forward, or reversed): the first tick where the
+/// shown frame has reached `frame`, then the first sequence frame boundary at or after it that
+/// still shows that cel.
+fn time_of_cel(s: &Session, it: &TrackItem, d: &Drawing, frame: i64, cel: usize) -> Option<Tick> {
+    let shown = |t: Tick| d.frame_at(it.source_time_at(t));
+    let reached = |t: Tick| if it.reverse { shown(t) <= frame } else { shown(t) >= frame };
+    let (mut lo, mut hi) = (it.start.0, it.end().0.checked_sub(1)?);
+    if lo > hi || !reached(Tick(hi)) {
+        return None;
+    }
+    // first tick in [lo, hi] that has reached `frame`; at most 64 halvings
+    for _ in 0..64 {
+        if lo >= hi {
+            break;
+        }
+        let mid = lo + (hi - lo) / 2;
+        if reached(Tick(mid)) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    let exact = Tick(lo);
+    if d.cel_index_at(shown(exact)) != Some(cel) {
+        return None;
+    }
+    let rate = s.sequence_rate();
+    let mut on_grid = rate.tick_of(rate.frame_at(exact));
+    if on_grid < exact {
+        on_grid = rate.tick_of(rate.frame_at(exact).checked_add(1)?);
+    }
+    Some(if on_grid >= it.start && on_grid < it.end() && d.cel_index_at(shown(on_grid)) == Some(cel) { on_grid } else { exact })
+}
+
+/// Move the playhead to the previous or next drawing of the target clip (`drawing.previousCel`,
+/// `drawing.nextCel`): the cel before or after the one shown, a held pose counting once. "Next"
+/// follows the timeline, so on a reversed clip it is the cel with the lower start frame. A cel
+/// trimmed off the clip does not count, one whose hold reaches into the clip does. `skipBlank`
+/// passes over cels without strokes. View-only: nothing is edited and no undo step is made.
+fn step_cel(s: &mut Session, p: &Value, forward: bool) -> Result<Value> {
+    let id = if forward { "drawing.nextCel" } else { "drawing.previousCel" };
+    let skip_blank = p.get("skipBlank").and_then(Value::as_bool).unwrap_or(false);
+    let (clip, _, frame) = target(s, id, p)?;
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(id, "not a drawing clip"))?;
+    let (_, it) = seq.find_item(clip).ok_or_else(|| bad(id, "no such clip"))?;
+    let (first, last) = drawing_frame_bounds(s, id, clip, d)?;
+    if frame < first || frame > last {
+        return Err(bad(id, format!("frame {frame} is outside the clip's visible range {first}..={last}")));
+    }
+    let toward_higher = forward != it.reverse;
+    let shown = d.cel_index_at(frame);
+    let none = || bad(id, if forward { "no next cel in this clip" } else { "no previous cel in this clip" });
+    let mut at = if toward_higher { Some(shown.map_or(0, |i| i + 1)) } else { shown.and_then(|i| i.checked_sub(1)) };
+    let found = loop {
+        let cel = at.and_then(|i| d.cels.get(i)).ok_or_else(none)?;
+        let i = at.ok_or_else(none)?;
+        let end = d.cels.get(i + 1).map(|c| c.frame);
+        // the clip shows this cel from `cel.frame` (or its first frame) up to `end`
+        if toward_higher && cel.frame > last || !toward_higher && end.is_some_and(|e| e <= first) {
+            return Err(none());
+        }
+        let visible = cel.frame <= last && end.is_none_or(|e| e > first);
+        if visible && !(skip_blank && cel.strokes.is_empty()) {
+            break (i, cel.frame.clamp(first, last), cel.strokes.is_empty());
+        }
+        at = if toward_higher { i.checked_add(1) } else { i.checked_sub(1) };
+    };
+    let (index, target_frame, blank) = found;
+    let time = time_of_cel(s, it, d, target_frame, index).ok_or_else(|| bad(id, "that cel is not shown by the clip"))?;
+    let cel_start = d.cels.get(index).map(|c| c.frame);
+    s.set_playhead(time);
+    Ok(json!({"clip": clip.0, "cel": cel_start, "frame": target_frame, "time": time.0, "blank": blank}))
 }
 
 fn set_hold(s: &mut Session, p: &Value) -> Result<Value> {
@@ -435,6 +525,24 @@ pub fn commands() -> Vec<CommandSpec> {
             r#"{"clip":id?,"frames":[int,...],"on":"ones"|"twos"|"threes","spacing":int?,"ripple":bool?,"dryRun":bool?}"#,
             has_drawing,
             retime_exposures,
+        ),
+        view_spec(
+            "drawing.previousCel",
+            "Previous Cel",
+            &["Graphics and Titles", "Drawing"],
+            "Cmd+Alt+,",
+            r#"{"clip":id?,"time":ticks?,"skipBlank":bool?}"#,
+            has_drawing,
+            |s, p| step_cel(s, p, false),
+        ),
+        view_spec(
+            "drawing.nextCel",
+            "Next Cel",
+            &["Graphics and Titles", "Drawing"],
+            "Cmd+Alt+.",
+            r#"{"clip":id?,"time":ticks?,"skipBlank":bool?}"#,
+            has_drawing,
+            |s, p| step_cel(s, p, true),
         ),
         spec("drawing.clearCel", "Clear Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, clear_cel),
         spec("drawing.deleteCel", "Delete Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, delete_cel),

@@ -29,7 +29,22 @@ hold a pose for several frames or place a new cel on every frame.
    follow each other, a pose that would land past the clip's end) changes nothing.
 4. Enable **Onion skin** to show the neighbouring cels: the previous cel in red and the next in
    green.
-5. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
+5. Compare poses:
+   **Previous Cel / Next Cel** (`Cmd+Alt+,` / `Cmd+Alt+.`, Graphics and Titles ▸ Drawing) move the
+   playhead to the previous or next *drawing*: a held pose counts once, a cel trimmed off the clip
+   does not count, one whose hold reaches into the clip does, and on a reversed clip "next" follows
+   the timeline. Blank cels are poses (`skipBlank: true` passes over them). With no neighbour the
+   command says so and the playhead stays.
+   **Review** (hold `Cmd+Alt+Up` for the previous pose or `Cmd+Alt+Down` for the next, with any tool
+   selected) shows that pose for as long as the key is down and puts the playhead and selection back
+   on release, on Escape and when the window loses focus. It only moves the playhead: nothing is
+   edited and there is no undo step. If a scrub or playback moves the playhead meanwhile, that move
+   stands. Switching from one key to the other stays relative to the pose the review began on. The
+   same behaviour is `drawing.reviewPrevious` / `drawing.reviewNext` (`{active?, skipBlank?}`, held
+   until `drawing.reviewEnd`, `active: false`, Escape or focus loss when sent as a command), and
+   `ui.inspect` reports `review`. A tablet's express keys or pen buttons can send the same chords
+   through the tablet driver, which is how a pen-driven review loop is set up.
+6. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
@@ -138,7 +153,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, onion skin in the Brush options |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

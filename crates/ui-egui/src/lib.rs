@@ -349,6 +349,8 @@ pub struct WaltCutApp {
     bindings: Vec<menus::KeyBinding>,
     /// Shortcut-set revision `bindings` were built from.
     bindings_rev: u64,
+    /// A pose review in progress (#61).
+    pub review: Option<panels::drawing_review::Review>,
     /// The menu tree last sent to `hooks.menu_changed` (the native menu bar).
     menu_sent: Vec<menus::MenuItem>,
     /// Keyboard Shortcuts dialog state.
@@ -576,6 +578,7 @@ impl WaltCutApp {
             last_time: 0.0,
             bindings: Vec::new(),
             bindings_rev: 0,
+            review: None,
             menu_sent: Vec::new(),
             shortcut_editor: Default::default(),
             toast: None,
@@ -1370,6 +1373,7 @@ impl WaltCutApp {
 
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
         panels::drawing::release_stale_erase(self, ctx);
+        panels::drawing_review::release_stale_review(self, ctx);
         let workspaces = (dock::names(&self.workspaces), self.ui.workspace.clone());
         if self.bindings_rev != self.session.shortcuts.revision || workspaces != self.menu_workspaces {
             self.menu_workspaces = workspaces;
@@ -1475,7 +1479,7 @@ impl WaltCutApp {
                     || id.starts_with("markers.goToSplit"))
             {
                 json!({"target": "source"})
-            } else if id == "drawing.eraseTemporarily" {
+            } else if matches!(id.as_str(), "drawing.eraseTemporarily" | "drawing.reviewPrevious" | "drawing.reviewNext") {
                 // a key press: the hold lasts as long as the key is down
                 json!({"key": true})
             } else {

@@ -138,6 +138,14 @@ twos = cmd("drawing.retimeExposures", {"clip": drawing, "frames": [0, 2, 5], "on
 check(twos["cels"] == [0, 2, 4, 7], f"cels 0, 2 and 5 retimed on twos give starts {twos['cels']}")
 cmd("edit.undo", {})
 check(sorted(c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]) == [0, 2, 5, 8], "undo restores the cels")
+nxt = cmd("drawing.nextCel", {"clip": drawing, "frame": 3})
+check(nxt["cel"] == 5, f"Next Cel from inside the hold of cel 2 lands on cel {nxt['cel']}")
+shown = call("ui.inspect")["result"]["playhead"]
+rev = cmd("drawing.reviewPrevious", {})
+check(rev["cel"] == 2 and call("ui.inspect")["result"]["review"]["active"], "holding Review Previous shows cel 2")
+cmd("drawing.reviewEnd", {})
+after = call("ui.inspect")["result"]
+check(after["playhead"] == shown and not after["review"]["active"], "ending the review puts the playhead back")
 state = call("ui.inspect")["result"]["ui"]["brush"]
 check(state["onion"] is True, "onion skin is on")
 call("ui.set", {"tool": "Brush"}, quiet=True)

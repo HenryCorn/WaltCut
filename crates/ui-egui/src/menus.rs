@@ -45,6 +45,9 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.retimeOnOnes", "Retime Cels on Ones", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnTwos", "Retime Cels on Twos", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnThrees", "Retime Cels on Threes", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.reviewPrevious", "Review Previous Cel While Held", ["Graphics and Titles", "Drawing"], Some("Cmd+Alt+Up")),
+    uic!("drawing.reviewNext", "Review Next Cel While Held", ["Graphics and Titles", "Drawing"], Some("Cmd+Alt+Down")),
+    uic!("drawing.reviewEnd", "End Cel Review", ["Graphics and Titles", "Drawing"], None),
     uic!("view.zoomIn", "Zoom In", ["View"], Some("=")),
     uic!("view.zoomOut", "Zoom Out", ["View"], Some("-")),
     uic!("view.zoomToSequence", "Zoom to Sequence", ["View"], Some("\\")),
@@ -226,6 +229,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         let tool = Tool::from_name(t).ok_or_else(|| format!("unknown tool `{t}`"))?;
         app.ui.tool = tool;
         return Ok(json!({"tool": tool}));
+    }
+    if let Some(r) = crate::panels::drawing_review::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
     }
     if let Some(r) = crate::panels::drawing::route(app, id, &params) {
         if let Err(e) = &r {
@@ -646,6 +655,9 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
         if it.id.starts_with("view.") {
             it.checked = crate::panels::monitor_view::checked(app, &it.id).or(crate::panels::menu_dialogs::checked(app, &it.id));
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
+        }
+        if let Some(doc) = crate::panels::drawing_review::params_doc(&it.id) {
+            it.params = Some(doc.to_string());
         }
         if let Some(doc) = crate::panels::drawing::params_doc(&it.id) {
             it.params = Some(doc.to_string());
