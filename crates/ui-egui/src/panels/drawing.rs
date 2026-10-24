@@ -11,7 +11,7 @@ use egui::{Color32, Pos2, Rect, Sense, Stroke as EStroke, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use waltcut_geom::{Affine, Vec2};
-use waltcut_project::drawing::{Brush, Drawing, Stroke};
+use waltcut_project::drawing::{Brush, Drawing, GhostRole, MAX_ONION_CELS, Stroke};
 use waltcut_project::{ClipId, TrackItem};
 
 use super::drawing_input::{FrameInput, PenPhase, PenSample, PenStats, Sample, Source, StrokeBuilder, frame_samples};
@@ -59,6 +59,10 @@ pub fn step_size(current: f32, up: bool, steps: u32) -> f32 {
 pub fn params_doc(id: &str) -> Option<&'static str> {
     match id {
         "drawing.brushSizeUp" | "drawing.brushSizeDown" => Some(r#"{"steps":int?}  steps of the size ladder 1…200 px (1–100, default 1); stops at the bounds"#),
+        "drawing.onionSkin" => Some(
+            r#"{"enabled":bool?,"before":0-4?,"after":0-4?,"opacity":0-1?,"falloff":0-1?,"tint":0-1?,"pin":frame|"current"|null?,"loop":bool?}  set the onion skin; with no parameter, report it. `pin` ghosts the cel starting on that frame (or the one shown now) until cleared with null; `loop` ghosts the first cel"#,
+        ),
+        "drawing.pinPose" => Some(r#"{}  pin the cel shown now for onion-skin comparison; again to unpin it"#),
         "drawing.eraseTemporarily" => Some(
             r#"{"active":bool?}  true (default) erases until false, until the window loses focus or another tool is chosen; bound to a key it erases while the key is held"#,
         ),
@@ -68,12 +72,124 @@ pub fn params_doc(id: &str) -> Option<&'static str> {
 
 /// The Brush commands act while the Brush tool is selected.
 pub fn enabled(app: &WaltCutApp, id: &str) -> bool {
-    params_doc(id).is_some() && app.ui.tool == Tool::Brush
+    params_doc(id).is_some() && (is_onion(id) || app.ui.tool == Tool::Brush)
+}
+
+/// The onion-skin commands work whatever tool is selected: they change a view setting only.
+fn is_onion(id: &str) -> bool {
+    matches!(id, "drawing.onionSkin" | "drawing.pinPose")
+}
+
+/// The drawing clip and the start frame of the cel shown at the playhead.
+fn shown_cel(app: &WaltCutApp) -> Option<OnionPin> {
+    let (clip, item, d) = target(app)?;
+    let t = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
+    Some(OnionPin { clip: clip.0, frame: d.cel_at(d.frame_at(t))?.frame })
+}
+
+/// The ghosts shown now, for `ui.inspect`: `[{role, frame, opacity}]` farthest first, empty when
+/// the onion skin is off or there is no drawing under the playhead.
+pub fn onion_report(app: &WaltCutApp) -> Value {
+    let b = &app.ui.brush;
+    let (Some((clip, item, d)), true) = (target(app), b.onion) else { return json!([]) };
+    let t = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
+    let look = b.onion_look();
+    let pin = b.onion_pin.filter(|p| p.clip == clip.0).map(|p| p.frame);
+    let ghosts = d.onion_plan(d.frame_at(t), look.before, look.after, pin, b.onion_loop);
+    Value::Array(
+        ghosts
+            .iter()
+            .filter_map(|g| {
+                let (role, n) = match g.role {
+                    GhostRole::Before(n) => ("before", n),
+                    GhostRole::After(n) => ("after", n),
+                    GhostRole::Pin => ("pin", 1),
+                    GhostRole::LoopStart => ("loop", 1),
+                };
+                Some(json!({"role": role, "n": n, "frame": d.cels.get(g.index)?.frame, "opacity": look.opacity_at(n)}))
+            })
+            .collect(),
+    )
+}
+
+fn onion_state(b: &BrushSettings) -> Value {
+    json!({"enabled": b.onion, "before": b.onion_look().before, "after": b.onion_look().after, "opacity": b.onion_look().opacity,
+        "falloff": b.onion_look().falloff, "tint": b.onion_look().tint, "pin": b.onion_pin, "loop": b.onion_loop})
+}
+
+/// `drawing.onionSkin` and `drawing.pinPose`. Every parameter is checked before any is applied.
+fn route_onion(app: &mut WaltCutApp, id: &str, params: &Value) -> Result<Value, String> {
+    if id == "drawing.pinPose" {
+        let shown = shown_cel(app).ok_or("there is no drawing cel at the playhead to pin")?;
+        let b = &mut app.ui.brush;
+        b.onion_pin = if b.onion_pin == Some(shown) { None } else { Some(shown) };
+        return Ok(onion_state(b));
+    }
+    let obj = match params {
+        Value::Null => None,
+        Value::Object(o) => Some(o),
+        _ => return Err("parameters must be an object".into()),
+    };
+    let known = ["enabled", "before", "after", "opacity", "falloff", "tint", "pin", "loop"];
+    if let Some(o) = obj
+        && let Some(k) = o.keys().find(|k| !known.contains(&k.as_str()))
+    {
+        return Err(format!("unknown parameter `{k}`; expected: {}", known.join(", ")));
+    }
+    let get = |k: &str| obj.and_then(|o| o.get(k));
+    let flag = |k: &str| match get(k) {
+        None => Ok(None),
+        Some(Value::Bool(v)) => Ok(Some(*v)),
+        Some(_) => Err(format!("`{k}` must be true or false")),
+    };
+    let count = |k: &str| match get(k) {
+        None => Ok(None),
+        Some(v) => match v.as_u64() {
+            Some(n) if n as usize <= MAX_ONION_CELS => Ok(Some(n as u8)),
+            _ => Err(format!("`{k}` must be a whole number from 0 to {MAX_ONION_CELS}")),
+        },
+    };
+    let unit = |k: &str| match get(k) {
+        None => Ok(None),
+        Some(v) => match v.as_f64() {
+            Some(n) if (0.0..=1.0).contains(&n) => Ok(Some(n as f32)),
+            _ => Err(format!("`{k}` must be a number from 0 to 1")),
+        },
+    };
+    let (enabled, looped) = (flag("enabled")?, flag("loop")?);
+    let (before, after) = (count("before")?, count("after")?);
+    let (opacity, falloff, tint) = (unit("opacity")?, unit("falloff")?, unit("tint")?);
+    let pin = match get("pin") {
+        None => None,
+        Some(Value::Null) | Some(Value::Bool(false)) => Some(None),
+        Some(Value::String(s)) if s == "current" => Some(Some(shown_cel(app).ok_or("there is no drawing cel at the playhead to pin")?)),
+        Some(v) => {
+            let frame = v.as_i64().filter(|f| *f >= 0).ok_or("`pin` must be a cel's start frame, \"current\" or null")?;
+            let (clip, _, d) = target(app).ok_or("there is no drawing to pin a cel of")?;
+            d.cel_on(frame).ok_or_else(|| format!("no cel starts on frame {frame}"))?;
+            Some(Some(OnionPin { clip: clip.0, frame }))
+        }
+    };
+    let b = &mut app.ui.brush;
+    b.onion = enabled.unwrap_or(b.onion);
+    b.onion_loop = looped.unwrap_or(b.onion_loop);
+    b.onion_before = before.unwrap_or(b.onion_before);
+    b.onion_after = after.unwrap_or(b.onion_after);
+    b.onion_opacity = opacity.unwrap_or(b.onion_opacity);
+    b.onion_falloff = falloff.unwrap_or(b.onion_falloff);
+    b.onion_tint = tint.unwrap_or(b.onion_tint);
+    if let Some(p) = pin {
+        b.onion_pin = p;
+    }
+    Ok(onion_state(b))
 }
 
 /// `drawing.brushSizeUp`, `drawing.brushSizeDown` and `drawing.eraseTemporarily`.
 pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     params_doc(id)?;
+    if is_onion(id) {
+        return Some(route_onion(app, id, params));
+    }
     if app.ui.tool != Tool::Brush {
         return Some(Err(format!("`{id}` is available while the Brush tool is selected")));
     }
@@ -155,6 +271,49 @@ impl CelMode {
     }
 }
 
+/// The cel pinned for comparison: the cel starting on `frame` of the drawing clip `clip`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnionPin {
+    pub clip: u64,
+    pub frame: i64,
+}
+
+/// The most opaque an onion skin is ever drawn: a ghost is a guide, never a solid layer that
+/// hides the picture and the cel being drawn.
+pub const MAX_ONION_OPACITY: f32 = 0.6;
+
+/// The onion-skin settings as they are used: every number inside its bounds (a hand-edited UI
+/// state or `ui.set` cannot make a ghost solid, negative or endless).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OnionLook {
+    pub before: usize,
+    pub after: usize,
+    pub opacity: f32,
+    pub falloff: f32,
+    pub tint: f32,
+}
+
+impl OnionLook {
+    /// Opacity of the `n`-th nearest ghost on its side (`n` = 1 is the nearest).
+    pub fn opacity_at(&self, n: usize) -> f32 {
+        let steps = i32::try_from(n.saturating_sub(1)).unwrap_or(i32::MAX);
+        (self.opacity * self.falloff.powi(steps)).clamp(0.0, MAX_ONION_OPACITY)
+    }
+}
+
+impl BrushSettings {
+    pub fn onion_look(&self) -> OnionLook {
+        let unit = |v: f32, default: f32| if v.is_finite() { v.clamp(0.0, 1.0) } else { default };
+        OnionLook {
+            before: usize::from(self.onion_before).min(MAX_ONION_CELS),
+            after: usize::from(self.onion_after).min(MAX_ONION_CELS),
+            opacity: unit(self.onion_opacity, 0.35),
+            falloff: unit(self.onion_falloff, 0.6),
+            tint: unit(self.onion_tint, 1.0),
+        }
+    }
+}
+
 /// Brush tool options (saved with the UI state).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -167,8 +326,19 @@ pub struct BrushSettings {
     pub pressure: bool,
     pub cel_mode: CelMode,
     pub onion: bool,
-    /// Onion skin opacity, 0..1.
+    /// Opacity of the nearest onion skin, 0..1 (shown at most [`MAX_ONION_OPACITY`]).
     pub onion_opacity: f32,
+    /// Distinct cels before / after the one shown that get a ghost, 0..=4 (default one each).
+    pub onion_before: u8,
+    pub onion_after: u8,
+    /// Each ghost further away is this fraction of the opacity of the one before it, 0..1.
+    pub onion_falloff: f32,
+    /// How far the ghosts take their tint rather than their own colours, 0..1.
+    pub onion_tint: f32,
+    /// A pose pinned for comparison, shown whatever the playhead does.
+    pub onion_pin: Option<OnionPin>,
+    /// Also ghost the drawing's first cel, to compare with the end of a loop.
+    pub onion_loop: bool,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -190,6 +360,12 @@ impl Default for BrushSettings {
             cel_mode: CelMode::Hold,
             onion: true,
             onion_opacity: 0.35,
+            onion_before: 1,
+            onion_after: 1,
+            onion_falloff: 0.6,
+            onion_tint: 1.0,
+            onion_pin: None,
+            onion_loop: false,
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -374,6 +550,28 @@ fn run(app: &mut WaltCutApp, cmd: &str, p: Value) {
     }
 }
 
+/// The onion-skin settings menu of the options bar.
+fn onion_menu(ui: &mut egui::Ui, b: &mut BrushSettings, auto: &mut crate::automation::Registry) {
+    let r = ui.menu_button("Onion", |ui| {
+        let mut row = |ui: &mut egui::Ui, id: &str, w: egui::Slider<'_>, text: &str| {
+            let r = ui.add(w.text(text));
+            auto.add(id, r.rect, text);
+        };
+        let max = MAX_ONION_CELS as u8;
+        row(ui, "program.brush.onion.before", egui::Slider::new(&mut b.onion_before, 0..=max), "Cels before");
+        row(ui, "program.brush.onion.after", egui::Slider::new(&mut b.onion_after, 0..=max), "Cels after");
+        row(ui, "program.brush.onion.opacity", egui::Slider::new(&mut b.onion_opacity, 0.0..=1.0), "Opacity");
+        row(ui, "program.brush.onion.falloff", egui::Slider::new(&mut b.onion_falloff, 0.0..=1.0), "Fade per cel");
+        row(ui, "program.brush.onion.tint", egui::Slider::new(&mut b.onion_tint, 0.0..=1.0), "Tint");
+        let r = ui.checkbox(&mut b.onion_loop, "First cel (loop start)");
+        auto.add("program.brush.onion.loop", r.rect, "loop start ghost");
+        if b.onion_pin.is_some() && ui.button("Unpin pose").clicked() {
+            b.onion_pin = None;
+        }
+    });
+    auto.add("program.brush.onion.menu", r.response.rect, "onion skin settings");
+}
+
 /// The Brush tool options bar, top-left over the picture.
 fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: bool) -> Rect {
     let area = egui::Area::new(egui::Id::new("brush-options")).fixed_pos(pic.min + vec2(8.0, 8.0)).order(egui::Order::Foreground);
@@ -416,7 +614,9 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                         ui.selectable_value(&mut b.cel_mode, m, m.label());
                     }
                 });
-                ui.checkbox(&mut b.onion, "Onion skin");
+                let r = ui.checkbox(&mut b.onion, "Onion skin");
+                app.auto.add("program.brush.onion", r.rect, "onion skin");
+                onion_menu(ui, b, &mut app.auto);
                 ui.separator();
                 let step = b.tween_step;
                 if !has_target {
@@ -443,6 +643,45 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
     r.response.rect
 }
 
+/// Tints of the ghosts: red before, green after, blue for the pinned pose, amber for the loop start.
+const TINT_BEFORE: [u8; 3] = [230, 70, 70];
+const TINT_AFTER: [u8; 3] = [60, 190, 90];
+const TINT_PIN: [u8; 3] = [70, 130, 230];
+const TINT_LOOP: [u8; 3] = [230, 170, 50];
+
+/// Names of the cached ghost rasters: one per place a ghost can take.
+fn ghost_slots() -> Vec<(GhostRole, String)> {
+    let mut v = vec![(GhostRole::LoopStart, "loop".to_string()), (GhostRole::Pin, "pin".to_string())];
+    for n in 1..=MAX_ONION_CELS {
+        v.push((GhostRole::Before(n), format!("before{n}")));
+        v.push((GhostRole::After(n), format!("after{n}")));
+    }
+    v
+}
+
+/// The onion skins of the cel shown on drawing frame `f`: the neighbouring cels as the engine
+/// rasterises them (erasers applied), tinted, cached. Painted over the picture only: nothing here
+/// is stored in the project or reaches an export.
+#[allow(clippy::too_many_arguments)]
+fn paint_ghosts(app: &WaltCutApp, ui: &mut egui::Ui, painter: &egui::Painter, clip: u64, d: &Drawing, f: i64, to_screen: &Affine, pic: Rect) {
+    let b = &app.ui.brush;
+    let look = b.onion_look();
+    let pin = b.onion_pin.filter(|p| p.clip == clip).map(|p| p.frame);
+    let plan = d.onion_plan(f, look.before, look.after, pin, b.onion_loop);
+    let revision = app.session.revision;
+    for (role, name) in ghost_slots() {
+        let slot = ui.data_mut(|dd| dd.get_temp_mut_or_default::<SharedSlot>(egui::Id::new(("brush-onion", name.as_str()))).clone());
+        let cel = plan.iter().find(|g| g.role == role).and_then(|g| d.cels.get(g.index));
+        let (tint, n) = match role {
+            GhostRole::Before(n) => (TINT_BEFORE, n),
+            GhostRole::After(n) => (TINT_AFTER, n),
+            GhostRole::Pin => (TINT_PIN, 1),
+            GhostRole::LoopStart => (TINT_LOOP, 1),
+        };
+        paint_onion(painter, &slot, revision, clip, cel.map(|c| (c.frame, c.strokes.as_slice())), tint, look.tint, look.opacity_at(n), to_screen, pic);
+    }
+}
+
 /// Draw the overlay and handle the Brush tool on the Program monitor picture `pic`.
 pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
     let tgt = target(app);
@@ -455,13 +694,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
     let f = item.source_time_at(app.session.playhead().clamp(item.start, item.end() - waltcut_time::Tick(1)));
     let f = d.frame_at(f);
     if app.ui.brush.onion {
-        // the neighbouring cels as the engine rasterises them (erasers applied), tinted, cached
-        let (prev, next) = d.neighbours(f);
-        let a = app.ui.brush.onion_opacity.clamp(0.0, 1.0);
-        let slot = |name: &str| ui.data_mut(|dd| dd.get_temp_mut_or_default::<SharedSlot>(egui::Id::new(("brush-onion", name))).clone());
-        let revision = app.session.revision;
-        paint_onion(&painter, &slot("prev"), revision, clip.0, prev.map(|c| (c.frame, c.strokes.as_slice())), [230, 70, 70], a, &map.to_screen, pic);
-        paint_onion(&painter, &slot("next"), revision, clip.0, next.map(|c| (c.frame, c.strokes.as_slice())), [60, 190, 90], a, &map.to_screen, pic);
+        paint_ghosts(app, ui, &painter, clip.0, &d, f, &map.to_screen, pic);
     }
     let id = egui::Id::new("brush-overlay");
     let resp = ui.interact(pic, id, Sense::click_and_drag());
@@ -617,6 +850,23 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, frame
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ghost_opacity_fades_with_distance_and_is_never_solid() {
+        let look = BrushSettings::default().onion_look();
+        assert_eq!((look.before, look.after, look.opacity_at(1)), (1, 1, 0.35));
+        assert!((look.opacity_at(2) - 0.21).abs() < 1e-6 && look.opacity_at(3) < look.opacity_at(2));
+        let wild =
+            BrushSettings { onion_opacity: 9.0, onion_falloff: f32::NAN, onion_tint: -4.0, onion_before: 255, onion_after: 255, ..BrushSettings::default() }
+                .onion_look();
+        assert_eq!((wild.before, wild.after, wild.tint), (MAX_ONION_CELS, MAX_ONION_CELS, 0.0));
+        for n in [0, 1, 2, usize::MAX] {
+            assert!(wild.opacity_at(n) <= MAX_ONION_OPACITY && wild.opacity_at(n) >= 0.0);
+        }
+        // settings saved before these existed load with the defaults
+        let old: BrushSettings = serde_json::from_value(json!({"onion": true, "onion_opacity": 0.5})).unwrap();
+        assert_eq!((old.onion_before, old.onion_after, old.onion_pin, old.onion_loop), (1, 1, None, false));
+    }
 
     #[test]
     fn the_size_ladder_is_monotonic_bounded_and_stops_at_both_ends() {

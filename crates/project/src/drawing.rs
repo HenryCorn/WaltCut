@@ -148,6 +148,27 @@ impl Cel {
     }
 }
 
+/// The most distinct cels the onion skin shows on each side of the one shown.
+pub const MAX_ONION_CELS: usize = 4;
+
+/// Why a cel is ghosted by the onion skin. `Before(1)` / `After(1)` are the nearest cels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GhostRole {
+    Before(usize),
+    After(usize),
+    /// The pose pinned for comparison.
+    Pin,
+    /// The first cel of the drawing, to compare with a loop's end.
+    LoopStart,
+}
+
+/// One onion-skin ghost: the cel at `index` in [`Drawing::cels`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ghost {
+    pub role: GhostRole,
+    pub index: usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Drawing {
     pub width: u32,
@@ -282,6 +303,63 @@ impl Drawing {
         }
     }
 
+    /// The onion-skin ghosts for the playhead on drawing frame `f`, in paint order (farthest
+    /// first, so the nearest ends on top).
+    ///
+    /// Up to `before` / `after` (each at most [`MAX_ONION_CELS`]) cels either side of the cel
+    /// shown, one ghost per *cel*: a held cel is one cel however long it is held, so it never
+    /// repeats. A blank cel is a pose and takes its place (it shows nothing but stops an older
+    /// drawing from standing in for it). A cel with the same strokes as the one shown, or as a
+    /// nearer ghost, is passed over, since it would only sit on top of it. `pin` adds the cel
+    /// starting on that frame and `loop_start` the first cel of the drawing, unless they are the
+    /// cel shown or already a ghost.
+    pub fn onion_plan(&self, f: i64, before: usize, after: usize, pin: Option<i64>, loop_start: bool) -> Vec<Ghost> {
+        let shown = self.cel_index_at(f);
+        let mut chosen: Vec<Ghost> = Vec::new();
+        let repeats = |chosen: &[Ghost], i: usize| -> bool {
+            let Some(c) = self.cels.get(i) else { return true };
+            if c.strokes.is_empty() {
+                return false;
+            }
+            let same = |j: usize| self.cels.get(j).is_some_and(|o| std::sync::Arc::ptr_eq(&o.strokes, &c.strokes) || o.strokes == c.strokes);
+            shown.is_some_and(same) || chosen.iter().any(|g| same(g.index))
+        };
+        let take = |chosen: &mut Vec<Ghost>, order: &mut dyn Iterator<Item = usize>, limit: usize, role: fn(usize) -> GhostRole| {
+            let mut n = 0;
+            for i in order {
+                if n >= limit.min(MAX_ONION_CELS) {
+                    break;
+                }
+                if !repeats(chosen, i) {
+                    n += 1;
+                    chosen.push(Ghost { role: role(n), index: i });
+                }
+            }
+        };
+        if let Some(s) = shown {
+            take(&mut chosen, &mut (0..s).rev(), before, GhostRole::Before);
+        }
+        take(&mut chosen, &mut (shown.map_or(0, |s| s + 1)..self.cels.len()), after, GhostRole::After);
+        let extra = |chosen: &[Ghost], i: usize| Some(i) != shown && !chosen.iter().any(|g| g.index == i) && !repeats(chosen, i);
+        let mut out = Vec::with_capacity(chosen.len() + 2);
+        if loop_start && !self.cels.is_empty() && extra(&chosen, 0) {
+            out.push(Ghost { role: GhostRole::LoopStart, index: 0 });
+        }
+        if let Some(i) = pin.and_then(|p| self.cel_on(p))
+            && extra(&chosen, i)
+            && !out.iter().any(|g| g.index == i)
+        {
+            out.push(Ghost { role: GhostRole::Pin, index: i });
+        }
+        let rank = |g: &Ghost| match g.role {
+            GhostRole::Before(n) | GhostRole::After(n) => n,
+            _ => 0,
+        };
+        chosen.sort_by_key(|g| std::cmp::Reverse(rank(g)));
+        out.extend(chosen);
+        out
+    }
+
     /// Restore the invariants after loading untrusted data: sorted unique cels, sane strokes.
     pub fn sanitize(&mut self) {
         self.cels.truncate(MAX_CELS);
@@ -366,6 +444,77 @@ mod tests {
     fn line(x0: f32, x1: f32, n: usize) -> Stroke {
         let points = (0..n).map(|i| StrokePoint { x: x0 + (x1 - x0) * i as f32 / (n - 1).max(1) as f32, y: 10.0, p: 1.0 }).collect();
         Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points }
+    }
+
+    fn cel_of(d: &mut Drawing, frame: i64, strokes: &[Stroke]) {
+        let i = d.ensure_cel(frame, false).unwrap();
+        d.cels[i].strokes_mut().extend_from_slice(strokes);
+    }
+    fn plan(d: &Drawing, f: i64, before: usize, after: usize, pin: Option<i64>, lp: bool) -> Vec<(GhostRole, i64)> {
+        d.onion_plan(f, before, after, pin, lp).iter().map(|g| (g.role, d.cels[g.index].frame)).collect()
+    }
+
+    #[test]
+    fn onion_plan_has_one_ghost_per_distinct_cel_and_never_repeats_a_hold() {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        for (f, x) in [(0, 10.0), (4, 20.0), (8, 30.0), (12, 40.0), (16, 50.0)] {
+            cel_of(&mut d, f, &[line(x, x + 5.0, 3)]);
+        }
+        // default: one either side; held frames 8..12 all give the same answer
+        for f in 8..12 {
+            assert_eq!(plan(&d, f, 1, 1, None, false), vec![(GhostRole::Before(1), 4), (GhostRole::After(1), 12)]);
+        }
+        // two either side, farthest painted first
+        assert_eq!(
+            plan(&d, 9, 2, 2, None, false),
+            vec![(GhostRole::Before(2), 0), (GhostRole::After(2), 16), (GhostRole::Before(1), 4), (GhostRole::After(1), 12)]
+        );
+        // nothing before the first cel; before the first cel starts only the next shows
+        assert_eq!(plan(&d, 0, 3, 0, None, false), vec![]);
+        let mut late = d.clone();
+        late.cels.remove(0);
+        assert_eq!(plan(&late, 1, 2, 1, None, false), vec![(GhostRole::After(1), 4)]);
+        // the count is bounded
+        assert_eq!(d.onion_plan(8, usize::MAX, usize::MAX, None, false).len(), 4);
+        assert!(d.onion_plan(8, 0, 0, None, false).is_empty());
+    }
+
+    #[test]
+    fn onion_plan_keeps_blank_cels_and_passes_over_copies() {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        cel_of(&mut d, 0, &[line(10.0, 20.0, 3)]);
+        cel_of(&mut d, 4, &[]); // blank pose
+        cel_of(&mut d, 8, &[line(30.0, 40.0, 3)]);
+        // the blank cel is the previous pose: it takes the place (and shows nothing) instead of
+        // frame 0 standing in for it
+        assert_eq!(plan(&d, 8, 1, 0, None, false), vec![(GhostRole::Before(1), 4)]);
+        // a duplicate of the cel shown only sits on top of it; a duplicate of a nearer ghost too
+        let mut e = Drawing::new(100, 100, FrameRate::new(24, 1));
+        let same = [line(10.0, 20.0, 3)];
+        cel_of(&mut e, 0, &[line(1.0, 2.0, 3)]);
+        cel_of(&mut e, 4, &same);
+        cel_of(&mut e, 8, &same);
+        cel_of(&mut e, 12, &same);
+        assert_eq!(plan(&e, 12, 2, 0, None, false), vec![(GhostRole::Before(1), 0)]);
+        assert_eq!(plan(&e, 0, 0, 3, None, false), vec![(GhostRole::After(1), 4)]);
+    }
+
+    #[test]
+    fn onion_plan_pin_and_loop_start_do_not_duplicate_other_ghosts() {
+        let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
+        for (f, x) in [(0, 10.0), (4, 20.0), (8, 30.0), (12, 40.0)] {
+            cel_of(&mut d, f, &[line(x, x + 5.0, 3)]);
+        }
+        assert_eq!(plan(&d, 12, 1, 0, Some(4), true), vec![(GhostRole::LoopStart, 0), (GhostRole::Pin, 4), (GhostRole::Before(1), 8)]);
+        // a pin on a neighbour, on the cel shown, on no cel at all, or the loop start being the pin
+        assert_eq!(plan(&d, 12, 1, 0, Some(8), false), vec![(GhostRole::Before(1), 8)]);
+        assert_eq!(plan(&d, 12, 0, 0, Some(12), false), vec![]);
+        assert_eq!(plan(&d, 12, 0, 0, Some(5), false), vec![]);
+        assert_eq!(plan(&d, 12, 0, 0, Some(0), true), vec![(GhostRole::LoopStart, 0)]);
+        // the loop start is the cel shown: nothing to compare
+        assert_eq!(plan(&d, 2, 0, 0, None, true), vec![]);
+        // the drawing playing no cel yet, an empty drawing
+        assert!(Drawing::new(10, 10, FrameRate::new(24, 1)).onion_plan(-5, 3, 3, Some(0), true).is_empty());
     }
 
     #[test]

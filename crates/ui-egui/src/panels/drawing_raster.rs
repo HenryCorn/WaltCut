@@ -77,6 +77,12 @@ pub fn eraser_footprint(stroke: &Stroke, m: &Affine, w: usize, h: usize) -> Imag
 /// A premultiplied linear raster as an egui image (premultiplied sRGB). `tint` replaces the colour
 /// (onion skins); `opacity` scales the alpha.
 pub fn color_image(img: &Image, tint: Option<[u8; 3]>, opacity: f32) -> ColorImage {
+    color_image_tinted(img, tint, 1.0, opacity)
+}
+
+/// Like [`color_image`], with the tint at `strength` (0 = the cel's own colours, 1 = the tint).
+pub fn color_image_tinted(img: &Image, tint: Option<[u8; 3]>, strength: f32, opacity: f32) -> ColorImage {
+    let strength = if strength.is_finite() { strength.clamp(0.0, 1.0) } else { 1.0 };
     let opacity = if opacity.is_finite() { opacity.clamp(0.0, 1.0) } else { 1.0 };
     let mut out = ColorImage::filled([img.w.max(1), img.h.max(1)], Color32::TRANSPARENT);
     if img.w == 0 || img.h == 0 {
@@ -90,7 +96,11 @@ pub fn color_image(img: &Image, tint: Option<[u8; 3]>, opacity: f32) -> ColorIma
         let alpha = a * opacity;
         let enc = |v: f32| (waltcut_color::linear_to_srgb((v / a).clamp(0.0, 1.0)) * alpha * 255.0).round() as u8;
         let (r, g, b) = match tint {
-            Some([r, g, b]) => ((r as f32 * alpha).round() as u8, (g as f32 * alpha).round() as u8, (b as f32 * alpha).round() as u8),
+            Some([tr, tg, tb]) => {
+                // premultiplied: mix the cel's own colour and the tint, both at this alpha
+                let mix = |own: u8, t: u8| (own as f32 + (t as f32 * alpha - own as f32) * strength).round() as u8;
+                (mix(enc(p[0]), tr), mix(enc(p[1]), tg), mix(enc(p[2]), tb))
+            }
             None => (enc(p[0]), enc(p[1]), enc(p[2])),
         };
         *dst = Color32::from_rgba_premultiplied(r, g, b, (alpha * 255.0).round() as u8);
@@ -166,6 +176,8 @@ pub struct OnionKey {
     pub origin: [u32; 2],
     pub size: (usize, usize),
     pub tint: [u8; 3],
+    /// Tint strength in thousandths.
+    pub strength: u32,
     pub opacity: u32,
 }
 
@@ -219,6 +231,7 @@ pub fn paint_onion(
     clip: u64,
     cel: Option<(i64, &[Stroke])>,
     tint: [u8; 3],
+    strength: f32,
     opacity: f32,
     to_screen: &Affine,
     pic: Rect,
@@ -271,6 +284,7 @@ pub fn paint_onion(
         origin: [pic.min.x.to_bits(), pic.min.y.to_bits()],
         size: (w, h),
         tint,
+        strength: (strength.clamp(0.0, 1.0) * 1000.0) as u32,
         opacity: (opacity.clamp(0.0, 1.0) * 1000.0) as u32,
     };
     let current = s.shown.as_ref().is_some_and(|(k, _, _)| *k == want);
@@ -283,7 +297,7 @@ pub fn paint_onion(
         std::thread::spawn(move || {
             let out = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let img = render_cel(&strokes, &m, key.size.0, key.size.1);
-                (key.clone(), color_image(&img, Some(key.tint), key.opacity as f32 / 1000.0))
+                (key.clone(), color_image_tinted(&img, Some(key.tint), key.strength as f32 / 1000.0, key.opacity as f32 / 1000.0))
             }));
             let _ = tx.send(out.map_err(|_| ()));
             repaint.request_repaint();
@@ -336,6 +350,25 @@ mod tests {
         assert_eq!(at(32, 16).a(), 0, "erased");
         assert!(at(10, 16).a() > 80, "kept, tinted at the onion opacity");
         assert!((at(10, 16).r() as i32 - (230.0f32 * at(10, 16).a() as f32 / 255.0).round() as i32).abs() <= 1);
+    }
+
+    #[test]
+    fn tint_strength_mixes_the_cels_own_colour_with_the_tint() {
+        let m = Affine::scale(1.0, 1.0);
+        let img = render_cel(&[stroke(Brush::Pen, &[(4.0, 8.0, 1.0), (60.0, 8.0, 1.0)], 8.0, [0.0, 0.0, 1.0, 1.0])], &m, 64, 16);
+        let at = |ci: &ColorImage| ci.pixels[8 * 64 + 30];
+        let (own, full, none, half) = (
+            color_image(&img, None, 1.0),
+            color_image_tinted(&img, Some([230, 70, 70]), 1.0, 1.0),
+            color_image_tinted(&img, Some([230, 70, 70]), 0.0, 1.0),
+            color_image_tinted(&img, Some([230, 70, 70]), 0.5, 1.0),
+        );
+        assert_eq!((at(&full).r(), at(&full).g(), at(&full).b()), (230, 70, 70));
+        assert_eq!(at(&none), at(&own), "strength 0 keeps the cel's colours");
+        assert_eq!((at(&half).r(), at(&half).b()), (115, 163), "halfway between blue (0,0,255) and the tint");
+        // hostile strength and opacity are clamped, never a panic
+        let _ = color_image_tinted(&img, Some([1, 2, 3]), f32::NAN, f32::INFINITY);
+        assert_eq!(at(&color_image_tinted(&img, Some([230, 70, 70]), 9.0, 1.0)), at(&full));
     }
 
     #[test]
