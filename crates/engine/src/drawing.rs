@@ -147,16 +147,18 @@ fn retime_exposures(s: &mut Session, p: &Value) -> Result<Value> {
     if frames.iter().any(|f| *f < first || *f > last) {
         return Err(bad(ID, format!("cel frames must be within the drawing clip's visible range {first}..={last}")));
     }
-    // checked on a copy first so a refusal leaves the history alone
+    // checked on a copy first so a refusal leaves the history alone, and so `dryRun` can show the result
     let mut probe = d.clone();
     let moved = probe.respace_cels(&frames, spacing, ripple, limit).map_err(|e| bad(ID, e))?;
+    let planned: Vec<i64> = probe.cels.iter().map(|c| c.frame).collect();
+    if p.get("dryRun").and_then(Value::as_bool).unwrap_or(false) {
+        return Ok(json!({"clip": clip.0, "moved": moved, "spacing": spacing, "cels": planned, "dryRun": true}));
+    }
     if moved == 0 {
         return Ok(json!({"clip": clip.0, "moved": 0}));
     }
     edit_drawing(s, ID, "Retime Exposures", id, |d| d.respace_cels(&frames, spacing, ripple, limit).map_err(|e| bad(ID, e)))?;
-    let cels: Vec<i64> =
-        s.active_sequence().and_then(|seq| drawing_of(s, seq, clip)).map(|(_, d)| d.cels.iter().map(|c| c.frame).collect()).unwrap_or_default();
-    Ok(json!({"clip": clip.0, "moved": moved, "spacing": spacing, "cels": cels}))
+    Ok(json!({"clip": clip.0, "moved": moved, "spacing": spacing, "cels": planned}))
 }
 
 fn set_hold(s: &mut Session, p: &Value) -> Result<Value> {
@@ -430,7 +432,7 @@ pub fn commands() -> Vec<CommandSpec> {
             "drawing.retimeExposures",
             "Retime Exposures",
             &["Graphics and Titles", "Drawing"],
-            r#"{"clip":id?,"frames":[int,...],"on":"ones"|"twos"|"threes","spacing":int?,"ripple":bool?}"#,
+            r#"{"clip":id?,"frames":[int,...],"on":"ones"|"twos"|"threes","spacing":int?,"ripple":bool?,"dryRun":bool?}"#,
             has_drawing,
             retime_exposures,
         ),

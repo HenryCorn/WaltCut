@@ -226,8 +226,35 @@ fn retiming_exposures_refuses_what_does_not_fit_and_leaves_history_alone() {
         assert!(s.execute("drawing.retimeExposures", params.clone()).is_err(), "{params}");
         assert_eq!(s.history.undo.len(), before, "{params}");
     }
-    // already on twos: nothing to do, no undo step
+    // a dry run reports the result and changes nothing
+    let r = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2], "on": "twos", "dryRun": true})).unwrap();
+    assert_eq!(r["cels"], json!([0, 2, 4, 42]));
+    assert_eq!(r["dryRun"], true);
+    assert_eq!(s.history.undo.len(), before);
+    // already on ones: nothing to do, no undo step
     s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2], "on": "ones"})).unwrap();
+    assert_eq!(s.history.undo.len(), before);
+}
+
+#[test]
+fn retiming_exposures_respects_the_trimmed_range_and_locked_tracks() {
+    let mut s = session();
+    let clip = new_drawing(&mut s);
+    for f in [0, 4, 6, 8] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+    }
+    s.execute("timeline.trim", json!({"clip": clip.0, "edge": "in", "mode": "regular", "deltaFrames": 4})).unwrap();
+    let before = s.history.undo.len();
+    // frame 0 is trimmed away: not part of what can be retimed
+    assert!(s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 4], "on": "twos"})).is_err());
+    let r = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [4, 6, 8], "on": "threes"})).unwrap();
+    assert_eq!(r["cels"], json!([0, 4, 7, 10]));
+    assert_eq!(s.history.undo.len(), before + 1);
+    let track = s.active_sequence().and_then(|seq| seq.find_item(clip)).map(|(id, _)| id).unwrap();
+    s.execute("timeline.setTrack", json!({"track": track.0, "locked": true})).unwrap();
+    let before = s.history.undo.len();
+    let err = s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [4, 7], "on": "twos"})).unwrap_err();
+    assert!(err.to_string().contains("locked"), "{err}");
     assert_eq!(s.history.undo.len(), before);
 }
 

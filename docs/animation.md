@@ -17,12 +17,15 @@ hold a pose for several frames or place a new cel on every frame.
    the next cel start. The Timeline shows these exposures in the drawing clip; drag a start marker
    to retime its pose, or drag an exposure end to adjust the hold. Empty cels are explicit blank
    poses; clearing a cel keeps its start, while deleting it lets an earlier pose hold again.
-   Click an exposure (Shift-click to extend) to pick it, then choose **Graphics and Titles ▸
-   Drawing ▸ Retime Cels on Ones / Twos / Threes**: the picked run of cels is re-spaced one, two or
+   Click an exposure (Shift-click to extend) to pick it, then right-click it, or choose **Graphics and
+   Titles ▸ Drawing ▸ Retime Cels on Ones / Twos / Threes**. In the right-click menu, hovering a choice
+   marks in the lane where the cels would land (white marks; the grey line is where a cel stands now)
+   and clicking applies it; Escape or clicking away changes nothing: the picked run of cels is re-spaced one, two or
    three frames apart from its first cel, every cel keeping its drawing. The last picked cel keeps
    its own hold and the cels after it move with it, so the rest of the animation keeps its timing;
    one undo step restores everything. With nothing picked the whole drawing is retimed. The
-   command is `drawing.retimeExposures {frames, on|spacing, ripple?}`; a refusal (cels that do not
+   command is `drawing.retimeExposures {frames, on|spacing, ripple?, dryRun?}` (`dryRun` returns the
+   resulting cel starts without editing); a refusal (cels that do not
    follow each other, a pose that would land past the clip's end) changes nothing.
 4. Enable **Onion skin** to show the neighbouring cels: the previous cel in red and the next in
    green.

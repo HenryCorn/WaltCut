@@ -183,3 +183,43 @@ fn retime_without_a_pick_acts_on_every_cel_and_refuses_a_gap_in_the_pick() {
     assert_eq!(answer.expect("a reply")["ok"], false);
     assert_eq!(driver.frames_of_cels(), vec![0, 2, 3, 4]);
 }
+
+#[test]
+fn right_clicking_an_exposure_offers_retimes_that_preview_on_hover_and_apply_on_click() {
+    let mut driver = Driver::new();
+    let clip = driver.clip;
+    for frame in 1..4 {
+        driver.call("engine.execute", json!({"command": "drawing.newCel", "params": {"clip": clip, "frame": frame}}));
+    }
+    driver.frames(4);
+    let second = driver.centre(&format!("timeline.cel.{clip}.1"));
+    driver.click(second, false);
+    let fourth = driver.centre(&format!("timeline.cel.{clip}.3"));
+    driver.click(fourth, true);
+
+    driver.harness.input_mut().events.push(egui::Event::PointerMoved(second));
+    driver.frames(1);
+    for pressed in [true, false] {
+        driver.harness.input_mut().events.push(egui::Event::PointerButton {
+            pos: second,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: Default::default(),
+        });
+        driver.frames(1);
+    }
+    driver.frames(3);
+    let twos = driver.centre("timeline.celMenu.twos");
+    driver.harness.input_mut().events.push(egui::Event::PointerMoved(twos));
+    driver.frames(3);
+    // hovering shows the plan and edits nothing
+    let preview = driver.harness.state().tl.retime_preview.clone();
+    assert_eq!(preview, Some((waltcut_project::ClipId(clip), vec![0, 1, 3, 5, 6])));
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 2, 3, 4]);
+    let history = driver.call("engine.execute", json!({"command": "drawing.inspect", "params": {"clip": clip}}));
+    assert_eq!(history["cels"].as_array().map(Vec::len), Some(5));
+
+    driver.click(twos, false);
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 3, 5, 6]);
+    assert!(driver.harness.state().tl.retime_preview.is_none());
+}
