@@ -194,6 +194,8 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
         seed: u64_p(p, "seed").or(Some(1234)),
     };
     req.validate().map_err(|e| bad(ID, e.to_string()))?;
+    // the provider gets the picture a delivery render would show: no guides unless asked
+    let include_guides = crate::export_tools::bool_param(p, "includeGuides", ID)?;
     let (times, hold) = frame_times(s, ID, p)?;
     if times.len() > CONFIRM_ABOVE_FRAMES && !bool_p(p, "confirm").unwrap_or(false) {
         return Err(bad(ID, format!("this sends {} frames, each billed by the provider; repeat with `confirm: true` to go ahead", times.len())));
@@ -229,7 +231,7 @@ fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
                 }
                 let first = c * concurrency;
                 *prog.status.lock().unwrap_or_else(PoisonError::into_inner) = format!("Frame {} of {n}", first + 1);
-                let opts = waltcut_render::RenderOptions { scale, ..Default::default() };
+                let opts = waltcut_render::RenderOptions { scale, guides: include_guides, ..Default::default() };
                 let mut pictures = Vec::new();
                 for t in chunk {
                     let img = waltcut_render::render_sequence(&project, seq_id, *t, opts, &provider);
@@ -355,7 +357,7 @@ pub fn commands() -> Vec<CommandSpec> {
             label: "AI Restyle…",
             menu: &[],
             shortcut: None,
-            params: r#"{"prompt":str,"negativePrompt":str?,"strength":0..1?,"seed":int?,"range":"playhead|inout|clip"?,"every":frames?,"maxFrames":int?,"confirm":bool?,"concurrency":1..4?,"wait":bool?}"#,
+            params: r#"{"prompt":str,"negativePrompt":str?,"strength":0..1?,"seed":int?,"range":"playhead|inout|clip"?,"every":frames?,"maxFrames":int?,"confirm":bool?,"concurrency":1..4?,"wait":bool?,"includeGuides":bool?}"#,
             enabled: has_seq,
             run: restyle,
             // never replayed by crash recovery: each run is billed by a cloud provider

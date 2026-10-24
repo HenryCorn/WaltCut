@@ -23,6 +23,7 @@ mod export_output;
 pub mod export_tools;
 pub mod graphic_design;
 pub mod graphics;
+pub mod guides;
 pub mod keyboard;
 mod keyframe_move;
 mod marker_export;
@@ -992,7 +993,8 @@ impl Session {
     fn render_program_with(&self, scale: f32, t: Tick, provider: &dyn waltcut_render::SourceProvider) -> Result<waltcut_render::Image> {
         let seq = self.renderable_sequence(scale)?;
         let t = self.sequence_rate().snap(t.max(Tick::ZERO));
-        let opts = waltcut_render::RenderOptions { scale, ..Default::default() };
+        // the Program picture, as the monitor shows it: with guides
+        let opts = waltcut_render::RenderOptions { scale, guides: true, ..Default::default() };
         Ok(waltcut_render::render_sequence(&self.project, seq, t, opts, provider))
     }
 
@@ -1075,6 +1077,8 @@ mod export_tests;
 mod file_tests;
 #[cfg(test)]
 mod gap_selection_tests;
+#[cfg(test)]
+mod guide_tests;
 #[cfg(test)]
 mod image_sequence_tests;
 #[cfg(test)]

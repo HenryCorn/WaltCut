@@ -57,11 +57,15 @@ pub struct RenderOptions {
     /// Return the image in the sequence's working space (HDR exports, scopes) instead of
     /// converting it for an SDR monitor. Only matters for HDR / wide-gamut sequences.
     pub working_output: bool,
+    /// Draw guide clips ([`waltcut_project::TrackItem::guide`]). Off by default so that a render
+    /// nobody thought about (an export, a frame, an AI input) can never carry a guide; only
+    /// the Program preview, which is for looking, asks for them.
+    pub guides: bool,
 }
 
 impl Default for RenderOptions {
     fn default() -> Self {
-        Self { scale: 1.0, depth: 0, working_output: false }
+        Self { scale: 1.0, depth: 0, working_output: false, guides: false }
     }
 }
 
@@ -163,7 +167,7 @@ pub(crate) fn render_seq_tracks(project: &Project, seq: &Sequence, t: Tick, opts
             continue;
         }
         let Some(item) = track.item_at(t) else { continue };
-        if !item.enabled {
+        if !item.enabled || (item.guide && !opts.guides) {
             continue;
         }
         match item_layer_ex(project, seq, item, t, opts, sources, true) {
@@ -437,7 +441,7 @@ pub(crate) fn base_layer(
             media_image(project, seq, item, t, &src, &frame, n, want)
         }
         ItemKind::Sequence(nested) => {
-            let sub = RenderOptions { scale: want, depth: opts.depth + 1, working_output: true };
+            let sub = RenderOptions { scale: want, depth: opts.depth + 1, working_output: true, guides: opts.guides };
             render_seq(project, nested, ft, sub, sources)
         }
         ItemKind::Graphic { .. } => {
@@ -542,6 +546,7 @@ pub fn arc_source(s: impl waltcut_media::MediaSource + 'static) -> SharedSource 
 mod tests;
 
 #[cfg(test)]
+mod guide_tests;
 #[cfg(test)]
 mod nest_tests;
 

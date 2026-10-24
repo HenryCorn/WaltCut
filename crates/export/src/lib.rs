@@ -119,6 +119,9 @@ pub struct ExportSettings {
     pub gpu_rendering: GpuRendering,
     #[serde(skip)]
     pub signal: ColorSignal,
+    /// Draw guide clips. Off: an export never carries a guide unless asked to.
+    #[serde(skip)]
+    pub include_guides: bool,
 }
 
 /// Buffered disk output. User exports write inside the engine's owned staging directory.
@@ -225,6 +228,7 @@ impl Default for ExportSettings {
             sdr: false,
             gpu_rendering: GpuRendering::Off,
             signal: ColorSignal::default(),
+            include_guides: false,
         }
     }
 }

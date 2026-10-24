@@ -99,7 +99,7 @@ fn push_tracks(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, 
             continue;
         }
         let Some(item) = tr.item_at(t) else { continue };
-        if !item.enabled {
+        if !item.enabled || (item.guide && !opts.guides) {
             continue;
         }
         push_item(project, seq, item, t, opts, sources, nest, layers);
@@ -111,14 +111,12 @@ fn push_tracks(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, 
 /// by one over what is below gives the same picture as compositing them together first only when
 /// they all blend Normal, and the frame must be one that plans as layers in the same colour
 /// pipeline.
-fn nest_is_plain(seq: &Sequence, nested: &Sequence, ft: Tick) -> bool {
+fn nest_is_plain(seq: &Sequence, nested: &Sequence, ft: Tick, guides: bool) -> bool {
     nested.settings.color == seq.settings.color
         && (nested.settings.width, nested.settings.height) == (seq.settings.width, seq.settings.height)
-        && nested
-            .video_tracks
-            .iter()
-            .filter(|tr| tr.enabled)
-            .all(|tr| tr.item_at(ft).filter(|i| i.enabled).is_none_or(|i| crate::opacity_blend(i, i.effect_time_at(ft)).1 == Blend::Normal))
+        && nested.video_tracks.iter().filter(|tr| tr.enabled).all(|tr| {
+            tr.item_at(ft).filter(|i| i.enabled && (guides || !i.guide)).is_none_or(|i| crate::opacity_blend(i, i.effect_time_at(ft)).1 == Blend::Normal)
+        })
 }
 
 /// Push the layer(s) of `item`. `nest` counts the nested sequences already followed to reach
@@ -146,7 +144,7 @@ fn push_item(
         && bl == Blend::Normal
         && op >= 1.0 - 1e-6
         && near_identity(&motion_matrix(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt))
-        && nest_is_plain(seq, nested, ft)
+        && nest_is_plain(seq, nested, ft, opts.guides)
     {
         push_tracks(project, nested, ft, opts, sources, nest + 1, out);
         return;

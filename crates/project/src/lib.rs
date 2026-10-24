@@ -568,6 +568,12 @@ pub struct TrackItem {
     /// ([`GraphicMeta`]). Schema v12.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graphic: Option<Box<GraphicMeta>>,
+    /// A guide (reference) clip: shown in the Program preview but left out of every delivery
+    /// render (frame and sequence exports, movie exports and AI Restyle input) unless the
+    /// export asks for guides. Not the same as disabled (shown nowhere), muted or locked.
+    /// Additive: omitted from the file when false, so projects without guides are unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub guide: bool,
 }
 
 fn deserialize_source_channels<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<u16>, D::Error> {
@@ -1443,6 +1449,7 @@ impl Project {
             source_channels,
             audio_stream: 0,
             graphic: source_graphic.and_then(|sg| sg.meta.map(Box::new)),
+            guide: false,
         })
     }
 

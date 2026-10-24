@@ -19,6 +19,9 @@ pub struct ExportUi {
     #[serde(skip)]
     pub for_sequence: Option<u64>,
     pub quick_open: bool,
+    /// Draw guide clips in this export (#65). Asked for each time: neither saved nor loaded.
+    #[serde(skip)]
+    pub include_guides: bool,
     #[serde(skip)]
     replace_path: Option<String>,
 }
@@ -33,6 +36,7 @@ impl Default for ExportUi {
             end_frame: 24,
             for_sequence: None,
             quick_open: false,
+            include_guides: false,
             replace_path: None,
         }
     }
@@ -62,6 +66,9 @@ pub fn export_params(app: &WaltCutApp) -> Value {
     if ex.range == "custom" {
         p["startFrame"] = json!(ex.start_frame);
         p["endFrame"] = json!(ex.end_frame);
+    }
+    if ex.include_guides {
+        p["includeGuides"] = json!(true);
     }
     p
 }
@@ -131,6 +138,9 @@ fn controls(app: &mut WaltCutApp, ui: &mut egui::Ui, quick: bool) {
     if before != (ex.path.clone(), ex.format, ex.range.clone(), ex.start_frame, ex.end_frame) {
         ex.replace_path = None;
     }
+    let response =
+        ui.checkbox(&mut ex.include_guides, "Include guide clips").on_hover_text("Guide clips (Clip ▸ Use as Guide) are left out of exports unless this is on");
+    app.auto.add(&format!("{prefix}.includeGuides"), response.rect, "Include guide clips");
     let active =
         app.session.jobs.iter().find(|j| app.session.export_offline.contains_key(&j.id) && j.result.lock().unwrap_or_else(|e| e.into_inner()).is_none());
     let cancel = if let Some(job) = active {

@@ -839,7 +839,7 @@ fn provider(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>) -> J
 }
 
 fn plan_job(job: &Job, seq: ItemId, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, previews: &PreviewStore) -> (waltcut_render::plan::FramePlan, bool) {
-    let opts = waltcut_render::RenderOptions { scale: job.scale, ..Default::default() };
+    let opts = waltcut_render::RenderOptions { scale: job.scale, guides: true, ..Default::default() };
     if let Some(frame) = preview_frame(job, seq, pool, previews)
         && let Some(q) = job.project.sequence(seq)
     {
@@ -869,7 +869,7 @@ fn render_job(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, pr
         return (Rgba { w: img.w, h: img.h, px: img.over_black_rgba8() }, true);
     }
     let provider = provider(job, pool, services);
-    let opts = waltcut_render::RenderOptions { scale: job.scale, ..Default::default() };
+    let opts = waltcut_render::RenderOptions { scale: job.scale, guides: true, ..Default::default() };
     let img = match job.key.target {
         Target::Sequence(seq) | Target::SequencePlan(seq) => Some(waltcut_render::render_sequence(&job.project, seq, job.time, opts, &provider)),
         Target::Item(item) => waltcut_render::render_item(&job.project, item, job.time, job.scale, &provider),
