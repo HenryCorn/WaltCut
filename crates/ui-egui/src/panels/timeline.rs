@@ -1020,17 +1020,19 @@ fn draw_drawing_exposures(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, i
             None => format!("Cel exposure from frame {} to clip end", cel.frame),
         };
         app.auto.add(&format!("timeline.cel.{}.{}", it.id.0, cel.frame), exposure, &label);
-        let start_handle = Rect::from_center_size(
-            pos2((retime_x + if reverse { -3.0 } else { 3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
-            vec2(6.0, lane.height()),
-        );
-        let end_handle = Rect::from_center_size(
-            pos2((hold_x + if reverse { 3.0 } else { -3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
-            vec2(6.0, lane.height()),
-        );
+        let (start_handle, end_handle) = cel_handles(body, lane, retime_x, hold_x, reverse);
         app.auto.add(&format!("timeline.cel.{}.{}.start", it.id.0, cel.frame), start_handle.intersect(body), "Retime cel start");
         app.auto.add(&format!("timeline.cel.{}.{}.end", it.id.0, cel.frame), end_handle.intersect(body), "Adjust cel hold");
     }
+}
+
+/// The start and hold-end handles of one exposure. They are 6 px wide, but each takes at most a
+/// third of the exposure, so a one-frame cel at a moderate zoom keeps a body to click.
+fn cel_handles(body: Rect, lane: Rect, retime_x: f32, hold_x: f32, reverse: bool) -> (Rect, Rect) {
+    let half = ((hold_x - retime_x).abs() / 6.0).clamp(1.0, 3.0);
+    let sign = if reverse { -1.0 } else { 1.0 };
+    let at = |x: f32| Rect::from_center_size(pos2(x.clamp(body.min.x + half, body.max.x - half), lane.center().y), vec2(half * 2.0, lane.height()));
+    (at(retime_x + sign * half), at(hold_x - sign * half))
 }
 
 fn drawing_cel_grab(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Grab> {
@@ -1064,17 +1066,10 @@ fn drawing_cel_grab(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2
             let Some((_, _, retime_x, hold_x, _, reverse)) = drawing_exposure_xs(layout, body, it, drawing, &drawing.cels, i, first, last) else {
                 continue;
             };
-            let start_handle = Rect::from_center_size(
-                pos2((retime_x + if reverse { -3.0 } else { 3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
-                vec2(6.0, lane.height()),
-            );
+            let (start_handle, end_handle) = cel_handles(body, lane, retime_x, hold_x, reverse);
             if start_handle.contains(pos) {
                 return Some(Grab::CelStart { track: row.track, clip: it.id, frame: cel.frame });
             }
-            let end_handle = Rect::from_center_size(
-                pos2((hold_x + if reverse { 3.0 } else { -3.0 }).clamp(body.min.x + 3.0, body.max.x - 3.0), lane.center().y),
-                vec2(6.0, lane.height()),
-            );
             if end_handle.contains(pos) {
                 let end_frame = match drawing.cels.get(i + 1) {
                     Some(next) => next.frame,
@@ -1167,7 +1162,15 @@ fn timeline_grab_at(app: &WaltCutApp, seq: &Sequence, layout: &Layout, pos: Pos2
     {
         return grab;
     }
-    grab_at(seq, layout, pos, tool, mods, roll_ripple)
+    let grab = grab_at(seq, layout, pos, tool, mods, roll_ripple);
+    // the lane belongs to the exposures: a clip edge zone must not swallow a cel at the clip's ends
+    if tool == Tool::Selection
+        && let Grab::Edge { track, clip, .. } = grab
+        && cel_under(app, seq, layout, clip, pos).is_some()
+    {
+        return Grab::Other(Hit::Clip { track, clip, edge: None });
+    }
+    grab
 }
 
 fn drawing_frame_at_x(app: &WaltCutApp, seq: &Sequence, layout: &Layout, clip: ClipId, x: f32) -> Option<i64> {
