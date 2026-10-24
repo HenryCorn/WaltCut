@@ -112,6 +112,53 @@ fn retime_cel(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"clip": clip.0, "cel": from, "frame": to}))
 }
 
+/// `spacing` (1 to 96 frames) or `on`: "ones" | "twos" | "threes".
+fn spacing_param(cmd: &str, p: &Value) -> Result<i64> {
+    if let Some(on) = p.get("on").and_then(Value::as_str) {
+        return match on {
+            "ones" => Ok(1),
+            "twos" => Ok(2),
+            "threes" => Ok(3),
+            _ => Err(bad(cmd, "`on` is ones, twos or threes")),
+        };
+    }
+    p.get("spacing").and_then(Value::as_i64).ok_or_else(|| bad(cmd, "need `on` (ones, twos, threes) or integer `spacing`"))
+}
+
+fn retime_exposures(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "drawing.retimeExposures";
+    let (clip, id, _) = target(s, ID, p)?;
+    let spacing = spacing_param(ID, p)?;
+    let ripple = p.get("ripple").and_then(Value::as_bool).unwrap_or(true);
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
+    let (first, last) = editable_frame_bounds(s, ID, clip, d)?;
+    let limit = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;
+    let frames: Vec<i64> = match p.get("frames") {
+        Some(v) => {
+            let a = v.as_array().ok_or_else(|| bad(ID, "`frames` is a list of cel start frames"))?;
+            if a.len() > d.cels.len() {
+                return Err(bad(ID, "more frames than the drawing has cels"));
+            }
+            a.iter().map(|f| f.as_i64().ok_or_else(|| bad(ID, "`frames` holds integers"))).collect::<Result<_>>()?
+        }
+        None => return Err(bad(ID, "need `frames`: the start frames of the selected cels")),
+    };
+    if frames.iter().any(|f| *f < first || *f > last) {
+        return Err(bad(ID, format!("cel frames must be within the drawing clip's visible range {first}..={last}")));
+    }
+    // checked on a copy first so a refusal leaves the history alone
+    let mut probe = d.clone();
+    let moved = probe.respace_cels(&frames, spacing, ripple, limit).map_err(|e| bad(ID, e))?;
+    if moved == 0 {
+        return Ok(json!({"clip": clip.0, "moved": 0}));
+    }
+    edit_drawing(s, ID, "Retime Exposures", id, |d| d.respace_cels(&frames, spacing, ripple, limit).map_err(|e| bad(ID, e)))?;
+    let cels: Vec<i64> =
+        s.active_sequence().and_then(|seq| drawing_of(s, seq, clip)).map(|(_, d)| d.cels.iter().map(|c| c.frame).collect()).unwrap_or_default();
+    Ok(json!({"clip": clip.0, "moved": moved, "spacing": spacing, "cels": cels}))
+}
+
 fn set_hold(s: &mut Session, p: &Value) -> Result<Value> {
     const ID: &str = "drawing.setHold";
     let (clip, id, _) = target(s, ID, p)?;
@@ -379,6 +426,14 @@ pub fn commands() -> Vec<CommandSpec> {
         spec("drawing.newCel", "New Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?,"copy":bool?}"#, has_drawing, new_cel),
         spec("drawing.retimeCel", "Retime Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"from":int,"to":int}"#, has_drawing, retime_cel),
         spec("drawing.setHold", "Set Cel Hold", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int,"endFrame":int}"#, has_drawing, set_hold),
+        spec(
+            "drawing.retimeExposures",
+            "Retime Exposures",
+            &["Graphics and Titles", "Drawing"],
+            r#"{"clip":id?,"frames":[int,...],"on":"ones"|"twos"|"threes","spacing":int?,"ripple":bool?}"#,
+            has_drawing,
+            retime_exposures,
+        ),
         spec("drawing.clearCel", "Clear Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, clear_cel),
         spec("drawing.deleteCel", "Delete Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?}"#, has_drawing, delete_cel),
         spec(

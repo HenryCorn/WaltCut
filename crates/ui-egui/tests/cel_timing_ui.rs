@@ -103,3 +103,83 @@ fn timeline_exposure_handles_retime_a_pose_and_adjust_its_hold() {
     assert_eq!(cels["cels"][1]["frame"], 5);
     assert_eq!(cels["exposures"][0]["endFrame"], 5);
 }
+
+impl Driver {
+    fn click(&mut self, at: Pos2, shift: bool) {
+        let modifiers = egui::Modifiers { shift, ..Default::default() };
+        self.harness.input_mut().events.push(egui::Event::ModifiersChanged(modifiers));
+        self.frames(1);
+        self.harness.input_mut().events.push(egui::Event::PointerMoved(at));
+        self.frames(1);
+        self.harness.input_mut().events.push(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers });
+        self.frames(1);
+        self.harness.input_mut().events.push(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers });
+        self.frames(2);
+        self.harness.input_mut().events.push(egui::Event::ModifiersChanged(egui::Modifiers::NONE));
+        self.frames(1);
+    }
+
+    fn centre(&mut self, id: &str) -> Pos2 {
+        let r = self.element(id);
+        pos2(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0)
+    }
+
+    fn frames_of_cels(&mut self) -> Vec<i64> {
+        let cels = self.call("engine.execute", json!({"command": "drawing.inspect", "params": {"clip": self.clip}}));
+        cels["cels"].as_array().unwrap().iter().map(|c| c["frame"].as_i64().unwrap()).collect()
+    }
+}
+
+#[test]
+fn picked_exposures_retime_on_twos_threes_and_ones_and_the_pick_follows() {
+    let mut driver = Driver::new();
+    let clip = driver.clip;
+    for frame in 1..4 {
+        driver.call("engine.execute", json!({"command": "drawing.newCel", "params": {"clip": clip, "frame": frame}}));
+    }
+    driver.frames(4);
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 2, 3, 4]);
+
+    let first = driver.centre(&format!("timeline.cel.{clip}.1"));
+    let third = driver.centre(&format!("timeline.cel.{clip}.3"));
+    driver.click(first, false);
+    driver.click(third, true);
+    driver.call("engine.execute", json!({"command": "drawing.retimeOnTwos", "params": {}}));
+    // cels 1..=3 are on twos from frame 1; the last keeps its hold, so the pose after it moves with it
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 3, 5, 6]);
+
+    // the pick followed the cels, so a second command acts on the same three
+    driver.call("engine.execute", json!({"command": "drawing.retimeOnThrees", "params": {}}));
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 4, 7, 8]);
+    driver.call("engine.execute", json!({"command": "drawing.retimeOnOnes", "params": {}}));
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 2, 3, 4]);
+
+    // one undo step each
+    driver.call("engine.execute", json!({"command": "edit.undo", "params": {}}));
+    assert_eq!(driver.frames_of_cels(), vec![0, 1, 4, 7, 8]);
+}
+
+#[test]
+fn retime_without_a_pick_acts_on_every_cel_and_refuses_a_gap_in_the_pick() {
+    let mut driver = Driver::new();
+    let clip = driver.clip;
+    driver.call("engine.execute", json!({"command": "drawing.retimeOnTwos", "params": {}}));
+    assert_eq!(driver.frames_of_cels(), vec![0, 2]);
+    for frame in [3, 4] {
+        driver.call("engine.execute", json!({"command": "drawing.newCel", "params": {"clip": clip, "frame": frame}}));
+    }
+    // 0, 2 and 4 picked by hand with 3 left out: refused, nothing moves
+    let (req, reply) =
+        ControlRequest::new("engine.execute", json!({"command": "drawing.retimeExposures", "params": {"clip": clip, "frames": [0, 2, 4], "on": "threes"}}));
+    driver.tx.send(req).unwrap();
+    let mut answer = None;
+    for _ in 0..600 {
+        driver.frames(1);
+        if let Ok(v) = reply.try_recv() {
+            answer = Some(v);
+            break;
+        }
+    }
+    assert_eq!(answer.expect("a reply")["ok"], false);
+    assert_eq!(driver.frames_of_cels(), vec![0, 2, 3, 4]);
+}
