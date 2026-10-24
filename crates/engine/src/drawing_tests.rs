@@ -258,6 +258,134 @@ fn retiming_exposures_respects_the_trimmed_range_and_locked_tracks() {
     assert_eq!(s.history.undo.len(), before);
 }
 
+/// Cels at 0 (strokes), 4 (blank), 8 (strokes) and 12 (strokes) on a two-second drawing.
+fn poses(s: &mut Session) -> ClipId {
+    let clip = new_drawing(s);
+    for (f, draw) in [(0, true), (4, false), (8, true), (12, true)] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+        if draw {
+            s.execute("drawing.addStroke", json!({"clip": clip.0, "frame": f, "stroke": line(f as f64)})).unwrap();
+        }
+    }
+    clip
+}
+
+fn playhead_frame(s: &Session) -> i64 {
+    s.sequence_rate().frame_at(s.playhead())
+}
+
+#[test]
+fn previous_and_next_cel_skip_holds_and_report_missing_neighbours() {
+    let mut s = session();
+    let clip = poses(&mut s);
+    let (undo, revision) = (s.history.undo.len(), s.revision);
+    // in the middle of the hold of cel 4
+    s.execute("playhead.set", json!({"frame": 6})).unwrap();
+    let r = s.execute("drawing.nextCel", json!({"clip": clip.0})).unwrap();
+    assert_eq!((r["cel"].as_i64(), playhead_frame(&s)), (Some(8), 8));
+    s.execute("drawing.nextCel", json!({})).unwrap();
+    assert_eq!(playhead_frame(&s), 12);
+    // the last cel holds to the end of the clip: no next one, and the playhead stays
+    let err = s.execute("drawing.nextCel", json!({})).unwrap_err();
+    assert!(err.to_string().contains("no next cel"), "{err}");
+    assert_eq!(playhead_frame(&s), 12);
+    s.execute("playhead.set", json!({"frame": 10})).unwrap();
+    s.execute("drawing.previousCel", json!({})).unwrap();
+    assert_eq!(playhead_frame(&s), 4, "a held pose counts once: from inside cel 8 the previous drawing is cel 4");
+    let r = s.execute("drawing.previousCel", json!({})).unwrap();
+    assert_eq!((r["frame"].as_i64(), playhead_frame(&s)), (Some(0), 0));
+    assert!(s.execute("drawing.previousCel", json!({})).unwrap_err().to_string().contains("no previous cel"));
+    // nothing was edited
+    assert_eq!((s.history.undo.len(), s.revision), (undo, revision));
+}
+
+#[test]
+fn blank_cels_are_poses_unless_skipped() {
+    let mut s = session();
+    let clip = poses(&mut s);
+    s.execute("playhead.set", json!({"frame": 0})).unwrap();
+    let r = s.execute("drawing.nextCel", json!({"clip": clip.0})).unwrap();
+    assert_eq!((playhead_frame(&s), r["blank"].clone()), (4, json!(true)));
+    s.execute("playhead.set", json!({"frame": 0})).unwrap();
+    s.execute("drawing.nextCel", json!({"clip": clip.0, "skipBlank": true})).unwrap();
+    assert_eq!(playhead_frame(&s), 8);
+    s.execute("drawing.previousCel", json!({"clip": clip.0, "skipBlank": true})).unwrap();
+    assert_eq!(playhead_frame(&s), 0);
+}
+
+#[test]
+fn cel_navigation_respects_trims_and_a_hold_that_reaches_into_the_clip() {
+    let mut s = session();
+    let clip = poses(&mut s);
+    // the clip now starts at drawing frame 6, inside the hold of cel 4
+    s.execute("timeline.trim", json!({"clip": clip.0, "edge": "in", "mode": "regular", "deltaFrames": 6})).unwrap();
+    let start = s.active_sequence().and_then(|seq| seq.find_item(clip)).map(|(_, it)| it.start).unwrap();
+    s.set_playhead(start);
+    // cel 0 ends before the clip begins: not a previous drawing; cel 4 is the one shown at the start
+    assert!(s.execute("drawing.previousCel", json!({})).is_err());
+    let r = s.execute("drawing.nextCel", json!({})).unwrap();
+    assert_eq!(r["cel"], 8);
+    // from cel 8, the previous drawing is cel 4, shown from the clip's first frame, not before it
+    let r = s.execute("drawing.previousCel", json!({})).unwrap();
+    assert_eq!((r["cel"].as_i64(), r["frame"].as_i64()), (Some(4), Some(6)));
+    assert_eq!(s.playhead(), start);
+}
+
+#[test]
+fn cel_navigation_follows_the_timeline_on_a_reversed_clip() {
+    let mut s = session();
+    let clip = poses(&mut s);
+    s.execute("clip.speedDuration", json!({"clips": [clip.0], "speed": 100, "reverse": true})).unwrap();
+    let start = s.active_sequence().and_then(|seq| seq.find_item(clip)).map(|(_, it)| it.start).unwrap();
+    s.set_playhead(start);
+    // the clip opens on its last cel; "next" in time is the cel before it in the drawing
+    let r = s.execute("drawing.nextCel", json!({})).unwrap();
+    assert_eq!(r["cel"], 8);
+    let r = s.execute("drawing.previousCel", json!({})).unwrap();
+    assert_eq!(r["cel"], 12);
+}
+
+#[test]
+fn cel_navigation_refuses_hostile_parameters() {
+    let mut s = session();
+    let clip = poses(&mut s);
+    let before = s.playhead();
+    for params in
+        [json!({"clip": clip.0, "frame": -5}), json!({"clip": clip.0, "frame": 9_000_000}), json!({"clip": 987_654}), json!({"clip": clip.0, "frame": "next"})]
+    {
+        assert!(s.execute("drawing.nextCel", params.clone()).is_err() || params["frame"] == "next", "{params}");
+        assert!(s.execute("drawing.previousCel", params.clone()).is_err() || params["frame"] == "next", "{params}");
+    }
+    assert_eq!(s.playhead(), before);
+}
+
+#[test]
+fn retimed_cels_and_navigation_agree_at_a_fractional_sequence_rate() {
+    let mut s = Session::default();
+    s.execute("file.newSequence", json!({"name": "NTSC", "fps": 23.976, "width": 320, "height": 180, "video": 1, "audio": 0})).unwrap();
+    let clip = new_drawing(&mut s);
+    for f in [0, 1, 2, 3, 20] {
+        s.execute("drawing.newCel", json!({"clip": clip.0, "frame": f})).unwrap();
+    }
+    assert_eq!(s.sequence_rate(), waltcut_time::FrameRate::FPS_23_976);
+    s.execute("drawing.retimeExposures", json!({"clip": clip.0, "frames": [0, 1, 2, 3], "on": "threes"})).unwrap();
+    let starts: Vec<i64> =
+        s.execute("drawing.inspect", json!({"clip": clip.0})).unwrap()["cels"].as_array().unwrap().iter().map(|c| c["frame"].as_i64().unwrap()).collect();
+    assert_eq!(starts, vec![0, 3, 6, 9, 26]);
+    // stepping through them lands on the exact frame of each, in exact ticks
+    s.execute("playhead.set", json!({"frame": 0})).unwrap();
+    for want in &starts[1..] {
+        s.execute("drawing.nextCel", json!({})).unwrap();
+        assert_eq!(s.playhead(), s.sequence_rate().tick_of(*want), "frame {want}");
+    }
+    assert!(s.execute("drawing.nextCel", json!({})).is_err());
+    // the same cels survive a save-format round trip
+    let seq = s.active_sequence().unwrap();
+    let (_, d) = crate::drawing::drawing_of(&s, seq, clip).unwrap();
+    let back: waltcut_project::drawing::Drawing = serde_json::from_slice(&serde_json::to_vec(d).unwrap()).unwrap();
+    assert_eq!(back.cels.iter().map(|c| c.frame).collect::<Vec<_>>(), starts);
+}
+
 #[test]
 fn hostile_parameters_are_refused_not_fatal() {
     let mut s = session();
