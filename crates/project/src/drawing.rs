@@ -344,7 +344,7 @@ mod tests {
     fn retiming_preserves_content_and_recalculates_exposure() {
         let mut d = Drawing::new(100, 100, FrameRate::new(24, 1));
         let first = d.ensure_cel(2, false).unwrap();
-        d.cels[first].strokes.push(line(0.0, 10.0, 3));
+        d.cels[first].strokes_mut().push(line(0.0, 10.0, 3));
         d.ensure_cel(6, false).unwrap();
         assert_eq!(d.exposure_end(2, 12), Some(6));
 
