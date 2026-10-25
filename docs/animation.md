@@ -164,6 +164,83 @@ hit, the erasers that belong to them, `conflict`, centre) and `drawing.transform
 lasso, dx, dy, rotation, scale, pivot, dryRun}`, which the UI's Apply calls. Not in this version:
 point editing, deformation, editing several cels at once, recolouring and thickness changes.
 
+## Fill a region
+
+Colour a closed shape without drawing the colour in by hand: with the Brush tool, turn on **Fill**
+in the options bar (`drawing.fillMode`, `Alt+F`, Graphics and Titles ▸ Drawing) and click inside the
+shape. `drawing.fill {point | seed, tolerance?, color?, cel?}` is the command the click runs. It
+fills the contiguous region around the click on the cel shown, as **one undo step**.
+
+### Decision: a fill is a stored operation in the cel's paint order (#68)
+
+A cel is an ordered list of operations, and an eraser is already one of them. A fill is another:
+a `Stroke` with `brush: Fill` whose `fill` field holds the **result**, and no points. The other
+option, baking the result into ordinary strokes, was rejected: a stroke is a round-capped polyline,
+so a concave region with holes would need a stroke per scan line (a few fills would pass the
+5 000-stroke cap), its edges would show seams, and the seed, tolerance and colour would be lost, so
+nothing could be edited afterwards. Storing only the seed and recomputing at render time was
+rejected too: it would run a flood fill per fill per frame, and a fill would change by itself when
+a line under it is edited or the rasteriser changes, which breaks "preview and export agree" over
+time. Storing the result makes rendering cheap and exact and keeps the fill what it was when you
+made it.
+
+What is stored (`Stroke.fill`, schema v19, see [project-files.md](project-files.md#fill-operations)):
+
+- `seed` (the clicked canvas pixel), `tolerance` (0–255) and the stroke's `color`, so the fill can be
+  recoloured or redone;
+- `rect` (`x, y, w, h`, canvas pixels inside the canvas) and `runs`: the result as a run-length
+  mask over `rect`, row by row, each run a class (0 outside, 1 filled, 2 **edge**) and a length.
+
+**Bounds.** A canvas of more than 8 847 360 pixels (4096 × 2160) is not filled and no fill is
+accepted from a file for it. A fill holds at most 65 536 runs, a cel 262 144 and a drawing
+2 097 152 (about 20 MB of project file at the very most); a region too ragged for that is refused
+with the number of runs it needed. The work is bounded by the canvas size, and the flood fill checks a cancel
+flag and a 5 s budget as it goes. Nothing is changed when any limit is hit.
+
+### What a fill does
+
+- **What it looks at.** Only the cel's own paint shown at that moment: its strokes, erasers and
+  earlier fills as rendered at full size. The video, references and other cels are not looked at
+  (filling from a reference layer is #69).
+- **Similar pixels.** The pixel under the seed is the target. A pixel is similar when every one of
+  its premultiplied linear red, green, blue and alpha values (0–255) is within `tolerance` of the
+  target's (default 32). The region is the 4-connected (not diagonal) set of similar pixels around
+  the seed, so a one-pixel diagonal line closes a shape.
+- **Seeds.** The seed must be inside the canvas: a point outside it is refused, not clamped.
+  A seed on an empty (transparent) pixel fills the empty region it is in, up to the canvas edge:
+  an open shape fills everything it leaks into, including the whole canvas. A seed on paint fills
+  the contiguous paint of that colour (it recolours a line or an earlier fill). A fully
+  transparent fill colour is refused (it would change nothing).
+- **Edge pixels.** The one-pixel shell around the region (pixels that are not similar but touch
+  it: the soft edge of a line) is stored as class 2 and painted *behind* what is already there,
+  so the colour reaches the line without a gap and never covers it. Filled pixels (class 1) are
+  painted over what is there like any stroke, with the colour's alpha. Wider antialiasing, gap closing and growing the
+  fill are #69.
+- **Order.** A fill is painted where it stands in the cel, so later strokes paint over it and a
+  later eraser removes it (an eraser before it does not). Erasing a fill leaves its stored region
+  alone; the paint under an eraser's pass is simply not shown.
+- **Editing a cel afterwards.** The result is saved, not live: drawing or erasing under a fill, moving
+  strokes with the lasso, or deleting them does not change it. To redo it, use `drawing.fillEdit
+  {index, tolerance}` (finds the region again from the same seed against the paint *before* the fill
+  in the cel, so it follows corrections made to the lines under it), recolour it with
+  `drawing.fillEdit {index, color}` (no new region), or remove it with `drawing.fillRemove
+  {index}`. `index` is the fill's position in the cel (`drawing.inspect {strokes: true}` lists
+  it). Each is one undo step and changes nothing when refused.
+- **Cels.** Duplicate copies fills with the strokes. In-betweens never morph a
+  fill: at each place where a cel has a fill, the nearer cel's operation is shown. The lasso never
+  selects a fill (it has no points), a stroke selection is refused if a transform would make an
+  eraser reach a fill, and Clear Cel removes fills with the strokes. Onion skins show fills.
+- **Same pixels.** Preview, stills, PNG sequences and movies all render the cel through
+  `waltcut_render::drawing::render_strokes`, so they agree pixel for pixel. A fill samples its mask at
+  the pixel centres of the output with bilinear coverage: at the drawing's own size and placement
+  that is exact (whole-pixel steps, no blur), under Motion scale or rotation the edge is as sharp
+  as one canvas pixel. The flood fill itself is integer maths on 8-bit values, so the same cel gives
+  the same region on every run and machine.
+- **Failures.** A locked track, a missing cel, a seed outside the canvas, an oversized canvas, too
+  many runs, a bad colour or tolerance, an unknown parameter, a cancelled or too long fill and a
+  cel that already holds 5 000 strokes are refused with the reason. The cel and the undo history
+  are untouched.
+
 ## Reference images
 
 To trace a picture, use the **Reference** menu in the Brush options bar (or **Graphics and Titles ▸

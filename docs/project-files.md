@@ -46,6 +46,30 @@ rather than dropping it on the next save. Schema v17 did bump for the first such
 stroke's `response`, the pressure curves it was drawn with (written only when set, see
 [animation.md](animation.md#pressure-response-curves)).
 
+### Fill operations
+
+A cel's paint is an ordered list, and a fill (#68, see [animation.md](animation.md#fill-a-region))
+is one entry in it: a stroke with `"brush": "Fill"`, an empty `points`, the fill's `color`, and a
+`fill` object that exists only on such a stroke. The bump to schema v19 is for this field and
+variant: an older build would refuse the unknown `Fill` brush rather than draw the cel without it.
+
+```json
+{"brush": "Fill", "color": [0.9, 0.2, 0.1, 1.0], "size": 1.0, "points": [],
+ "fill": {"seed": [120, 80], "tolerance": 32, "rect": [40, 30, 160, 120],
+          "runs": [[0, 4820], [2, 1], [1, 158], [2, 1], [0, 4], …]}}
+```
+
+- `rect` is `[x, y, w, h]` in canvas pixels and lies inside the drawing's canvas. `runs` is a
+  run-length mask over the `rect` cells in row-major order: `[class, length]` pairs with class 0 (not
+  filled), 1 (filled) or 2 (edge, painted behind existing paint). Lengths are at least 1, add up
+  to exactly `w × h`, and neighbouring runs have different classes, so one mask has one encoding.
+- Size is bounded on write and on load: at most 65 536 runs per fill, 262 144 per cel, 2 097 152 per
+  drawing, a canvas of at most 8 847 360 pixels. A fill that breaks a rule (a rectangle outside the
+  canvas, runs that do not add up, a seed outside the rectangle's canvas, a colour that is not a
+  colour) is dropped when the drawing is loaded, as an invalid stroke is; the rest of the cel is kept.
+- A cel without fills is stored exactly as before (the `fill` key is written only on a fill).
+  `crates/format/tests/fixtures/v19-edit.waltcut` holds a drawing with a fill.
+
 ### One schema, no migrations
 
 The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 18 (16 was the
