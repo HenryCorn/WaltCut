@@ -3129,6 +3129,7 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::drawing::commands());
     v.extend(crate::ai::commands());
     v.extend(crate::guides::commands());
+    v.extend(crate::stroke_select::commands());
     v.extend(crate::reference::commands());
     v.extend(crate::graphic_design::commands());
     v.extend(crate::shortcuts::commands());

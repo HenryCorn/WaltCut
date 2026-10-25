@@ -344,6 +344,12 @@ pub struct BrushSettings {
     /// loaded back: a session starts drawing.
     #[serde(skip_deserializing)]
     pub reference_move: bool,
+    /// Lasso mode (#66): a drag selects strokes instead of drawing. Never loaded back.
+    #[serde(skip_deserializing)]
+    pub lasso: bool,
+    /// The selected strokes and their pending transform. Never saved or loaded back.
+    #[serde(skip_deserializing)]
+    pub selection: Option<super::stroke_select::StrokeSelection>,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -372,6 +378,8 @@ impl Default for BrushSettings {
             onion_pin: None,
             onion_loop: false,
             reference_move: false,
+            lasso: false,
+            selection: None,
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -417,12 +425,12 @@ fn live_stroke(b: &BrushSettings, l: &Live) -> Stroke {
 const MAX_PENDING: usize = 512;
 
 /// Picture ↔ drawing canvas mapping for one clip at the playhead.
-struct Mapping {
+pub(super) struct Mapping {
     /// canvas px → screen points
-    to_screen: Affine,
+    pub(super) to_screen: Affine,
     from_screen: Affine,
     /// screen points per canvas pixel
-    scale: f32,
+    pub(super) scale: f32,
 }
 
 impl Mapping {
@@ -442,7 +450,7 @@ impl Mapping {
         let scale = to_screen.determinant().abs().sqrt() as f32;
         (scale.is_finite() && scale > 0.0).then_some(Mapping { to_screen, from_screen, scale })
     }
-    fn canvas(&self, p: Pos2) -> (f32, f32) {
+    pub(super) fn canvas(&self, p: Pos2) -> (f32, f32) {
         let q = self.from_screen.apply(Vec2::new(p.x as f64, p.y as f64));
         (q.x as f32, q.y as f32)
     }
@@ -454,7 +462,7 @@ fn color32(c: [f32; 4], alpha: f32) -> Color32 {
 }
 
 /// The drawing clip the Brush tool paints on, with its drawing.
-fn target(app: &WaltCutApp) -> Option<(ClipId, TrackItem, std::sync::Arc<Drawing>)> {
+pub(super) fn target(app: &WaltCutApp) -> Option<(ClipId, TrackItem, std::sync::Arc<Drawing>)> {
     let clip = waltcut_engine::drawing::target_clip(&app.session, &Value::Null)?;
     let seq = app.session.active_sequence()?;
     let (_, it) = seq.find_item(clip)?;
@@ -647,6 +655,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                     run(app, "drawing.tween", json!({"step": step}));
                 }
                 super::reference::menu(app, ui);
+                super::stroke_select::controls(app, ui);
             });
         });
     });
@@ -700,6 +709,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let panning = turn.pan_held != PanHold::Off;
     // Move with pen: a drag moves the reference instead of drawing (#3)
     let moving_ref = !panning && super::reference::moving(app);
+    // Lasso mode: a drag selects strokes (or moves the pending transform) instead of drawing (#66)
+    let lassoing = !panning && !moving_ref && app.ui.brush.lasso;
     let tgt = target(app);
     // the options bar sits where it does on an upright picture: a turned one is narrow
     let bar = options_bar(app, ui, layout_pic, tgt.is_some());
@@ -720,6 +731,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     if panning {
         let grabbing = ui.input(|i| i.pointer.primary_down());
         ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+    } else if lassoing {
+        super::stroke_select::overlay(app, ui, &painter, &resp, &map, &d, f);
     } else if moving_ref {
         let grabbing = ui.input(|i| i.pointer.primary_down());
         ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
@@ -754,6 +767,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let middle = ui.input(|i| i.pointer.middle_down());
     let begin_wanted = !panning
         && !moving_ref
+        && !lassoing
         && (resp.drag_started_by(egui::PointerButton::Primary)
             || resp.drag_started_by(egui::PointerButton::Secondary)
             || resp.clicked_by(egui::PointerButton::Primary)
@@ -762,7 +776,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // Every pointer sample of the frame, in order, with the pressure it was made at.
     let stream = frame_input(app, ui, live.is_some());
     // a drag that pans is not a stroke: its pen samples are dropped
-    let stream = if (panning || moving_ref) && live.is_none() { Vec::new() } else { stream };
+    let stream = if (panning || moving_ref || lassoing) && live.is_none() { Vec::new() } else { stream };
     // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
     let cancelled =
         ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
@@ -888,6 +902,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         None => format!("Frame {f} · no cel yet"),
     };
     let label = if moving_ref { format!("{label} · drag to move the reference") } else { label };
+    let label = if lassoing { format!("{label} · lasso: drag around strokes") } else { label };
     painter.text(pic.left_bottom() + vec2(8.0, -8.0), egui::Align2::LEFT_BOTTOM, label, egui::FontId::proportional(12.0), Color32::from_white_alpha(200));
 }
 
