@@ -515,7 +515,13 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
     let cels: Vec<Value> = d
         .cels
         .iter()
-        .map(|c| if full { json!({"frame": c.frame, "strokes": c.strokes.iter().map(crate::drawing_fill::stroke_json).collect::<Vec<_>>()}) } else { json!({"frame": c.frame, "strokes": c.strokes.len()}) })
+        .map(|c| {
+            if full {
+                json!({"frame": c.frame, "strokes": c.strokes.iter().map(crate::drawing_fill::stroke_json).collect::<Vec<_>>()})
+            } else {
+                json!({"frame": c.frame, "strokes": c.strokes.len()})
+            }
+        })
         .collect();
     let (_, last) = drawing_frame_bounds(s, ID, clip, d)?;
     let clip_end = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;

@@ -167,9 +167,22 @@ point editing, deformation, editing several cels at once, recolouring and thickn
 ## Fill a region
 
 Colour a closed shape without drawing the colour in by hand: with the Brush tool, turn on **Fill**
-in the options bar (`drawing.fillMode`, `Alt+F`, Graphics and Titles ▸ Drawing) and click inside the
-shape. `drawing.fill {point | seed, tolerance?, color?, cel?}` is the command the click runs. It
-fills the contiguous region around the click on the cel shown, as **one undo step**.
+in the options bar (`drawing.fillMode {enabled?, tolerance?}`, `Alt+F`, Graphics and Titles ▸
+Drawing) and **click** inside the shape. A click fills the contiguous region around it on the cel
+shown with the brush colour, as **one undo step**; a drag in Fill mode draws nothing, and a click
+on the options bar is not a click on the picture. The command the click runs is `drawing.fill
+{point | seed, tolerance?, color?, cel?}` (`point` is canvas coordinates, `seed` a whole pixel;
+`cel` is `hold`, `new` or `copy` as for strokes, and the region is found in the paint of the cel
+the fill is added to).
+
+- **Tolerance** (slider, `drawing.fillMode {tolerance}`, 0–255, default 32) is how different a
+  pixel may be and still join the region; 0 is an exact match. It is saved with the interface
+  state; the mode is not (a session starts drawing). Fill and Lasso exclude each other.
+- **Recolour last** and **Remove last** (shown in Fill mode) recolour the brush colour onto, or
+  remove, the newest fill of the cel shown: `drawing.fillEdit` and `drawing.fillRemove`, below.
+- Automation ids: `program.brush.fill`, `program.brush.fill.tolerance`,
+  `program.brush.fill.recolor`, `program.brush.fill.remove`; `ui.inspect` reports
+  `ui.brush.fill` and `ui.brush.fill_tolerance`.
 
 ### Decision: a fill is a stored operation in the cel's paint order (#68)
 
@@ -195,7 +208,9 @@ What is stored (`Stroke.fill`, schema v19, see [project-files.md](project-files.
 accepted from a file for it. A fill holds at most 65 536 runs, a cel 262 144 and a drawing
 2 097 152 (about 20 MB of project file at the very most); a region too ragged for that is refused
 with the number of runs it needed. The work is bounded by the canvas size, and the flood fill checks a cancel
-flag and a 5 s budget as it goes. Nothing is changed when any limit is hit.
+callback and a 5 s time budget as it goes, so a runaway stops with an error and changes nothing.
+The app has no Cancel button for it: the fill runs when you click and returns within the budget
+(measured times are in the pull request for #68).
 
 ### What a fill does
 
@@ -234,8 +249,8 @@ flag and a 5 s budget as it goes. Nothing is changed when any limit is hit.
   `waltcut_render::drawing::render_strokes`, so they agree pixel for pixel. A fill samples its mask at
   the pixel centres of the output with bilinear coverage: at the drawing's own size and placement
   that is exact (whole-pixel steps, no blur), under Motion scale or rotation the edge is as sharp
-  as one canvas pixel. The flood fill itself is integer maths on 8-bit values, so the same cel gives
-  the same region on every run and machine.
+  as one canvas pixel. The flood fill itself is integer maths on 8-bit values over the rasterised
+  cel, so the same cel gives the same region on every run of a build.
 - **Failures.** A locked track, a missing cel, a seed outside the canvas, an oversized canvas, too
   many runs, a bad colour or tolerance, an unknown parameter, a cancelled or too long fill and a
   cel that already holds 5 000 strokes are refused with the reason. The cel and the undo history

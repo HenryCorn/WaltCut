@@ -110,7 +110,14 @@ fn the_schema_before_fills_is_refused_with_the_legacy_release() {
 fn fills_round_trip_and_plain_cels_are_unchanged() {
     use waltcut_project::drawing::{Brush, Drawing, Fill, Stroke, StrokePoint};
     use waltcut_project::{ItemKind, Label};
-    let pen = || Stroke { brush: Brush::Pen, color: [0.0, 0.0, 0.0, 1.0], size: 2.0, points: vec![StrokePoint { x: 1.0, y: 2.0, p: 1.0 }], response: None, fill: None };
+    let pen = || Stroke {
+        brush: Brush::Pen,
+        color: [0.0, 0.0, 0.0, 1.0],
+        size: 2.0,
+        points: vec![StrokePoint { x: 1.0, y: 2.0, p: 1.0 }],
+        response: None,
+        fill: None,
+    };
     let mut p = golden();
     let mut d = Drawing::new(16, 16, waltcut_time::FrameRate::FPS_24);
     d.ensure_cel(0, false).unwrap();

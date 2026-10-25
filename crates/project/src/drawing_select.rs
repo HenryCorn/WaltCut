@@ -253,7 +253,14 @@ mod tests {
     use crate::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32)], size: f32) -> Stroke {
-        Stroke { brush, color: [0.0, 0.0, 0.0, 1.0], size, points: pts.iter().map(|&(x, y)| StrokePoint { x, y, p: 1.0 }).collect(), response: None, fill: None }
+        Stroke {
+            brush,
+            color: [0.0, 0.0, 0.0, 1.0],
+            size,
+            points: pts.iter().map(|&(x, y)| StrokePoint { x, y, p: 1.0 }).collect(),
+            response: None,
+            fill: None,
+        }
     }
     fn pen(pts: &[(f32, f32)]) -> Stroke {
         stroke(Brush::Pen, pts, 4.0)

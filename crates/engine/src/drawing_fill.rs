@@ -84,7 +84,10 @@ fn tolerance_p(cmd: &str, p: &Value) -> Result<Option<u8>> {
 }
 
 fn index_p(cmd: &str, p: &Value) -> Result<usize> {
-    p.get("index").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok()).ok_or_else(|| bad(cmd, "need `index`: the fill's position in the cel (see drawing.inspect {strokes: true})"))
+    p.get("index")
+        .and_then(Value::as_u64)
+        .and_then(|i| usize::try_from(i).ok())
+        .ok_or_else(|| bad(cmd, "need `index`: the fill's position in the cel (see drawing.inspect {strokes: true})"))
 }
 
 /// A fill colour: a visible colour, clamped to 0..1.
@@ -192,11 +195,8 @@ pub(crate) fn fill_edit_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bo
     let d = s.project.item(item).and_then(|i| i.as_drawing()).ok_or_else(|| bad(ID, "not a drawing"))?;
     let ci = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown on this frame"))?;
     let cel = d.cels.get(ci).ok_or_else(|| bad(ID, "no such cel"))?;
-    let (old, old_fill) = cel
-        .strokes
-        .get(index)
-        .and_then(|st| st.fill.clone().map(|f| (st, f)))
-        .ok_or_else(|| bad(ID, format!("stroke {index} of this cel is not a fill")))?;
+    let (old, old_fill) =
+        cel.strokes.get(index).and_then(|st| st.fill.clone().map(|f| (st, f))).ok_or_else(|| bad(ID, format!("stroke {index} of this cel is not a fill")))?;
     let color = if has_color { fill_color(ID, p.get("color"))? } else { old.color };
     let tolerance = new_tolerance.unwrap_or(old_fill.tolerance);
     if color == old.color && tolerance == old_fill.tolerance {

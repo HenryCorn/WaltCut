@@ -86,7 +86,8 @@ impl Driver {
 
     fn element(&mut self, id: &str) -> egui::Rect {
         let v = self.call("ui.elements", json!({"prefix": "program.brush"}))["result"].clone();
-        let r = v.as_array().and_then(|a| a.iter().find(|e| e["id"] == id)).and_then(|e| e["rect"].as_array()).unwrap_or_else(|| panic!("no element {id}")).clone();
+        let r =
+            v.as_array().and_then(|a| a.iter().find(|e| e["id"] == id)).and_then(|e| e["rect"].as_array()).unwrap_or_else(|| panic!("no element {id}")).clone();
         let f = |i: usize| r[i].as_f64().unwrap() as f32;
         egui::Rect::from_min_size(egui::pos2(f(0), f(1)), egui::vec2(f(2), f(3)))
     }
@@ -144,7 +145,14 @@ fn the_fill_mode_command_toggles_sets_the_tolerance_and_refuses_bad_values_whole
     assert_eq!(d.ui("drawing.fillMode", json!({})).unwrap(), json!({"fill": true, "tolerance": 32}));
     assert_eq!(d.ui("drawing.fillMode", json!({"tolerance": 90})).unwrap(), json!({"fill": true, "tolerance": 90}), "a tolerance alone keeps the mode");
     assert_eq!(d.ui("drawing.fillMode", json!({"enabled": false, "tolerance": 5})).unwrap(), json!({"fill": false, "tolerance": 5}));
-    for bad in [json!({"tolerance": 256}), json!({"tolerance": -1}), json!({"tolerance": 1.5}), json!({"tolerance": "x"}), json!({"enabled": "yes"}), json!({"colour": 1})] {
+    for bad in [
+        json!({"tolerance": 256}),
+        json!({"tolerance": -1}),
+        json!({"tolerance": 1.5}),
+        json!({"tolerance": "x"}),
+        json!({"enabled": "yes"}),
+        json!({"colour": 1}),
+    ] {
         let before = d.brush();
         assert!(d.ui("drawing.fillMode", bad.clone()).is_err(), "{bad}");
         assert_eq!(d.brush(), before, "{bad} changes nothing");

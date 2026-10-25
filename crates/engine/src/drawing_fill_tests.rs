@@ -230,7 +230,8 @@ fn a_cancelled_or_oversized_fill_leaves_the_cel_and_history_alone() {
 fn a_fill_can_be_recoloured_redone_with_another_tolerance_and_removed() {
     let (mut s, clip) = session();
     // a translucent line splits the canvas
-    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": {"brush": "Marker", "color": "#000000", "size": 6, "points": [[80.0, 0.0], [80.0, 89.0]]}})).unwrap();
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": {"brush": "Marker", "color": "#000000", "size": 6, "points": [[80.0, 0.0], [80.0, 89.0]]}}))
+        .unwrap();
     let r = s.execute("drawing.fill", json!({"seed": [10, 45], "tolerance": 0, "color": "#ff0000"})).unwrap();
     let half = r["pixels"].as_u64().unwrap();
     assert!(half < 160 * 90 / 2 + 400, "tolerance 0 stops at the marker: {half}");
@@ -250,7 +251,9 @@ fn a_fill_can_be_recoloured_redone_with_another_tolerance_and_removed() {
     s.execute("edit.undo", json!({})).unwrap();
     assert_eq!(s.execute("drawing.inspect", json!({"strokes": true})).unwrap()["cels"][0]["strokes"][1]["fill"]["pixels"], json!(half));
     // nothing to change, the wrong stroke, a bad index, unknown keys
-    for params in [json!({"index": 1}), json!({"index": 0, "color": "#00ff00"}), json!({"index": 9, "color": "#00ff00"}), json!({"index": 1, "colour": "#00ff00"})] {
+    for params in
+        [json!({"index": 1}), json!({"index": 0, "color": "#00ff00"}), json!({"index": 9, "color": "#00ff00"}), json!({"index": 1, "colour": "#00ff00"})]
+    {
         let before = (s.revision, s.history.undo.len());
         assert!(s.execute("drawing.fillEdit", params.clone()).is_err(), "{params}");
         assert_eq!((s.revision, s.history.undo.len()), before);

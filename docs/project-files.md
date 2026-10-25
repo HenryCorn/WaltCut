@@ -8,7 +8,7 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 ```json
 {
   "format": "filmcraft.project",
-  "schema_version": 18,
+  "schema_version": 19,
   "generator": "WaltCut 0.1.0",
   "project": { "name": "…", "settings": { … }, "root": { … }, "items": { … }, "next_id": 48 },
   "view": { "open_sequences": [21, 50], "active_sequence": 50, "sequences": { "21": { "pps": 40.0, "scroll": 0.0, … } } }
@@ -44,7 +44,7 @@ rather than dropping it on the next save. Schema v17 did bump for the first such
 `guide: true` (a reference clip left out of delivery renders, see
 [animation.md](animation.md#guide-clips)), so that an older build says "newer schema" instead. Schema v18 did the same for a drawing
 stroke's `response`, the pressure curves it was drawn with (written only when set, see
-[animation.md](animation.md#pressure-response-curves)).
+[animation.md](animation.md#pressure-response-curves)), and v19 for the fill operation below.
 
 ### Fill operations
 
@@ -65,14 +65,17 @@ variant: an older build would refuse the unknown `Fill` brush rather than draw t
   to exactly `w × h`, and neighbouring runs have different classes, so one mask has one encoding.
 - Size is bounded on write and on load: at most 65 536 runs per fill, 262 144 per cel, 2 097 152 per
   drawing, a canvas of at most 8 847 360 pixels. A fill that breaks a rule (a rectangle outside the
-  canvas, runs that do not add up, a seed outside the rectangle's canvas, a colour that is not a
-  colour) is dropped when the drawing is loaded, as an invalid stroke is; the rest of the cel is kept.
+  canvas, runs that do not add up, a seed that is not inside its region, a colour that is not a
+  visible colour, or one past a budget, the first fills in order being kept) is **dropped when the
+  project is loaded** (`Drawing::repair_fills`, logged as a warning) and the rest of the cel is kept,
+  the way an out-of-range audio stream index is repaired rather than refusing the project. It is
+  gone from the next save of that project; the file on disk is not touched by opening it.
 - A cel without fills is stored exactly as before (the `fill` key is written only on a fill).
   `crates/format/tests/fixtures/v19-edit.waltcut` holds a drawing with a fill.
 
 ### One schema, no migrations
 
-The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 18 (16 was the
+The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 19 (16 was the
 baseline of the reduced app), and there is no migration code: a project written before it does not
 open. Versions 1–15 are the WaltCut and first WaltCut builds, up to the
 [`v0.0.1-legacy`](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy) release.
@@ -80,7 +83,7 @@ open. Versions 1–15 are the WaltCut and first WaltCut builds, up to the
 Opening an older file returns one error and does nothing else:
 
 > this project was created by an earlier FilmCraft or WaltCut build (project schema v15); this
-> build only opens schema v18. Open it with the v0.0.1-legacy release
+> build only opens schema v19. Open it with the v0.0.1-legacy release
 > (https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy). The file has not been changed.
 
 - **Never modified.** Reading a project never writes: the file, its `Auto-Save` siblings and its
@@ -96,7 +99,7 @@ Opening an older file returns one error and does nothing else:
   (`crates/format`, `tests::hostile_documents_return_errors` and the fixtures tests).
 
 To change the schema from here: bump `SCHEMA_VERSION`, add a fixture of the new shape under
-`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v18-edit.waltcut`) passing.
+`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v19-edit.waltcut`) passing.
 A change that older builds would load but then silently drop on save needs the bump too. Whether
 to write a migration for a later schema is decided when that happens; none exists today.
 
@@ -104,8 +107,8 @@ to write a migration for a later schema is decided when that happens; none exist
 
 A file with a `schema_version` newer than the build supports is **refused**, not half-read:
 
-> this project was saved by a newer version of WaltCut (project schema v19); this build reads up to
-> v18. Update WaltCut to open it.
+> this project was saved by a newer version of WaltCut (project schema v20); this build reads up to
+> v19. Update WaltCut to open it.
 
 Reading it partially and saving it back would silently drop whatever the newer version added.
 

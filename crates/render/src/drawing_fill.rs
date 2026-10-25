@@ -88,7 +88,7 @@ pub fn compute_fill(strokes: &[Stroke], width: u32, height: u32, seed: [u32; 2],
             }
             render_strokes(chunk, &Affine::IDENTITY, &mut img);
         }
-        img.px.chunks_exact(4).map(|p| p.iter().enumerate().fold(0u32, |acc, (c, v)| acc | (quantise(*v) << (8 * c)))).collect()
+        img.px.as_chunks::<4>().0.iter().map(|p| p.iter().enumerate().fold(0u32, |acc, (c, v)| acc | (quantise(*v) << (8 * c)))).collect()
     };
     let at = |x: usize, y: usize| y * w + x;
     let target = pix.get(at(seed[0] as usize, seed[1] as usize)).copied().ok_or_else(|| refused("the point is outside the canvas"))?;
@@ -152,10 +152,12 @@ pub fn compute_fill(strokes: &[Stroke], width: u32, height: u32, seed: [u32; 2],
                 (Some(px), Some(py)) if px < w && py < h => plane.get(at(px, py)) == Some(&CLASS_FILLED),
                 _ => false,
             };
-            if filled_at(x.checked_sub(1), Some(y)) || filled_at(Some(x + 1), Some(y)) || filled_at(Some(x), y.checked_sub(1)) || filled_at(Some(x), Some(y + 1)) {
-                if let Some(c) = plane.get_mut(at(x, y)) {
-                    *c = CLASS_EDGE;
-                }
+            let touches = filled_at(x.checked_sub(1), Some(y))
+                || filled_at(Some(x + 1), Some(y))
+                || filled_at(Some(x), y.checked_sub(1))
+                || filled_at(Some(x), Some(y + 1));
+            if touches && let Some(c) = plane.get_mut(at(x, y)) {
+                *c = CLASS_EDGE;
             }
         }
     }
