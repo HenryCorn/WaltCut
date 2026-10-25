@@ -10,12 +10,12 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// The golden file: a project written by this schema, with media, a sequence, markers and effects.
 fn golden() -> Project {
-    decode(&fixture("v16-edit.waltcut")).unwrap().project
+    decode(&fixture("v17-edit.waltcut")).unwrap().project
 }
 
 #[test]
 fn golden_project_opens_and_round_trips_without_loss() {
-    let bytes = fixture("v16-edit.waltcut");
+    let bytes = fixture("v17-edit.waltcut");
     let l = decode(&bytes).unwrap();
     assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
@@ -41,7 +41,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 
 #[test]
 fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
-    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v16-edit.waltcut")).unwrap();
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v17-edit.waltcut")).unwrap();
     for (path, value) in [
         ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
         ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
@@ -85,6 +85,27 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
     waltcut_format::autosave::rotate(&autosave, "old", 1).unwrap();
     assert_eq!(files.iter().map(|f| hash(f)).collect::<Vec<_>>(), before);
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// v16 was the last schema before clips could be guides: it is refused like any earlier one.
+#[test]
+fn the_previous_schema_is_refused_with_the_legacy_release() {
+    let e = decode(&fixture("v16-edit.waltcut")).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 16, supported } if supported == SCHEMA_VERSION), "{e}");
+    assert!(e.to_string().contains(LEGACY_RELEASE));
+}
+
+/// A guide clip survives a save and a load, and an unmarked clip's JSON has no `guide` key.
+#[test]
+fn guide_clips_round_trip_and_unmarked_clips_are_unchanged() {
+    let mut p = golden();
+    let plain = encode(&p, true);
+    assert!(!String::from_utf8_lossy(&plain).contains("\"guide\""), "the key is written only when set");
+    let seq = p.sequence_mut(ItemId(21)).unwrap();
+    seq.video_tracks[0].items[0].guide = true;
+    let bytes = encode(&p, true);
+    assert!(String::from_utf8_lossy(&bytes).contains("\"guide\": true"));
+    assert!(decode(&bytes).unwrap().project.sequence(ItemId(21)).unwrap().video_tracks[0].items[0].guide);
 }
 
 #[test]

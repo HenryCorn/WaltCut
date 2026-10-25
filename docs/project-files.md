@@ -8,7 +8,7 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 ```json
 {
   "format": "filmcraft.project",
-  "schema_version": 16,
+  "schema_version": 17,
   "generator": "WaltCut 0.1.0",
   "project": { "name": "…", "settings": { … }, "root": { … }, "items": { … }, "next_id": 48 },
   "view": { "open_sequences": [21, 50], "active_sequence": 50, "sequences": { "21": { "pps": 40.0, "scroll": 0.0, … } } }
@@ -38,22 +38,23 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 ### Additive clip fields
 
 A clip field that is written only when it is set, and that a project without it never contains,
-is added without a schema bump: files that do not use it are unchanged for every build. Today
-that is a clip's `guide: true` (a reference clip left out of delivery renders, see
-[animation.md](animation.md#guide-clips)). A build that does not know the field refuses a file
-that has it, with the unknown-field error below, rather than dropping it on the next save.
+could be added without a schema bump: files that do not use it are unchanged for every build. A
+build that does not know the field refuses a file that has it, with the unknown-field error below,
+rather than dropping it on the next save. Schema v17 did bump for the first such field, a clip's
+`guide: true` (a reference clip left out of delivery renders, see
+[animation.md](animation.md#guide-clips)), so that an older build says "newer schema" instead.
 
 ### One schema, no migrations
 
-The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 16, the
-baseline of the reduced app, and there is no migration code: a project written before it does not
-open. Earlier versions (1–15) are the WaltCut and first WaltCut builds, up to the
+The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 17 (16 was the
+baseline of the reduced app), and there is no migration code: a project written before it does not
+open. Versions 1–15 are the WaltCut and first WaltCut builds, up to the
 [`v0.0.1-legacy`](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy) release.
 
 Opening an older file returns one error and does nothing else:
 
 > this project was created by an earlier FilmCraft or WaltCut build (project schema v15); this
-> build only opens schema v16. Open it with the v0.0.1-legacy release
+> build only opens schema v17. Open it with the v0.0.1-legacy release
 > (https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy). The file has not been changed.
 
 - **Never modified.** Reading a project never writes: the file, its `Auto-Save` siblings and its
@@ -69,7 +70,7 @@ Opening an older file returns one error and does nothing else:
   (`crates/format`, `tests::hostile_documents_return_errors` and the fixtures tests).
 
 To change the schema from here: bump `SCHEMA_VERSION`, add a fixture of the new shape under
-`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v16-edit.waltcut`) passing.
+`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v17-edit.waltcut`) passing.
 A change that older builds would load but then silently drop on save needs the bump too. Whether
 to write a migration for a later schema is decided when that happens; none exists today.
 
@@ -77,8 +78,8 @@ to write a migration for a later schema is decided when that happens; none exist
 
 A file with a `schema_version` newer than the build supports is **refused**, not half-read:
 
-> this project was saved by a newer version of WaltCut (project schema v17); this build reads up to
-> v16. Update WaltCut to open it.
+> this project was saved by a newer version of WaltCut (project schema v18); this build reads up to
+> v17. Update WaltCut to open it.
 
 Reading it partially and saving it back would silently drop whatever the newer version added.
 
