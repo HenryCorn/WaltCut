@@ -44,6 +44,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
     uic!("drawing.onionSkin", "Onion Skin Settings", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.pinPose", "Pin Pose for Onion Skin", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.smoothing", "Stroke Smoothing", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.lightTable", "Light Table Pose Shift", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.lightTableShift", "Shift Pose While Held", ["Graphics and Titles", "Drawing"], Some("Alt+T")),
     uic!("drawing.lightTableReset", "Reset Pose Shift", ["Graphics and Titles", "Drawing"], Some("Alt+Shift+T")),

@@ -64,6 +64,9 @@ pub fn params_doc(id: &str) -> Option<&'static str> {
             r#"{"enabled":bool?,"before":0-4?,"after":0-4?,"opacity":0-1?,"falloff":0-1?,"tint":0-1?,"pin":frame|"current"|null?,"loop":bool?}  set the onion skin; with no parameter, report it. `pin` ghosts the cel starting on that frame (or the one shown now) until cleared with null; `loop` ghosts the first cel"#,
         ),
         "drawing.pinPose" => Some(r#"{}  pin the cel shown now for onion-skin comparison; again to unpin it"#),
+        "drawing.smoothing" => Some(
+            r#"{"mode":"off"|"smooth"?,"strength":0-1?,"pressure":0-1?}  set stroke smoothing for strokes drawn from now on (position strength and, apart, pressure strength); with no parameter, report it. Off stores the pen's samples as they came; a stroke always ends exactly where the pen lifts"#,
+        ),
         "drawing.eraseTemporarily" => Some(
             r#"{"active":bool?}  true (default) erases until false, until the window loses focus or another tool is chosen; bound to a key it erases while the key is held"#,
         ),
@@ -78,7 +81,7 @@ pub fn enabled(app: &WaltCutApp, id: &str) -> bool {
 
 /// The onion-skin commands work whatever tool is selected: they change a view setting only.
 fn is_onion(id: &str) -> bool {
-    matches!(id, "drawing.onionSkin" | "drawing.pinPose")
+    matches!(id, "drawing.onionSkin" | "drawing.pinPose" | "drawing.smoothing")
 }
 
 /// The drawing clip and the start frame of the cel shown at the playhead.
@@ -120,6 +123,9 @@ fn onion_state(b: &BrushSettings) -> Value {
 
 /// `drawing.onionSkin` and `drawing.pinPose`. Every parameter is checked before any is applied.
 fn route_onion(app: &mut WaltCutApp, id: &str, params: &Value) -> Result<Value, String> {
+    if id == "drawing.smoothing" {
+        return route_smoothing(app, params);
+    }
     if id == "drawing.pinPose" {
         let shown = shown_cel(app).ok_or("there is no drawing cel at the playhead to pin")?;
         let b = &mut app.ui.brush;
@@ -183,6 +189,67 @@ fn route_onion(app: &mut WaltCutApp, id: &str, params: &Value) -> Result<Value, 
         b.onion_pin = p;
     }
     Ok(onion_state(b))
+}
+
+fn smoothing_state(s: &super::drawing_smooth::Smoothing) -> Value {
+    json!({"mode": s.mode.param(), "strength": s.position(), "pressure": s.pressure(), "active": s.is_active()})
+}
+
+/// `drawing.smoothing`. Every parameter is checked before any is applied.
+fn route_smoothing(app: &mut WaltCutApp, params: &Value) -> Result<Value, String> {
+    use super::drawing_smooth::SmoothMode;
+    let obj = match params {
+        Value::Null => None,
+        Value::Object(o) => Some(o),
+        _ => return Err("parameters must be an object".into()),
+    };
+    if let Some(o) = obj
+        && let Some(k) = o.keys().find(|k| !["mode", "strength", "pressure"].contains(&k.as_str()))
+    {
+        return Err(format!("unknown parameter `{k}`; expected: mode, strength, pressure"));
+    }
+    let get = |k: &str| obj.and_then(|o| o.get(k)).filter(|v| !v.is_null());
+    let mode = match get("mode").map(|v| v.as_str()) {
+        None => None,
+        Some(Some("off")) => Some(SmoothMode::Off),
+        Some(Some("smooth")) => Some(SmoothMode::Smooth),
+        Some(_) => return Err("`mode` must be \"off\" or \"smooth\"".into()),
+    };
+    let unit = |k: &str| match get(k) {
+        None => Ok(None),
+        Some(v) => match v.as_f64() {
+            Some(n) if (0.0..=1.0).contains(&n) => Ok(Some(n as f32)),
+            _ => Err(format!("`{k}` must be a number from 0 to 1")),
+        },
+    };
+    let (strength, pressure) = (unit("strength")?, unit("pressure")?);
+    let st = &mut app.ui.brush.smoothing;
+    st.mode = mode.unwrap_or(st.mode);
+    st.strength = strength.unwrap_or(st.strength);
+    st.pressure = pressure.unwrap_or(st.pressure);
+    Ok(smoothing_state(st))
+}
+
+/// The smoothing menu of the options bar.
+fn smoothing_menu(ui: &mut egui::Ui, b: &mut BrushSettings, auto: &mut crate::automation::Registry) {
+    use super::drawing_smooth::SmoothMode;
+    // the label never changes width; it turns blue while smoothing is on
+    let label = egui::RichText::new("Smooth");
+    let label = if b.smoothing.mode == SmoothMode::Off { label } else { label.strong().color(egui::Color32::from_rgb(70, 130, 230)) };
+    let r = ui.menu_button(label, |ui| {
+        let mut on = b.smoothing.mode == SmoothMode::Smooth;
+        let r = ui.checkbox(&mut on, "Smooth strokes");
+        auto.add("program.brush.smooth", r.rect, "stroke smoothing");
+        b.smoothing.mode = if on { SmoothMode::Smooth } else { SmoothMode::Off };
+        ui.add_enabled_ui(on, |ui| {
+            let r = ui.add(egui::Slider::new(&mut b.smoothing.strength, 0.0..=1.0).text("Position"));
+            auto.add("program.brush.smooth.strength", r.rect, "position smoothing");
+            let r = ui.add(egui::Slider::new(&mut b.smoothing.pressure, 0.0..=1.0).text("Pressure"));
+            auto.add("program.brush.smooth.pressure", r.rect, "pressure smoothing");
+        });
+        ui.label(egui::RichText::new("The line trails the pen a little while smoothing is on.").small());
+    });
+    auto.add("program.brush.smooth.menu", r.response.rect, "smoothing settings");
 }
 
 /// `drawing.brushSizeUp`, `drawing.brushSizeDown` and `drawing.eraseTemporarily`.
@@ -353,6 +420,8 @@ pub struct BrushSettings {
     /// The temporary shift of the pinned pose (#64). Never saved or loaded back.
     #[serde(skip_deserializing)]
     pub light_table: super::light_table::LightTable,
+    /// Stroke smoothing (#57): Off stores what the pen sent.
+    pub smoothing: super::drawing_smooth::Smoothing,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -384,6 +453,7 @@ impl Default for BrushSettings {
             lasso: false,
             selection: None,
             light_table: Default::default(),
+            smoothing: Default::default(),
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -638,6 +708,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 let r = ui.checkbox(&mut b.onion, "Onion skin");
                 app.auto.add("program.brush.onion", r.rect, "onion skin");
                 onion_menu(ui, b, &mut app.auto);
+                smoothing_menu(ui, b, &mut app.auto);
                 ui.separator();
                 let step = b.tween_step;
                 if !has_target {
@@ -828,7 +899,11 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         let ended = pending.last().is_some_and(|s| s.phase == PenPhase::Up);
         let start = ui.input(|i| i.pointer.press_origin()).or_else(|| ui.input(|i| i.pointer.interact_pos()));
         if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && layout_pic.contains(turn.unshow(layout_pic.center(), p))) {
-            let mut l = Live { clip: clip.0, stroke: StrokeBuilder::default(), eraser: secondary || app.ui.brush.erase_held != EraseHold::Off };
+            let mut l = Live {
+                clip: clip.0,
+                stroke: StrokeBuilder::with_smoothing(&app.ui.brush.smoothing),
+                eraser: secondary || app.ui.brush.erase_held != EraseHold::Off,
+            };
             let mut samples = std::mem::take(&mut pending);
             if samples.first().is_none_or(|s| s.phase != PenPhase::Down) {
                 // the press itself was not seen (no hook, or a drag that began elsewhere): start where it was pressed

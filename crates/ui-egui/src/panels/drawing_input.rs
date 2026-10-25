@@ -124,6 +124,8 @@ pub struct StrokeBuilder {
     /// Event time of each kept sample.
     pub t_ns: Vec<u64>,
     last: Option<(Pos2, f32)>,
+    /// Smooths the kept samples as they arrive (#57); None stores them as captured.
+    smoother: Option<super::drawing_smooth::Smoother>,
     pub received: u64,
     pub decimated: u64,
     pub truncated: u64,
@@ -134,6 +136,11 @@ fn clean_pressure(p: f32) -> f32 {
 }
 
 impl StrokeBuilder {
+    /// A builder for a stroke started with these smoothing settings (Off stores samples as captured).
+    pub fn with_smoothing(settings: &super::drawing_smooth::Smoothing) -> Self {
+        Self { smoother: super::drawing_smooth::Smoother::new(settings), ..Self::default() }
+    }
+
     /// Offer a sample (`canvas` is its canvas position). Returns whether it was kept.
     pub fn push(&mut self, s: &Sample, canvas: (f32, f32)) -> bool {
         self.received += 1;
@@ -147,7 +154,11 @@ impl StrokeBuilder {
             self.decimated += 1;
             return false;
         }
-        self.store(s, canvas, p);
+        let point = match self.smoother.as_mut() {
+            Some(f) => f.step([canvas.0, canvas.1, p]),
+            None => [canvas.0, canvas.1, p],
+        };
+        self.store(s, point, p);
         true
     }
 
@@ -157,14 +168,23 @@ impl StrokeBuilder {
         if !s.pos.x.is_finite() || !s.pos.y.is_finite() || !canvas.0.is_finite() || !canvas.1.is_finite() {
             return;
         }
+        let pressure = clean_pressure(s.pressure);
+        if let Some(f) = self.smoother.as_mut() {
+            // the smoothed point catches up with the pen and the stroke ends exactly where it was lifted
+            for point in f.finish([canvas.0, canvas.1, pressure]) {
+                if self.points.last() != Some(&point) {
+                    self.store(s, point, pressure);
+                }
+            }
+            return;
+        }
         if self.last.is_some_and(|(q, _)| q == s.pos) {
             return;
         }
-        self.store(s, canvas, clean_pressure(s.pressure));
+        self.store(s, [canvas.0, canvas.1, pressure], pressure);
     }
 
-    fn store(&mut self, s: &Sample, canvas: (f32, f32), pressure: f32) {
-        let point = [canvas.0, canvas.1, pressure];
+    fn store(&mut self, s: &Sample, point: [f32; 3], pressure: f32) {
         if self.points.len() < waltcut_project::drawing::MAX_STROKE_POINTS {
             self.points.push(point);
             self.t_ns.push(s.t_ns);
