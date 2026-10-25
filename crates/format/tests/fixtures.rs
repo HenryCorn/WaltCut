@@ -129,9 +129,12 @@ fn fills_round_trip_and_plain_cels_are_unchanged() {
     bare.add_item("plain", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
     let written = String::from_utf8_lossy(&encode(&bare, true)).into_owned();
     assert!(!written.contains("\"Fill\"") && !written.contains("\"fill\""), "no fill key without a fill");
-    let fill = Fill::encode([4, 4], 7, [2, 2, 8, 8], &[1u8; 64]).unwrap();
+    let fill = Fill::encode([4, 4], 7, [2, 2, 8, 8], &[1u8; 64]).unwrap().with_options(2, 1, Some(7));
     let good = Stroke::fill_op([0.2, 0.4, 0.6, 0.5], fill);
-    let bad = Stroke::fill_op([0.2, 0.4, 0.6, 0.5], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, 40, 40], runs: vec![[1, 1600]] });
+    let bad = Stroke::fill_op(
+        [0.2, 0.4, 0.6, 0.5],
+        Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, 40, 40], runs: vec![[1, 1600]], gap: 0, grow: 0, reference: None },
+    );
     if let Some(c) = d.cels.first_mut() {
         c.strokes_mut().push(good.clone());
         c.strokes_mut().push(bad);

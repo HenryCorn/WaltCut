@@ -7,7 +7,7 @@
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
 onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
-curves; region fill; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
+curves; region fill, also from another clip with gap closing and edge growth; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
 
@@ -307,6 +307,50 @@ check(next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels
 cmd("edit.undo", {})
 cmd("edit.undo", {})
 check(still("fill-undone.png") == fill_plain, "undoing the recolour and the fill gives back the outline alone")
+
+print("== reference fill: colour under line art on another clip, gap closing, edge growth, preview, apply, cancel")
+cmd("playhead.set", {"frame": 12})
+art = cmd("drawing.new", {"seconds": 1, "name": "Line art"})["clip"]
+# a closed square with a 4 pixel opening in its top edge, drawn on its own clip
+for pts in ([[40, 30], [150, 30]], [[158, 30], [260, 30]], [[260, 30], [260, 150], [40, 150], [40, 30]]):
+    cmd("drawing.addStroke", {"clip": art, "frame": 0, "stroke": {"brush": "Pen", "color": "#000000", "size": 4.0, "points": pts}})
+art_before = cmd("drawing.inspect", {"clip": art, "strokes": True})
+leak = cmd("drawing.fillPreview", {"clip": drawing, "reference": art, "point": [150, 90]})
+closed = cmd("drawing.fillPreview", {"clip": drawing, "reference": art, "point": [150, 90], "gap": 2})
+check(leak["pixels"] > 320 * 180 * 6 // 10, f"an opening of 4 pixels leaks with no closing radius ({leak['pixels']} pixels)")
+check(closed["pixels"] < 320 * 180 // 2, f"a radius of 2 closes it ({closed['pixels']} pixels)")
+cmd("timeline.select", {"clips": [drawing]})
+before_plain = still("ref-before.png")
+done = cmd("drawing.fill", {"clip": drawing, "reference": art, "point": [150, 90], "gap": 2, "grow": 2, "color": "#f4a261"})
+check(done["reference"] == art and (done["gap"], done["grow"]) == (2, 2), f"the fill records its options ({done})")
+check(still("ref-filled.png") != before_plain, "the exported still has the reference fill in it")
+check(cmd("drawing.inspect", {"clip": art, "strokes": True}) == art_before, "the line art clip was not modified")
+time.sleep(0.4)
+shot("08j-reference-fill")
+cmd("edit.undo", {})
+check(still("ref-undone.png") == before_plain, "one undo removes the reference fill")
+cmd("drawing.fillMode", {"enabled": True, "reference": art, "gap": 2, "grow": 1, "preview": True})
+rect = [e for e in call("ui.elements", {"prefix": "program.brush"})["result"] if e["id"] == "program.brush"][0]["rect"]
+x, y, w, h = rect
+count = lambda: next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"] if c["frame"] == 12)
+before_count = count()
+call("ui.click", {"x": x + w * (150 / 320), "y": y + h * (140 / 180)})
+time.sleep(0.4)
+pending = call("ui.inspect")["result"]["ui"]["brush"]["fill_pending"]
+check(pending and pending["pixels"] > 10_000 and count() == before_count, f"a click in Preview mode shows the region and changes nothing ({pending})")
+shot("08k-fill-preview")
+ids = [e["id"] for e in call("ui.elements", {"prefix": "program.brush.fill"})["result"]]
+check(all(i in ids for i in ("program.brush.fill.apply", "program.brush.fill.cancel", "program.brush.fill.reference", "program.brush.fill.gap", "program.brush.fill.grow", "program.brush.fill.preview")), f"the new controls are registered ({ids})")
+cmd("drawing.fillCancel", {})
+check(call("ui.inspect")["result"]["ui"]["brush"]["fill_pending"] is None and count() == before_count, "Cancel drops the preview")
+call("ui.click", {"x": x + w * (150 / 320), "y": y + h * (140 / 180)})
+time.sleep(0.4)
+cmd("drawing.fillApply", {})
+check(count() == before_count + 1, "Apply paints the previewed fill as one step")
+cmd("drawing.fillMode", {"enabled": False, "preview": False, "reference": None})
+cmd("edit.undo", {})
+check(count() == before_count, "one undo removes it")
+cmd("edit.clear", {"clips": [art]})
 
 print("== light table: shift the pinned pose, draw against it, Escape, reset")
 cmd("playhead.set", {"frame": 0})

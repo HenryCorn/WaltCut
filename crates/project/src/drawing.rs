@@ -1113,7 +1113,7 @@ mod fill_tests {
         // a cel's run budget
         let many = |n: usize| {
             let runs: Vec<[u32; 2]> = (0..n).map(|i| [u32::from(i % 2 == 0), 1]).collect();
-            Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, n as u32, 1], runs })
+            Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, n as u32, 1], runs, gap: 0, grow: 0, reference: None })
         };
         let mut e = Drawing::new(MAX_CEL_FILL_RUNS as u32, 1, FrameRate::new(24, 1));
         e.cels = vec![Cel { frame: 0, strokes: (0..5).map(|_| many(60_000)).collect::<Vec<_>>().into() }];

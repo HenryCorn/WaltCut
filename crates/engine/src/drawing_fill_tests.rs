@@ -304,3 +304,275 @@ fn filling_is_enabled_for_a_drawing_and_listed_with_its_parameters() {
     }
     assert!(!Session::default().is_enabled("drawing.fill"), "nothing to fill without a drawing");
 }
+
+// ---- reference drawing, gap closure and edge expansion (#69) ----
+
+/// Line art on clip B, a colour clip A under it: both 160 × 90, both 2 s from 0.
+fn two_drawings() -> (Session, ClipId, ClipId) {
+    let (mut s, a) = session();
+    let r = s.execute("drawing.new", json!({"seconds": 2, "name": "Lines"})).unwrap();
+    (s, a, ClipId(r["clip"].as_u64().unwrap()))
+}
+
+/// An outline on `clip` whose top edge is open by `opening` transparent pixels (4 px lines on whole
+/// pixels: a round cap reaches 2 px past its end).
+fn open_outline(s: &mut Session, clip: ClipId, opening: u32) {
+    let (a, b) = (60.0, 64.0 + f64::from(opening));
+    for pts in [vec![[40.0, 20.0], [a, 20.0]], vec![[b, 20.0], [120.0, 20.0]], vec![[120.0, 20.0], [120.0, 70.0], [40.0, 70.0], [40.0, 20.0]]] {
+        s.execute("drawing.addStroke", json!({"clip": clip.0, "frame": 0, "stroke": line("#000000", 4.0, &pts)})).unwrap();
+    }
+}
+
+fn pixels_of(r: &Value) -> u64 {
+    r["pixels"].as_u64().unwrap()
+}
+
+fn fill_stroke(s: &Session, clip: ClipId, i: usize) -> waltcut_project::drawing::Stroke {
+    drawing(s, clip).cels[0].strokes[i].clone()
+}
+
+#[test]
+fn gap_closure_works_at_the_limit_and_leaks_beyond_it() {
+    let inside = 79 * 49u64;
+    for gap in [1u32, 2, 4, 8] {
+        for (opening, closed) in [(2 * gap, true), (2 * gap + 1, false)] {
+            let (mut s, a, _) = two_drawings();
+            open_outline(&mut s, a, opening);
+            let r = s.execute("drawing.fill", json!({"clip": a.0, "seed": [80, 45], "gap": gap})).unwrap();
+            assert_eq!(pixels_of(&r) < inside + 800, closed, "gap {gap}, opening {opening}: {r}");
+            assert_eq!((r["gap"].clone(), r["grow"].clone(), r["reference"].clone()), (json!(gap), json!(0), Value::Null));
+        }
+    }
+    // without a radius the smallest opening already leaks
+    let (mut s, a, _) = two_drawings();
+    open_outline(&mut s, a, 2);
+    assert!(pixels_of(&s.execute("drawing.fill", json!({"clip": a.0, "seed": [80, 45]})).unwrap()) > inside * 2);
+}
+
+#[test]
+fn a_fill_from_a_reference_drawing_writes_only_to_the_colour_clip() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 4);
+    let art_before = drawing(&s, art);
+    let undo = s.history.undo.len();
+    // the colour clip is empty: from itself the whole canvas is one region
+    let own = s.execute("drawing.fillPreview", json!({"clip": colour.0, "seed": [80, 45]})).unwrap();
+    assert_eq!(pixels_of(&own), 160 * 90);
+    // from the line art the region is the closed shape
+    let r = s.execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "gap": 2, "color": "#ff0000"})).unwrap();
+    assert!(pixels_of(&r) < 79 * 49 + 800 && pixels_of(&r) > 60 * 40, "{r}");
+    assert_eq!(r["reference"], json!(art.0));
+    assert_eq!(s.history.undo.len(), undo + 1, "one undo step");
+    assert_eq!(drawing(&s, art), art_before, "the reference is never modified");
+    let cel = &drawing(&s, colour).cels[0];
+    assert_eq!(cel.strokes.len(), 1, "only the fill is on the colour cel, no line art copied");
+    assert_eq!(cel.strokes[0].fill.as_ref().map(|f| f.reference), Some(Some(art.0)));
+    // undo and redo
+    s.execute("edit.undo", json!({})).unwrap();
+    assert!(drawing(&s, colour).cels.first().is_none_or(|c| c.strokes.is_empty()));
+    assert_eq!(drawing(&s, art), art_before);
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(drawing(&s, colour).cels[0].strokes.len(), 1);
+    // the same colour cel from the reference at the same place gives the same fill again
+    let again = s.execute("drawing.fillPreview", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "gap": 2})).unwrap();
+    assert_eq!((pixels_of(&again), again["runs"].clone()), (pixels_of(&r), r["runs"].clone()));
+}
+
+#[test]
+fn the_reference_may_be_locked_but_the_target_may_not() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 0);
+    let track = |s: &Session, c: ClipId| s.active_sequence().and_then(|q| q.find_item(c)).map(|(t, _)| t.0).unwrap();
+    s.execute("timeline.setTrack", json!({"track": track(&s, art), "locked": true})).unwrap();
+    let r = s.execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "color": "#ff0000"})).unwrap();
+    assert!(pixels_of(&r) < 79 * 49 + 800, "a locked reference is still read: {r}");
+    s.execute("timeline.setTrack", json!({"track": track(&s, art), "locked": false})).unwrap();
+    s.execute("timeline.setTrack", json!({"track": track(&s, colour), "locked": true})).unwrap();
+    let before = (s.revision, s.history.undo.len(), drawing(&s, colour));
+    let e = s.execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45]})).unwrap_err();
+    assert!(e.to_string().contains("locked"), "{e}");
+    assert_eq!((s.revision, s.history.undo.len(), drawing(&s, colour)), before);
+}
+
+#[test]
+fn unavailable_or_unsuitable_references_are_refused_and_change_nothing() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 0);
+    // a clip of a different canvas size
+    let other = {
+        let r = s.execute("drawing.new", json!({"seconds": 2, "name": "Odd"})).unwrap();
+        ClipId(r["clip"].as_u64().unwrap())
+    };
+    s.edit("resize", |p, _| {
+        let id = p.items.iter().find(|(_, i)| i.name == "Odd").map(|(id, _)| *id).unwrap();
+        if let Some(d) = p.item_mut(id).and_then(|i| i.as_drawing_mut()) {
+            d.width = 100;
+        }
+        Ok(())
+    })
+    .unwrap();
+    let snapshot = |s: &Session| (s.revision, s.history.undo.len(), drawing(s, colour));
+    let before = snapshot(&s);
+    for (params, why) in [
+        (json!({"reference": colour.0}), "different drawing clip"),
+        (json!({"reference": 999_999u64}), "no longer exists"),
+        (json!({"reference": other.0}), "same size"),
+        (json!({"reference": 0}), "id of a drawing clip"),
+        (json!({"reference": -3}), "id of a drawing clip"),
+        (json!({"reference": "x"}), "id of a drawing clip"),
+        (json!({"reference": art.0, "frame": 0}), "a time, not a frame"),
+        (json!({"reference": art.0, "time": 10_000_000_000_000_000i64}), "not shown at this time"),
+    ] {
+        let mut p = json!({"clip": colour.0, "seed": [80, 45]});
+        p.as_object_mut().unwrap().extend(params.as_object().unwrap().clone());
+        let e = s.execute("drawing.fill", p.clone()).unwrap_err();
+        assert!(e.to_string().contains(why), "{p}: {e}");
+        assert!(s.execute("drawing.fillPreview", p.clone()).is_err());
+        assert_eq!(snapshot(&s), before, "{p} must change nothing");
+    }
+    // a reference with no cel at that time shows nothing to search in
+    let (mut t, c2, a2) = two_drawings();
+    let e = t.execute("drawing.fill", json!({"clip": c2.0, "reference": a2.0, "seed": [5, 5]})).unwrap_err();
+    assert!(e.to_string().contains("no cel"), "{e}");
+    // a reference that is a non-drawing clip
+    let (mut u, c3, _) = two_drawings();
+    let media = u.execute("graphics.newColorMatte", json!({})).ok().and_then(|r| r["clip"].as_u64());
+    if let Some(m) = media {
+        assert!(u.execute("drawing.fill", json!({"clip": c3.0, "reference": m, "seed": [5, 5]})).is_err());
+    }
+}
+
+#[test]
+fn hostile_gap_grow_and_seed_values_are_refused() {
+    let (mut s, a, _) = two_drawings();
+    let before = (s.revision, s.history.undo.len(), drawing(&s, a));
+    for p in [
+        json!({"gap": 9}),
+        json!({"gap": 255}),
+        json!({"gap": 256}),
+        json!({"gap": -1}),
+        json!({"gap": 1.5}),
+        json!({"gap": "wide"}),
+        json!({"grow": 9}),
+        json!({"grow": u64::MAX}),
+        json!({"grow": -2}),
+        json!({"grow": [1]}),
+    ] {
+        let mut q = json!({"clip": a.0, "seed": [5, 5]});
+        q.as_object_mut().unwrap().extend(p.as_object().unwrap().clone());
+        assert!(s.execute("drawing.fill", q.clone()).is_err(), "{q}");
+        assert!(s.execute("drawing.fillPreview", q.clone()).is_err(), "{q}");
+        assert!(s.execute("drawing.fillEdit", json!({"clip": a.0, "index": 0, "gap": q["gap"].clone(), "grow": q["grow"].clone()})).is_err());
+    }
+    assert_eq!((s.revision, s.history.undo.len(), drawing(&s, a)), before);
+    // the extremes are accepted and bounded work on an awkward canvas
+    s.execute("drawing.fillPreview", json!({"clip": a.0, "seed": [159, 89], "gap": 8, "grow": 8})).unwrap();
+}
+
+#[test]
+fn edge_expansion_reaches_under_a_reference_line_and_is_stored() {
+    let (mut s, colour, art) = two_drawings();
+    // a vertical 8 px wide bar of line art
+    s.execute("drawing.addStroke", json!({"clip": art.0, "frame": 0, "stroke": line("#000000", 8.0, &[[80.0, 0.0], [80.0, 89.0]])})).unwrap();
+    for grow in [0u32, 2, 3] {
+        let r = s
+            .execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [10, 45], "grow": grow, "color": "#ff0000", "cel": "hold"}))
+            .unwrap();
+        assert_eq!(r["grow"], json!(grow));
+        let i = r["index"].as_u64().unwrap() as usize;
+        let px = fill_stroke(&s, colour, i).fill.unwrap().decode().unwrap();
+        let f = fill_stroke(&s, colour, i).fill.unwrap();
+        let [rx, ry, rw, _] = f.rect;
+        let row = &px[((45 - ry) * rw) as usize..((46 - ry) * rw) as usize];
+        let last = row.iter().rposition(|c| *c == 1).unwrap();
+        assert_eq!(row.iter().skip(last + 1).take_while(|c| **c == 2).count(), grow as usize + 1, "grow {grow} from x = {}", rx as usize + last);
+    }
+}
+
+#[test]
+fn the_stored_result_does_not_follow_the_reference_but_a_redo_does() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 0);
+    s.execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "color": "#ff0000"})).unwrap();
+    let stored = fill_stroke(&s, colour, 0);
+    // the reference is edited (an erased wall opens the shape), then moved away
+    s.execute("drawing.addStroke", json!({"clip": art.0, "frame": 0, "stroke": {"brush": "Eraser", "size": 30, "points": [[80.0, 10.0], [80.0, 30.0]]}}))
+        .unwrap();
+    assert_eq!(fill_stroke(&s, colour, 0), stored, "the fill is a saved result");
+    s.execute("drawing.fillEdit", json!({"clip": colour.0, "index": 0, "color": "#0000ff"})).unwrap();
+    assert!(fill_stroke(&s, colour, 0).fill == stored.fill, "recolouring never needs the reference");
+    // a redo reads the reference as it is now: the opened shape leaks over the whole canvas
+    let r = s.execute("drawing.fillEdit", json!({"clip": colour.0, "index": 0, "gap": 1})).unwrap();
+    assert!(pixels_of(&r) > 79 * 49 * 2, "{r}");
+    let redone = fill_stroke(&s, colour, 0).fill.unwrap();
+    assert_eq!((redone.reference, redone.gap, redone.seed), (Some(art.0), 1, [80, 45]));
+    // the reference goes away: the colour stays and exports, a redo is refused with the reason
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("edit.clear", json!({"clips": [art.0]})).unwrap();
+    let before = (s.revision, s.history.undo.len(), drawing(&s, colour));
+    let e = s.execute("drawing.fillEdit", json!({"clip": colour.0, "index": 0, "tolerance": 5})).unwrap_err();
+    assert!(e.to_string().contains("no longer exists"), "{e}");
+    assert_eq!((s.revision, s.history.undo.len(), drawing(&s, colour)), before, "a refused redo changes nothing");
+    s.execute("drawing.fillEdit", json!({"clip": colour.0, "index": 0, "color": "#00ff00"})).unwrap();
+    assert!(s.execute("drawing.fillRemove", json!({"clip": colour.0, "index": 0})).is_ok(), "removing never needs the reference");
+}
+
+#[test]
+fn a_preview_changes_nothing_and_matches_the_fill() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 4);
+    let params = json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "gap": 2, "grow": 1, "color": "#ff0000"});
+    let before = (s.revision, s.history.undo.len(), s.is_dirty(), drawing(&s, colour), drawing(&s, art));
+    let p = s.execute("drawing.fillPreview", params.clone()).unwrap();
+    assert_eq!(p["preview"], json!(true));
+    assert_eq!((s.revision, s.history.undo.len(), s.is_dirty(), drawing(&s, colour), drawing(&s, art)), before);
+    let (_, _, fill) = crate::drawing_fill::preview_with(&s, &params, &|| false).unwrap();
+    let r = s.execute("drawing.fill", params.clone()).unwrap();
+    assert_eq!(fill_stroke(&s, colour, 0).fill.as_deref(), Some(&fill), "applying gives exactly the previewed region");
+    assert_eq!((pixels_of(&p), p["runs"].clone(), p["rect"].clone()), (pixels_of(&r), r["runs"].clone(), r["rect"].clone()));
+    // cancelling a preview is dropping it; a cancelled search is refused and changes nothing
+    let e = crate::drawing_fill::preview_with(&s, &params, &|| true).unwrap_err();
+    assert!(e.to_string().contains("cancelled"), "{e}");
+    let c = crate::drawing_fill::fill_with(&mut s, &params, &|| true).unwrap_err();
+    assert!(c.to_string().contains("cancelled"));
+    assert_eq!(drawing(&s, colour).cels[0].strokes.len(), 1);
+}
+
+#[test]
+fn a_reference_fill_survives_save_and_load_and_export_matches_the_preview() {
+    let (mut s, colour, art) = two_drawings();
+    open_outline(&mut s, art, 4);
+    s.execute("drawing.fill", json!({"clip": colour.0, "reference": art.0, "seed": [80, 45], "gap": 2, "grow": 2, "color": [0.9, 0.2, 0.1, 0.8]})).unwrap();
+    let before = (preview(&s), drawing(&s, colour));
+    let dir = Scratch::new("reference");
+    let path = dir.path("reference.waltcut");
+    s.execute("file.save", json!({"path": path})).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let compact: String = text.split_whitespace().collect();
+    assert!(compact.contains("\"gap\":2") && compact.contains("\"grow\":2") && compact.contains(&format!("\"reference\":{}", art.0)), "options are stored");
+    let mut t = Session::default();
+    t.execute("file.open", json!({"path": path})).unwrap();
+    assert_eq!(drawing(&t, colour), before.1, "the stored fill, with its options, comes back exactly");
+    assert_eq!(preview(&t).2, before.0.2, "and draws the same pixels");
+    // export equals preview, pixel for pixel
+    let png = dir.path("still.png");
+    t.execute("file.exportFrame", json!({"path": png})).unwrap();
+    let exported = image::load_from_memory(&std::fs::read(&png).unwrap()).unwrap().to_rgba8();
+    assert_eq!(exported.as_raw(), &before.0.2, "export and preview are the same pixels");
+    // a plain fill has none of the new keys
+    let (mut p, c, _) = two_drawings();
+    outline(&mut p, 40.0, 20.0, 120.0, 70.0);
+    p.execute("drawing.fill", json!({"clip": c.0, "seed": [80, 45]})).unwrap();
+    p.execute("file.save", json!({"path": dir.path("plain.waltcut")})).unwrap();
+    let plain = std::fs::read_to_string(dir.path("plain.waltcut")).unwrap();
+    assert!(!plain.contains("\"gap\"") && !plain.contains("\"grow\"") && !plain.contains("\"reference\""));
+}
+
+#[test]
+fn preview_is_listed_and_the_commands_take_the_new_parameters() {
+    let (s, _) = session();
+    assert!(s.is_enabled("drawing.fillPreview"));
+    assert!(!Session::default().is_enabled("drawing.fillPreview"));
+    let doc = |id: &str| crate::commands::find(id).map(|c| c.params).unwrap_or("");
+    assert!(doc("drawing.fill").contains("reference") && doc("drawing.fill").contains("gap") && doc("drawing.fill").contains("grow"));
+}

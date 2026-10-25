@@ -57,6 +57,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.canvasReset", "Reset Canvas View", ["View", "Drawing View"], Some("Alt+0")),
     uic!("drawing.lassoMode", "Lasso Select Strokes", ["Graphics and Titles", "Drawing"], Some("Alt+L")),
     uic!("drawing.fillMode", "Fill Region", ["Graphics and Titles", "Drawing"], Some("Alt+F")),
+    uic!("drawing.fillApply", "Apply Fill Preview", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.fillCancel", "Cancel Fill Preview", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.selectStrokes", "Select Strokes by Lasso", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.selectionTransform", "Transform Selected Strokes", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.selectionApply", "Apply Stroke Transform", ["Graphics and Titles", "Drawing"], Some("Alt+Enter")),
