@@ -300,15 +300,7 @@ pub fn parse_stroke(cmd: &str, v: &Value) -> Result<Stroke> {
         Some(b) => Brush::from_name(b).ok_or_else(|| bad(cmd, format!("unknown brush `{b}` (Pen, Pencil, Marker or Eraser)")))?,
         None => Brush::Pen,
     };
-    let color = match v.get("color") {
-        None | Some(Value::Null) => [0.0, 0.0, 0.0, 1.0],
-        Some(Value::String(h)) => hex_color(h).ok_or_else(|| bad(cmd, format!("bad colour `{h}`")))?,
-        Some(Value::Array(a)) => {
-            let c = |i: usize, d: f64| a.get(i).and_then(Value::as_f64).unwrap_or(d) as f32;
-            [c(0, 0.0), c(1, 0.0), c(2, 0.0), c(3, 1.0)]
-        }
-        Some(_) => return Err(bad(cmd, "`color` is [r, g, b, a] or \"#rrggbb\"")),
-    };
+    let color = parse_color(cmd, v.get("color"))?;
     let size = f64_p(v, "size").unwrap_or(6.0) as f32;
     let pts = v.get("points").and_then(Value::as_array).ok_or_else(|| bad(cmd, "a stroke needs `points`"))?;
     if pts.len() > drawing::MAX_STROKE_POINTS {
@@ -328,7 +320,21 @@ pub fn parse_stroke(cmd: &str, v: &Value) -> Result<Stroke> {
         None | Some(Value::Null) => None,
         Some(r) => Some(parse_response(cmd, r)?),
     };
-    Stroke { brush, color, size, points, response }.sanitized().map_err(|e| bad(cmd, e))
+    Stroke { brush, color, size, points, response, fill: None }.sanitized().map_err(|e| bad(cmd, e))
+}
+
+/// A `color` parameter: `"#rrggbb"` / `"#rrggbbaa"` or `[r, g, b, a?]` (0..1, straight alpha);
+/// opaque black when absent.
+pub(crate) fn parse_color(cmd: &str, v: Option<&Value>) -> Result<[f32; 4]> {
+    Ok(match v {
+        None | Some(Value::Null) => [0.0, 0.0, 0.0, 1.0],
+        Some(Value::String(h)) => hex_color(h).ok_or_else(|| bad(cmd, format!("bad colour `{h}`")))?,
+        Some(Value::Array(a)) => {
+            let c = |i: usize, d: f64| a.get(i).and_then(Value::as_f64).unwrap_or(d) as f32;
+            [c(0, 0.0), c(1, 0.0), c(2, 0.0), c(3, 1.0)]
+        }
+        Some(_) => return Err(bad(cmd, "`color` is [r, g, b, a] or \"#rrggbb\"")),
+    })
 }
 
 /// `{width?, opacity?}`, each a preset name (`linear`, `soft`, `firm`, `scurve`) or `[[pressure,
@@ -384,7 +390,7 @@ fn new_drawing(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// How a stroke picks its cel: draw into the cel shown (`hold`), or start a cel on this frame,
 /// empty (`new`) or as a copy of the one shown (`copy`).
-fn cel_mode(cmd: &str, p: &Value) -> Result<(bool, bool)> {
+pub(crate) fn cel_mode(cmd: &str, p: &Value) -> Result<(bool, bool)> {
     Ok(match str_p(p, "cel").unwrap_or("hold") {
         "hold" | "current" => (false, false),
         "new" => (true, false),
@@ -509,7 +515,7 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
     let cels: Vec<Value> = d
         .cels
         .iter()
-        .map(|c| if full { json!({"frame": c.frame, "strokes": c.strokes}) } else { json!({"frame": c.frame, "strokes": c.strokes.len()}) })
+        .map(|c| if full { json!({"frame": c.frame, "strokes": c.strokes.iter().map(crate::drawing_fill::stroke_json).collect::<Vec<_>>()}) } else { json!({"frame": c.frame, "strokes": c.strokes.len()}) })
         .collect();
     let (_, last) = drawing_frame_bounds(s, ID, clip, d)?;
     let clip_end = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;

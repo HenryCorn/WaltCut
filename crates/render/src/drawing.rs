@@ -33,6 +33,11 @@ struct Dab {
 }
 
 fn paint_stroke(s: &Stroke, m: &Affine, k: f32, img: &mut Image) {
+    // a fill is a stored region, not a path (#68)
+    if let Some(fill) = &s.fill {
+        crate::drawing_fill::paint_fill(s, fill, m, img);
+        return;
+    }
     if img.w == 0 || img.h == 0 || s.points.is_empty() || !s.size.is_finite() || s.size <= 0.0 {
         return;
     }
@@ -135,7 +140,7 @@ mod tests {
     use waltcut_project::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32, f32)], size: f32) -> Stroke {
-        Stroke { brush, color: [1.0, 1.0, 1.0, 1.0], size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(), response: None }
+        Stroke { brush, color: [1.0, 1.0, 1.0, 1.0], size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(), response: None, fill: None }
     }
 
     fn alpha(img: &Image, x: usize, y: usize) -> f32 {
@@ -251,6 +256,7 @@ mod response_render_tests {
             size: 12.0,
             points: (0..20).map(|i| StrokePoint { x: 8.0 + i as f32 * 2.5, y: 16.0, p }).collect(),
             response: None,
+            fill: None,
         }
     }
 

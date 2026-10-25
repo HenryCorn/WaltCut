@@ -332,7 +332,7 @@ impl CelMode {
             CelMode::Copy => "New cel from held",
         }
     }
-    fn param(self) -> &'static str {
+    pub(super) fn param(self) -> &'static str {
         match self {
             CelMode::Hold => "hold",
             CelMode::New => "new",
@@ -416,6 +416,12 @@ pub struct BrushSettings {
     /// Lasso mode (#66): a drag selects strokes instead of drawing. Never loaded back.
     #[serde(skip_deserializing)]
     pub lasso: bool,
+    /// Fill mode (#68): a click fills the region under it instead of a drag drawing. Never loaded
+    /// back.
+    #[serde(skip_deserializing)]
+    pub fill: bool,
+    /// How different from the clicked pixel a pixel may be and still be filled (0-255).
+    pub fill_tolerance: u8,
     /// The selected strokes and their pending transform. Never saved or loaded back.
     #[serde(skip_deserializing)]
     pub selection: Option<super::stroke_select::StrokeSelection>,
@@ -456,6 +462,8 @@ impl Default for BrushSettings {
             onion_loop: false,
             reference_move: false,
             lasso: false,
+            fill: false,
+            fill_tolerance: waltcut_engine::drawing_fill::DEFAULT_TOLERANCE,
             selection: None,
             light_table: Default::default(),
             smoothing: Default::default(),
@@ -498,6 +506,7 @@ fn live_stroke(b: &BrushSettings, l: &Live) -> Stroke {
         size: b.size,
         points: l.stroke.points.iter().map(|p| waltcut_project::drawing::StrokePoint { x: p[0], y: p[1], p: p[2] }).collect(),
         response: b.stroke_response(),
+        fill: None,
     }
 }
 
@@ -738,6 +747,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 }
                 super::light_table::controls(app, ui);
                 super::reference::menu(app, ui);
+                super::fill::controls(app, ui);
                 super::stroke_select::controls(app, ui);
             });
         });
@@ -803,6 +813,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let moving_ref = !panning && !shifting && super::reference::moving(app);
     // Lasso mode: a drag selects strokes (or moves the pending transform) instead of drawing (#66)
     let lassoing = !panning && !shifting && !moving_ref && app.ui.brush.lasso;
+    // Fill mode (#68): a click fills the region under it, a drag draws nothing
+    let filling = !panning && !shifting && !moving_ref && !lassoing && app.ui.brush.fill;
     let tgt = target(app);
     // the options bar sits where it does on an upright picture: a turned one is narrow
     let bar = options_bar(app, ui, layout_pic, tgt.is_some());
@@ -828,6 +840,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         super::light_table::drag(app, ui, &resp, &map, &d);
     } else if lassoing {
         super::stroke_select::overlay(app, ui, &painter, &resp, &map, &d, f);
+    } else if filling {
+        super::fill::overlay(app, ui, &painter, &resp, &map, bar, clip.0);
     } else if moving_ref {
         let grabbing = ui.input(|i| i.pointer.primary_down());
         ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
@@ -864,6 +878,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         && !shifting
         && !moving_ref
         && !lassoing
+        && !filling
         && (resp.drag_started_by(egui::PointerButton::Primary)
             || resp.drag_started_by(egui::PointerButton::Secondary)
             || resp.clicked_by(egui::PointerButton::Primary)
@@ -872,7 +887,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // Every pointer sample of the frame, in order, with the pressure it was made at.
     let stream = frame_input(app, ui, live.is_some());
     // a drag that pans is not a stroke: its pen samples are dropped
-    let stream = if (panning || shifting || moving_ref || lassoing) && live.is_none() { Vec::new() } else { stream };
+    let stream = if (panning || shifting || moving_ref || lassoing || filling) && live.is_none() { Vec::new() } else { stream };
     // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
     let cancelled =
         ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
@@ -1007,6 +1022,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let label = if moving_ref { format!("{label} · drag to move the reference") } else { label };
     let label = if shifting { format!("{label} · drag to shift the pinned pose (Shift-drag turns it)") } else { label };
     let label = if lassoing { format!("{label} · lasso: drag around strokes") } else { label };
+    let label = if filling { format!("{label} · fill: click inside a shape") } else { label };
     painter.text(pic.left_bottom() + vec2(8.0, -8.0), egui::Align2::LEFT_BOTTOM, label, egui::FontId::proportional(12.0), Color32::from_white_alpha(200));
 }
 

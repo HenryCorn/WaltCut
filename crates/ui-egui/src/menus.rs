@@ -56,6 +56,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.canvasPan", "Pan While Held", ["View", "Drawing View"], Some("Alt+H")),
     uic!("view.canvasReset", "Reset Canvas View", ["View", "Drawing View"], Some("Alt+0")),
     uic!("drawing.lassoMode", "Lasso Select Strokes", ["Graphics and Titles", "Drawing"], Some("Alt+L")),
+    uic!("drawing.fillMode", "Fill Region", ["Graphics and Titles", "Drawing"], Some("Alt+F")),
     uic!("drawing.selectStrokes", "Select Strokes by Lasso", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.selectionTransform", "Transform Selected Strokes", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.selectionApply", "Apply Stroke Transform", ["Graphics and Titles", "Drawing"], Some("Alt+Enter")),
@@ -247,6 +248,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         let tool = Tool::from_name(t).ok_or_else(|| format!("unknown tool `{t}`"))?;
         app.ui.tool = tool;
         return Ok(json!({"tool": tool}));
+    }
+    if let Some(r) = crate::panels::fill::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
     }
     if let Some(r) = crate::panels::stroke_select::route(app, id, &params) {
         if let Err(e) = &r {
@@ -718,6 +725,10 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
         if let Some(doc) = crate::panels::light_table::params_doc(&it.id) {
             it.params = Some(doc.to_string());
             it.enabled &= crate::panels::light_table::enabled(app, &it.id);
+        }
+        if let Some(doc) = crate::panels::fill::params_doc(&it.id) {
+            it.params = Some(doc.to_string());
+            it.enabled &= crate::panels::fill::enabled(app, &it.id);
         }
         if let Some(doc) = crate::panels::stroke_select::params_doc(&it.id) {
             it.params = Some(doc.to_string());

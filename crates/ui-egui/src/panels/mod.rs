@@ -37,6 +37,7 @@ pub mod reference;
 pub mod sequence_settings;
 pub mod settings;
 pub mod shortcuts_dialog;
+pub mod fill;
 pub mod stroke_select;
 pub mod timeline;
 pub mod timeline_hit;

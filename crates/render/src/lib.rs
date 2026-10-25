@@ -13,6 +13,7 @@ pub mod audio;
 pub mod blend;
 pub mod colorman;
 pub mod drawing;
+pub mod drawing_fill;
 pub mod flow;
 pub mod graphic_clip;
 pub mod graphics;

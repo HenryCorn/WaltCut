@@ -19,6 +19,7 @@ pub mod commands;
 pub mod demo;
 pub mod doc_path;
 pub mod drawing;
+pub mod drawing_fill;
 mod export_output;
 pub mod export_tools;
 pub mod graphic_design;
@@ -1071,6 +1072,8 @@ mod clip_ops_tests;
 mod color_tests;
 #[cfg(test)]
 mod drawing_tests;
+#[cfg(test)]
+mod drawing_fill_tests;
 #[cfg(test)]
 mod explicit_targets_tests;
 #[cfg(test)]

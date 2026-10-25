@@ -13,6 +13,9 @@
 use serde::{Deserialize, Serialize};
 use waltcut_time::{FrameRate, Tick};
 
+pub use crate::drawing_fill::Fill;
+use crate::drawing_fill::{MAX_CEL_FILL_RUNS, MAX_DRAWING_FILL_RUNS};
+
 /// The most samples one stroke may hold (a long, slow scribble at 240 Hz is a few thousand).
 pub const MAX_STROKE_POINTS: usize = 20_000;
 /// The most strokes one cel may hold.
@@ -36,9 +39,13 @@ pub enum Brush {
     Marker,
     /// Removes paint from the strokes under it in the same cel.
     Eraser,
+    /// A stored region fill (#68): carries a [`Fill`] and no points. Not a pen you draw with, so it
+    /// is not in [`Brush::ALL`] and `drawing.addStroke` does not take it.
+    Fill,
 }
 
 impl Brush {
+    /// The four brushes a stroke is drawn with (a fill is made by `drawing.fill`).
     pub const ALL: [Brush; 4] = [Brush::Pen, Brush::Pencil, Brush::Marker, Brush::Eraser];
 
     pub fn label(self) -> &'static str {
@@ -47,6 +54,7 @@ impl Brush {
             Brush::Pencil => "Pencil",
             Brush::Marker => "Marker",
             Brush::Eraser => "Eraser",
+            Brush::Fill => "Fill",
         }
     }
 
@@ -63,6 +71,7 @@ impl Brush {
             Brush::Pencil => (0.4 + 0.6 * p, 0.25 + 0.75 * p),
             Brush::Marker => (1.0, 0.6),
             Brush::Eraser => (0.3 + 0.7 * p, 1.0),
+            Brush::Fill => (1.0, 1.0),
         }
     }
 }
@@ -196,12 +205,46 @@ pub struct Stroke {
     /// only when set, so a stroke without one is stored as it always was).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response: Option<PressureResponse>,
+    /// The stored result of a fill: present exactly when `brush` is [`Brush::Fill`] (written only
+    /// then). Shared, so cloning a cel's strokes never copies a mask.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<std::sync::Arc<Fill>>,
 }
 
 impl Stroke {
+    /// A fill operation painting `fill` in `color` (sRGB, straight alpha).
+    pub fn fill_op(color: [f32; 4], fill: Fill) -> Stroke {
+        Stroke { brush: Brush::Fill, color, size: 1.0, points: Vec::new(), response: None, fill: Some(std::sync::Arc::new(fill)) }
+    }
+
+    /// Whether this operation is a fill.
+    pub fn is_fill(&self) -> bool {
+        self.brush == Brush::Fill
+    }
+
+    /// Clamp a fill from an untrusted source to sane values, for a canvas of `w × h`. Fails when
+    /// it is not a usable fill.
+    pub fn sanitized_fill(mut self, w: u32, h: u32) -> Result<Stroke, String> {
+        let fill = self.fill.as_deref().filter(|_| self.brush == Brush::Fill).ok_or("a fill needs its region")?;
+        fill.validate(w, h)?;
+        if self.color.iter().any(|c| !c.is_finite()) || self.color[3] <= 0.0 {
+            return Err("a fill needs a visible colour".into());
+        }
+        for c in &mut self.color {
+            *c = c.clamp(0.0, 1.0);
+        }
+        self.size = 1.0;
+        self.points.clear();
+        self.response = None;
+        Ok(self)
+    }
+
     /// Clamp a stroke from an untrusted source (command parameters, a project file) to sane values.
     /// Fails when nothing drawable is left.
     pub fn sanitized(mut self) -> Result<Stroke, String> {
+        if self.brush == Brush::Fill || self.fill.is_some() {
+            return Err("a fill is made with the fill command, not drawn".into());
+        }
         if !self.size.is_finite() || self.size <= 0.0 {
             return Err("stroke size must be a positive number".into());
         }
@@ -242,6 +285,9 @@ impl Stroke {
 
     /// Bounding box `(min_x, min_y, max_x, max_y)` including the brush radius.
     pub fn bounds(&self) -> Option<(f32, f32, f32, f32)> {
+        if let Some(f) = &self.fill {
+            return Some(f.bounds());
+        }
         let r = self.size * 0.5 + 1.0;
         let mut it = self.points.iter();
         let first = it.next()?;
@@ -266,6 +312,11 @@ pub struct Cel {
 }
 
 impl Cel {
+    /// How many fill runs this cel's fills hold.
+    pub fn fill_runs(&self) -> usize {
+        self.strokes.iter().filter_map(|s| s.fill.as_deref()).map(|f| f.runs.len()).sum()
+    }
+
     /// The strokes for editing: copies them first when another clone of the cel still shares them.
     pub fn strokes_mut(&mut self) -> &mut Vec<Stroke> {
         std::sync::Arc::make_mut(&mut self.strokes)
@@ -484,17 +535,66 @@ impl Drawing {
         out
     }
 
-    /// Restore the invariants after loading untrusted data: sorted unique cels, sane strokes.
+    /// How many fill runs all the cels hold.
+    pub fn fill_runs(&self) -> usize {
+        self.cels.iter().map(Cel::fill_runs).sum()
+    }
+
+    /// Drop the fills that are not usable on this canvas, or that would pass a cel's or the
+    /// drawing's run budget (the first ones in order are kept): a fill from an untrusted file never
+    /// reaches the renderer or the editor. Returns how many were dropped. Strokes are untouched.
+    pub fn repair_fills(&mut self) -> usize {
+        let (w, h) = (self.width, self.height);
+        let (mut dropped, mut drawing_runs) = (0usize, 0usize);
+        for c in &mut self.cels {
+            if !c.strokes.iter().any(|s| s.brush == Brush::Fill || s.fill.is_some()) {
+                continue;
+            }
+            let mut cel_runs = 0usize;
+            let keep: Vec<bool> = c
+                .strokes
+                .iter()
+                .map(|s| {
+                    if s.brush != Brush::Fill && s.fill.is_none() {
+                        return true;
+                    }
+                    let runs = s.fill.as_deref().map_or(0, |f| f.runs.len());
+                    let ok = cel_runs + runs <= MAX_CEL_FILL_RUNS && drawing_runs + runs <= MAX_DRAWING_FILL_RUNS && s.clone().sanitized_fill(w, h).is_ok();
+                    if ok {
+                        cel_runs += runs;
+                        drawing_runs += runs;
+                    }
+                    ok
+                })
+                .collect();
+            let mut i = 0;
+            c.strokes_mut().retain(|_| {
+                let k = keep.get(i).copied().unwrap_or(false);
+                i += 1;
+                dropped += usize::from(!k);
+                k
+            });
+        }
+        dropped
+    }
+
+    /// Restore the invariants after loading untrusted data: sorted unique cels, sane strokes and
+    /// fills (see [`Drawing::repair_fills`]); what cannot be made sane is dropped.
     pub fn sanitize(&mut self) {
         self.cels.truncate(MAX_CELS);
         self.cels.sort_by_key(|c| c.frame);
         self.cels.dedup_by_key(|c| c.frame);
+        self.repair_fills();
+        let (w, h) = (self.width, self.height);
         for c in &mut self.cels {
             let strokes = c.strokes_mut();
             strokes.truncate(MAX_CEL_STROKES);
             *strokes = std::mem::take(strokes)
                 .into_iter()
                 .filter_map(|mut s| {
+                    if s.brush == Brush::Fill {
+                        return s.sanitized_fill(w, h).ok();
+                    }
                     // a damaged curve costs the stroke its response, not the stroke
                     if s.response.as_ref().is_some_and(|r| r.validate().is_err()) {
                         s.response = None;
@@ -516,6 +616,8 @@ pub fn tween(a: &Cel, b: &Cel, t: f32) -> Vec<Stroke> {
     let mut out = Vec::with_capacity(n);
     for i in 0..n {
         match (a.strokes.get(i), b.strokes.get(i)) {
+            // a fill is never morphed: the nearer cel's operation stands in
+            (Some(sa), Some(sb)) if sa.is_fill() || sb.is_fill() => out.push(if t < 0.5 { sa.clone() } else { sb.clone() }),
             (Some(sa), Some(sb)) => {
                 let k = sa.points.len().max(sb.points.len()).clamp(2, 512);
                 let pa = resample(&sa.points, k);
@@ -532,6 +634,7 @@ pub fn tween(a: &Cel, b: &Cel, t: f32) -> Vec<Stroke> {
                     size: lerp(sa.size, sb.size),
                     points,
                     response: if t < 0.5 { sa.response.clone() } else { sb.response.clone() },
+                    fill: None,
                 });
             }
             (Some(s), None) if t < 0.5 => out.push(s.clone()),
@@ -582,7 +685,7 @@ mod tests {
 
     fn line(x0: f32, x1: f32, n: usize) -> Stroke {
         let points = (0..n).map(|i| StrokePoint { x: x0 + (x1 - x0) * i as f32 / (n - 1).max(1) as f32, y: 10.0, p: 1.0 }).collect();
-        Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points, response: None }
+        Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points, response: None, fill: None }
     }
 
     fn cel_of(d: &mut Drawing, frame: i64, strokes: &[Stroke]) {
@@ -833,6 +936,7 @@ mod response_tests {
             size: 10.0,
             points: points.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(),
             response: None,
+            fill: None,
         }
     }
 
@@ -943,5 +1047,87 @@ mod response_tests {
         let mut cmd = pen(&[(1.0, 1.0, 0.5)]);
         cmd.response = Some(PressureResponse { width: Some(Curve(vec![[0.0, 0.0]])), opacity: None });
         assert!(cmd.sanitized().unwrap_err().contains("`width`"));
+    }
+}
+
+#[cfg(test)]
+mod fill_tests {
+    use super::*;
+    use crate::drawing_fill::{MAX_CEL_FILL_RUNS, MAX_FILL_PIXELS};
+
+    fn fill_stroke(rect: [u32; 4]) -> Stroke {
+        let cells = vec![1u8; (rect[2] * rect[3]) as usize];
+        Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill::encode([rect[0], rect[1]], 32, rect, &cells).unwrap())
+    }
+
+    fn pen() -> Stroke {
+        Stroke { brush: Brush::Pen, color: [0.0, 0.0, 0.0, 1.0], size: 4.0, points: vec![StrokePoint { x: 1.0, y: 1.0, p: 1.0 }], response: None, fill: None }
+    }
+
+    #[test]
+    fn a_fill_is_an_operation_with_bounds_and_no_points() {
+        let f = fill_stroke([10, 20, 30, 40]);
+        assert!(f.is_fill() && f.points.is_empty());
+        assert_eq!(f.bounds(), Some((10.0, 20.0, 40.0, 60.0)));
+        assert_eq!(f.clone().sanitized_fill(100, 100).unwrap(), f);
+        // a drawn stroke has no fill key; a fill's brush reads back as Fill
+        let json = serde_json::to_string(&pen()).unwrap();
+        assert!(!json.contains("fill"), "{json}");
+        let back: Stroke = serde_json::from_str(&serde_json::to_string(&f).unwrap()).unwrap();
+        assert_eq!(back, f);
+        assert_eq!(Brush::from_name("Fill"), None, "a fill is not a brush to draw with");
+    }
+
+    #[test]
+    fn a_fill_is_never_a_drawn_stroke_and_a_stroke_is_never_a_fill() {
+        assert!(fill_stroke([0, 0, 4, 4]).sanitized().is_err());
+        assert!(Stroke { fill: fill_stroke([0, 0, 4, 4]).fill, ..pen() }.sanitized().is_err());
+        assert!(Stroke { brush: Brush::Fill, ..pen() }.sanitized_fill(10, 10).is_err());
+        assert!(pen().sanitized_fill(10, 10).is_err());
+        let mut clear = fill_stroke([0, 0, 4, 4]);
+        clear.color[3] = 0.0;
+        assert!(clear.sanitized_fill(10, 10).is_err(), "a fully transparent fill changes nothing");
+        let mut nan = fill_stroke([0, 0, 4, 4]);
+        nan.color[0] = f32::NAN;
+        assert!(nan.sanitized_fill(10, 10).is_err());
+        let mut bright = fill_stroke([0, 0, 4, 4]);
+        bright.color = [4.0, -1.0, 0.5, 9.0];
+        assert_eq!(bright.sanitized_fill(10, 10).unwrap().color, [1.0, 0.0, 0.5, 1.0]);
+    }
+
+    #[test]
+    fn loading_keeps_good_fills_and_drops_bad_ones_and_those_over_budget() {
+        let mut d = Drawing::new(64, 64, FrameRate::new(24, 1));
+        let outside = fill_stroke([60, 60, 8, 8]);
+        let ok = fill_stroke([0, 0, 8, 8]);
+        d.cels = vec![Cel { frame: 0, strokes: vec![pen(), outside, ok.clone(), pen()].into() }];
+        d.sanitize();
+        assert_eq!(d.cels[0].strokes.len(), 3, "the fill outside the canvas is dropped, the rest is kept in order");
+        assert_eq!(d.cels[0].strokes[1], ok);
+        // too large a canvas holds no fills
+        let mut big = Drawing::new(8192, 8192, FrameRate::new(24, 1));
+        assert!(u64::from(big.width) * u64::from(big.height) > MAX_FILL_PIXELS);
+        big.cels = vec![Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 8, 8]), pen()].into() }];
+        big.sanitize();
+        assert_eq!(big.cels[0].strokes.len(), 1);
+        // a cel's run budget
+        let many = |n: usize| {
+            let runs: Vec<[u32; 2]> = (0..n).map(|i| [u32::from(i % 2 == 0), 1]).collect();
+            Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, n as u32, 1], runs })
+        };
+        let mut e = Drawing::new(MAX_CEL_FILL_RUNS as u32, 1, FrameRate::new(24, 1));
+        e.cels = vec![Cel { frame: 0, strokes: (0..5).map(|_| many(60_000)).collect::<Vec<_>>().into() }];
+        e.sanitize();
+        assert_eq!(e.cels[0].strokes.len(), 4, "the fifth 60 000-run fill passes the cel's 262 144-run budget");
+        assert_eq!(e.fill_runs(), 240_000);
+    }
+
+    #[test]
+    fn an_in_between_never_morphs_a_fill() {
+        let a = Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 4, 4])].into() };
+        let b = Cel { frame: 4, strokes: vec![pen()].into() };
+        assert!(tween(&a, &b, 0.25)[0].is_fill());
+        assert!(!tween(&a, &b, 0.75)[0].is_fill());
+        assert!(tween(&b, &a, 0.75)[0].is_fill());
     }
 }
