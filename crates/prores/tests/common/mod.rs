@@ -12,7 +12,8 @@ pub fn ffmpeg() -> Option<PathBuf> {
 }
 
 pub fn fixture_dir() -> PathBuf {
-    waltcut_testkit::fixtures_dir("prores")
+    // keyed on this file: it holds every ffmpeg argument list (#106)
+    waltcut_testkit::fixtures::recipe_fixtures_dir("prores", include_str!("mod.rs"))
 }
 
 fn run(ff: &Path, args: &[&str]) {

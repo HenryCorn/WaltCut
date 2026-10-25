@@ -41,6 +41,15 @@ pub fn recipe_dir(sub: &str, recipe: &str) -> PathBuf {
     fixtures_dir(sub).join(format!("recipe-{:016x}", hash.finish()))
 }
 
+/// [`recipe_dir`], created: for generators that write several files (inputs and outputs) into
+/// their fixture folder. Key it on everything that shapes the output (ffmpeg arguments, or the
+/// generator source with `include_str!`) so a changed generator never reuses a stale cache (#106).
+pub fn recipe_fixtures_dir(sub: &str, recipe: &str) -> PathBuf {
+    let d = recipe_dir(sub, recipe);
+    std::fs::create_dir_all(&d).unwrap_or_else(|e| panic!("create {}: {e}", d.display()));
+    d
+}
+
 /// A temporary sibling of `out` that no other thread or process will pick: the stem gets
 /// `.tmp-<pid>-<thread>-<n>` and the extension is kept (ffmpeg chooses the muxer from it).
 pub fn temp_path(out: &Path) -> PathBuf {
@@ -111,6 +120,17 @@ pub fn generate_and_report<T>(name: &str, outputs: &[PathBuf], generate: impl Fn
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recipe_fixtures_dir_is_created_and_follows_the_recipe() {
+        let namespace = format!("testkit-recipes/{}-dir", std::process::id());
+        let a = recipe_fixtures_dir(&namespace, "ffmpeg -t 1");
+        let b = recipe_fixtures_dir(&namespace, "ffmpeg -t 2");
+        assert!(a.is_dir() && b.is_dir());
+        assert_ne!(a, b);
+        assert_eq!(a, recipe_fixtures_dir(&namespace, "ffmpeg -t 1"));
+        std::fs::remove_dir_all(fixtures_dir(&namespace)).unwrap();
+    }
 
     #[test]
     fn root_is_the_workspace() {
