@@ -267,6 +267,30 @@ used to position or fade a drawing.
   the pen) and the status bar says so. The pen queue holds 4 096 samples between frames; if it
   overflows the oldest moves are dropped (never the stroke's first and last samples) and the loss
   is counted.
+- **Smoothing** (`drawing.smoothing {mode?, strength?, pressure?}`, **Smooth** in the Brush
+  options bar, Graphics and Titles ▸ Drawing ▸ Stroke Smoothing). **Off** (the default) stores the
+  captured samples exactly as before. **Smooth** passes each kept sample through an adaptive moving
+  average, one at a time and in order (so the result does not depend on how samples were batched
+  into frames), in canvas pixels:
+  - *Position* strength 0–1 (`alpha = 1 - 0.9 × strength`): small moves are absorbed, and the
+    filter follows the pen more closely the faster it moves (the follow rises with the square of
+    the pen's step, reaching full at 16 canvas pixels per sample). On a synthetic ±2 px zigzag
+    drawn in 3 px steps the wobble falls from 2.0 px to 1.22 px at strength 0.3 and to 0.31 px at
+    0.9; a 90° corner drawn in 8 px steps is rounded by 0.4, 2.2 and 7 px at strengths 0.3, 0.6
+    and 1 (all measured by the unit tests). *Pressure* has its own strength (`alpha = 1 - 0.8 ×
+    pressure`) and never moves the position.
+  - The smoothed line **trails the pen** while you draw. That lag is intentional: the options bar
+    says so and the **Smooth** button turns blue while it is on.
+  - **Pen-up** ends the stroke exactly where the pen lifted: the smoothed point first catches up
+    along the filter's own curve (at most 32 extra points), then the true end point is stored, so
+    no straight segment to the cursor is added beyond the last quarter pixel. A tap stays one
+    point. **Escape** and focus loss drop the stroke before anything is committed, with or without
+    smoothing. A mouse is smoothed the same way. The setting is a view of how the *next* strokes
+    are made: it adds no undo step, changes no stored stroke and is saved with the interface state.
+  - Not in this version: a trailing (rope) stabilizer, and smoothing already drawn strokes. Bad
+    values (a mode other than `off` / `smooth`, a strength outside 0–1, unknown parameters) are
+    refused whole. The filter costs 8 ns per sample on the development machine (measured); the
+    delay between pen and screen was not measured (no camera rig), only the lag above.
 - **What you see is what is drawn.** The live stroke, the stroke between pen-up and the arrival of
   the new frame, and the onion skins are rasterised by the same CPU code as the Program monitor
   and export (`waltcut_render::drawing`) with the same placement, so Pen, Pencil, Marker and
@@ -330,7 +354,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.smoothing`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

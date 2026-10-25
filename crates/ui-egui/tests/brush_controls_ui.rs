@@ -200,16 +200,16 @@ fn erase_while_held_erases_and_then_brings_the_brush_back() {
     let mut d = Driver::new();
     let alt = egui::Modifiers::ALT;
     let before = d.brush();
-    d.draw(0.3);
+    d.draw(0.55);
     d.event(egui::Event::ModifiersChanged(alt));
     d.event(key(egui::Key::E, true, alt));
     assert_eq!(d.brush()["erase_held"], "Key");
-    d.draw(0.3);
+    d.draw(0.55);
     d.event(key(egui::Key::E, false, alt));
     d.event(egui::Event::ModifiersChanged(egui::Modifiers::NONE));
     d.frames(2);
     assert_eq!(d.brush()["erase_held"], "Off");
-    d.draw(0.5);
+    d.draw(0.7);
     use waltcut_project::drawing::Brush;
     assert_eq!(d.strokes(), vec![Brush::Pen, Brush::Eraser, Brush::Pen], "the eraser stroke, then the Pen is back");
     let after = d.brush();
@@ -225,7 +225,7 @@ fn erase_while_held_ends_on_focus_loss_tool_change_and_command_and_draws_nothing
     // as a command: on until off
     assert_eq!(d.command("drawing.eraseTemporarily", json!({})).expect("on")["erasing"], true);
     assert_eq!(d.brush()["erase_held"], "Command");
-    d.draw(0.3);
+    d.draw(0.55);
     assert_eq!(d.strokes(), vec![Brush::Eraser]);
     // regression: a window driven over the control channel is never focused, and that must not
     // end a hold (only the loss of focus does)

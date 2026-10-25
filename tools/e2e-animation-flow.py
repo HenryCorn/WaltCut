@@ -6,8 +6,10 @@
 
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
-onion skin; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes
-4444 MOV and a PNG sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg and ffprobe.
+onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; the light
+table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
+sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
+and ffprobe.
 
 AI Restyle is not driven: its mock provider is an engine-test seam, not reachable from the app.
 Standard library only. See docs/e2e.md.
@@ -242,6 +244,27 @@ check(lasso_after != lasso_before, "applying moved the strokes")
 cmd("edit.undo", {})
 check(still("lasso-undone.png") == lasso_before, "one undo puts every stroke back")
 cmd("drawing.lassoMode", {"enabled": False})
+
+print("== smoothing: a stroke with smoothing on, back off, undo")
+cmd("playhead.set", {"frame": 0})
+call("ui.set", {"tool": "Brush"}, quiet=True)
+time.sleep(0.4)
+rect = [e for e in call("ui.elements", {"prefix": "program.brush"})["result"] if e["id"] == "program.brush"][0]["rect"]
+x, y, w, h = rect
+strokes_at = lambda: next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"] if c["frame"] == 0)
+check(cmd("drawing.smoothing", {})["mode"] == "off", "smoothing starts off")
+cmd("drawing.smoothing", {"mode": "smooth", "strength": 0.8, "pressure": 0.3})
+state = call("ui.inspect")["result"]["ui"]["brush"]["smoothing"]
+check(state["mode"] == "Smooth" and abs(state["strength"] - 0.8) < 1e-6, f"smoothing is on ({state})")
+before = strokes_at()
+call("ui.drag", {"from": {"x": x + w * 0.2, "y": y + h * 0.8}, "to": {"x": x + w * 0.7, "y": y + h * 0.85}, "steps": 40})
+time.sleep(0.4)
+check(strokes_at() == before + 1, "a smoothed stroke was drawn")
+shot("08h-smoothing")
+cmd("drawing.smoothing", {"mode": "off"})
+check(call("ui.inspect")["result"]["ui"]["brush"]["smoothing"]["mode"] == "Off", "smoothing is off again")
+cmd("edit.undo", {})
+check(strokes_at() == before, "one undo takes the stroke away; the setting had no undo step")
 
 print("== light table: shift the pinned pose, draw against it, Escape, reset")
 cmd("playhead.set", {"frame": 0})
