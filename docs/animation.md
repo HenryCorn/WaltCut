@@ -267,8 +267,8 @@ used to position or fade a drawing.
   the pen) and the status bar says so. The pen queue holds 4 096 samples between frames; if it
   overflows the oldest moves are dropped (never the stroke's first and last samples) and the loss
   is counted.
-- **Smoothing** (`drawing.smoothing {mode?, strength?, pressure?}`, **Smooth** in the Brush
-  options bar, Graphics and Titles ▸ Drawing ▸ Stroke Smoothing). **Off** (the default) stores the
+- **Smoothing** (`drawing.smoothing {mode?, strength?, pressure?}`, **Feel ▸ Smooth strokes** in the
+  Brush options bar, Graphics and Titles ▸ Drawing ▸ Stroke Smoothing). **Off** (the default) stores the
   captured samples exactly as before. **Smooth** passes each kept sample through an adaptive moving
   average, one at a time and in order (so the result does not depend on how samples were batched
   into frames), in canvas pixels:
@@ -279,8 +279,8 @@ used to position or fade a drawing.
     0.9; a 90° corner drawn in 8 px steps is rounded by 0.4, 2.2 and 7 px at strengths 0.3, 0.6
     and 1 (all measured by the unit tests). *Pressure* has its own strength (`alpha = 1 - 0.8 ×
     pressure`) and never moves the position.
-  - The smoothed line **trails the pen** while you draw. That lag is intentional: the options bar
-    says so and the **Smooth** button turns blue while it is on.
+  - The smoothed line **trails the pen** while you draw. That lag is intentional: the menu says so
+    and the **Feel** button turns blue while smoothing or a curve is in use.
   - **Pen-up** ends the stroke exactly where the pen lifted: the smoothed point first catches up
     along the filter's own curve (at most 32 extra points), then the true end point is stored, so
     no straight segment to the cursor is added beyond the last quarter pixel. A tap stays one
@@ -311,6 +311,39 @@ used to position or fade a drawing.
   used for that frame), samples received, thinned, queue-dropped and invalid, cancelled and
   truncated strokes, and the point count, duration and sampling rate of the last stroke. These
   numbers describe what WaltCut received from the driver, not how good the tablet is.
+
+## Pressure response curves
+
+A pen's pressure becomes line width and opacity through the brush's own response (a Pen thins to a
+hairline at a light touch, a Pencil also fades). To tune light touch, taper and opacity, open
+**Feel** in the Brush options bar (`drawing.pressureCurve {preset?, width?, opacity?, reset?}`,
+Graphics and Titles ▸ Drawing ▸ Pressure Response Curves):
+
+- **Presets** *Linear* (the brush's own response, the default), *Soft* (a light touch already
+  leaves a good line), *Firm* (needs a harder press) and *S-curve* (soft at both ends).
+- **Width** and **Opacity** have their own curve and editor: five handles at pressure 0, ¼, ½, ¾
+  and 1, dragged up or down. A curve is straight lines between 2–8 points from pressure 0 to 1,
+  increasing, each within 0–1; the command takes the points as `[[pressure, response], …]` or a
+  preset name, and `null` is the brush's own response. A bad curve, a number outside 0–1, an
+  unknown preset or key is refused whole and changes nothing.
+- A **preview** stroke (pressure rising from nothing to full and back) is drawn with the brush
+  colour and the curves as you change them. **Reset** puts both curves back.
+- The Marker has constant width and opacity, so curves do nothing to it.
+
+**What is stored.** The curves in use are saved *with each new stroke* (`response` in the project
+file, written only when it differs from the brush's own, so a project without curves is byte for
+byte what it was). A stroke therefore looks the same after changing the settings, after saving and
+reopening, and in every export; changing the settings never alters a stroke already drawn. The
+stored pressures are the pen's own; the curve is applied when the stroke is drawn. Schema v18 added
+the field, so an older build says "newer schema" instead of drawing it differently. A damaged curve
+in a file costs the stroke its response, not the stroke. `drawing.addStroke` takes the same
+`response` inside `stroke`; an in-between of two strokes takes the nearer stroke's response.
+
+**Mouse.** A mouse draws at full pressure and never stores a response, so it is the same whatever
+the curves are. With Pressure switched off a stroke stores no response either (the platform pen
+queue still sends its own pressures; that switch has only ever governed the pointer fallback).
+The setting is saved with the interface state and adds no undo step. Hardware tuning on a real
+pen is the maintainer's check (#5): the tests drive synthetic pen samples.
 
 ## AI Restyle
 
@@ -354,7 +387,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.smoothing`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.smoothing`, `drawing.pressureCurve`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

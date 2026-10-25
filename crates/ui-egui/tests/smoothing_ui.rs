@@ -271,15 +271,10 @@ fn the_controls_are_automatable_and_the_menu_lists_the_command() {
     let mut d = Driver::new();
     d.frames(2);
     let ids = |d: &mut Driver| -> Vec<String> {
-        d.call("ui.elements", json!({"prefix": "program.brush.smooth"}))["result"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| e["id"].as_str().unwrap().to_string())
-            .collect()
+        d.call("ui.elements", json!({"prefix": "program.brush."}))["result"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_string()).collect()
     };
-    assert!(ids(&mut d).contains(&"program.brush.smooth.menu".to_string()));
-    d.call("ui.click", json!({"id": "program.brush.smooth.menu"}));
+    assert!(ids(&mut d).contains(&"program.brush.feel.menu".to_string()));
+    d.call("ui.click", json!({"id": "program.brush.feel.menu"}));
     d.frames(3);
     let found = ids(&mut d);
     for id in ["smooth", "smooth.strength", "smooth.pressure"] {

@@ -6,8 +6,8 @@
 
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
-onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; the light
-table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
+onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
+curves; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
 
@@ -265,6 +265,17 @@ cmd("drawing.smoothing", {"mode": "off"})
 check(call("ui.inspect")["result"]["ui"]["brush"]["smoothing"]["mode"] == "Off", "smoothing is off again")
 cmd("edit.undo", {})
 check(strokes_at() == before, "one undo takes the stroke away; the setting had no undo step")
+
+print("== pressure curves: presets, a custom width curve, a refused curve, reset")
+check(cmd("drawing.pressureCurve", {})["default"] is True, "the brush starts with its own pressure response")
+soft = cmd("drawing.pressureCurve", {"preset": "soft"})
+check(soft["width"] == soft["opacity"] and not soft["default"], "the Soft preset sets both curves")
+custom = cmd("drawing.pressureCurve", {"width": [[0, 0], [0.5, 0.2], [1, 1]], "opacity": None})
+check(len(custom["width"]) == 3 and custom["opacity"] is None, f"a custom width curve and the brush's own opacity ({custom})")
+r = call("engine.execute", {"command": "drawing.pressureCurve", "params": {"width": [[0, 0], [0.7, 0.5], [0.3, 0.6], [1, 1]]}}, quiet=True)
+check(not r.get("ok"), "a curve that goes backwards is refused")
+check(call("ui.inspect")["result"]["ui"]["brush"]["response"]["width"] == custom["width"], "the refusal changed nothing")
+check(cmd("drawing.pressureCurve", {"reset": True})["default"] is True, "reset restores the brush's own response")
 
 print("== light table: shift the pinned pose, draw against it, Escape, reset")
 cmd("playhead.set", {"frame": 0})

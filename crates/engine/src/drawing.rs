@@ -324,7 +324,35 @@ pub fn parse_stroke(cmd: &str, v: &Value) -> Result<Stroke> {
             _ => None,
         })
         .collect();
-    Stroke { brush, color, size, points }.sanitized().map_err(|e| bad(cmd, e))
+    let response = match v.get("response") {
+        None | Some(Value::Null) => None,
+        Some(r) => Some(parse_response(cmd, r)?),
+    };
+    Stroke { brush, color, size, points, response }.sanitized().map_err(|e| bad(cmd, e))
+}
+
+/// `{width?, opacity?}`, each a preset name (`linear`, `soft`, `firm`, `scurve`) or `[[pressure,
+/// response], …]` (2–8 points from pressure 0 to 1, increasing, all within 0..1).
+pub fn parse_response(cmd: &str, v: &Value) -> Result<drawing::PressureResponse> {
+    let obj = v.as_object().ok_or_else(|| bad(cmd, "`response` is {width?, opacity?}"))?;
+    if let Some(k) = obj.keys().find(|k| !["width", "opacity"].contains(&k.as_str())) {
+        return Err(bad(cmd, format!("unknown `response` key `{k}`; expected: width, opacity")));
+    }
+    let curve = |name: &str| -> Result<Option<drawing::Curve>> {
+        match obj.get(name) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(preset)) => drawing::Curve::preset(preset)
+                .map(Some)
+                .ok_or_else(|| bad(cmd, format!("`{name}`: unknown preset `{preset}` ({})", drawing::CURVE_PRESETS.join(", ")))),
+            Some(c) => {
+                let curve: drawing::Curve =
+                    serde_json::from_value(c.clone()).map_err(|_| bad(cmd, format!("`{name}` is a preset name or [[pressure, response], …]")))?;
+                curve.validate().map_err(|e| bad(cmd, format!("`{name}`: {e}")))?;
+                Ok(Some(curve))
+            }
+        }
+    };
+    Ok(drawing::PressureResponse { width: curve("width")?, opacity: curve("opacity")? })
 }
 
 fn hex_color(h: &str) -> Option<[f32; 4]> {
@@ -503,7 +531,7 @@ pub(crate) fn has_drawing(s: &Session) -> std::result::Result<(), String> {
 }
 
 pub fn commands() -> Vec<CommandSpec> {
-    const STROKE: &str = r##"{"clip":id?,"frame":int?,"time":ticks?,"cel":"hold|new|copy"?,"stroke":{"brush":"Pen|Pencil|Marker|Eraser"?,"color":"#rrggbb"|[r,g,b,a]?,"size":px?,"points":[[x,y,pressure?],...]}}"##;
+    const STROKE: &str = r##"{"clip":id?,"frame":int?,"time":ticks?,"cel":"hold|new|copy"?,"stroke":{"brush":"Pen|Pencil|Marker|Eraser"?,"color":"#rrggbb"|[r,g,b,a]?,"size":px?,"points":[[x,y,pressure?],...],"response":{"width":preset|[[p,r],...]?,"opacity":preset|[[p,r],...]?}?}}"##;
     vec![
         spec(
             "drawing.new",

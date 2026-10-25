@@ -468,3 +468,62 @@ fn the_project_file_format_of_cels_is_unchanged() {
     let old: waltcut_project::drawing::Cel = serde_json::from_value(json!({"frame": 5})).unwrap();
     assert!(old.strokes.is_empty());
 }
+
+fn stored_response(s: &Session) -> Vec<Option<waltcut_project::drawing::PressureResponse>> {
+    s.project.items.values().filter_map(|i| i.as_drawing()).flat_map(|d| d.cels.iter().flat_map(|c| c.strokes.iter().map(|st| st.response.clone()))).collect()
+}
+
+#[test]
+fn a_stroke_keeps_the_pressure_response_it_was_drawn_with_through_undo_and_save() {
+    use waltcut_project::drawing::Curve;
+    let mut s = session();
+    new_drawing(&mut s);
+    let mut with = line(10.0);
+    with["response"] = json!({"width": "soft", "opacity": [[0.0, 0.0], [0.5, 0.2], [1.0, 1.0]]});
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": with})).unwrap();
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": line(60.0)})).unwrap();
+    let r = stored_response(&s);
+    assert_eq!(r[0].as_ref().and_then(|r| r.width.clone()), Curve::preset("soft"));
+    assert_eq!(r[0].as_ref().and_then(|r| r.opacity.as_ref()).map(|c| c.0.len()), Some(3));
+    assert_eq!(r[1], None, "a stroke drawn without a response is stored without one");
+    // the identity, written out, is stored as nothing
+    let mut ident = line(90.0);
+    ident["response"] = json!({"width": "linear", "opacity": [[0, 0], [1, 1]]});
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": ident})).unwrap();
+    assert_eq!(stored_response(&s)[2], None);
+    // undo and redo bring back the same response
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("edit.undo", json!({})).unwrap();
+    assert!(stored_response(&s).is_empty());
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(stored_response(&s)[0].as_ref().and_then(|r| r.width.clone()), Curve::preset("soft"));
+}
+
+#[test]
+fn malformed_responses_are_refused_and_change_nothing() {
+    let mut s = session();
+    new_drawing(&mut s);
+    s.execute("drawing.addStroke", json!({"frame": 0, "stroke": line(10.0)})).unwrap();
+    let before = serde_json::to_string(&s.project).unwrap();
+    for bad in [
+        json!("soft"),
+        json!([[0, 0], [1, 1]]),
+        json!({"width": "bouncy"}),
+        json!({"width": [[0, 0]]}),
+        json!({"width": [[0, 0], [1, 1], [2, 2]]}),
+        json!({"width": [[0, 0], [0.5, 7], [1, 1]]}),
+        json!({"width": [[0, 0], [0.6, 0.5], [0.4, 0.6], [1, 1]]}),
+        json!({"width": [[0.2, 0], [1, 1]]}),
+        json!({"width": [[0, 0], [1, 1]], "hue": 1}),
+        json!({"opacity": "firm", "width": [[0, 0, 0], [1, 1]]}),
+        json!({"opacity": 5}),
+        json!({"opacity": [[0, 0], [null, 1]]}),
+    ] {
+        let mut stroke = line(30.0);
+        stroke["response"] = bad.clone();
+        let e = s.execute("drawing.addStroke", json!({"frame": 0, "stroke": stroke})).unwrap_err().to_string();
+        assert!(!e.is_empty(), "{bad}");
+        assert_eq!(serde_json::to_string(&s.project).unwrap(), before, "{bad} changed the project");
+    }
+}

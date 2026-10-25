@@ -45,6 +45,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.onionSkin", "Onion Skin Settings", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.pinPose", "Pin Pose for Onion Skin", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.smoothing", "Stroke Smoothing", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.pressureCurve", "Pressure Response Curves", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.lightTable", "Light Table Pose Shift", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.lightTableShift", "Shift Pose While Held", ["Graphics and Titles", "Drawing"], Some("Alt+T")),
     uic!("drawing.lightTableReset", "Reset Pose Shift", ["Graphics and Titles", "Drawing"], Some("Alt+Shift+T")),
@@ -254,6 +255,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         return r;
     }
     if let Some(r) = crate::panels::reference::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
+    }
+    if let Some(r) = crate::panels::pressure_curve::route(app, id, &params) {
         if let Err(e) = &r {
             app.ui.status = e.clone();
         }
@@ -703,6 +710,9 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
         }
         if let Some(doc) = crate::panels::drawing_review::params_doc(&it.id) {
+            it.params = Some(doc.to_string());
+        }
+        if let Some(doc) = crate::panels::pressure_curve::params_doc(&it.id) {
             it.params = Some(doc.to_string());
         }
         if let Some(doc) = crate::panels::light_table::params_doc(&it.id) {
