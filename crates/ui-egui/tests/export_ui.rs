@@ -120,6 +120,24 @@ impl Driver {
     fn has(&mut self, id: &str) -> bool {
         self.ok("ui.elements", json!({"prefix":id})).as_array().unwrap().iter().any(|entry| entry["id"] == id)
     }
+    /// Step frames until `ok` holds (bounded), so an assertion on UI state does not depend on how
+    /// many frames a loaded machine needed to draw it (#139). Returns whether it held.
+    fn eventually(&mut self, mut ok: impl FnMut(&mut Self) -> bool) -> bool {
+        for _ in 0..400 {
+            if ok(self) {
+                return true;
+            }
+            self.frames(1);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        ok(self)
+    }
+    fn wait_has(&mut self, id: &str) -> bool {
+        self.eventually(|d| d.has(id))
+    }
+    fn wait_ui_export(&mut self, key: &str, expected: Value) -> bool {
+        self.eventually(|d| d.ok("ui.inspect", json!({}))["ui"]["export"][key] == expected)
+    }
     fn wait_export(&mut self) -> Value {
         for _ in 0..2000 {
             self.frames(2);
@@ -229,7 +247,8 @@ fn export_button_writes_the_retained_movie_and_the_real_cancel_widget_stops_a_jo
     let video = &file.tracks[file.track_of_kind(waltcut_isobmff::TrackKind::Video).unwrap()];
     assert_eq!(video.samples.len(), 6);
     assert_eq!(video.entries[0].format.0, *b"ap4h");
-    assert!(driver.has("export.status"));
+    // the status line is drawn by the frame after the job's result lands, not by the one that saw it finish
+    assert!(driver.wait_has("export.status"));
 
     let path = driver.path("cancel.mov");
     driver.ok("ui.set", json!({"export":{"path":path,"endFrame":10_000}}));
@@ -283,6 +302,19 @@ fn quick_export_uses_the_same_simple_draft_and_can_be_closed_by_automation() {
     assert!(job["result"].get("error").is_none(), "{job}");
     assert!(std::path::Path::new(&driver.path("out.mov")).exists());
     driver.click("quickExport.close");
-    assert_eq!(driver.ok("ui.inspect", json!({}))["ui"]["export"]["quickOpen"], false);
-    assert!(!driver.has("quickExport.button"));
+    assert!(driver.wait_ui_export("quickOpen", json!(false)), "quickExport.close did not close the dialog");
+    assert!(driver.eventually(|d| !d.has("quickExport.button")));
+}
+
+/// The waiting helpers tolerate state that arrives some frames late and give up (false) otherwise.
+#[test]
+fn eventually_waits_for_late_ui_state_and_gives_up_when_it_never_comes() {
+    let mut driver = Driver::new("eventually");
+    let mut calls = 0;
+    assert!(driver.eventually(|_| {
+        calls += 1;
+        calls > 5
+    }));
+    assert!(calls > 5);
+    assert!(!driver.wait_has("export.no-such-widget"));
 }
