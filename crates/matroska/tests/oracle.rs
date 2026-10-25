@@ -39,6 +39,8 @@ fn compare(ffprobe: &Path, path: &Path) -> (MkvFile, Vec<Packet>) {
     let ff = json["packets"].as_array().unwrap();
     assert_eq!(packets.len(), ff.len(), "{name}: packet count");
     let (mut pts_checked, mut dur_checked) = (0, 0);
+    // Index of the final packet of each track (`-t` trims the muxed end, see below).
+    let last_of_track: Vec<Option<usize>> = (0..file.tracks.len()).map(|t| packets.iter().rposition(|p| p.track == t)).collect();
     for (i, (p, f)) in packets.iter().zip(ff).enumerate() {
         let ctx = format!("{name}: packet {i} (track {})", p.track);
         assert_eq!(int(&f["stream_index"]), Some(p.track as i64), "{ctx}: stream");
@@ -61,6 +63,14 @@ fn compare(ffprobe: &Path, path: &Path) -> (MkvFile, Vec<Packet>) {
         if let Some(dur) = int(&f["duration"])
             && p.duration != 0
         {
+            if last_of_track.get(p.track).copied().flatten() == Some(i) && (p.duration as i64) < dur {
+                // The muxer trimmed the last block of the track and wrote a shorter BlockDuration
+                // (mjpeg_ac3: 8 ms of a 32 ms AC-3 frame). The element is authoritative and we
+                // report it; ffprobe 8.x replaces it with the full codec-parser frame duration
+                // (32 ms). Accept a shorter explicit duration there, never a longer one.
+                assert!(p.duration > 0, "{ctx}: trimmed duration must stay positive");
+                continue;
+            }
             assert!((dur - p.duration as i64).abs() <= 1, "{ctx}: duration ffprobe {dur} vs {}", p.duration);
             dur_checked += 1;
         }
