@@ -340,6 +340,10 @@ pub struct BrushSettings {
     pub onion_pin: Option<OnionPin>,
     /// Also ghost the drawing's first cel, to compare with the end of a loop.
     pub onion_loop: bool,
+    /// A drag on the picture moves the target drawing's reference instead of drawing (#3). Never
+    /// loaded back: a session starts drawing.
+    #[serde(skip_deserializing)]
+    pub reference_move: bool,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -367,6 +371,7 @@ impl Default for BrushSettings {
             onion_tint: 1.0,
             onion_pin: None,
             onion_loop: false,
+            reference_move: false,
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -641,6 +646,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 if ui.button("In-between").on_hover_text(format!("Fill the frames up to the next cel with in-betweens on {step}s")).clicked() {
                     run(app, "drawing.tween", json!({"step": step}));
                 }
+                super::reference::menu(app, ui);
             });
         });
     });
@@ -692,6 +698,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // what the pen sees: the rectangle that bounds the (possibly turned) picture
     let pic = turn.bounds(layout_pic);
     let panning = turn.pan_held != PanHold::Off;
+    // Move with pen: a drag moves the reference instead of drawing (#3)
+    let moving_ref = !panning && super::reference::moving(app);
     let tgt = target(app);
     // the options bar sits where it does on an upright picture: a turned one is narrow
     let bar = options_bar(app, ui, layout_pic, tgt.is_some());
@@ -712,6 +720,24 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     if panning {
         let grabbing = ui.input(|i| i.pointer.primary_down());
         ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+    } else if moving_ref {
+        let grabbing = ui.input(|i| i.pointer.primary_down());
+        ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+        // one drag is one undo step: its first move starts it, the rest join it
+        let first_id = id.with("reference-first");
+        if resp.drag_started_by(egui::PointerButton::Primary) {
+            ui.data_mut(|dd| dd.insert_temp(first_id, true));
+        }
+        let moved = resp.drag_delta();
+        if resp.dragged_by(egui::PointerButton::Primary) && (moved.x != 0.0 || moved.y != 0.0) {
+            // screen → picture → sequence pixels, through the view (the reference is placed in the sequence's pixels)
+            let c = layout_pic.center();
+            let (a, b) = (turn.unshow(c, c), turn.unshow(c, c + moved));
+            let (sx, sy) = (frame.0 as f32 / layout_pic.width().max(1.0), frame.1 as f32 / layout_pic.height().max(1.0));
+            let first = ui.data_mut(|dd| dd.remove_temp::<bool>(first_id)).unwrap_or(false);
+            let merge = if first { json!("start") } else { json!(true) };
+            run(app, "reference.set", json!({"dx": ((b.x - a.x) * sx) as f64, "dy": ((b.y - a.y) * sy) as f64, "merge": merge}));
+        }
     } else if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
         // brush outline under the pointer
@@ -727,6 +753,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let secondary = ui.input(|i| i.pointer.button_down(egui::PointerButton::Secondary));
     let middle = ui.input(|i| i.pointer.middle_down());
     let begin_wanted = !panning
+        && !moving_ref
         && (resp.drag_started_by(egui::PointerButton::Primary)
             || resp.drag_started_by(egui::PointerButton::Secondary)
             || resp.clicked_by(egui::PointerButton::Primary)
@@ -735,7 +762,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // Every pointer sample of the frame, in order, with the pressure it was made at.
     let stream = frame_input(app, ui, live.is_some());
     // a drag that pans is not a stroke: its pen samples are dropped
-    let stream = if panning && live.is_none() { Vec::new() } else { stream };
+    let stream = if (panning || moving_ref) && live.is_none() { Vec::new() } else { stream };
     // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
     let cancelled =
         ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
@@ -860,6 +887,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         Some(c) => format!("Frame {f} · holding cel {}", c.frame),
         None => format!("Frame {f} · no cel yet"),
     };
+    let label = if moving_ref { format!("{label} · drag to move the reference") } else { label };
     painter.text(pic.left_bottom() + vec2(8.0, -8.0), egui::Align2::LEFT_BOTTOM, label, egui::FontId::proportional(12.0), Color32::from_white_alpha(200));
 }
 

@@ -36,6 +36,7 @@ pub mod presets;
 pub mod previews;
 pub mod project_panel;
 pub mod project_tools;
+pub mod reference;
 pub mod relink;
 pub mod sequence_extras;
 pub mod sequence_tools;
@@ -1116,6 +1117,8 @@ mod previews_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod project_panel_tests;
+#[cfg(test)]
+mod reference_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod relink_tests;

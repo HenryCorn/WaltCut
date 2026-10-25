@@ -90,6 +90,40 @@ hold a pose for several frames or place a new cel on every frame.
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
+## Reference images
+
+To trace a picture, use the **Reference** menu in the Brush options bar (or **Graphics and Titles ▸
+Drawing ▸ Place Reference Image / Paste Reference Image**, `reference.place`,
+`reference.pasteImage`):
+
+- **Place Image…** (the host's file picker) or **Paste Image** (the picture on the clipboard, saved
+  the way Paste Media saves it) puts the picture on a video track named **Reference** directly
+  below the target drawing, for the drawing clip's whole duration, at **50 % opacity** (the
+  scaling follows Preferences ▸ Media). The playhead and selection stay where they were. It is
+  **one undo step**, and all or nothing: a locked drawing track or Reference track, a missing or
+  unreadable picture or a bad parameter change nothing (no import is left behind). A free,
+  unlocked Reference track right below the drawing is reused; otherwise a new one is added there.
+  `reference.place {path | item, target?, opacity?, guide?}` also takes a picture already in the
+  project (`item`).
+- The Reference menu then controls the drawing's reference without leaving the drawing:
+  **Opacity**, **Scale** and **Rotation** sliders, **Hide**, **Lock** (locks the Reference track:
+  nothing else changes it), **Guide only (not exported)**, four **Nudge** buttons (10 sequence
+  pixels each) and **Move with pen**. With Move with pen on, a drag on the Program monitor moves
+  the reference instead of drawing (the cursor is a hand, the status text says so, and the
+  mapping goes through the view and zoom, so it follows the pen in a turned view); one drag is one
+  undo step. It is never remembered: a session starts drawing.
+  The same changes are `reference.set {clip?, target?, opacity?, hidden?, locked?, guide?, x?, y?, dx?,
+  dy?, scale?, rotation?, merge?}` (all values are checked before any is applied; send
+  `merge: "start"` with the first move of a drag and `merge: true` with the rest to make it one undo
+  step) and `reference.list {target?}` names the references (identity, track, settings) for scripts.
+- **A reference is ordinary artwork.** A visible reference is in the Program monitor and in
+  stills, PNG sequences and movies; **Hide** takes it out of both. To see it while keeping it out of
+  what you deliver, turn on **Guide only**: that is the guide policy below. Nothing here changes
+  how the drawing itself is stored or exported.
+- A reference is found by being on a `Reference` track below the drawing and overlapping it; the
+  clip, its Motion and Opacity are the usual ones (the Effect Controls edit them too) and are saved
+  with the project like any clip.
+
 ## Guide clips
 
 A **guide** is a reference or tracing clip (a placed picture, a drawing, a graphic) that you see
@@ -222,7 +256,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |
