@@ -3,7 +3,7 @@
 //! A project file is UTF-8 JSON with an explicit schema version:
 //!
 //! ```json
-//! { "format": "waltcut.project", "schema_version": 16, "generator": "WaltCut 0.1.0", "project": { … } }
+//! { "format": "waltcut.project", "schema_version": 17, "generator": "WaltCut 0.1.0", "project": { … } }
 //! ```
 //!
 //! - **One schema, no migrations.** [`SCHEMA_VERSION`] is the only version this build reads and
@@ -24,6 +24,9 @@
 //! - **v1–v15**: WaltCut and the first WaltCut builds, up to [`LEGACY_RELEASE`]. Not readable.
 //! - **v16**: the reduction baseline. The model is unchanged from v15; the bump makes every earlier
 //!   file fail with a clear message instead of loading into a model that is about to lose fields.
+//! - **v17**: the drawing-tools release. A clip may carry `guide: true` (a reference left out of
+//!   delivery renders, written only when set). The bump keeps a build that does not know the field
+//!   from opening such a file; a v16 file is refused like any earlier one.
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
@@ -45,7 +48,7 @@ pub const FORMAT_ID: &str = "waltcut.project";
 pub const LEGACY_FORMAT_ID: &str = "filmcraft.project";
 
 /// The schema version this build writes and reads. Nothing else is readable.
-pub const SCHEMA_VERSION: u32 = 16;
+pub const SCHEMA_VERSION: u32 = 17;
 
 /// The last build that opens projects written before the reduction.
 pub const LEGACY_RELEASE: &str = "v0.0.1-legacy";
@@ -294,7 +297,7 @@ mod tests {
 
     #[test]
     fn schema_version_is_the_reduction_baseline() {
-        assert_eq!(SCHEMA_VERSION, 16);
+        assert_eq!(SCHEMA_VERSION, 17);
         assert!(FormatError::TooOld { found: 15, supported: SCHEMA_VERSION }.to_string().contains(LEGACY_RELEASE));
     }
 
@@ -441,7 +444,7 @@ mod tests {
 
     #[test]
     fn every_earlier_schema_is_refused_with_the_legacy_release() {
-        for old in [0, 1, 8, 14, 15] {
+        for old in [0, 1, 8, 14, 15, 16] {
             let mut v = doc_of(&Project::new("x"));
             v["schema_version"] = Value::from(old);
             let e = decode(&serde_json::to_vec(&v).unwrap()).unwrap_err();
@@ -474,11 +477,11 @@ mod tests {
             b"\"x\"",
             b"{}",
             b"\xff\xfe",
-            br#"{"schema_version":"16"}"#,
-            br#"{"schema_version":16}"#,
+            br#"{"schema_version":"17"}"#,
+            br#"{"schema_version":17}"#,
             br#"{"schema_version":-1}"#,
             br#"{"schema_version":99999999999}"#,
-            br#"{"format":"filmcraft.project","schema_version":16,"project":7}"#,
+            br#"{"format":"filmcraft.project","schema_version":17,"project":7}"#,
         ] {
             assert!(decode(junk).is_err(), "{}", String::from_utf8_lossy(junk));
         }
@@ -555,8 +558,8 @@ mod tests {
         assert_eq!(peek_schema(b"{\"schema_version\"\n :\t7 }"), Some(7));
         assert_eq!(peek_schema(br#"{"items":{},"root":{}}"#), Some(1));
         // behind the first 4 KiB: found by a full parse
-        let late = format!(r#"{{"padding":"{}","schema_version":16}}"#, "x".repeat(PEEK_BYTES * 2));
-        assert_eq!(peek_schema(late.as_bytes()), Some(16));
+        let late = format!(r#"{{"padding":"{}","schema_version":17}}"#, "x".repeat(PEEK_BYTES * 2));
+        assert_eq!(peek_schema(late.as_bytes()), Some(17));
         for junk in [&b""[..], b"{", b"[1]", br#"{"schema_version":"x"}"#, br#"{"schema_version":99999999999}"#] {
             assert_eq!(peek_schema(junk), None, "{}", String::from_utf8_lossy(junk));
         }
