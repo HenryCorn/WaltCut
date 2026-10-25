@@ -350,6 +350,9 @@ pub struct BrushSettings {
     /// The selected strokes and their pending transform. Never saved or loaded back.
     #[serde(skip_deserializing)]
     pub selection: Option<super::stroke_select::StrokeSelection>,
+    /// The temporary shift of the pinned pose (#64). Never saved or loaded back.
+    #[serde(skip_deserializing)]
+    pub light_table: super::light_table::LightTable,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -380,6 +383,7 @@ impl Default for BrushSettings {
             reference_move: false,
             lasso: false,
             selection: None,
+            light_table: Default::default(),
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -654,6 +658,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 if ui.button("In-between").on_hover_text(format!("Fill the frames up to the next cel with in-betweens on {step}s")).clicked() {
                     run(app, "drawing.tween", json!({"step": step}));
                 }
+                super::light_table::controls(app, ui);
                 super::reference::menu(app, ui);
                 super::stroke_select::controls(app, ui);
             });
@@ -688,16 +693,23 @@ fn paint_ghosts(app: &WaltCutApp, ui: &mut egui::Ui, painter: &egui::Painter, cl
     let pin = b.onion_pin.filter(|p| p.clip == clip).map(|p| p.frame);
     let plan = d.onion_plan(f, look.before, look.after, pin, b.onion_loop);
     let revision = app.session.revision;
+    // the pinned pose may be shifted by the light table (#64): it is placed, not edited
+    let shifted = super::light_table::placement(app, d).map(|(index, m)| (index, to_screen.then_apply(&m)));
     for (role, name) in ghost_slots() {
         let slot = ui.data_mut(|dd| dd.get_temp_mut_or_default::<SharedSlot>(egui::Id::new(("brush-onion", name.as_str()))).clone());
-        let cel = plan.iter().find(|g| g.role == role).and_then(|g| d.cels.get(g.index));
+        let ghost = plan.iter().find(|g| g.role == role);
+        let cel = ghost.and_then(|g| d.cels.get(g.index));
+        let place = match (ghost, &shifted) {
+            (Some(g), Some((index, m))) if g.index == *index => m,
+            _ => to_screen,
+        };
         let (tint, n) = match role {
             GhostRole::Before(n) => (TINT_BEFORE, n),
             GhostRole::After(n) => (TINT_AFTER, n),
             GhostRole::Pin => (TINT_PIN, 1),
             GhostRole::LoopStart => (TINT_LOOP, 1),
         };
-        paint_onion(painter, &slot, revision, clip, cel.map(|c| (c.frame, c.strokes.as_slice())), tint, look.tint, look.opacity_at(n), to_screen, pic);
+        paint_onion(painter, &slot, revision, clip, cel.map(|c| (c.frame, c.strokes.as_slice())), tint, look.tint, look.opacity_at(n), place, pic);
     }
 }
 
@@ -707,10 +719,12 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // what the pen sees: the rectangle that bounds the (possibly turned) picture
     let pic = turn.bounds(layout_pic);
     let panning = turn.pan_held != PanHold::Off;
+    // Shift pose: a drag moves the pinned onion-skin pose instead of drawing (#64)
+    let shifting = !panning && app.ui.brush.light_table.hold != super::light_table::ShiftHold::Off;
     // Move with pen: a drag moves the reference instead of drawing (#3)
-    let moving_ref = !panning && super::reference::moving(app);
+    let moving_ref = !panning && !shifting && super::reference::moving(app);
     // Lasso mode: a drag selects strokes (or moves the pending transform) instead of drawing (#66)
-    let lassoing = !panning && !moving_ref && app.ui.brush.lasso;
+    let lassoing = !panning && !shifting && !moving_ref && app.ui.brush.lasso;
     let tgt = target(app);
     // the options bar sits where it does on an upright picture: a turned one is narrow
     let bar = options_bar(app, ui, layout_pic, tgt.is_some());
@@ -724,6 +738,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     if app.ui.brush.onion {
         paint_ghosts(app, ui, &painter, clip.0, &d, f, &map.to_screen, pic);
     }
+    super::light_table::paint_indicator(app, &painter, &map, &d, bar.left_bottom());
     let id = egui::Id::new("brush-overlay");
     // while the pan is held the drag belongs to the pan, not to a stroke
     let resp = ui.interact(pic, id, if panning { Sense::hover() } else { Sense::click_and_drag() });
@@ -731,6 +746,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     if panning {
         let grabbing = ui.input(|i| i.pointer.primary_down());
         ui.ctx().set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+    } else if shifting {
+        super::light_table::drag(app, ui, &resp, &map, &d);
     } else if lassoing {
         super::stroke_select::overlay(app, ui, &painter, &resp, &map, &d, f);
     } else if moving_ref {
@@ -766,6 +783,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     let secondary = ui.input(|i| i.pointer.button_down(egui::PointerButton::Secondary));
     let middle = ui.input(|i| i.pointer.middle_down());
     let begin_wanted = !panning
+        && !shifting
         && !moving_ref
         && !lassoing
         && (resp.drag_started_by(egui::PointerButton::Primary)
@@ -776,7 +794,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
     // Every pointer sample of the frame, in order, with the pressure it was made at.
     let stream = frame_input(app, ui, live.is_some());
     // a drag that pans is not a stroke: its pen samples are dropped
-    let stream = if (panning || moving_ref || lassoing) && live.is_none() { Vec::new() } else { stream };
+    let stream = if (panning || shifting || moving_ref || lassoing) && live.is_none() { Vec::new() } else { stream };
     // a stroke is abandoned when the window loses focus or Escape is pressed: nothing is committed
     let cancelled =
         ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false) | egui::Event::Key { key: egui::Key::Escape, pressed: true, .. })));
@@ -902,6 +920,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         None => format!("Frame {f} · no cel yet"),
     };
     let label = if moving_ref { format!("{label} · drag to move the reference") } else { label };
+    let label = if shifting { format!("{label} · drag to shift the pinned pose (Shift-drag turns it)") } else { label };
     let label = if lassoing { format!("{label} · lasso: drag around strokes") } else { label };
     painter.text(pic.left_bottom() + vec2(8.0, -8.0), egui::Align2::LEFT_BOTTOM, label, egui::FontId::proportional(12.0), Color32::from_white_alpha(200));
 }

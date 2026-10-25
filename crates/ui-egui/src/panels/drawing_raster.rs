@@ -217,6 +217,13 @@ pub struct OnionSlot {
     pub failed: u64,
 }
 
+impl OnionSlot {
+    /// What the texture on show was rendered from (for tests and diagnostics).
+    pub fn shown_key(&self) -> Option<&OnionKey> {
+        self.shown.as_ref().map(|(k, _, _)| k)
+    }
+}
+
 /// An onion slot shared through egui's data store.
 #[derive(Clone, Default)]
 pub struct SharedSlot(pub Arc<Mutex<OnionSlot>>);

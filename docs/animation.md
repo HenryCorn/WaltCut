@@ -80,13 +80,47 @@ hold a pose for several frames or place a new cel on every frame.
      as a command, until `{active: false}`. It also ends on Escape, when the window loses focus
      and when another tool is chosen. (The Hand tool and a middle-button drag still pan.)
    - **Modifier ownership.** `Alt` + a letter is a held drawing aid (`Alt+E` erase, `Alt+H`
-     pan), `Cmd+Alt` + an arrow is pose review. A reference placed under the drawing is moved
-     with its own controls, not with a plain drag on the picture, so it cannot compete with pan.
+     pan, `Alt+T` shift the pinned pose), `Cmd+Alt` + an arrow is pose review. A reference placed
+     under the drawing is moved with its own controls, not with a plain drag on the picture, so it
+     cannot compete with pan.
    - While the picture is turned or mirrored, safe margins, rulers, guides, the Graphics and
      Transform handles and the eyedropper are not drawn, because they assume an upright picture;
      reset the view to use them. `ui.inspect` reports `ui.program.canvas` (`rotation`,
      `mirror`, `panHeld`).
-7. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
+7. **Light table.** Slide and turn the *pinned* comparison pose to check proportions against the
+   cel you are drawing (for a character that travels across the shot, line the pose up with where
+   it now stands). Pin a pose first (**Pin Pose for Onion Skin**), then tick **Light table ▸
+   Shift pose with pen** in the Brush options bar (`Alt+T`, held, or `drawing.lightTableShift`). While it is on, a drag on the
+   picture moves the pose with the pen, **Shift**-drag turns it about the middle of the canvas, and
+   nothing is drawn; let go, untick it or choose another tool and the pose stays where you put it
+   while you draw. The same menu sets **X**, **Y** and **Rotate °** exactly;
+   a **Pose shifted** (or **Shifting pose**, with **Done**) badge, a dashed outline of where the pose now is and a note under the options
+   bar show that the ghost is not where it was drawn, and **Reset pose** (`Alt+Shift+T`,
+   `drawing.lightTableReset`) puts it back.
+   - It is a view of the pose, like the onion skin: the source cel, its exposure, the clip, the
+     undo history, the project's changed mark and the saved file are untouched, and no export, still
+     or AI Restyle input includes it (tests compare the project, the undo history, the revision and
+     the rendered frame before and after). It is not saved and WaltCut starts unshifted.
+   - The shift belongs to the pinned cel. It is moved with the pen through the same mapping as a
+     stroke (view rotation and mirror, zoom, Motion), so the pose follows the pen in a turned view,
+     and the current cel stays drawable and lands where the pen is. A pinned cel that is also the
+     previous or next cel is the ghost that moves; when it is the cel shown (or hidden behind a
+     nearer cel with the same strokes, or Onion skin is off) there is nothing to shift on screen and
+     the note says so.
+   - **Exits.** Letting go of the key, `{active: false}`, unticking or choosing another tool ends
+     the hold and *keeps* the alignment. **Escape** or the window losing focus *during* a hold
+     abandons the hold: the alignment goes back to what it was when the hold began (a drag in
+     progress is dropped with it). **Reset**, unpinning, pinning another cel, switching to a
+     different drawing clip and deleting the pinned cel *discard* the alignment. Moving the
+     playhead, drawing, undo and turning Onion skin off keep it.
+   - `drawing.lightTable {dx?, dy?, rotation?, reset?}` (canvas pixels within ±1 000 000, degrees
+     wrapped into (-180, 180]; all values are checked before any is applied; with no parameter it
+     reports `{pinned, pose, dx, dy, rotation, shifted, hold, showing}`), `drawing.lightTableShift
+     {active?}` and `drawing.lightTableReset`. A shift with no pinned pose, a bad number or an
+     unknown parameter is refused and changes nothing. `ui.inspect` reports `ui.brush.light_table`.
+     Automation ids: `program.brush.light.menu`, and in it `.shift`, `.dx`, `.dy`, `.rotation`,
+     `.reset`; while shifting or shifted `.badge`, `.done`, `.resetBadge`.
+8. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
@@ -296,7 +330,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |
