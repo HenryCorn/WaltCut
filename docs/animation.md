@@ -90,6 +90,46 @@ hold a pose for several frames or place a new cel on every frame.
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
    a straight stroke interpolation, not a semantic or AI-generated pose.
 
+## Lasso-select and transform strokes
+
+Correct a misplaced or oversized part of a cel without erasing and redrawing it. With the Brush
+tool, turn on **Lasso** in the options bar (`drawing.lassoMode`, `Alt+L`, Graphics and Titles ▸
+Drawing). While it is on nothing is drawn:
+
+- A drag that starts outside the selection draws a **lasso**; letting go selects the *paint
+  strokes of the cel shown* with **more than half of their points** inside it
+  (`drawing.selectStrokes {lasso}`, canvas pixels; `{clear: true}` drops it). Eraser strokes are
+  never lassoed directly.
+- The selection is highlighted in blue. A drag that starts inside its box moves the **pending
+  transform**; **X**, **Y**, **Rotate °** (clockwise) and **Scale ×** (uniform, the brush size
+  scales with it) in the options bar set it exactly (`drawing.selectionTransform {dx, dy,
+  rotation, scale}`), about the selection's centre. The result is previewed in orange over the
+  picture; no artwork changes yet.
+- **Apply** (button, `Alt+Enter`, `drawing.selectionApply`) is one undo step and changes only that
+  cel's strokes (clip Motion is untouched); **Cancel** drops the pending transform; **Escape**
+  drops the lasso being drawn, then the pending transform, then the selection. The selection is
+  also dropped when the project changes under it, and none of this state is saved.
+
+**Erasers.** An eraser stroke removes paint from the strokes before it where it passes, so the
+rules keep it from revealing or removing anything by surprise:
+
+- An eraser that comes after a selected stroke and overlaps it **belongs to the selection** and
+  moves with it (the erased gap travels with the paint).
+- An eraser that overlaps both selected and unselected paint is **ambiguous**: the selection says
+  so and the transform is refused until those strokes are selected too (or you erase again).
+- A transform is refused when, after it, a moved eraser would overlap unselected paint before it,
+  or moved paint would land under an unselected eraser after it. Stroke order never changes, and
+  overlap is judged by stroke bounds including the brush radius, so a refusal can be stricter than
+  the pixels need but never looser.
+- Locked tracks, a missing cel, an invalid selection, non-finite or extreme numbers (scale outside
+  0.01–100, coordinates beyond ±1 000 000 px, a brush size outside 0.05–1000) and bad parameters
+  are refused with the reason and change nothing.
+
+Scripts use the engine commands directly: `drawing.lassoSelect {lasso}` (read only: the strokes
+hit, the erasers that belong to them, `conflict`, centre) and `drawing.transformStrokes {strokes |
+lasso, dx, dy, rotation, scale, pivot, dryRun}`, which the UI's Apply calls. Not in this version:
+point editing, deformation, editing several cels at once, recolouring and thickness changes.
+
 ## Reference images
 
 To trace a picture, use the **Reference** menu in the Brush options bar (or **Graphics and Titles ▸
@@ -256,7 +296,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

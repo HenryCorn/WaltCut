@@ -56,7 +56,7 @@ pub fn target_clip(s: &Session, p: &Value) -> Option<ClipId> {
 }
 
 /// Target clip, its drawing item and the drawing frame a command works on.
-fn target(s: &Session, cmd: &str, p: &Value) -> Result<(ClipId, ItemId, i64)> {
+pub(crate) fn target(s: &Session, cmd: &str, p: &Value) -> Result<(ClipId, ItemId, i64)> {
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let clip = target_clip(s, p).ok_or_else(|| bad(cmd, "no drawing clip: select one or make one with Graphics and Titles ▸ New Layer ▸ New Drawing"))?;
     let (id, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(cmd, "not a drawing clip"))?;
@@ -74,7 +74,7 @@ fn target(s: &Session, cmd: &str, p: &Value) -> Result<(ClipId, ItemId, i64)> {
 }
 
 /// Edit the drawing `id` as one undo step.
-fn edit_drawing<R>(s: &mut Session, cmd: &str, label: &str, id: ItemId, f: impl FnOnce(&mut Drawing) -> Result<R>) -> Result<R> {
+pub(crate) fn edit_drawing<R>(s: &mut Session, cmd: &str, label: &str, id: ItemId, f: impl FnOnce(&mut Drawing) -> Result<R>) -> Result<R> {
     s.edit(label, |pr, _| {
         let d = pr.item_mut(id).and_then(|i| i.as_drawing_mut()).ok_or_else(|| bad(cmd, "not a drawing"))?;
         f(d)
@@ -497,7 +497,7 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
     }))
 }
 
-fn has_drawing(s: &Session) -> std::result::Result<(), String> {
+pub(crate) fn has_drawing(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
     target_clip(s, &Value::Null).map(|_| ()).ok_or_else(|| "no drawing clip is selected or under the playhead".into())
 }
