@@ -171,6 +171,47 @@ fn a_lasso_drag_selects_the_strokes_and_the_erasers_that_belong_to_them_without_
     assert_eq!(d.strokes().len(), 4);
 }
 
+/// The selection controls used to wrap mid-label ("4 strokes +" / "1 eraser X") and drop Clear on a
+/// line of its own: every control is now a single line, none overlaps another, and the count and
+/// the four fields share one row above the buttons.
+#[test]
+fn the_selection_controls_are_one_line_each_and_do_not_overlap() {
+    let mut d = Driver::new();
+    d.ui("drawing.lassoMode", json!({})).unwrap();
+    d.lasso(2.0, 8.0, 124.0, 34.0);
+    d.ui("drawing.selectionTransform", json!({"dx": 5})).unwrap();
+    d.frames(3);
+    let rects = |d: &mut Driver, ids: &[&str]| -> Vec<[f64; 4]> {
+        let all = d.call("ui.elements", json!({"prefix": "program.brush.lasso"}))["result"].clone();
+        ids.iter()
+            .map(|id| {
+                let e = all.as_array().unwrap().iter().find(|e| e["id"] == *id).unwrap_or_else(|| panic!("no element {id}"));
+                let r = e["rect"].as_array().unwrap();
+                [r[0].as_f64().unwrap(), r[1].as_f64().unwrap(), r[2].as_f64().unwrap(), r[3].as_f64().unwrap()]
+            })
+            .collect()
+    };
+    let top = ["program.brush.lasso.status", "program.brush.lasso.dx", "program.brush.lasso.dy", "program.brush.lasso.rotation", "program.brush.lasso.scale"];
+    let bottom = ["program.brush.lasso.apply", "program.brush.lasso.cancel", "program.brush.lasso.clear"];
+    let (t, b) = (rects(&mut d, &top), rects(&mut d, &bottom));
+    for r in t.iter().chain(&b) {
+        assert!(r[3] < 30.0, "a control wrapped onto two lines: {r:?}");
+    }
+    let row = |rs: &[[f64; 4]]| rs.iter().map(|r| r[1] + r[3] / 2.0).fold((f64::MAX, f64::MIN), |(lo, hi), y| (lo.min(y), hi.max(y)));
+    let (lo, hi) = row(&t);
+    assert!(hi - lo < 6.0, "the count and the four fields share a row: {t:?}");
+    let (lo_b, hi_b) = row(&b);
+    assert!(hi_b - lo_b < 6.0, "Apply, Cancel and Clear share a row: {b:?}");
+    assert!(lo_b > hi + 10.0, "the buttons sit on their own row below: {t:?} {b:?}");
+    let all: Vec<_> = t.iter().chain(&b).collect();
+    for (i, x) in all.iter().enumerate() {
+        for y in &all[i + 1..] {
+            let apart = x[0] + x[2] <= y[0] || y[0] + y[2] <= x[0] || x[1] + x[3] <= y[1] || y[1] + y[3] <= x[1];
+            assert!(apart, "overlapping controls {x:?} {y:?}");
+        }
+    }
+}
+
 #[test]
 fn a_pending_transform_is_a_preview_that_apply_makes_one_undo_step_and_cancel_drops() {
     let mut d = Driver::new();
