@@ -70,6 +70,13 @@ variant: an older build would refuse the unknown `Fill` brush rather than draw t
   project is loaded** (`Drawing::repair_fills`, logged as a warning) and the rest of the cel is kept,
   the way an out-of-range audio stream index is repaired rather than refusing the project. It is
   gone from the next save of that project; the file on disk is not touched by opening it.
+- A fill made with the options of #69 may also carry `"gap"` (0-8), `"grow"` (0-8) and
+  `"reference"` (the id of the reference drawing clip, at least 1), each written only when not
+  default. They only say how the region was found: the mask alone is drawn. No schema bump: files
+  that do not use them are unchanged and `Fill` rejects unknown keys, so an older build refuses a
+  file that has them (unknown-field error) instead of dropping them. Out-of-range values make the
+  fill invalid (dropped on load). A reference that no longer exists is not an error; it only stops
+  the fill being redone from it ([animation.md](animation.md#reference-fill-gap-closure-and-edge-expansion-69)).
 - A cel without fills is stored exactly as before (the `fill` key is written only on a fill).
   `crates/format/tests/fixtures/v19-edit.waltcut` holds a drawing with a fill.
 

@@ -422,6 +422,20 @@ pub struct BrushSettings {
     pub fill: bool,
     /// How different from the clicked pixel a pixel may be and still be filled (0-255).
     pub fill_tolerance: u8,
+    /// Closing radius of a fill, canvas pixels (0-8): openings up to twice this are closed (#69).
+    pub fill_gap: u8,
+    /// Edge pixels a fill adds under lines beyond its one-pixel shell (0-8) (#69).
+    pub fill_grow: u8,
+    /// The drawing clip a fill finds its region in; `None` is the drawing itself (#69). Never
+    /// loaded back: clip ids belong to a project.
+    #[serde(skip_deserializing)]
+    pub fill_reference: Option<u64>,
+    /// A click previews the region instead of filling (#69). Never loaded back.
+    #[serde(skip_deserializing)]
+    pub fill_preview: bool,
+    /// The previewed fill waiting for Apply or Cancel. Never saved or loaded back.
+    #[serde(skip_deserializing)]
+    pub fill_pending: Option<super::fill::PendingFill>,
     /// The selected strokes and their pending transform. Never saved or loaded back.
     #[serde(skip_deserializing)]
     pub selection: Option<super::stroke_select::StrokeSelection>,
@@ -464,6 +478,11 @@ impl Default for BrushSettings {
             lasso: false,
             fill: false,
             fill_tolerance: waltcut_engine::drawing_fill::DEFAULT_TOLERANCE,
+            fill_gap: 0,
+            fill_grow: 0,
+            fill_reference: None,
+            fill_preview: false,
+            fill_pending: None,
             selection: None,
             light_table: Default::default(),
             smoothing: Default::default(),

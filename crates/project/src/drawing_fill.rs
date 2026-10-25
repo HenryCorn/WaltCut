@@ -16,6 +16,11 @@ pub const MAX_CEL_FILL_RUNS: usize = 262_144;
 /// The most fill runs one drawing may hold, over all its cels.
 pub const MAX_DRAWING_FILL_RUNS: usize = 2_097_152;
 
+/// The largest gap-closing radius, in canvas pixels (#69): openings up to twice this are closed.
+pub const MAX_FILL_GAP: u8 = 8;
+/// The most extra edge pixels a fill may expand by (#69), on top of the one-pixel shell.
+pub const MAX_FILL_GROW: u8 = 8;
+
 /// A cell outside the region.
 pub const CLASS_OUTSIDE: u8 = 0;
 /// A cell of the region: painted over what is there.
@@ -36,6 +41,20 @@ pub struct Fill {
     pub tolerance: u8,
     pub rect: [u32; 4],
     pub runs: Vec<[u32; 2]>,
+    /// The gap-closing radius the region was found with (0 when none; written only when set).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub gap: u8,
+    /// The edge expansion beyond the one-pixel shell (0 when none; written only when set).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub grow: u8,
+    /// The drawing clip the region was found in, when it was not the cel itself (#69). Provenance
+    /// for redoing the fill: the mask alone is drawn, so a reference that is gone changes nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference: Option<u64>,
+}
+
+fn is_zero(v: &u8) -> bool {
+    *v == 0
 }
 
 impl Fill {
@@ -72,13 +91,24 @@ impl Fill {
         if needed > MAX_FILL_RUNS {
             return Err(format!("that region is too ragged to store: it needs {needed} runs and a fill holds at most {MAX_FILL_RUNS}"));
         }
-        Ok(Fill { seed, tolerance, rect, runs })
+        Ok(Fill { seed, tolerance, rect, runs, gap: 0, grow: 0, reference: None })
+    }
+
+    /// This fill, recorded as found with the options of #69.
+    pub fn with_options(mut self, gap: u8, grow: u8, reference: Option<u64>) -> Fill {
+        self.gap = gap;
+        self.grow = grow;
+        self.reference = reference;
+        self
     }
 
     /// The reason this is not a usable fill for a canvas of `canvas_w × canvas_h`, if it is not.
     pub fn validate(&self, canvas_w: u32, canvas_h: u32) -> Result<(), String> {
         if u64::from(canvas_w) * u64::from(canvas_h) > MAX_FILL_PIXELS {
             return Err(format!("a canvas of {canvas_w} × {canvas_h} is too large to hold a fill"));
+        }
+        if self.gap > MAX_FILL_GAP || self.grow > MAX_FILL_GROW || self.reference == Some(0) {
+            return Err(format!("a fill's gap and grow are at most {MAX_FILL_GAP} and {MAX_FILL_GROW}, and its reference a clip id"));
         }
         let [x, y, w, h] = self.rect;
         if w == 0 || h == 0 {
@@ -178,6 +208,21 @@ mod tests {
     }
 
     #[test]
+    fn options_are_written_only_when_set_and_survive_json() {
+        let plain = Fill::encode([1, 1], 0, [0, 0, 4, 4], &[1u8; 16]).unwrap();
+        let json = serde_json::to_string(&plain).unwrap();
+        assert!(!json.contains("gap") && !json.contains("grow") && !json.contains("reference"), "{json}");
+        let tuned = plain.clone().with_options(3, 2, Some(41));
+        tuned.validate(4, 4).unwrap();
+        let json = serde_json::to_string(&tuned).unwrap();
+        assert!(json.contains("\"gap\":3") && json.contains("\"grow\":2") && json.contains("\"reference\":41"), "{json}");
+        assert_eq!(serde_json::from_str::<Fill>(&json).unwrap(), tuned);
+        // a file without the keys is the plain fill
+        assert_eq!(serde_json::from_str::<Fill>(&serde_json::to_string(&plain).unwrap()).unwrap(), plain);
+        assert!(serde_json::from_str::<Fill>(r#"{"seed":[0,0],"tolerance":0,"rect":[0,0,1,1],"runs":[[1,1]],"gap":300}"#).is_err());
+    }
+
+    #[test]
     fn a_whole_canvas_is_one_run() {
         let f = Fill::encode([0, 0], 0, [0, 0, 1920, 1080], &vec![1u8; 1920 * 1080]).unwrap();
         assert_eq!(f.runs, vec![[1, 1920 * 1080]]);
@@ -213,6 +258,9 @@ mod tests {
         cases.push(("too short", with(&|f| f.runs = vec![[1, 15]])));
         cases.push(("too long", with(&|f| f.runs = vec![[1, 17]])));
         cases.push(("length overflow", with(&|f| f.runs = vec![[1, u32::MAX], [0, u32::MAX]])));
+        cases.push(("gap too wide", with(&|f| f.gap = MAX_FILL_GAP + 1)));
+        cases.push(("grow too wide", with(&|f| f.grow = MAX_FILL_GROW + 1)));
+        cases.push(("reference zero", with(&|f| f.reference = Some(0))));
         cases.push(("seed not filled", with(&|f| f.runs = vec![[0, 16]])));
         for (name, f) in cases {
             assert!(f.validate(4, 4).is_err(), "{name} must not validate");
@@ -220,7 +268,7 @@ mod tests {
             let _ = f.decode();
         }
         assert!(good.validate(4096, 4096).is_err(), "a canvas over the pixel cap holds no fill");
-        let huge = Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, u32::MAX, u32::MAX], runs: vec![[1, 1]] };
+        let huge = Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, u32::MAX, u32::MAX], runs: vec![[1, 1]], gap: 0, grow: 0, reference: None };
         assert!(huge.decode().is_err());
         assert!(serde_json::from_str::<Fill>(r#"{"seed":[0,0],"tolerance":0,"rect":[0,0,1,1],"runs":[[1,1]],"extra":1}"#).is_err());
         assert!(serde_json::from_str::<Fill>(r#"{"seed":[0,0],"tolerance":300,"rect":[0,0,1,1],"runs":[[1,1]]}"#).is_err());

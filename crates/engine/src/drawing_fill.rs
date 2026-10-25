@@ -1,4 +1,5 @@
-//! Region fill commands (#68): `drawing.fill`, `drawing.fillEdit` and `drawing.fillRemove`.
+//! Region fill commands (#68, #69): `drawing.fill`, `drawing.fillPreview`, `drawing.fillEdit` and
+//! `drawing.fillRemove`, with the reference drawing, gap closing and edge growing options.
 //!
 //! A fill is one operation in the cel's paint order (see `docs/animation.md`, Fill a region): the
 //! flood fill is `waltcut_render::drawing_fill`, the stored result `waltcut_project::drawing_fill`.
@@ -11,12 +12,15 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use waltcut_project::ClipId;
+use waltcut_project::drawing::Drawing;
 use waltcut_project::drawing::{MAX_CEL_STROKES, Stroke};
-use waltcut_project::drawing_fill::{Fill, MAX_CEL_FILL_RUNS, MAX_DRAWING_FILL_RUNS};
-use waltcut_render::drawing_fill::{FillError, compute_fill};
+use waltcut_project::drawing_fill::{Fill, MAX_CEL_FILL_RUNS, MAX_DRAWING_FILL_RUNS, MAX_FILL_GAP, MAX_FILL_GROW};
+use waltcut_render::drawing_fill::{FillError, FillOptions, compute_fill};
 
-use crate::commands::{CommandSpec, bad};
-use crate::drawing::{cel_mode, edit_drawing, has_drawing, parse_color, target, target_clip};
+use waltcut_time::Tick;
+
+use crate::commands::{CommandSpec, bad, time_p};
+use crate::drawing::{cel_mode, drawing_of, edit_drawing, has_drawing, parse_color, target, target_clip};
 use crate::stroke_select::check_keys;
 use crate::{EngineError, Result, Session};
 
@@ -31,7 +35,10 @@ pub(crate) fn stroke_json(s: &Stroke) -> Value {
         Some(f) => json!({
             "brush": "Fill",
             "color": s.color,
-            "fill": {"seed": f.seed, "tolerance": f.tolerance, "rect": f.rect, "runs": f.runs.len(), "pixels": f.filled_pixels()},
+            "fill": {
+                "seed": f.seed, "tolerance": f.tolerance, "gap": f.gap, "grow": f.grow, "reference": f.reference,
+                "rect": f.rect, "runs": f.runs.len(), "pixels": f.filled_pixels(),
+            },
         }),
         None => serde_json::to_value(s).unwrap_or(Value::Null),
     }
@@ -90,6 +97,56 @@ fn index_p(cmd: &str, p: &Value) -> Result<usize> {
         .ok_or_else(|| bad(cmd, "need `index`: the fill's position in the cel (see drawing.inspect {strokes: true})"))
 }
 
+/// `key`: a whole number from 0 to `max`.
+fn small_p(cmd: &str, p: &Value, key: &str, max: u8) -> Result<Option<u8>> {
+    match p.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(v) => v
+            .as_u64()
+            .and_then(|t| u8::try_from(t).ok())
+            .filter(|t| *t <= max)
+            .map(Some)
+            .ok_or_else(|| bad(cmd, format!("`{key}` is a whole number from 0 to {max}"))),
+    }
+}
+
+/// `reference`: the id of a drawing clip (a whole number, at least 1).
+fn reference_p(cmd: &str, p: &Value) -> Result<Option<u64>> {
+    match p.get("reference") {
+        None | Some(Value::Null) => Ok(None),
+        Some(v) => v.as_u64().filter(|c| *c > 0).map(Some).ok_or_else(|| bad(cmd, "`reference` is the id of a drawing clip")),
+    }
+}
+
+/// The paint of the reference drawing clip's cel shown at the time the fill is made, for finding
+/// the region in (#69). The reference is only read: it may be locked or on a hidden track. Refused,
+/// with the reason, when it is the target itself, is not a drawing clip, has another canvas size or
+/// shows no cel then. `p` carries `time` (or the playhead is used); a `frame` is refused because it
+/// counts the target's frames, not the reference's.
+fn reference_strokes(s: &Session, cmd: &str, target_clip: ClipId, target: &Drawing, reference: u64, p: &Value) -> Result<Arc<Vec<Stroke>>> {
+    if p.get("frame").is_some_and(|f| !f.is_null()) {
+        return Err(bad(cmd, "a fill from a reference is made at a time, not a frame: give `time` (or use the playhead)"));
+    }
+    if reference == target_clip.0 {
+        return Err(bad(cmd, "the reference must be a different drawing clip than the one being painted"));
+    }
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, item) = seq.find_item(ClipId(reference)).ok_or_else(|| bad(cmd, format!("the reference clip {reference} no longer exists")))?;
+    let (_, rd) = drawing_of(s, seq, ClipId(reference)).ok_or_else(|| bad(cmd, format!("the reference clip {reference} is not a drawing")))?;
+    if (rd.width, rd.height) != (target.width, target.height) {
+        return Err(bad(
+            cmd,
+            format!("the reference is {} × {} and the drawing {} × {}: they must be the same size", rd.width, rd.height, target.width, target.height),
+        ));
+    }
+    let t = time_p(s, p, "").unwrap_or_else(|| s.playhead());
+    if item.duration <= Tick::ZERO || t < item.start || t >= item.end() {
+        return Err(bad(cmd, format!("the reference clip {reference} is not shown at this time")));
+    }
+    let cel = rd.cel_at(rd.frame_at(item.source_time_at(t))).ok_or_else(|| bad(cmd, format!("the reference clip {reference} has no cel at this time")))?;
+    Ok(cel.strokes.clone())
+}
+
 /// A fill colour: a visible colour, clamped to 0..1.
 fn fill_color(cmd: &str, v: Option<&Value>) -> Result<[f32; 4]> {
     let mut c = parse_color(cmd, v)?;
@@ -120,22 +177,37 @@ fn report(clip: ClipId, cel: i64, index: usize, color: [f32; 4], fill: &Fill, ch
     let [x, y, w, h] = fill.rect;
     json!({
         "clip": clip.0, "cel": cel, "index": index, "changed": changed, "color": color, "seed": fill.seed, "tolerance": fill.tolerance,
-        "rect": {"x": x, "y": y, "w": w, "h": h}, "pixels": fill.filled_pixels(), "runs": fill.runs.len(),
+        "gap": fill.gap, "grow": fill.grow, "reference": fill.reference, "rect": {"x": x, "y": y, "w": w, "h": h}, "pixels": fill.filled_pixels(), "runs": fill.runs.len(),
     })
 }
 
-/// `drawing.fill`, with a callback that can stop it (a flag in a caller that has one; the time
-/// budget always applies).
-pub(crate) fn fill_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -> Result<Value> {
-    const ID: &str = "drawing.fill";
-    check_keys(ID, p, &["clip", "frame", "time", "point", "seed", "tolerance", "color", "cel"])?;
-    let (clip, item, frame) = target(s, ID, p)?;
-    unlocked(s, ID, clip)?;
-    let seed = seed_p(ID, p)?;
-    let tolerance = tolerance_p(ID, p)?.unwrap_or(DEFAULT_TOLERANCE);
-    let color = fill_color(ID, p.get("color"))?;
-    let (new_cel, copy) = cel_mode(ID, p)?;
-    let d = s.project.item(item).and_then(|i| i.as_drawing()).ok_or_else(|| bad(ID, "not a drawing"))?;
+/// Everything a fill needs once it has been found and checked against every limit.
+struct Found {
+    clip: ClipId,
+    item: waltcut_project::ItemId,
+    frame: i64,
+    color: [f32; 4],
+    new_cel: bool,
+    copy: bool,
+    fill: Fill,
+}
+
+const FILL_KEYS: &[&str] = &["clip", "frame", "time", "point", "seed", "tolerance", "color", "cel", "reference", "gap", "grow"];
+
+/// Find the region `drawing.fill` / `drawing.fillPreview` would paint, and check it against every
+/// limit, without changing anything.
+fn find(s: &Session, cmd: &str, p: &Value, cancel: &dyn Fn() -> bool) -> Result<Found> {
+    check_keys(cmd, p, FILL_KEYS)?;
+    let (clip, item, frame) = target(s, cmd, p)?;
+    unlocked(s, cmd, clip)?;
+    let seed = seed_p(cmd, p)?;
+    let tolerance = tolerance_p(cmd, p)?.unwrap_or(DEFAULT_TOLERANCE);
+    let gap = small_p(cmd, p, "gap", MAX_FILL_GAP)?.unwrap_or(0);
+    let grow = small_p(cmd, p, "grow", MAX_FILL_GROW)?.unwrap_or(0);
+    let reference = reference_p(cmd, p)?;
+    let color = fill_color(cmd, p.get("color"))?;
+    let (new_cel, copy) = cel_mode(cmd, p)?;
+    let d = s.project.item(item).and_then(|i| i.as_drawing()).ok_or_else(|| bad(cmd, "not a drawing"))?;
     // the paint the fill goes after: the cel it will be added to, which is the one shown, or on a
     // new cel the one already starting on this frame; failing that a copy of the cel held, or nothing
     let existing = if new_cel { d.cel_on(frame) } else { d.cel_index_at(frame) }.and_then(|i| d.cels.get(i));
@@ -146,20 +218,34 @@ pub(crate) fn fill_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -
     };
     let creating = existing.is_none();
     if base.len() >= MAX_CEL_STROKES {
-        return Err(bad(ID, format!("a cel may hold at most {MAX_CEL_STROKES} strokes")));
+        return Err(bad(cmd, format!("a cel may hold at most {MAX_CEL_STROKES} strokes")));
     }
+    // the paint the region is searched in: the cel itself, or the reference drawing's cel
+    let searched = match reference {
+        Some(r) => reference_strokes(s, cmd, clip, d, r, p)?,
+        None => base.clone(),
+    };
     let started = Instant::now();
     let stop = || cancel() || started.elapsed() > FILL_BUDGET;
-    let (fill, _) = compute_fill(&base, d.width, d.height, seed, tolerance, &stop).map_err(|e| refusal(ID, e))?;
+    let (mut fill, _) = compute_fill(&searched, d.width, d.height, seed, tolerance, FillOptions { gap, grow }, &stop).map_err(|e| refusal(cmd, e))?;
+    fill.reference = reference;
     let runs = fill.runs.len();
     let cel_runs = runs_of(&base);
     if cel_runs + runs > MAX_CEL_FILL_RUNS {
-        return Err(bad(ID, format!("this cel's fills would hold {} runs and a cel holds at most {MAX_CEL_FILL_RUNS}", cel_runs + runs)));
+        return Err(bad(cmd, format!("this cel's fills would hold {} runs and a cel holds at most {MAX_CEL_FILL_RUNS}", cel_runs + runs)));
     }
     let drawing_runs = d.fill_runs() + if creating && copy { cel_runs } else { 0 };
     if drawing_runs + runs > MAX_DRAWING_FILL_RUNS {
-        return Err(bad(ID, format!("this drawing's fills would hold {} runs and a drawing holds at most {MAX_DRAWING_FILL_RUNS}", drawing_runs + runs)));
+        return Err(bad(cmd, format!("this drawing's fills would hold {} runs and a drawing holds at most {MAX_DRAWING_FILL_RUNS}", drawing_runs + runs)));
     }
+    Ok(Found { clip, item, frame, color, new_cel, copy, fill })
+}
+
+/// `drawing.fill`, with a callback that can stop it (a flag in a caller that has one; the time
+/// budget always applies).
+pub(crate) fn fill_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -> Result<Value> {
+    const ID: &str = "drawing.fill";
+    let Found { clip, item, frame, color, new_cel, copy, fill } = find(s, ID, p, cancel)?;
     let shown = fill.clone();
     let (cel_frame, index) = edit_drawing(s, ID, "Fill Region", item, |d| {
         let i = match d.cel_index_at(frame) {
@@ -176,6 +262,25 @@ pub(crate) fn fill_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -
     Ok(report(clip, cel_frame, index, color, &shown, true))
 }
 
+/// `drawing.fillPreview`: the region `drawing.fill` would paint with the same parameters, found
+/// and checked the same way, and nothing changed (no history, no revision). The fill is returned
+/// beside the report for a caller that wants to show it.
+pub fn preview_with(s: &Session, p: &Value, cancel: &dyn Fn() -> bool) -> Result<(Value, [f32; 4], Fill)> {
+    const ID: &str = "drawing.fillPreview";
+    let Found { clip, frame, color, fill, .. } = find(s, ID, p, cancel)?;
+    let mut r = report(clip, frame, 0, color, &fill, false);
+    if let Value::Object(o) = &mut r {
+        o.remove("index");
+        o.remove("changed");
+        o.insert("preview".into(), json!(true));
+    }
+    Ok((r, color, fill))
+}
+
+fn fill_preview_cmd(s: &mut Session, p: &Value) -> Result<Value> {
+    preview_with(s, p, &|| false).map(|(r, _, _)| r)
+}
+
 fn fill_cmd(s: &mut Session, p: &Value) -> Result<Value> {
     fill_with(s, p, &|| false)
 }
@@ -183,14 +288,15 @@ fn fill_cmd(s: &mut Session, p: &Value) -> Result<Value> {
 /// `drawing.fillEdit {index, color?, tolerance?}`.
 pub(crate) fn fill_edit_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -> Result<Value> {
     const ID: &str = "drawing.fillEdit";
-    check_keys(ID, p, &["clip", "frame", "time", "index", "color", "tolerance"])?;
+    check_keys(ID, p, &["clip", "frame", "time", "index", "color", "tolerance", "gap", "grow"])?;
     let (clip, item, frame) = target(s, ID, p)?;
     unlocked(s, ID, clip)?;
     let index = index_p(ID, p)?;
     let new_tolerance = tolerance_p(ID, p)?;
+    let (new_gap, new_grow) = (small_p(ID, p, "gap", MAX_FILL_GAP)?, small_p(ID, p, "grow", MAX_FILL_GROW)?);
     let has_color = !matches!(p.get("color"), None | Some(Value::Null));
-    if new_tolerance.is_none() && !has_color {
-        return Err(bad(ID, "give `color`, `tolerance` or both"));
+    if new_tolerance.is_none() && new_gap.is_none() && new_grow.is_none() && !has_color {
+        return Err(bad(ID, "give `color`, `tolerance`, `gap` or `grow`"));
     }
     let d = s.project.item(item).and_then(|i| i.as_drawing()).ok_or_else(|| bad(ID, "not a drawing"))?;
     let ci = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown on this frame"))?;
@@ -199,17 +305,26 @@ pub(crate) fn fill_edit_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bo
         cel.strokes.get(index).and_then(|st| st.fill.clone().map(|f| (st, f))).ok_or_else(|| bad(ID, format!("stroke {index} of this cel is not a fill")))?;
     let color = if has_color { fill_color(ID, p.get("color"))? } else { old.color };
     let tolerance = new_tolerance.unwrap_or(old_fill.tolerance);
-    if color == old.color && tolerance == old_fill.tolerance {
+    let (gap, grow) = (new_gap.unwrap_or(old_fill.gap), new_grow.unwrap_or(old_fill.grow));
+    let refind = (tolerance, gap, grow) != (old_fill.tolerance, old_fill.gap, old_fill.grow);
+    if color == old.color && !refind {
         return Ok(report(clip, cel.frame, index, color, &old_fill, false));
     }
-    let fill = if tolerance == old_fill.tolerance {
+    let fill = if !refind {
         old_fill.clone()
     } else {
-        // the region again, from the same seed, against the paint before this fill as it is now
-        let before = cel.strokes.get(..index).ok_or_else(|| bad(ID, "no such stroke"))?;
+        // the region again, from the same seed: in the reference drawing as it is now when the fill
+        // was made from one, else against the paint before this fill as it is now
+        let searched = match old_fill.reference {
+            Some(r) => reference_strokes(s, ID, clip, d, r, p)?,
+            None => Arc::new(cel.strokes.get(..index).ok_or_else(|| bad(ID, "no such stroke"))?.to_vec()),
+        };
         let started = Instant::now();
         let stop = || cancel() || started.elapsed() > FILL_BUDGET;
-        Arc::new(compute_fill(before, d.width, d.height, old_fill.seed, tolerance, &stop).map_err(|e| refusal(ID, e))?.0)
+        let (mut found, _) =
+            compute_fill(&searched, d.width, d.height, old_fill.seed, tolerance, FillOptions { gap, grow }, &stop).map_err(|e| refusal(ID, e))?;
+        found.reference = old_fill.reference;
+        Arc::new(found)
     };
     let cel_runs = (runs_of(&cel.strokes).saturating_sub(old_fill.runs.len())) + fill.runs.len();
     if cel_runs > MAX_CEL_FILL_RUNS {
@@ -280,13 +395,22 @@ pub fn commands() -> Vec<CommandSpec> {
         spec(
             "drawing.fill",
             "Fill Region",
-            r##"{"clip":id?,"frame":int?,"point":[x,y]|"seed":[px,py],"tolerance":0-255?,"color":"#rrggbb"|[r,g,b,a]?,"cel":"hold|new|copy"?}  fill the contiguous region around the point on the cel shown (canvas pixels); one undo step"##,
+            r##"{"clip":id?,"frame":int?,"point":[x,y]|"seed":[px,py],"tolerance":0-255?,"color":"#rrggbb"|[r,g,b,a]?,"cel":"hold|new|copy"?,"reference":clip id?,"gap":0-8?,"grow":0-8?,"time":ticks?}  fill the contiguous region around the point on the cel shown (canvas pixels); `reference` finds the region in another drawing clip's cel at the same time (no `frame`), `gap` closes openings up to twice that many pixels, `grow` widens the edge under lines; one undo step"##,
             fill_cmd,
         ),
+        CommandSpec {
+            journal: false,
+            ..spec(
+                "drawing.fillPreview",
+                "Preview Fill",
+                r##"same parameters as drawing.fill  report the region drawing.fill would paint (rect, pixels, runs) without changing the project, the history or the saved state"##,
+                fill_preview_cmd,
+            )
+        },
         spec(
             "drawing.fillEdit",
             "Edit Fill",
-            r##"{"clip":id?,"frame":int?,"index":int,"color":"#rrggbb"|[r,g,b,a]?,"tolerance":0-255?}  recolour a fill of the cel shown, or find its region again from the same seed against the paint before it"##,
+            r##"{"clip":id?,"frame":int?,"time":ticks?,"index":int,"color":"#rrggbb"|[r,g,b,a]?,"tolerance":0-255?,"gap":0-8?,"grow":0-8?}  recolour a fill of the cel shown, or find its region again from the same seed (against the paint before it, or in its reference drawing as it is now) with another tolerance, gap or grow"##,
             fill_edit_cmd,
         ),
         spec("drawing.fillRemove", "Remove Fill", r#"{"clip":id?,"frame":int?,"index":int}  remove a fill from the cel shown"#, fill_remove),

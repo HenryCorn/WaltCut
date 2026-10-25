@@ -217,8 +217,8 @@ at 1920 × 1080 and 52 ms at 4096 × 2160; painting a fill of that size into a f
 ### What a fill does
 
 - **What it looks at.** Only the cel's own paint shown at that moment: its strokes, erasers and
-  earlier fills as rendered at full size. The video, references and other cels are not looked at
-  (filling from a reference layer is #69).
+  earlier fills as rendered at full size. The video, references and other cels are not looked at,
+  unless you name a **reference drawing** (below).
 - **Similar pixels.** The pixel under the seed is the target. A pixel is similar when every one of
   its premultiplied linear red, green, blue and alpha values (0–255) is within `tolerance` of the
   target's (default 32). The region is the 4-connected (not diagonal) set of similar pixels around
@@ -231,8 +231,8 @@ at 1920 × 1080 and 52 ms at 4096 × 2160; painting a fill of that size into a f
 - **Edge pixels.** The one-pixel shell around the region (pixels that are not similar but touch
   it: the soft edge of a line) is stored as class 2 and painted *behind* what is already there,
   so the colour reaches the line without a gap and never covers it. Filled pixels (class 1) are
-  painted over what is there like any stroke, with the colour's alpha. Wider antialiasing, gap closing and growing the
-  fill are #69.
+  painted over what is there like any stroke, with the colour's alpha. Gap closing and growing the
+  fill further are the options below.
 - **Order.** A fill is painted where it stands in the cel, so later strokes paint over it and a
   later eraser removes it (an eraser before it does not). Erasing a fill leaves its stored region
   alone; the paint under an eraser's pass is simply not shown.
@@ -257,6 +257,74 @@ at 1920 × 1080 and 52 ms at 4096 × 2160; painting a fill of that size into a f
   many runs, a bad colour or tolerance, an unknown parameter, a cancelled or too long fill and a
   cel that already holds 5 000 strokes are refused with the reason. The cel and the undo history
   are untouched.
+
+### Reference fill, gap closure and edge expansion (#69)
+
+Colour on one drawing clip from the line art of another, and tolerate imperfect lines. Three
+options extend `drawing.fill` (and `drawing.fillEdit`); the defaults reproduce the fill above
+exactly.
+
+- **`reference`** (a drawing clip id). The region is found in the paint of *that* clip's cel shown
+  at the same timeline time (its strokes, erasers and fills rendered at full size), and the fill is
+  written to the target clip's cel. The reference is only read: it is never modified, may sit on a
+  locked or hidden track, and is not looked at by anything but the region search. The target's own
+  paint is not part of the search in this mode (so a fill may overlap earlier colour; paint order
+  decides what shows). The reference must be a different drawing clip with the **same canvas size**,
+  and must have a cel on that frame; otherwise the fill is refused. `frame` cannot be combined
+  with `reference` (the two clips have different frame numbers): use `time` or the playhead.
+  Motion transforms of the clips are not applied; canvas pixels meet canvas pixels.
+- **`gap`** (0-8, default 0): the *closing radius*, in source pixels. Pixels within `gap` pixels
+  (Euclidean, `dx² + dy² <= gap²`) of a line count as line while the region is searched, so an
+  opening up to `2 × gap` pixels wide between two lines is closed and one of `2 × gap + 1` leaks.
+  The region found is then grown back over the pixels it had to skip (never over a line), so the
+  colour still reaches the line; at a closed gap it may poke at most `gap` pixels into the pixels
+  that touch the line ends. A seed within `gap` pixels of a line starts from the nearest pixel
+  that is further away (searched by distance, then row, then column); with none in reach the
+  fill is refused with that reason. All distances are source pixels, so the result does not depend on
+  the view zoom or on the canvas rotation, mirroring or pan.
+- **`grow`** (0-8, default 0): the *edge expansion*, in source pixels, on top of the one-pixel
+  shell. The edge (class 2) is every pixel within `1 + grow` pixels of the region (`dx² + dy² <=
+  (1 + grow)²`), including pixels under a line. Edge pixels are painted *behind* what the cel
+  already holds, so under a line drawn in the same cel nothing is covered, and with a reference the
+  colour reaches under the reference's lines, which hides the antialiased halo between colour and
+  line. `grow 0` is the shell of #68.
+
+**What is stored (decision).** Nothing new is *needed* to draw a fill: the stored result stays the
+run-length mask of #68, so rendering, preview and export do not change and do not know about
+references. Three optional fields are added to `Fill`, written only when not default: `gap`,
+`grow` and `reference` (the reference clip id), so a fill can be redone with the same options.
+Because they are optional and written only when set, files without them are byte for byte what
+they were and **no schema bump** is made (the rule in
+[project-files.md](project-files.md#fill-operations): `Fill` rejects unknown keys, so a build that
+does not know them refuses the file with the unknown-field error instead of dropping them).
+`gap` and `grow` over 8 or a `reference` of 0 make the fill invalid, and it is dropped on load like
+any invalid fill. The reference is a *provenance*, not a live link.
+
+**When the reference later changes.** Nothing happens to the fill. Like every fill it is a saved
+result: edit, move or delete the reference's lines, delete the reference clip, lock it, and the
+colour stays as it was and exports the same. Only a *redo* looks at the reference again:
+`drawing.fillEdit {index, tolerance? | gap? | grow?}` finds the region again from the same seed in
+the reference as it is now (at the time you give or the playhead), with the stored options changed
+by the ones you pass. If the reference clip no longer exists, is not a drawing, has another canvas
+size or has no cel there, the redo is refused with that reason and nothing changes; recolouring and
+removing never need the reference.
+
+**Preview, apply, cancel.** `drawing.fillPreview` takes the parameters of `drawing.fill` and returns
+the region it would paint (rectangle, pixel and run counts) without touching the project, the
+history or the dirty flag; cancelling a preview is dropping it. In the app, the **Preview** switch
+(Fill mode) makes a click compute a preview instead of a fill: the region is drawn over the
+picture, **Apply** runs `drawing.fill` with the same parameters (the same region, the search is
+deterministic) as one undo step, **Cancel** or `Esc` drops it. Preview state is interface state
+only, never saved. There is no background thread: a search is checked against a cancel callback
+and the 5 s budget as before, and the work is a few passes over the canvas (the gap pass is
+`O(pixels x (2 x gap + 1))`).
+
+Options bar (Fill mode): **Reference** (This drawing or any other drawing clip of the sequence),
+**Gap** and **Grow** number fields, **Preview**, **Apply**, **Cancel**. Automation ids:
+`program.brush.fill.reference`, `program.brush.fill.gap`, `program.brush.fill.grow`,
+`program.brush.fill.preview`, `program.brush.fill.apply`, `program.brush.fill.cancel`;
+`drawing.fillMode` also takes `gap`, `grow`, `reference` and `preview`, and `ui.inspect` reports
+`ui.brush.fill_gap`, `fill_grow`, `fill_reference`, `fill_preview` and `fill_pending`.
 
 ## Reference images
 
