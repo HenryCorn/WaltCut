@@ -6,8 +6,8 @@
 
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
-onion skin; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG sequence and
-check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg and ffprobe.
+onion skin; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes
+4444 MOV and a PNG sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg and ffprobe.
 
 AI Restyle is not driven: its mock provider is an engine-test seam, not reachable from the app.
 Standard library only. See docs/e2e.md.
@@ -242,6 +242,48 @@ check(lasso_after != lasso_before, "applying moved the strokes")
 cmd("edit.undo", {})
 check(still("lasso-undone.png") == lasso_before, "one undo puts every stroke back")
 cmd("drawing.lassoMode", {"enabled": False})
+
+print("== light table: shift the pinned pose, draw against it, Escape, reset")
+cmd("playhead.set", {"frame": 0})
+call("ui.set", {"tool": "Brush"}, quiet=True)
+cmd("drawing.onionSkin", {"enabled": True, "before": 0, "after": 0, "pin": 8, "loop": False})
+home = still("light-before.png")
+shifted = cmd("drawing.lightTable", {"dx": 30, "dy": -12, "rotation": 8})
+check(shifted["shifted"] and shifted["showing"] and (shifted["dx"], shifted["dy"], shifted["rotation"]) == (30, -12, 8), f"the pinned pose is shifted and showing ({shifted})")
+time.sleep(0.6)
+call("ui.inspect")
+check(still("light-shifted.png") == home, "a shifted pose is not in the exported still")
+shot("08e-light-table-shifted")
+strokes_before = cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"]
+cmd("drawing.lightTableShift", {"active": True})
+check(call("ui.inspect")["result"]["ui"]["brush"]["light_table"]["hold"] == "Command", "the Shift pose hold is on")
+rect = [e for e in call("ui.elements", {"prefix": "program.brush"})["result"] if e["id"] == "program.brush"][0]["rect"]
+x, y, w, h = rect
+call("ui.drag", {"from": {"x": x + w * 0.45, "y": y + h * 0.78}, "to": {"x": x + w * 0.55, "y": y + h * 0.88}, "steps": 8})
+time.sleep(0.4)
+table = call("ui.inspect")["result"]["ui"]["brush"]["light_table"]
+check(table["shift"]["dx"] > 30 and table["shift"]["dy"] > -12, f"a drag moved the pose with the pen ({table['shift']})")
+check(cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"] == strokes_before, "the drag drew nothing")
+cmd("drawing.lightTableShift", {"active": False})
+kept = call("ui.inspect")["result"]["ui"]["brush"]["light_table"]["shift"]
+call("ui.drag", {"from": {"x": x + w * 0.4, "y": y + h * 0.72}, "to": {"x": x + w * 0.6, "y": y + h * 0.8}, "steps": 8})
+time.sleep(0.4)
+check(cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"] == strokes_before + 1, "the current cel is still drawable against the shifted pose")
+check(call("ui.inspect")["result"]["ui"]["brush"]["light_table"]["shift"] == kept, "drawing kept the alignment")
+shot("08f-light-table-drawing")
+cmd("drawing.lightTableShift", {"active": True})
+cmd("drawing.lightTable", {"dx": 99})
+call("ui.key", {"key": "Escape"})
+back = call("ui.inspect")["result"]["ui"]["brush"]["light_table"]
+check(back["hold"] == "Off" and back["shift"] == kept, "Escape gives back what the hold changed")
+cmd("drawing.lightTableReset", {})
+check(not call("ui.inspect")["result"]["ui"]["brush"]["light_table"]["pose"], "Reset puts the pose back where it was drawn")
+time.sleep(0.6)
+call("ui.inspect")
+shot("08g-light-table-reset")
+cmd("edit.undo", {})
+check(cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"] == strokes_before, "one undo takes the stroke away; the shift had no undo step")
+cmd("drawing.onionSkin", {"before": 1, "after": 1, "pin": None})
 
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})

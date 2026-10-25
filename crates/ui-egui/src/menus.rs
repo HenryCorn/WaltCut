@@ -44,6 +44,9 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("drawing.eraseTemporarily", "Erase While Held", ["Graphics and Titles", "Drawing"], Some("Alt+E")),
     uic!("drawing.onionSkin", "Onion Skin Settings", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.pinPose", "Pin Pose for Onion Skin", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.lightTable", "Light Table Pose Shift", ["Graphics and Titles", "Drawing"], None),
+    uic!("drawing.lightTableShift", "Shift Pose While Held", ["Graphics and Titles", "Drawing"], Some("Alt+T")),
+    uic!("drawing.lightTableReset", "Reset Pose Shift", ["Graphics and Titles", "Drawing"], Some("Alt+Shift+T")),
     uic!("view.canvasRotateRight", "Rotate Canvas Right", ["View", "Drawing View"], Some("Alt+.")),
     uic!("view.canvasRotateLeft", "Rotate Canvas Left", ["View", "Drawing View"], Some("Alt+,")),
     uic!("view.canvasRotate", "Set Canvas Rotation", ["View", "Drawing View"], None),
@@ -250,6 +253,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         return r;
     }
     if let Some(r) = crate::panels::reference::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
+    }
+    if let Some(r) = crate::panels::light_table::route(app, id, &params) {
         if let Err(e) = &r {
             app.ui.status = e.clone();
         }
@@ -694,6 +703,10 @@ pub fn menu_items(app: &WaltCutApp) -> Vec<MenuItem> {
         }
         if let Some(doc) = crate::panels::drawing_review::params_doc(&it.id) {
             it.params = Some(doc.to_string());
+        }
+        if let Some(doc) = crate::panels::light_table::params_doc(&it.id) {
+            it.params = Some(doc.to_string());
+            it.enabled &= crate::panels::light_table::enabled(app, &it.id);
         }
         if let Some(doc) = crate::panels::stroke_select::params_doc(&it.id) {
             it.params = Some(doc.to_string());
