@@ -420,16 +420,21 @@ pub fn controls(app: &mut WaltCutApp, ui: &mut Ui) {
         if sel.strokes.len() == 1 { "" } else { "s" },
         if sel.erasers.is_empty() { String::new() } else { format!(" + {} eraser", sel.erasers.len()) }
     );
-    let l = ui.label(egui::RichText::new(text).strong());
+    // the selection gets its own rows, so the options bar never splits a label or a field from its
+    // caption: the count and the four fields, then the buttons and the refusal
+    ui.end_row();
+    let l = ui.add(egui::Label::new(egui::RichText::new(text).strong()).extend());
     app.auto.add("program.brush.lasso.status", l.rect, "selection");
     let mut p = sel.pending;
     let mut changed = false;
     let mut drag =
         |ui: &mut Ui, id: &str, label: &str, v: &mut f64, range: std::ops::RangeInclusive<f64>, speed: f64, auto: &mut crate::automation::Registry| {
-            ui.label(label);
-            let r = ui.add(egui::DragValue::new(v).range(range).speed(speed));
-            auto.add(&format!("program.brush.lasso.{id}"), r.rect, label);
-            changed |= r.changed();
+            ui.horizontal(|ui| {
+                ui.label(label);
+                let r = ui.add(egui::DragValue::new(v).range(range).speed(speed));
+                auto.add(&format!("program.brush.lasso.{id}"), r.rect, label);
+                changed |= r.changed();
+            });
         };
     drag(ui, "dx", "X", &mut p.dx, -100_000.0..=100_000.0, 1.0, &mut app.auto);
     drag(ui, "dy", "Y", &mut p.dy, -100_000.0..=100_000.0, 1.0, &mut app.auto);
@@ -438,6 +443,7 @@ pub fn controls(app: &mut WaltCutApp, ui: &mut Ui) {
     if changed && let Some(s) = app.ui.brush.selection.as_mut() {
         s.pending = p;
     }
+    ui.end_row();
     let refused = refusal(app);
     let can_apply = refused.is_none() && !p.is_identity();
     let apply = ui.add_enabled(can_apply, egui::Button::new("Apply"));
