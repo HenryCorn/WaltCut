@@ -157,6 +157,10 @@ pub fn route(app: &mut WaltCutApp, id: &str, params: &Value) -> Option<Result<Va
         "drawing.lassoMode" => flag(params, "enabled").map(|e| {
             let on = e.unwrap_or(!app.ui.brush.lasso);
             app.ui.brush.lasso = on;
+            if on {
+                // Fill and Lasso exclude each other
+                app.ui.brush.fill = false;
+            }
             if !on {
                 app.ui.brush.selection = None;
             }

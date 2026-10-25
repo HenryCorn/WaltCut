@@ -184,6 +184,7 @@ fn preview(ui: &mut Ui, b: &BrushSettings) {
         size: b.size.clamp(2.0, 18.0),
         points,
         response: (!b.response.is_default()).then(|| b.response.clone()),
+        fill: None,
     };
     let to_screen = Affine::translate(f64::from(rect.min.x), f64::from(rect.min.y));
     super::drawing_raster::paint_stroke_preview(&ui.painter_at(rect), "brush-response-preview", &stroke, &to_screen, rect);

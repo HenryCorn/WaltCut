@@ -73,7 +73,7 @@ fn gen_stroke(rng: &mut Rng, w: f32, h: f32, n: usize, index: usize) -> Stroke {
             StrokePoint { x, y, p: (std::f32::consts::PI * t).sin().clamp(0.05, 1.0) }
         })
         .collect();
-    Stroke { brush, color: [rng.unit(), rng.unit(), rng.unit(), 1.0], size: 4.0 + rng.unit() * 20.0, points, response: None }
+    Stroke { brush, color: [rng.unit(), rng.unit(), rng.unit(), 1.0], size: 4.0 + rng.unit() * 20.0, points, response: None, fill: None }
 }
 
 pub fn gen_drawing(wl: &Workload, w: u32, h: u32, rate: waltcut_time::FrameRate) -> Drawing {

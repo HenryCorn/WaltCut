@@ -11,7 +11,9 @@
 //!   *belongs* to the selection and is transformed with it, so the erased gap goes with the paint.
 //!   When such an eraser's bounds also overlap an unselected paint stroke before it, it crosses
 //!   both: the selection is **ambiguous** and a transform is refused (`conflict`) until those strokes
-//!   are selected too. Erasers that touch no selected stroke stay where they are.
+//!   are selected too. A fill (#68) is never hit, never selectable and never moves: it is a saved
+//!   result. For these rules it is unselected paint with the bounds of its region. Erasers that
+//!   touch no selected stroke stay where they are.
 //! * **Landing.** A transform is refused when, after it, a moved eraser would overlap an
 //!   unselected paint stroke before it (it would erase that stroke), or moved paint would land under
 //!   an unselected eraser after it (it would be erased). Order in the cel never changes.
@@ -153,6 +155,9 @@ pub fn plan_selection(strokes: &[Stroke], selected: &[usize]) -> Result<Selectio
         if is_eraser(s) {
             return Err(format!("stroke {i} is an eraser: erasers move with the paint they erase and cannot be selected"));
         }
+        if s.is_fill() {
+            return Err(format!("stroke {i} is a fill: a fill is a saved result and is not moved with strokes (redo it with drawing.fillEdit, or remove it)"));
+        }
     }
     let bounds: Vec<Option<Bounds>> = strokes.iter().map(Stroke::bounds).collect();
     let mut erasers = Vec::new();
@@ -171,7 +176,8 @@ pub fn plan_selection(strokes: &[Stroke], selected: &[usize]) -> Result<Selectio
         if let Some((u, _)) = shared
             && conflict.is_none()
         {
-            conflict = Some(format!("eraser stroke {e} crosses the selection and stroke {u}: select stroke {u} too, or erase again"));
+            let fix = if strokes.get(u).is_some_and(Stroke::is_fill) { "remove that fill first (drawing.fillRemove)" } else { "select it too" };
+            conflict = Some(format!("eraser stroke {e} crosses the selection and stroke {u}: {fix}, or erase again"));
         }
         erasers.push(e);
     }
@@ -247,7 +253,14 @@ mod tests {
     use crate::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32)], size: f32) -> Stroke {
-        Stroke { brush, color: [0.0, 0.0, 0.0, 1.0], size, points: pts.iter().map(|&(x, y)| StrokePoint { x, y, p: 1.0 }).collect(), response: None }
+        Stroke {
+            brush,
+            color: [0.0, 0.0, 0.0, 1.0],
+            size,
+            points: pts.iter().map(|&(x, y)| StrokePoint { x, y, p: 1.0 }).collect(),
+            response: None,
+            fill: None,
+        }
     }
     fn pen(pts: &[(f32, f32)]) -> Stroke {
         stroke(Brush::Pen, pts, 4.0)
@@ -390,5 +403,28 @@ mod tests {
         let sel = plan_selection(&strokes, &[0, 1]).unwrap();
         let (cx, cy) = selection_centre(&strokes, &sel).unwrap();
         assert!((cx - 50.0).abs() < 1e-3 && (cy - 5.0).abs() < 1e-3, "{cx} {cy}");
+    }
+
+    #[test]
+    fn a_fill_is_never_selected_or_moved_and_counts_as_unselected_paint_for_erasers() {
+        use crate::drawing_fill::Fill;
+        let fill = Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill::encode([40, 5], 0, [30, 0, 40, 20], &[1u8; 800]).unwrap());
+        let strokes = vec![pen(&[(10.0, 10.0), (90.0, 10.0)]), fill, stroke(Brush::Eraser, &[(50.0, 0.0), (50.0, 20.0)], 6.0)];
+        // a lasso around everything hits only the pen stroke
+        let around = [(0.0, 0.0), (200.0, 0.0), (200.0, 200.0), (0.0, 200.0)];
+        assert_eq!(lasso_hits(&strokes, &around).unwrap(), vec![0]);
+        // asking for the fill by number is refused
+        let e = plan_selection(&strokes, &[1]).unwrap_err();
+        assert!(e.contains("fill"), "{e}");
+        // the eraser crosses the selected pen stroke and the fill's region: ambiguous, and the way out names the fill
+        let sel = plan_selection(&strokes, &[0]).unwrap();
+        let why = sel.conflict.unwrap();
+        assert!(why.contains("stroke 1") && why.contains("remove that fill"), "{why}");
+        assert!(transform_selection(&strokes, &[0], &Transform { dx: 5.0, ..Transform::identity() }).is_err());
+        // with no eraser in the way the pen stroke moves and the fill stays exactly as it was
+        let calm = vec![strokes[0].clone(), strokes[1].clone()];
+        let (moved, _) = transform_selection(&calm, &[0], &Transform { dx: 5.0, ..Transform::identity() }).unwrap();
+        assert_eq!(moved[1], calm[1]);
+        assert_eq!(moved[0].points[0].x, 15.0);
     }
 }

@@ -321,7 +321,7 @@ mod tests {
     use waltcut_project::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32, f32)], size: f32, color: [f32; 4]) -> Stroke {
-        Stroke { brush, color, size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(), response: None }
+        Stroke { brush, color, size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(), response: None, fill: None }
     }
     fn alpha(img: &Image, x: usize, y: usize) -> f32 {
         img.px[(y * img.w + x) * 4 + 3]

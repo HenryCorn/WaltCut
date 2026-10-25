@@ -7,7 +7,7 @@
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
 onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
-curves; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
+curves; region fill; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
 
@@ -276,6 +276,37 @@ r = call("engine.execute", {"command": "drawing.pressureCurve", "params": {"widt
 check(not r.get("ok"), "a curve that goes backwards is refused")
 check(call("ui.inspect")["result"]["ui"]["brush"]["response"]["width"] == custom["width"], "the refusal changed nothing")
 check(cmd("drawing.pressureCurve", {"reset": True})["default"] is True, "reset restores the brush's own response")
+
+print("== fill: close a shape, fill it, recolour, a refused fill, a click in Fill mode, undo")
+cmd("playhead.set", {"frame": 12})
+call("ui.set", {"tool": "Brush"}, quiet=True)
+square = [[100, 40], [220, 40], [220, 140], [100, 140], [100, 40]]
+cmd("drawing.addStroke", {"clip": drawing, "frame": 12, "cel": "new", "stroke": {"brush": "Pen", "color": "#1d3557", "size": 6.0, "points": square}})
+fill_plain = still("fill-plain.png")
+filled = cmd("drawing.fill", {"clip": drawing, "frame": 12, "point": [160, 90], "color": "#e63946", "tolerance": 24})
+check(10_000 < filled["pixels"] < 320 * 180 // 2 and filled["changed"], f"a click inside the square fills only the inside ({filled['pixels']} pixels)")
+fill_done = still("fill-done.png")
+check(fill_done != fill_plain, "the exported still has the fill in it")
+time.sleep(0.5)
+shot("08i-fill")
+recolour = cmd("drawing.fillEdit", {"clip": drawing, "frame": 12, "index": 1, "color": "#2a9d8f"})
+check(recolour["pixels"] == filled["pixels"] and still("fill-recoloured.png") != fill_done, "recolouring keeps the region and changes the picture")
+refused = call("engine.execute", {"command": "drawing.fill", "params": {"clip": drawing, "frame": 12, "point": [900, 10]}}, quiet=True)
+check(not refused.get("ok") and "outside" in refused.get("error", ""), "a point outside the canvas is refused")
+cmd("drawing.fillMode", {"enabled": True, "tolerance": 24})
+rect = [e for e in call("ui.elements", {"prefix": "program.brush"})["result"] if e["id"] == "program.brush"][0]["rect"]
+x, y, w, h = rect
+before_count = next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"] if c["frame"] == 12)
+call("ui.click", {"x": x + w * (30 / 320), "y": y + h * (170 / 180)})
+time.sleep(0.4)
+after_count = next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"] if c["frame"] == 12)
+check(after_count == before_count + 1, "a pointer click in Fill mode adds a fill")
+cmd("drawing.fillMode", {"enabled": False})
+cmd("edit.undo", {})
+check(next(c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"] if c["frame"] == 12) == before_count, "one undo removes the clicked fill")
+cmd("edit.undo", {})
+cmd("edit.undo", {})
+check(still("fill-undone.png") == fill_plain, "undoing the recolour and the fill gives back the outline alone")
 
 print("== light table: shift the pinned pose, draw against it, Escape, reset")
 cmd("playhead.set", {"frame": 0})

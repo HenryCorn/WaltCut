@@ -40,7 +40,7 @@ fn num(cmd: &str, p: &Value, key: &str, default: f64) -> Result<f64> {
     }
 }
 
-fn check_keys(cmd: &str, p: &Value, known: &[&str]) -> Result<()> {
+pub(crate) fn check_keys(cmd: &str, p: &Value, known: &[&str]) -> Result<()> {
     match p {
         Value::Null => Ok(()),
         Value::Object(o) => match o.keys().find(|k| !known.contains(&k.as_str())) {

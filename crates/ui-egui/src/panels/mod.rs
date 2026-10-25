@@ -16,6 +16,7 @@ pub mod effects;
 pub mod events;
 pub mod export_mode;
 pub mod file_dialogs;
+pub mod fill;
 pub mod frame_export;
 pub mod graphic_design;
 pub mod graphics;

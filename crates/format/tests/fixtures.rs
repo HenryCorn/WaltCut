@@ -10,17 +10,17 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// The golden file: a project written by this schema, with media, a sequence, markers and effects.
 fn golden() -> Project {
-    decode(&fixture("v18-edit.waltcut")).unwrap().project
+    decode(&fixture("v19-edit.waltcut")).unwrap().project
 }
 
 #[test]
 fn golden_project_opens_and_round_trips_without_loss() {
-    let bytes = fixture("v18-edit.waltcut");
+    let bytes = fixture("v19-edit.waltcut");
     let l = decode(&bytes).unwrap();
     assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
     assert_eq!(p.name, "Legacy Edit");
-    assert_eq!(p.next_id, 48);
+    assert_eq!(p.next_id, 49);
     let media = p.item(ItemId(5)).unwrap();
     assert_eq!(media.name, "Ocean_Sunset.mp4");
     let seq = p.sequence(ItemId(21)).unwrap();
@@ -30,6 +30,15 @@ fn golden_project_opens_and_round_trips_without_loss() {
     assert_eq!(clip.source_in, Tick(243_675_432_000));
     assert_eq!(clip.effects.len(), 2);
     seq.check().unwrap();
+    // the drawing with a fill: its outline, then the fill's stored region, in paint order
+    let d = p.item(ItemId(48)).and_then(|i| i.as_drawing()).unwrap();
+    let strokes = &d.cels[0].strokes;
+    assert_eq!(strokes.len(), 2);
+    let fill = strokes[1].fill.as_deref().unwrap();
+    assert!(strokes[1].is_fill() && strokes[1].points.is_empty());
+    assert_eq!((fill.seed, fill.tolerance, fill.rect), ([10, 8], 32, [3, 2, 26, 14]));
+    fill.validate(d.width, d.height).unwrap();
+    assert_eq!(fill.filled_pixels(), 20 * 8);
     // saved again it is the same document: nothing added, nothing lost (the writer's name aside)
     let again = encode(p, true);
     let (old, new): (serde_json::Value, serde_json::Value) = (serde_json::from_slice(&bytes).unwrap(), serde_json::from_slice(&again).unwrap());
@@ -41,7 +50,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 
 #[test]
 fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
-    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v18-edit.waltcut")).unwrap();
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v19-edit.waltcut")).unwrap();
     for (path, value) in [
         ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
         ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
@@ -87,6 +96,59 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// v18 was the last schema before a cel could hold a fill: it is refused like any earlier one.
+#[test]
+fn the_schema_before_fills_is_refused_with_the_legacy_release() {
+    let e = decode(&fixture("v18-edit.waltcut")).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 18, supported } if supported == SCHEMA_VERSION), "{e}");
+    assert!(e.to_string().contains(LEGACY_RELEASE));
+}
+
+/// A fill survives a save and a load exactly; a drawing without one has no `fill` key; a damaged
+/// fill is dropped on load and the rest of the cel stays.
+#[test]
+fn fills_round_trip_and_plain_cels_are_unchanged() {
+    use waltcut_project::drawing::{Brush, Drawing, Fill, Stroke, StrokePoint};
+    use waltcut_project::{ItemKind, Label};
+    let pen = || Stroke {
+        brush: Brush::Pen,
+        color: [0.0, 0.0, 0.0, 1.0],
+        size: 2.0,
+        points: vec![StrokePoint { x: 1.0, y: 2.0, p: 1.0 }],
+        response: None,
+        fill: None,
+    };
+    let mut p = golden();
+    let mut d = Drawing::new(16, 16, waltcut_time::FrameRate::FPS_24);
+    d.ensure_cel(0, false).unwrap();
+    if let Some(c) = d.cels.first_mut() {
+        c.strokes_mut().push(pen());
+    }
+    let plain = p.add_item("plain", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
+    let mut bare = Project::new("bare");
+    bare.add_item("plain", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
+    let written = String::from_utf8_lossy(&encode(&bare, true)).into_owned();
+    assert!(!written.contains("\"Fill\"") && !written.contains("\"fill\""), "no fill key without a fill");
+    let fill = Fill::encode([4, 4], 7, [2, 2, 8, 8], &[1u8; 64]).unwrap();
+    let good = Stroke::fill_op([0.2, 0.4, 0.6, 0.5], fill);
+    let bad = Stroke::fill_op([0.2, 0.4, 0.6, 0.5], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, 40, 40], runs: vec![[1, 1600]] });
+    if let Some(c) = d.cels.first_mut() {
+        c.strokes_mut().push(good.clone());
+        c.strokes_mut().push(bad);
+        c.strokes_mut().push(pen());
+    }
+    let filled = p.add_item("filled", Label::Iris, ItemKind::Drawing(d.into()), None);
+    let bytes = encode(&p, true);
+    let back = decode(&bytes).unwrap().project;
+    let strokes = |p: &Project, id| p.item(id).and_then(|i| i.as_drawing()).map(|d| d.cels[0].strokes.to_vec());
+    assert_eq!(strokes(&back, plain).map(|s| s.len()), Some(1));
+    let kept = strokes(&back, filled).unwrap();
+    assert_eq!(kept.len(), 3, "the fill outside the 16 × 16 canvas is dropped, the strokes and the good fill stay");
+    assert_eq!(kept[1], good);
+    // and the stored region is bit for bit what was saved
+    assert_eq!(kept[1].fill, good.fill);
+}
+
 /// v17 was the last schema before strokes could carry a pressure response: it is refused like any
 /// earlier one.
 #[test]
@@ -108,6 +170,7 @@ fn pressure_responses_round_trip_and_plain_strokes_are_unchanged() {
         size: 6.0,
         points: vec![StrokePoint { x: 1.0, y: 2.0, p: 0.3 }, StrokePoint { x: 9.0, y: 4.0, p: 0.8 }],
         response,
+        fill: None,
     };
     let mut p = golden();
     let mut d = Drawing::new(64, 32, waltcut_time::FrameRate::FPS_24);
