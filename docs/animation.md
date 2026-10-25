@@ -210,7 +210,9 @@ accepted from a file for it. A fill holds at most 65 536 runs, a cel 262 144 and
 with the number of runs it needed. The work is bounded by the canvas size, and the flood fill checks a cancel
 callback and a 5 s time budget as it goes, so a runaway stops with an error and changes nothing.
 The app has no Cancel button for it: the fill runs when you click and returns within the budget
-(measured times are in the pull request for #68).
+(release build, a fill of the whole canvas, which is the largest region: finding it takes 20 ms
+at 1920 × 1080 and 52 ms at 4096 × 2160; painting a fill of that size into a frame takes 19 ms and
+67 ms, paid by every frame render that shows it, so very large fills slow playback on big canvases).
 
 ### What a fill does
 
