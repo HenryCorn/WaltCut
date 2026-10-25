@@ -29,6 +29,7 @@ pub mod monitor;
 pub mod monitor_view;
 pub mod panel_state;
 pub mod presets;
+pub mod pressure_curve;
 pub mod project;
 pub mod project_dialogs;
 pub mod project_views;

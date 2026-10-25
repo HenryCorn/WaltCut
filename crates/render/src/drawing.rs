@@ -43,7 +43,7 @@ fn paint_stroke(s: &Stroke, m: &Affine, k: f32, img: &mut Image) {
         .filter(|p| p.x.is_finite() && p.y.is_finite())
         .map(|p| {
             let q = m.apply(Vec2::new(p.x as f64, p.y as f64));
-            let (rf, af) = s.brush.response(p.p);
+            let (rf, af) = s.response_at(p.p);
             Dab { x: q.x as f32, y: q.y as f32, r: (half * rf).max(0.35), a: af }
         })
         .collect();
@@ -135,7 +135,7 @@ mod tests {
     use waltcut_project::drawing::StrokePoint;
 
     fn stroke(brush: Brush, pts: &[(f32, f32, f32)], size: f32) -> Stroke {
-        Stroke { brush, color: [1.0, 1.0, 1.0, 1.0], size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect() }
+        Stroke { brush, color: [1.0, 1.0, 1.0, 1.0], size, points: pts.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(), response: None }
     }
 
     fn alpha(img: &Image, x: usize, y: usize) -> f32 {
@@ -230,5 +230,60 @@ mod tests {
         let mut dot = Image::new(16, 16);
         render_strokes(&[stroke(Brush::Pen, &[(8.0, 8.0, 1.0)], 6.0)], &Affine::scale(1.0, 1.0), &mut dot);
         assert!(alpha(&dot, 8, 8) > 0.99);
+    }
+}
+
+#[cfg(test)]
+mod response_render_tests {
+    use super::*;
+    use waltcut_project::drawing::{Curve, PressureResponse, StrokePoint};
+
+    fn render(s: &Stroke) -> Vec<f32> {
+        let mut img = Image::new(64, 32);
+        paint_stroke(s, &Affine::IDENTITY, 1.0, &mut img);
+        img.px.clone()
+    }
+
+    fn line(brush: Brush, p: f32) -> Stroke {
+        Stroke {
+            brush,
+            color: [0.0, 0.0, 0.0, 1.0],
+            size: 12.0,
+            points: (0..20).map(|i| StrokePoint { x: 8.0 + i as f32 * 2.5, y: 16.0, p }).collect(),
+            response: None,
+        }
+    }
+
+    #[test]
+    fn a_stroke_without_a_response_renders_as_it_always_did_and_the_curves_change_it() {
+        for brush in [Brush::Pen, Brush::Pencil] {
+            let plain = line(brush, 0.4);
+            let mut identity = plain.clone();
+            identity.response = Some(PressureResponse::default());
+            assert_eq!(render(&plain), render(&identity), "{brush:?}: an empty response is the brush's own");
+            let mut soft = plain.clone();
+            soft.response = Some(PressureResponse { width: Curve::preset("soft"), opacity: Curve::preset("soft") });
+            assert_ne!(render(&plain), render(&soft), "{brush:?}: a curve changes the line");
+            // the same stroke renders the same every time (deterministic replay)
+            assert_eq!(render(&soft), render(&soft.clone()));
+        }
+    }
+
+    #[test]
+    fn width_and_opacity_are_independent() {
+        let base = line(Brush::Pencil, 0.4);
+        let mut width_only = base.clone();
+        width_only.response = Some(PressureResponse { width: Curve::preset("soft"), opacity: None });
+        let mut opacity_only = base.clone();
+        opacity_only.response = Some(PressureResponse { width: None, opacity: Curve::preset("soft") });
+        let (a, b, c) = (render(&base), render(&width_only), render(&opacity_only));
+        assert_ne!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(b, c);
+        // the Marker has constant width and opacity: curves do nothing to it
+        let mut marker = line(Brush::Marker, 0.4);
+        let before = render(&marker);
+        marker.response = Some(PressureResponse { width: Curve::preset("firm"), opacity: Curve::preset("firm") });
+        assert_eq!(render(&marker), before);
     }
 }

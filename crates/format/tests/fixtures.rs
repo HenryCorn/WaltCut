@@ -10,12 +10,12 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// The golden file: a project written by this schema, with media, a sequence, markers and effects.
 fn golden() -> Project {
-    decode(&fixture("v17-edit.waltcut")).unwrap().project
+    decode(&fixture("v18-edit.waltcut")).unwrap().project
 }
 
 #[test]
 fn golden_project_opens_and_round_trips_without_loss() {
-    let bytes = fixture("v17-edit.waltcut");
+    let bytes = fixture("v18-edit.waltcut");
     let l = decode(&bytes).unwrap();
     assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
@@ -41,7 +41,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 
 #[test]
 fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
-    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v17-edit.waltcut")).unwrap();
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v18-edit.waltcut")).unwrap();
     for (path, value) in [
         ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
         ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
@@ -85,6 +85,49 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
     waltcut_format::autosave::rotate(&autosave, "old", 1).unwrap();
     assert_eq!(files.iter().map(|f| hash(f)).collect::<Vec<_>>(), before);
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// v17 was the last schema before strokes could carry a pressure response: it is refused like any
+/// earlier one.
+#[test]
+fn the_schema_before_pressure_responses_is_refused_with_the_legacy_release() {
+    let e = decode(&fixture("v17-edit.waltcut")).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 17, supported } if supported == SCHEMA_VERSION), "{e}");
+    assert!(e.to_string().contains(LEGACY_RELEASE));
+}
+
+/// A stroke's pressure response survives a save and a load, a stroke without one has no `response`
+/// key.
+#[test]
+fn pressure_responses_round_trip_and_plain_strokes_are_unchanged() {
+    use waltcut_project::drawing::{Brush, Curve, Drawing, PressureResponse, Stroke, StrokePoint};
+    use waltcut_project::{ItemKind, Label};
+    let stroke = |response| Stroke {
+        brush: Brush::Pencil,
+        color: [0.0, 0.0, 0.0, 1.0],
+        size: 6.0,
+        points: vec![StrokePoint { x: 1.0, y: 2.0, p: 0.3 }, StrokePoint { x: 9.0, y: 4.0, p: 0.8 }],
+        response,
+    };
+    let mut p = golden();
+    let mut d = Drawing::new(64, 32, waltcut_time::FrameRate::FPS_24);
+    d.ensure_cel(0, false).unwrap();
+    if let Some(c) = d.cels.first_mut() {
+        c.strokes_mut().push(stroke(None));
+    }
+    let id = p.add_item("plain", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
+    let plain = encode(&p, true);
+    assert!(!String::from_utf8_lossy(&plain).contains("\"response\""), "the key is written only when set");
+    let response = PressureResponse { width: Curve::preset("soft"), opacity: Curve::preset("firm") };
+    if let Some(c) = d.cels.first_mut() {
+        c.strokes_mut().push(stroke(Some(response.clone())));
+    }
+    let id2 = p.add_item("curved", Label::Iris, ItemKind::Drawing(d.into()), None);
+    let bytes = encode(&p, true);
+    let back = decode(&bytes).unwrap().project;
+    let stored = |p: &Project, id| p.item(id).and_then(|i| i.as_drawing()).map(|d| d.cels[0].strokes.iter().map(|s| s.response.clone()).collect::<Vec<_>>());
+    assert_eq!(stored(&back, id), Some(vec![None]));
+    assert_eq!(stored(&back, id2), Some(vec![None, Some(response)]));
 }
 
 /// v16 was the last schema before clips could be guides: it is refused like any earlier one.

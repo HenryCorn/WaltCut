@@ -230,12 +230,13 @@ fn route_smoothing(app: &mut WaltCutApp, params: &Value) -> Result<Value, String
     Ok(smoothing_state(st))
 }
 
-/// The smoothing menu of the options bar.
+/// The Feel menu of the options bar: stroke smoothing and the pressure response.
 fn smoothing_menu(ui: &mut egui::Ui, b: &mut BrushSettings, auto: &mut crate::automation::Registry) {
     use super::drawing_smooth::SmoothMode;
-    // the label never changes width; it turns blue while smoothing is on
-    let label = egui::RichText::new("Smooth");
-    let label = if b.smoothing.mode == SmoothMode::Off { label } else { label.strong().color(egui::Color32::from_rgb(70, 130, 230)) };
+    // the label never changes width; it turns blue while smoothing or a pressure curve is in use
+    let label = egui::RichText::new("Feel");
+    let label =
+        if b.smoothing.mode == SmoothMode::Off && b.response.is_default() { label } else { label.strong().color(egui::Color32::from_rgb(70, 130, 230)) };
     let r = ui.menu_button(label, |ui| {
         let mut on = b.smoothing.mode == SmoothMode::Smooth;
         let r = ui.checkbox(&mut on, "Smooth strokes");
@@ -248,8 +249,9 @@ fn smoothing_menu(ui: &mut egui::Ui, b: &mut BrushSettings, auto: &mut crate::au
             auto.add("program.brush.smooth.pressure", r.rect, "pressure smoothing");
         });
         ui.label(egui::RichText::new("The line trails the pen a little while smoothing is on.").small());
+        super::pressure_curve::section(ui, b, auto);
     });
-    auto.add("program.brush.smooth.menu", r.response.rect, "smoothing settings");
+    auto.add("program.brush.feel.menu", r.response.rect, "pen feel: smoothing and pressure response");
 }
 
 /// `drawing.brushSizeUp`, `drawing.brushSizeDown` and `drawing.eraseTemporarily`.
@@ -422,6 +424,9 @@ pub struct BrushSettings {
     pub light_table: super::light_table::LightTable,
     /// Stroke smoothing (#57): Off stores what the pen sent.
     pub smoothing: super::drawing_smooth::Smoothing,
+    /// How a pen's pressure becomes width and opacity (#56); stored with each new stroke when it
+    /// is not the brush's own response.
+    pub response: waltcut_project::drawing::PressureResponse,
     /// In-between spacing for In-between to Next Cel (2 = on twos).
     pub tween_step: u32,
     /// Input diagnostics (read-only: shown by `ui.inspect`, never loaded back).
@@ -454,6 +459,7 @@ impl Default for BrushSettings {
             selection: None,
             light_table: Default::default(),
             smoothing: Default::default(),
+            response: Default::default(),
             tween_step: 2,
             pen: PenStats::default(),
             erase_held: EraseHold::Off,
@@ -491,6 +497,7 @@ fn live_stroke(b: &BrushSettings, l: &Live) -> Stroke {
         color: b.color,
         size: b.size,
         points: l.stroke.points.iter().map(|p| waltcut_project::drawing::StrokePoint { x: p[0], y: p[1], p: p[2] }).collect(),
+        response: b.stroke_response(),
     }
 }
 
@@ -964,12 +971,15 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
                 waltcut_project::drawing::MAX_STROKE_POINTS
             );
         }
-        let stroke = json!({
+        let mut stroke = json!({
             "brush": if l.eraser { Brush::Eraser.label() } else { b.brush.label() },
             "color": b.color,
             "size": b.size,
             "points": l.stroke.points,
         });
+        if let (Some(r), Some(o)) = (b.stroke_response(), stroke.as_object_mut()) {
+            o.insert("response".into(), serde_json::to_value(r).unwrap_or(Value::Null));
+        }
         let params = json!({"clip": l.clip, "cel": b.cel_mode.param(), "stroke": stroke});
         let shown = live_stroke(&b, &l);
         run(app, "drawing.addStroke", params);

@@ -67,6 +67,108 @@ impl Brush {
     }
 }
 
+/// The most control points a response curve may have.
+pub const MAX_CURVE_POINTS: usize = 8;
+
+/// A pressure response curve (#56): pressure (x, 0..1) to the pressure the brush then uses (y,
+/// 0..1), straight lines between control points. The first point is at x = 0 and the last at
+/// x = 1, x strictly increases, and there are 2..=[`MAX_CURVE_POINTS`] of them, so a curve is
+/// total and cheap to evaluate. `[[0,0],[1,1]]` is the identity.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Curve(pub Vec<[f32; 2]>);
+
+/// The named response presets: `linear` (the identity), `soft` (a light touch already leaves a
+/// good line), `firm` (needs a harder press) and `scurve` (soft at both ends).
+pub const CURVE_PRESETS: [&str; 4] = ["linear", "soft", "firm", "scurve"];
+
+impl Curve {
+    pub fn linear() -> Curve {
+        Curve(vec![[0.0, 0.0], [1.0, 1.0]])
+    }
+
+    pub fn preset(name: &str) -> Option<Curve> {
+        let pts: &[[f32; 2]] = match name.trim().to_ascii_lowercase().as_str() {
+            "linear" => return Some(Curve::linear()),
+            "soft" => &[[0.0, 0.0], [0.25, 0.5], [0.6, 0.85], [1.0, 1.0]],
+            "firm" => &[[0.0, 0.0], [0.5, 0.25], [0.8, 0.6], [1.0, 1.0]],
+            "scurve" => &[[0.0, 0.0], [0.25, 0.1], [0.5, 0.5], [0.75, 0.9], [1.0, 1.0]],
+            _ => return None,
+        };
+        Some(Curve(pts.to_vec()))
+    }
+
+    /// The reason this is not a usable curve, if it is not one.
+    pub fn validate(&self) -> Result<(), String> {
+        let n = self.0.len();
+        if !(2..=MAX_CURVE_POINTS).contains(&n) {
+            return Err(format!("a pressure curve has 2 to {MAX_CURVE_POINTS} points, not {n}"));
+        }
+        if self.0.iter().any(|p| !p[0].is_finite() || !p[1].is_finite() || !(0.0..=1.0).contains(&p[0]) || !(0.0..=1.0).contains(&p[1])) {
+            return Err("every curve point is a pair of numbers from 0 to 1".into());
+        }
+        if self.0.first().map(|p| p[0]) != Some(0.0) || self.0.last().map(|p| p[0]) != Some(1.0) {
+            return Err("a pressure curve starts at pressure 0 and ends at pressure 1".into());
+        }
+        if self.0.windows(2).any(|w| w[1][0] <= w[0][0]) {
+            return Err("curve points must be in increasing pressure order".into());
+        }
+        Ok(())
+    }
+
+    /// Whether this is the identity (a straight line from the corner to the corner).
+    pub fn is_identity(&self) -> bool {
+        self.0.as_slice() == [[0.0, 0.0], [1.0, 1.0]] || (self.validate().is_ok() && self.0.iter().all(|p| p[0] == p[1]))
+    }
+
+    /// The curve's value at `pressure`. Total: a pressure outside 0..1 or not finite is brought
+    /// into range (a mouse's 1), and a curve that fails [`Curve::validate`] is the identity.
+    pub fn at(&self, pressure: f32) -> f32 {
+        let x = if pressure.is_finite() { pressure.clamp(0.0, 1.0) } else { 1.0 };
+        if self.validate().is_err() {
+            return x;
+        }
+        for w in self.0.windows(2) {
+            if x <= w[1][0] {
+                let span = w[1][0] - w[0][0];
+                let t = if span > 0.0 { (x - w[0][0]) / span } else { 1.0 };
+                return (w[0][1] + (w[1][1] - w[0][1]) * t).clamp(0.0, 1.0);
+            }
+        }
+        self.0.last().map_or(x, |p| p[1])
+    }
+}
+
+/// How a stroke's pressure becomes width and opacity, stored with the stroke so it looks the same
+/// whatever the preferences are when the project is reopened (#56). A missing curve is the brush's
+/// own response; a stroke with no `response` is exactly what earlier builds drew.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PressureResponse {
+    /// Applied to the pressure that sets the width.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<Curve>,
+    /// Applied to the pressure that sets the opacity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<Curve>,
+}
+
+impl PressureResponse {
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, c) in [("width", &self.width), ("opacity", &self.opacity)] {
+            if let Some(c) = c {
+                c.validate().map_err(|e| format!("`{name}`: {e}"))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether both curves are the brush's own response.
+    pub fn is_default(&self) -> bool {
+        self.width.as_ref().is_none_or(Curve::is_identity) && self.opacity.as_ref().is_none_or(Curve::is_identity)
+    }
+}
+
 /// One pointer sample, in drawing canvas pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StrokePoint {
@@ -90,6 +192,10 @@ pub struct Stroke {
     /// Diameter at full pressure, canvas pixels.
     pub size: f32,
     pub points: Vec<StrokePoint>,
+    /// How pressure becomes width and opacity; absent for the brush's own response (and written
+    /// only when set, so a stroke without one is stored as it always was).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response: Option<PressureResponse>,
 }
 
 impl Stroke {
@@ -113,7 +219,25 @@ impl Stroke {
         for p in &mut self.points {
             p.p = if p.p.is_finite() { p.p.clamp(0.0, 1.0) } else { 1.0 };
         }
+        if let Some(r) = &self.response {
+            r.validate()?;
+            // the brush's own response is stored as none
+            if r.is_default() {
+                self.response = None;
+            }
+        }
         Ok(self)
+    }
+
+    /// The radius and opacity factors (0..1) at a pressure sample: the brush's response applied to
+    /// the pressure after this stroke's own curves, if it has any.
+    pub fn response_at(&self, pressure: f32) -> (f32, f32) {
+        let through = |c: Option<&Curve>| c.map_or(pressure, |c| c.at(pressure));
+        let (width_p, opacity_p) = match &self.response {
+            Some(r) => (through(r.width.as_ref()), through(r.opacity.as_ref())),
+            None => (pressure, pressure),
+        };
+        (self.brush.response(width_p).0, self.brush.response(opacity_p).1)
     }
 
     /// Bounding box `(min_x, min_y, max_x, max_y)` including the brush radius.
@@ -368,7 +492,16 @@ impl Drawing {
         for c in &mut self.cels {
             let strokes = c.strokes_mut();
             strokes.truncate(MAX_CEL_STROKES);
-            *strokes = std::mem::take(strokes).into_iter().filter_map(|s| s.sanitized().ok()).collect();
+            *strokes = std::mem::take(strokes)
+                .into_iter()
+                .filter_map(|mut s| {
+                    // a damaged curve costs the stroke its response, not the stroke
+                    if s.response.as_ref().is_some_and(|r| r.validate().is_err()) {
+                        s.response = None;
+                    }
+                    s.sanitized().ok()
+                })
+                .collect();
         }
     }
 }
@@ -393,7 +526,13 @@ pub fn tween(a: &Cel, b: &Cel, t: f32) -> Vec<Stroke> {
                 for (c, d) in color.iter_mut().zip(sb.color) {
                     *c = lerp(*c, d);
                 }
-                out.push(Stroke { brush: if t < 0.5 { sa.brush } else { sb.brush }, color, size: lerp(sa.size, sb.size), points });
+                out.push(Stroke {
+                    brush: if t < 0.5 { sa.brush } else { sb.brush },
+                    color,
+                    size: lerp(sa.size, sb.size),
+                    points,
+                    response: if t < 0.5 { sa.response.clone() } else { sb.response.clone() },
+                });
             }
             (Some(s), None) if t < 0.5 => out.push(s.clone()),
             (None, Some(s)) if t >= 0.5 => out.push(s.clone()),
@@ -443,7 +582,7 @@ mod tests {
 
     fn line(x0: f32, x1: f32, n: usize) -> Stroke {
         let points = (0..n).map(|i| StrokePoint { x: x0 + (x1 - x0) * i as f32 / (n - 1).max(1) as f32, y: 10.0, p: 1.0 }).collect();
-        Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points }
+        Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points, response: None }
     }
 
     fn cel_of(d: &mut Drawing, frame: i64, strokes: &[Stroke]) {
@@ -680,5 +819,129 @@ mod tests {
         assert!(tween(&Cel::default(), &Cel::default(), f32::NAN).is_empty());
         let dot = Cel { frame: 0, strokes: vec![line(5.0, 5.0, 1)].into() };
         assert_eq!(tween(&dot, &b, 0.25).len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod response_tests {
+    use super::*;
+
+    fn pen(points: &[(f32, f32, f32)]) -> Stroke {
+        Stroke {
+            brush: Brush::Pencil,
+            color: [0.0, 0.0, 0.0, 1.0],
+            size: 10.0,
+            points: points.iter().map(|&(x, y, p)| StrokePoint { x, y, p }).collect(),
+            response: None,
+        }
+    }
+
+    #[test]
+    fn curves_hit_their_endpoints_interpolate_and_are_total() {
+        for name in CURVE_PRESETS {
+            let c = Curve::preset(name).unwrap();
+            assert!(c.validate().is_ok(), "{name}");
+            assert_eq!((c.at(0.0), c.at(1.0)), (0.0, 1.0), "{name} keeps both endpoints");
+        }
+        let soft = Curve::preset("soft").unwrap();
+        // straight lines between control points
+        assert!((soft.at(0.125) - 0.25).abs() < 1e-6 && (soft.at(0.25) - 0.5).abs() < 1e-6);
+        assert!(soft.at(0.1) > 0.1 && Curve::preset("firm").unwrap().at(0.1) < 0.1, "soft lifts a light touch, firm needs a harder press");
+        // pressures outside 0..1, NaN and infinity are brought into range; a mouse's 1 is the end
+        assert_eq!((soft.at(-3.0), soft.at(7.0), soft.at(f32::NAN), soft.at(f32::INFINITY)), (0.0, 1.0, 1.0, 1.0));
+        // a curve that fails validation is the identity rather than a panic
+        let bad = Curve(vec![[0.5, 0.5], [0.2, 0.9]]);
+        assert!(bad.validate().is_err());
+        assert_eq!((bad.at(0.3), Curve(vec![]).at(0.3), Curve(vec![[f32::NAN, 0.0]; 3]).at(0.3)), (0.3, 0.3, 0.3));
+        assert!(Curve::linear().is_identity() && Curve(vec![[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]]).is_identity());
+        assert!(!soft.is_identity());
+        assert!(Curve::preset("Soft ").is_some() && Curve::preset("nope").is_none());
+    }
+
+    #[test]
+    fn malformed_curves_are_refused_with_a_reason() {
+        let ok = |pts: &[[f32; 2]]| Curve(pts.to_vec()).validate();
+        assert!(ok(&[[0.0, 0.2], [1.0, 0.9]]).is_ok());
+        for (pts, why) in [
+            (vec![[0.0, 0.0]], "points"),
+            (vec![[0.0, 0.0]; 9], "points"),
+            (vec![[0.0, 0.0], [0.5, 2.0], [1.0, 1.0]], "0 to 1"),
+            (vec![[0.0, 0.0], [0.5, f32::NAN], [1.0, 1.0]], "0 to 1"),
+            (vec![[0.0, 0.0], [f32::INFINITY, 0.5], [1.0, 1.0]], "0 to 1"),
+            (vec![[0.1, 0.0], [1.0, 1.0]], "starts at pressure 0"),
+            (vec![[0.0, 0.0], [0.9, 1.0]], "ends at pressure 1"),
+            (vec![[0.0, 0.0], [0.5, 0.5], [0.5, 0.6], [1.0, 1.0]], "increasing"),
+            (vec![[0.0, 0.0], [0.7, 0.5], [0.4, 0.6], [1.0, 1.0]], "increasing"),
+        ] {
+            let e = ok(&pts).unwrap_err();
+            assert!(e.contains(why), "{pts:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn without_a_response_a_stroke_is_drawn_exactly_as_before() {
+        let s = pen(&[(0.0, 0.0, 0.0), (5.0, 0.0, 0.3), (10.0, 0.0, 1.0)]);
+        for p in [0.0, 0.1, 0.5, 1.0, f32::NAN] {
+            assert_eq!(s.response_at(p), s.brush.response(p), "{p}");
+        }
+        // the identity, however it is written, is stored as nothing and changes nothing
+        let mut id = s.clone();
+        id.response = Some(PressureResponse { width: Some(Curve::linear()), opacity: Some(Curve(vec![[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]])) });
+        assert_eq!(id.sanitized().unwrap().response, None);
+    }
+
+    #[test]
+    fn width_and_opacity_follow_their_own_curves() {
+        let mut s = pen(&[(0.0, 0.0, 0.5), (9.0, 0.0, 0.5)]);
+        s.response = Some(PressureResponse { width: Some(Curve::preset("soft").unwrap()), opacity: None });
+        let (w, a) = s.response_at(0.25);
+        // the width saw pressure 0.5, the opacity the pen's 0.25
+        assert_eq!(w, Brush::Pencil.response(0.5).0);
+        assert_eq!(a, Brush::Pencil.response(0.25).1);
+        s.response = Some(PressureResponse { width: None, opacity: Some(Curve::preset("firm").unwrap()) });
+        let (w, a) = s.response_at(0.5);
+        assert_eq!(w, Brush::Pencil.response(0.5).0);
+        assert_eq!(a, Brush::Pencil.response(0.25).1);
+        // a mouse's full pressure reaches the end of any curve
+        assert_eq!(s.response_at(1.0), Brush::Pencil.response(1.0));
+    }
+
+    #[test]
+    fn the_response_is_stored_only_when_set_and_survives_a_round_trip() {
+        let plain = serde_json::to_string(&pen(&[(0.0, 0.0, 1.0)])).unwrap();
+        assert!(!plain.contains("response"), "{plain}");
+        let mut s = pen(&[(0.0, 0.0, 0.2), (4.0, 0.0, 0.9)]);
+        s.response = Some(PressureResponse { width: Curve::preset("scurve"), opacity: Curve::preset("firm") });
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains("\"response\""));
+        let back: Stroke = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+        // and what was saved before the field existed still loads, drawn the same
+        let old: Stroke = serde_json::from_str(&plain).unwrap();
+        assert_eq!(old.response, None);
+        // an unknown key in a response is refused
+        assert!(serde_json::from_str::<Stroke>(r#"{"color":[0,0,0,1],"size":3,"points":[],"response":{"width":[[0,0],[1,1]],"hue":1}}"#).is_err());
+    }
+
+    #[test]
+    fn a_damaged_curve_in_a_loaded_project_costs_the_response_not_the_stroke() {
+        let mut d = Drawing::new(64, 32, waltcut_time::FrameRate::FPS_24);
+        d.ensure_cel(0, false).unwrap();
+        let mut bad = pen(&[(1.0, 1.0, 0.5), (4.0, 4.0, 0.7)]);
+        bad.response = Some(PressureResponse { width: Some(Curve(vec![[0.0, 0.0], [0.5, f32::NAN], [1.0, 1.0]])), opacity: None });
+        let mut good = pen(&[(2.0, 2.0, 0.5)]);
+        good.response = Some(PressureResponse { width: Curve::preset("soft"), opacity: None });
+        if let Some(c) = d.cels.first_mut() {
+            c.strokes_mut().extend([bad, good.clone()]);
+        }
+        d.sanitize();
+        let strokes = &d.cels[0].strokes;
+        assert_eq!(strokes.len(), 2);
+        assert_eq!(strokes[0].response, None);
+        assert_eq!(strokes[1].response, good.response);
+        // a command's stroke with a damaged curve is refused instead
+        let mut cmd = pen(&[(1.0, 1.0, 0.5)]);
+        cmd.response = Some(PressureResponse { width: Some(Curve(vec![[0.0, 0.0]])), opacity: None });
+        assert!(cmd.sanitized().unwrap_err().contains("`width`"));
     }
 }
