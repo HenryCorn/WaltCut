@@ -13,6 +13,7 @@ pub mod audio;
 pub mod blend;
 pub mod colorman;
 pub mod drawing;
+pub mod drawing_cache;
 pub mod drawing_fill;
 pub mod flow;
 pub mod graphic_clip;
@@ -327,10 +328,11 @@ pub(crate) fn item_layer_ex(
     if let ItemKind::Drawing(d) = &pi.kind {
         // strokes straight to the output, like graphics
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
-        let mut canvas = Image::new(w, h);
-        if let Some(cel) = d.cel_at(d.frame_at(item.source_time_at(t))) {
-            drawing::render_strokes(&cel.strokes, &m, &mut canvas);
-        }
+        // a held or unchanged cel is not rasterised again (#71): the cache returns the same pixels
+        let canvas = match d.cel_at(d.frame_at(item.source_time_at(t))) {
+            Some(cel) => drawing_cache::rasterise_cel(&cel.strokes, &m, w, h),
+            None => Image::new(w, h),
+        };
         let (op, bl) = opacity_blend(item, mt);
         return Some(Layer::Full { image: canvas, opacity: op, blend: bl, opaque: false });
     }
@@ -454,11 +456,10 @@ pub(crate) fn base_layer(
         }
         ItemKind::Drawing(d) => {
             let (gw, gh) = (((src_size.0 as f32 * want).ceil() as usize).max(1), ((src_size.1 as f32 * want).ceil() as usize).max(1));
-            let mut img = Image::new(gw, gh);
-            if let Some(cel) = d.cel_at(d.frame_at(ft)) {
-                drawing::render_strokes(&cel.strokes, &Affine::scale(want as f64, want as f64), &mut img);
+            match d.cel_at(d.frame_at(ft)) {
+                Some(cel) => drawing_cache::rasterise_cel(&cel.strokes, &Affine::scale(want as f64, want as f64), gw, gh),
+                None => Image::new(gw, gh),
             }
-            img
         }
     })
 }

@@ -166,6 +166,70 @@ Focused proposal, in order of benefit per effort (each needs its own issue; 1 is
 4. Bound the frame-plan cache by the size of its layers, not 1 GiB of 15 MB plans, if lower
    memory matters.
 
+## Cel raster cache, off → on (#71)
+
+Same build, same machine, same workloads as the baseline above (Apple M4 Pro, 12 cores, 24 GB,
+macOS 15 / Darwin 24.6, release build of `origin/main` plus #71), cache switched off with
+`--no-cel-cache` (rasterise every frame, as before) and on, runs alternating off, on, off, on…
+(three pairs for *small* and *medium*, two for *stress*; median, individual runs in brackets).
+**The machine was shared and its load average swung between 6 and 40 from one pair to the next**
+(the `load` column of the JSON), which is why the runs of one mode differ by 2× among themselves; the
+off and on runs of a pair were made minutes apart under similar load. Read the ratios inside a
+pair, not the absolute milliseconds. Nothing here was measured on a pen tablet.
+
+```sh
+# the build the numbers come from
+cargo build --release -p waltcut-ui-egui --example bench
+B=target/release/examples/bench
+$B --section drawing --only medium --no-cel-cache --json off.json    # cache off
+$B --section drawing --only medium --json on.json                    # cache on
+```
+
+The pen-up row differs from the baseline table on purpose: the picture of the cel under the pen is on
+screen before the stroke (the bench now waits for it, untimed), as it is in the app. With the
+old methodology (first stroke on a cel nobody had shown) the cache cannot help: the first stroke is a
+whole rasterisation either way.
+
+| measurement (median of pairs) | small off → on | medium off → on | stress off → on |
+|---|---|---|---|
+| Pen-up until the exact frame is ready, p50 (ms) | 27 → 24 | 81 → 15 | 843 → 37 |
+| … p95 (ms) | 64 → 58 | 113 → 71 | 906 → 46 |
+| Random seek until the exact frame is shown, p50 (ms) | 145 → 167 | 206 → 107 | 919 → 134 |
+| … p95 (ms) | 265 → 281 | 322 → 208 | 1201 → 1066 |
+| Playhead drag stops until the frame is shown, p50 (ms) | 65 → 73 | 99 → 46 | 1486 → 659 |
+| Playback at full resolution: frames dropped (%) | 10.4 → 8.3 | 46 → 1.0 | 99 → 67 |
+| … frame job service time, p50 (ms) | 41 → 45 | 92 → 6.4 | 1059 → 28 |
+| … p95 (ms) | 168 → 162 | 181 → 59 | 1258 → 1111 |
+| CPU seconds used while playing | 11.4 → 10.9 | 24.8 → 15.4 | 41.6 → 31.6 |
+| CPU seconds used while scrubbing | 6.9 → 6.7 | 14.0 → 9.1 | 59.1 → 31.7 |
+| Peak RSS after playback (MB) | 3710 → 3724 | 3744 → 4489 | 2884 → 4208 |
+| Peak RSS after scrubbing (MB) | 2569 → 2788 | 2678 → 3164 | 2651 → 3028 |
+
+What this shows, and what it does not:
+
+* *Small* is **not helped and not hurt**: its cels (about 800 samples) are under `MIN_CACHED_WEIGHT`
+  and never looked up (`bypassed` counts every frame); the differences in the table are the noise of
+  the shared machine (the two modes run the same code).
+* *Medium* and *stress* gain where the same cel is shown again: held frames, a loop, a scrub back to
+  a cel, the exact frame after pen-up (the new stroke is painted on the cached raster of the cel,
+  not the cel redrawn: one stroke instead of 150 or 1 500). Cold cels cost what they always did,
+  which is why the **p95 of seeks and of playback jobs barely moves for *stress*** (a random seek to
+  a cel not yet shown is a whole rasterisation, 650 to 1 100 ms) and why *stress* still drops 67 %
+  of its frames: 96 cels at full resolution do not fit the 256 MiB budget (about 9 cels do), so a
+  loop over all of them evicts what it is about to need. This is a bound that was chosen, not
+  an oversight: a larger budget would be a decision about the app's memory, not a free win.
+* **It costs memory.** The cache itself is capped at 256 MiB (it held 241 MB at the end of both big
+  workloads) but the peak RSS of the playback and scrub phases rose by 0.4 to 1.3 GB in *medium* and
+  *stress*: the cache plus the 33 MB working images each hit expands, and a frame pipeline that now
+  runs faster keeps more frame plans alive before the 1 GiB plan cache evicts. I did not separate
+  the two; the number is the peak, not the steady state.
+* `perf.stats` ▸ `drawingCache` reports `hits`, `extended` (pen-up), `misses`, `bypassed`, `evicted`,
+  `entries` and `MB` against `budgetMB`. After the *medium* run: 381 hits, 20 extensions, 254
+  misses, 132 evictions.
+* Not measured: onion-skin UI cost (it does not use this cache, and is unchanged: 0.9 ms live frame
+  in every run), the native app's playback with audio (see the app check in the PR), a pen tablet, and
+  any machine other than this one.
+
 ## Memory of clips on a timeline (MEM1–MEM3)
 
 Measured on the desktop release build with `footprint`, `heap` and `malloc_history`

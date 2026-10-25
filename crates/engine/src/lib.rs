@@ -1071,6 +1071,8 @@ mod clip_ops_tests;
 #[cfg(test)]
 mod color_tests;
 #[cfg(test)]
+mod drawing_cache_tests;
+#[cfg(test)]
 mod drawing_fill_tests;
 #[cfg(test)]
 mod drawing_tests;

@@ -507,6 +507,64 @@ queue still sends its own pressures; that switch has only ever governed the poin
 The setting is saved with the interface state and adds no undo step. Hardware tuning on a real
 pen is the maintainer's check (#5): the tests drive synthetic pen samples.
 
+## Cel raster cache (#71)
+
+### Decision: what is cached, and what invalidates it
+
+Playback, scrubbing, the exact frame after pen-up and export all rasterise a cel with the same
+CPU code (`waltcut_render::drawing::render_strokes`), once per frame job. That is the cost the
+baseline (#70, `docs/performance.md`) attributes almost all of a drawing frame's time to, and a
+cel held for several frames is rasterised again for each. Decision: **cache the rasterised cel,
+and nothing else**, in `crates/render/src/drawing_cache.rs`.
+
+* **What.** The premultiplied linear RGBA float raster of one cel's strokes (fills and erasers
+  included: they are strokes in paint order) at one canvas size and placement. Stored cropped to
+  the rectangle where any pixel is not exactly zero, so a sparse cel costs little. Opacity,
+  blend mode, Motion keyframes' effect on opacity, the reference video and onion skins are
+  applied *after* the raster and are never part of it.
+* **Key.** (identity of the cel's `Arc<Vec<Stroke>>`, output width, output height, the six
+  numbers of the canvas-to-output matrix as bits). The raster is a pure function of exactly the
+  strokes and that matrix, so:
+  * **strokes, erasers, fills, undo/redo, retime, transform-strokes:** every edit goes through
+    `Arc::make_mut`, which gives the edited cel a new allocation (the entry holds a `Weak`, so an
+    allocation is never edited in place or reused while its entry exists). An edited cel is
+    therefore a new key, and an old key is only reached again by undo/redo, when its pixels are
+    right again. Identity is the allocation, not a hash, so there is no collision to be unlucky
+    with;
+  * **reference fills (#69):** a reference only feeds the *search* for the region when the fill is
+    made; what is painted is the stored mask, so the raster does not depend on the reference clip
+    and moving or deleting it changes nothing here;
+  * **canvas size, rendering scale, clip Motion (position, scale, rotation, anchor):** in the
+    matrix and the size. A Motion animation therefore rasterises at each distinct placement, as
+    before, and only an unchanged placement reuses;
+  * **onion skins, light table, guide visibility, pose pins, ghost tint:** not an input of the
+    raster at all. The editor draws those from its own screen-space textures; toggling them
+    cannot invalidate a cel raster.
+* **Pen-up extension.** A new stroke makes a new allocation, so identity alone would miss on
+  every stroke. When a cel's list is a bit-identical prefix of the new list (same placement), the
+  cached raster of the prefix is copied and only the new strokes are painted on it. The
+  rasteriser is a fold over the strokes in order on one image, so this is the same arithmetic in
+  the same order: the result is bit-identical, not approximately equal. If the prefix is gone
+  (history trimmed), the cel is rasterised whole.
+* **Worth it only where measured.** A cel under `MIN_CACHED_WEIGHT` samples rasterises in about
+  as long as a copy would take, so it is rasterised every time and never stored.
+* **Bounds.** Hard budget 256 MiB of rasters (`Settings`-free constant, `BUDGET_BYTES`) and at
+  most 128 entries; least recently used entries go first; a raster over half the budget is not
+  stored; sizes are checked arithmetic and an absurd canvas is rendered, not cached. Entries
+  whose cel no longer exists are dropped on every insert. Clearing (`clear()`, also what tests
+  use) and eviction touch nothing but these copies: the strokes, the project, the source media
+  and the undo history are never read for ownership. A cache hit returns exactly the pixels a
+  fresh rasterisation would.
+* **Threads.** One process-wide cache behind a `Mutex` (poison-tolerant). The lock is never held
+  while rasterising: two workers that miss on the same cel both rasterise it and the second
+  insert replaces the first with identical pixels. A worker whose job is cancelled simply does not
+  insert. `perf.stats` reports `drawingCache` (hits, extended, misses, entries, MB, budget MB,
+  evictions) beside the frame cache's numbers.
+* **Measured.** Same-machine off/on numbers, costs (memory) and limits (cold cels, a stress shot
+  larger than the budget) are in [performance.md](performance.md#cel-raster-cache-off--on-71).
+* **Not done here.** Dirty rectangles, tiles and a GPU raster cache stay out: no measurement
+  asked for them, and the copy-on-write cels already give the prefix property that matters.
+
 ## AI Restyle
 
 Open **Graphics and Titles ▸ AI Restyle…** to restyle the frame at the playhead, every Nth frame of

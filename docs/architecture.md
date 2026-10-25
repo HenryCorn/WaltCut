@@ -302,6 +302,14 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   leaves none behind (parts of a batch, such as render-preview segments, keep them for the next part). A clip
   with effects, frame blending, colour management, or a picture that is not placed
   one to one on the output takes the general path.
+- **Cel raster cache (#71).** `waltcut_render::drawing_cache` (L3, no new dependency) holds the
+  rasterised cels of Drawing clips: one process-wide, byte-bounded (256 MiB, 128 entries, LRU),
+  `Mutex`-guarded table that `item_layer_ex` and `base_layer` read through. It owns copies only: the
+  project, the undo history and the media are never touched by an eviction or a clear. It keys on
+  the allocation of a cel's `Arc<Vec<Stroke>>` (copy-on-write, so an edit is a new key) plus output
+  size and placement, extends the cached raster of a cel when strokes are appended, and never
+  changes a pixel. The decision and its invalidation table are in
+  [animation.md](animation.md#cel-raster-cache-71).
 - **Frame scheduling.** `crates/ui-egui/src/frames.rs` runs a small pool of worker threads with
   prioritised jobs: the frame on screen first, then playback prefetch, then thumbnails. The UI never
   decodes. It shows the exact frame when it is ready and holds the nearest cached frame meanwhile.

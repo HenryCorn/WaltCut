@@ -59,12 +59,31 @@ pub fn export_json() -> Value {
     json!({"stages": stages})
 }
 
+/// The cel raster cache (#71): lookups answered from it (`hits`), cels extended from a cached
+/// earlier version (`extended`, a stroke added), cels rasterised whole (`misses`) or not looked up
+/// (`bypassed`: too small to be worth it, or too large to keep), entries evicted, and what it
+/// holds against its budget. Cumulative counters: diff two readings.
+pub fn drawing_cache_json() -> Value {
+    let c = waltcut_render::drawing_cache::global().stats();
+    json!({
+        "hits": c.hits,
+        "extended": c.extended,
+        "misses": c.misses,
+        "bypassed": c.bypassed,
+        "evicted": c.evicted,
+        "entries": c.entries,
+        "MB": c.bytes as f64 / 1e6,
+        "budgetMB": c.budget as f64 / 1e6,
+    })
+}
+
 /// The engine's `perf.stats`.
 pub fn stats(s: &Session) -> Value {
     let running = s.jobs.iter().filter(|j| j.result.lock().map(|r| r.is_none()).unwrap_or(false)).count();
     json!({
         "decode": decode_json(),
         "export": export_json(),
+        "drawingCache": drawing_cache_json(),
         "media": {"openSources": s.media.open_sources()},
         "jobs": {"total": s.jobs.len(), "running": running},
     })
@@ -109,6 +128,9 @@ mod tests {
         assert!(v["decode"]["hardware"]["backend"].is_null() || v["decode"]["hardware"]["backend"].is_string());
         for k in ["setupMs", "renderMs", "encodeMs", "convertMs", "audioMs", "muxMs", "finishMs", "waitMs"] {
             assert!(v["export"]["stages"][k].is_number(), "export.stages.{k} in {v}");
+        }
+        for k in ["hits", "extended", "misses", "bypassed", "evicted", "entries", "MB", "budgetMB"] {
+            assert!(v["drawingCache"][k].is_number(), "drawingCache.{k} in {v}");
         }
         assert!(v["media"]["openSources"].is_number());
         assert_eq!(v["jobs"]["running"], json!(0));

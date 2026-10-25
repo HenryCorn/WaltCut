@@ -54,7 +54,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "bench [--sections {}] [--repeat N] [--quick] [--cpu] [--only SUBSTRING] [--hw auto|off] [--label NAME] [--out DIR]\n       bench --section NAME [--json FILE]   (one section in this process)",
+            "bench [--sections {}] [--repeat N] [--quick] [--cpu] [--only SUBSTRING] [--hw auto|off] [--no-cel-cache] [--label NAME] [--out DIR]\n       bench --section NAME [--json FILE]   (one section in this process)",
             SECTIONS.join(",")
         );
         return;
@@ -69,6 +69,10 @@ fn main() {
     // as the desktop app: OS hardware decoders in front of ours, unless Hardware decoding is Off
     waltcut_platform::register();
     waltcut_codecs::hw::set_hardware_decoding(opts.hw != "off");
+    // `--no-cel-cache`: the same build without the cel raster cache (#71), for A/B runs
+    if args.iter().any(|a| a == "--no-cel-cache") {
+        waltcut_render::drawing_cache::global().set_enabled(false);
+    }
     if let Some(section) = arg_value(&args, "--section") {
         let v = run_section(&section, &opts);
         let text = serde_json::to_string_pretty(&v).unwrap_or_default();
