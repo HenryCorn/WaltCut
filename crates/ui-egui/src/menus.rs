@@ -50,6 +50,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.canvasMirror", "Mirror Canvas", ["View", "Drawing View"], Some("Alt+M")),
     uic!("view.canvasPan", "Pan While Held", ["View", "Drawing View"], Some("Alt+H")),
     uic!("view.canvasReset", "Reset Canvas View", ["View", "Drawing View"], Some("Alt+0")),
+    uic!("reference.pasteImage", "Paste Reference Image", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnOnes", "Retime Cels on Ones", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnTwos", "Retime Cels on Twos", ["Graphics and Titles", "Drawing"], None),
     uic!("drawing.retimeOnThrees", "Retime Cels on Threes", ["Graphics and Titles", "Drawing"], None),
@@ -237,6 +238,12 @@ pub fn invoke(app: &mut WaltCutApp, ctx: &egui::Context, id: &str, mut params: V
         let tool = Tool::from_name(t).ok_or_else(|| format!("unknown tool `{t}`"))?;
         app.ui.tool = tool;
         return Ok(json!({"tool": tool}));
+    }
+    if let Some(r) = crate::panels::reference::route(app, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
+        return r;
     }
     if let Some(r) = crate::panels::drawing_review::route(app, id, &params) {
         if let Err(e) = &r {
@@ -631,7 +638,7 @@ fn paste_clipboard_media(app: &mut WaltCutApp, insert: bool) -> Option<Result<Va
 }
 
 /// A compressed PNG of a clipboard image; an error when its size and pixels disagree.
-fn encode_png(width: usize, height: usize, rgba: Vec<u8>) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_png(width: usize, height: usize, rgba: Vec<u8>) -> Result<Vec<u8>, String> {
     let (w, h) = (u32::try_from(width).map_err(|e| e.to_string())?, u32::try_from(height).map_err(|e| e.to_string())?);
     let img = image::RgbaImage::from_raw(w, h, rgba).ok_or("the image on the clipboard is malformed")?;
     let mut png = Vec::new();

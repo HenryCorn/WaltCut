@@ -21,6 +21,7 @@ own preferences and recovery files.
 | Drawing | `drawing.new`, then Pen, Pencil, Marker and Eraser strokes | – (screenshots) |
 | Cels | new, duplicate and held cels, `drawing.tween`, retime frame 4 to 5, retime three cels on twos and undo, Next Cel and a pose review that restores the playhead, onion skin | cels at frames 0, 2, 5, 8; the twos run starts 0, 2, 4, 7; onion skin on |
 | Onion skin | two cels before and one after with fading opacity; a pinned pose and the loop start with nothing else | ghosts at frames 0, 2, 8; opacities 0.25 and 0.5; then exactly the loop and pin ghosts |
+| Reference image | place a picture under the drawing, adjust it, hide it, undo | one reference at 50 %; a Reference track is added; the exported still differs with it and equals the plain one when it is hidden; three undo steps remove it |
 | Guide clip | mark the drawing clip as a guide, export a frame with and without `includeGuides`, unmark | the default still is the same as the unguided one's; with `includeGuides` it differs |
 | Drawing view | rotate 90°, mirror, draw a stroke through the turned view, pan hold, reset | a stroke drawn through the turned view is added; the pan hold switches on; reset restores 0°, no mirror (where the stroke lands is covered by `canvas_view_ui.rs`) |
 | Preview | play, stop, three frame steps | the playhead moved three frames |
