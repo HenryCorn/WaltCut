@@ -191,6 +191,8 @@ pub fn drawing(o: &Opts) -> Vec<Value> {
                 merge(&mut row, crate::drawing_ui::ui(&s, wl, o));
                 row["rss_after_ui_mb"] = json!(rss_mb());
             }
+            let c = waltcut_render::drawing_cache::global().stats();
+            row["cel_cache"] = json!({"hits": c.hits, "extended": c.extended, "misses": c.misses, "bypassed": c.bypassed, "evicted": c.evicted, "entries": c.entries, "mb": c.bytes as f64 / 1e6});
             row["load"] = json!(load_avg());
             rows.push(row);
         }
@@ -258,6 +260,22 @@ fn pen_up(s: &mut Session, seq: ItemId, clip: i64, wl: &Workload, o: &Opts) -> V
     let mut rng = Rng(77);
     let (mut commit, mut ready, mut undo) = (Vec::new(), Vec::new(), Vec::new());
     for _ in 0..trials {
+        // the picture the person is looking at: the cel under the pen is on screen before the stroke
+        // (not timed; the cel raster cache extends this picture's raster instead of redrawing the cel)
+        {
+            let target =
+                if display_gpu(&display) { waltcut_ui_egui::frames::Target::SequencePlan(seq) } else { waltcut_ui_egui::frames::Target::Sequence(seq) };
+            let key = waltcut_ui_egui::frames::FrameKey { target, frame, size: 1000, revision: s.revision, draft: false };
+            let project = s.project.clone();
+            let t0 = Instant::now();
+            loop {
+                bench.server.request(key, rate.tick_of(frame), 1.0, &project, 0);
+                if display_exact(&mut display, &bench.server, key) || t0.elapsed() > Duration::from_secs(10) {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
         let st = gen_stroke(&mut rng, 1920.0, 1080.0, 150, 1);
         let pts: Vec<[f32; 3]> = st.points.iter().map(|p| [p.x, p.y, p.p]).collect();
         let params = json!({"clip": clip, "cel": "hold", "stroke": {"brush": "Pen", "color": [0.1, 0.1, 0.1, 1.0], "size": st.size, "points": pts}});
