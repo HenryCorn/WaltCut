@@ -162,3 +162,14 @@ fn setup_validates_and_status_never_shows_the_key() {
     let e = s.execute("ai.restyle", json!({"prompt": "x"})).unwrap_err().to_string();
     assert!(e.contains("not available yet"), "{e}");
 }
+
+/// Regression (#105): sessions without a project all wrote their frames to
+/// `restyle-<seconds>-<job>`, so two re-styles in the same second (parallel tests, two windows)
+/// overwrote each other's `frame_00001.png` and one of them lost its track.
+#[test]
+fn two_restyles_in_the_same_second_never_share_a_frame_folder() {
+    let (a, b) = (Session::default(), Session::default());
+    let dirs: Vec<_> = (0..4).flat_map(|_| [super::ai::output_dir(&a, 1), super::ai::output_dir(&b, 1)]).collect();
+    let unique: std::collections::HashSet<_> = dirs.iter().collect();
+    assert_eq!(unique.len(), dirs.len(), "{dirs:?}");
+}

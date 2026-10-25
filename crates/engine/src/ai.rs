@@ -172,7 +172,7 @@ fn frame_times(s: &Session, cmd: &str, p: &Value) -> Result<(Vec<Tick>, Tick)> {
 }
 
 /// Folder for a job's frames: next to the saved project, else in the data directory.
-fn output_dir(s: &Session, job: u64) -> PathBuf {
+pub(crate) fn output_dir(s: &Session, job: u64) -> PathBuf {
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let base = match (&s.path, &s.prefs_path) {
         (Some(p), _) => std::path::Path::new(p).with_extension("").with_file_name(format!(
@@ -182,7 +182,11 @@ fn output_dir(s: &Session, job: u64) -> PathBuf {
         (None, Some(pp)) => pp.parent().map(|d| d.join("AI Frames")).unwrap_or_else(|| std::env::temp_dir().join("WaltCut AI Frames")),
         (None, None) => std::env::temp_dir().join("WaltCut AI Frames"),
     };
-    base.join(format!("restyle-{stamp}-{job}"))
+    // `job` restarts at 1 in every session, so a per-process counter (and the process id) keeps
+    // two re-styles in the same second, in this or another instance, out of each other's folder.
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = NEXT.fetch_add(1, Ordering::Relaxed);
+    base.join(format!("restyle-{stamp}-{}-{seq}-{job}", std::process::id()))
 }
 
 fn restyle(s: &mut Session, p: &Value) -> Result<Value> {
