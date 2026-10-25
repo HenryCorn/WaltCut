@@ -50,7 +50,12 @@ jobs:
           shared-key: macos-verification
           cache-on-failure: true
       - name: Report cache restore
-        run: echo "Rust cache hit = $CACHE_HIT"
+        run: |
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "Rust cache: exact hit (dependencies restored, workspace crates still rebuild)"
+          else
+            echo "Rust cache: no exact match; a partial restore from the shared-key prefix is used if one exists (see the restore step above), otherwise this is a cold build"
+          fi
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
       - name: Install ffmpeg (test oracle)
@@ -84,7 +89,12 @@ jobs:
           shared-key: macos-verification
           cache-on-failure: true
       - name: Report cache restore
-        run: echo "Rust cache hit = $CACHE_HIT"
+        run: |
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "Rust cache: exact hit (dependencies restored, workspace crates still rebuild)"
+          else
+            echo "Rust cache: no exact match; a partial restore from the shared-key prefix is used if one exists (see the restore step above), otherwise this is a cold build"
+          fi
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
       - name: Install ffmpeg (test oracle)
