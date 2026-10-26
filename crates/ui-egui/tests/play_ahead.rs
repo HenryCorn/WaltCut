@@ -126,3 +126,35 @@ fn the_ring_keeps_no_more_than_the_lead() {
     let lead_blocks = (SR as f64 * LEAD_S / BLOCK_FRAMES as f64).ceil() as u64;
     assert!(calls.load(Ordering::Relaxed) <= lead_blocks + 1, "mixed {} blocks", calls.load(Ordering::Relaxed));
 }
+
+/// Regression (#163): a device callback that underruns while the mixer is between reading the
+/// silence it must skip and publishing its block used to leave that block late by the missing
+/// frames, so sound drifted behind the picture (`frame 2048` played frame 1025 on CI). Here the
+/// device callback runs as fast as it can against a mixer of about one period per block, which
+/// underruns constantly and hits that window within a few rounds; every audible frame must be the
+/// one due at that moment.
+#[test]
+fn an_underrun_while_a_block_is_published_never_leaves_it_late() {
+    let (mut drifted, mut underruns) = (0, 0);
+    for round in 0..40u64 {
+        let stats = Arc::new(AudioStats::default());
+        let delay = Duration::from_micros(300 + (round % 7) * 150);
+        let mut fill = spawn(frame_numbers(delay, Arc::default()), 1, SR, 2, stats.clone());
+        let mut buf = vec![0f32; PERIOD * 2];
+        for k in 0..3000usize {
+            fill(&mut buf, 2);
+            for (i, f) in buf.chunks(2).enumerate() {
+                let due = (1 + k * PERIOD + i) as f32;
+                if f[0] != 0.0 && f[0] != due {
+                    drifted += 1;
+                }
+            }
+            if k % 4 == 3 {
+                std::thread::sleep(Duration::from_micros(200));
+            }
+        }
+        underruns += stats.underruns.load(Ordering::Relaxed);
+    }
+    assert!(underruns > 0, "the test must underrun to mean anything");
+    assert_eq!(drifted, 0, "frames played away from the device frame they were mixed for");
+}
