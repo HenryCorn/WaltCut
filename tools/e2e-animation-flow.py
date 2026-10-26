@@ -7,7 +7,7 @@
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
 onion skin; linked exposures; lasso, reference and guide clips; the drawing view; stroke smoothing and the rope stabilizer; pressure
-curves; region fill, also from another clip with gap closing and edge growth; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
+curves; region fill, also from another clip with gap closing and edge growth; the light table's pose shift; the in-between assist (explicit stroke pairs, preview, cancel, accept); preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
 
@@ -455,6 +455,55 @@ for _ in range(undo_steps):
 check([c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]] == original, "undo restores every cel")
 refused = call("engine.execute", {"command": "drawing.linkCel", "params": {"clip": drawing, "from": 3, "frame": 30}}, quiet=True)
 check(not refused.get("ok") and "no cel starts" in refused.get("error", ""), "linking from a frame with no cel is refused")
+
+print("== in-between assist: pair strokes, preview, cancel, accept, undo")
+call("ui.set", {"tool": "Brush"}, quiet=True)
+original = [c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]]
+for frame, cx, _new in [(12, 110, True), (18, 190, True)]:
+    cmd("drawing.addStroke", {"clip": drawing, "frame": frame, "cel": "new", "stroke": {"brush": "Pen", "color": "#1d3557", "size": 6.0, "points": arc(cx, 90, 30)}})
+    cmd("drawing.addStroke", {"clip": drawing, "frame": frame, "stroke": {"brush": "Marker", "color": "#e63946", "size": 10.0, "points": [[cx - 40, 150, 0.8], [cx + 40, 150, 0.8]]}})
+undo_steps = 4
+def assist_cels():
+    return {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing, "strokes": True})["cels"]}
+before = assist_cels()
+mapping = {"clip": drawing, "from": 12, "to": 18, "pairs": [{"from": 0, "to": 0}, {"from": 1, "to": 1}], "step": 2}
+shown = cmd("drawing.inbetweenPreview", {**mapping, "geometry": True})
+check(shown["status"] == "ok" and shown["frames"] == [14, 16], f"the preview makes cels at {shown['frames']}")
+check(assist_cels() == before, "a preview changes no cel")
+unsupported = cmd("drawing.inbetweenPreview", {"clip": drawing, "from": 12, "to": 18, "pairs": [{"from": 0, "to": 9}]})
+check(unsupported["status"] == "unsupported" and unsupported["problems"][0]["kind"] == "outOfRange", "a stroke that is not there is reported, not guessed")
+cmd("drawing.inbetweenCancel", {})
+cmd("playhead.set", {"frame": 12})
+time.sleep(0.5)
+call("ui.click", {"id": "program.brush.inbetween.open"})
+time.sleep(0.5)
+call("ui.click", {"id": "program.brush.inbetween.inOrder"})
+time.sleep(0.3)
+call("ui.click", {"id": "program.brush.inbetween.preview"})
+time.sleep(0.8)
+call("ui.inspect")
+assist = call("ui.inspect")["result"]["ui"]["brush"]["inbetween"]
+check(assist["report"]["status"] == "ok" and assist["report"]["frames"] == [14, 16], f"the window previews {assist['report']['frames']}")
+check(assist_cels() == before, "the window's preview changes no cel")
+shot("08m-inbetween-assist-preview")
+call("ui.click", {"id": "program.brush.inbetween.cancel"})
+time.sleep(0.3)
+check(assist_cels() == before and call("ui.inspect")["result"]["ui"]["brush"]["inbetween"]["report"] is None, "cancel leaves nothing")
+call("ui.click", {"id": "program.brush.inbetween.preview"})
+time.sleep(0.5)
+call("ui.click", {"id": "program.brush.inbetween.accept"})
+time.sleep(0.5)
+call("ui.inspect")
+after = assist_cels()
+undo_steps += 1
+check(sorted(after) == sorted(list(before) + [14, 16]), f"accept made cels 14 and 16 ({sorted(after)})")
+check(after[12] == before[12] and after[18] == before[18], "the two chosen cels are untouched")
+check([after[14], after[16]] == [c["strokes"] for c in shown["cels"]], "the accepted cels are the previewed strokes")
+shot("08n-inbetween-assist-accepted")
+call("ui.click", {"id": "program.brush.inbetween.open"})
+for _ in range(undo_steps):
+    cmd("edit.undo", {})
+check([c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]] == original, "undo restores every cel")
 
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})

@@ -87,7 +87,7 @@ pub(crate) fn edit_drawing<R>(s: &mut Session, cmd: &str, label: &str, id: ItemI
 }
 
 /// Inclusive drawing-frame bounds visible through this clip's current source-time mapping.
-fn drawing_frame_bounds(s: &Session, cmd: &str, clip: ClipId, d: &Drawing) -> Result<(i64, i64)> {
+pub(crate) fn drawing_frame_bounds(s: &Session, cmd: &str, clip: ClipId, d: &Drawing) -> Result<(i64, i64)> {
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let (_, it) = seq.find_item(clip).ok_or_else(|| bad(cmd, "no such clip"))?;
     if it.duration <= Tick::ZERO {
@@ -481,7 +481,7 @@ fn delete_cel(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// The drawing's track must not be locked: linking changes what a locked exposure lane shows.
-fn unlocked_clip(s: &Session, cmd: &str, clip: ClipId) -> Result<()> {
+pub(crate) fn unlocked_clip(s: &Session, cmd: &str, clip: ClipId) -> Result<()> {
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let (track, _) = seq.find_item(clip).ok_or_else(|| bad(cmd, "no such clip"))?;
     if seq.track(track).is_none_or(|t| t.locked) {

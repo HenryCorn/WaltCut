@@ -22,6 +22,7 @@ pub mod frame_export;
 pub mod graphic_design;
 pub mod graphics;
 pub mod import_mode;
+pub mod inbetween;
 pub mod keyboard;
 pub mod light_table;
 pub mod media_dialogs;

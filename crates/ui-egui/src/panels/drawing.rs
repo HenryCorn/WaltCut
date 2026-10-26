@@ -465,6 +465,9 @@ pub struct BrushSettings {
     /// The temporary shift of the pinned pose (#64). Never saved or loaded back.
     #[serde(skip_deserializing)]
     pub light_table: super::light_table::LightTable,
+    /// The in-between assist's pairing table and last answer (#72). Never saved or loaded back.
+    #[serde(skip_deserializing)]
+    pub inbetween: super::inbetween::Assist,
     /// Stroke smoothing (#57): Off stores what the pen sent.
     pub smoothing: super::drawing_smooth::Smoothing,
     /// How a pen's pressure becomes width and opacity (#56); stored with each new stroke when it
@@ -508,6 +511,7 @@ impl Default for BrushSettings {
             fill_pending: None,
             selection: None,
             light_table: Default::default(),
+            inbetween: Default::default(),
             smoothing: Default::default(),
             response: Default::default(),
             tween_step: 2,
@@ -788,6 +792,7 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 if ui.button("In-between").on_hover_text(format!("Fill the frames up to the next cel with in-betweens on {step}s")).clicked() {
                     run(app, "drawing.tween", json!({"step": step}));
                 }
+                super::inbetween::controls(app, ui);
                 super::light_table::controls(app, ui);
                 super::reference::menu(app, ui);
                 super::fill::controls(app, ui);
@@ -872,6 +877,8 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         paint_ghosts(app, ui, &painter, clip.0, &d, f, &map.to_screen, pic);
     }
     super::light_table::paint_indicator(app, &painter, &map, &d, bar.left_bottom());
+    super::inbetween::paint_overlay(app, &painter, &map, bar.left_bottom() + vec2(0.0, 24.0));
+    super::inbetween::window(app, ui.ctx(), clip.0, &d, f);
     let id = egui::Id::new("brush-overlay");
     // while the pan is held the drag belongs to the pan, not to a stroke
     let resp = ui.interact(pic, id, if panning { Sense::hover() } else { Sense::click_and_drag() });
