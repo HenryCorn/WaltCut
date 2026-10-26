@@ -94,6 +94,15 @@ pub fn fixtures_dir() -> PathBuf {
     waltcut_testkit::fixtures_dir("hevc")
 }
 
+/// Where `f`'s stream and reference decode are cached: a folder keyed on everything that shapes
+/// them, so a changed fixture definition regenerates instead of reusing a stale file (#106).
+pub fn fixture_dir_for(f: &Fixture) -> PathBuf {
+    waltcut_testkit::fixtures::recipe_fixtures_dir(
+        "hevc",
+        &format!("{} {} {}x{} {} {} {} {:?}", f.name, f.source, f.width, f.height, f.frames, f.filter, f.bit_depth, f.args),
+    )
+}
+
 fn run(cmd: &mut Command) -> bool {
     match cmd.output() {
         Ok(o) if o.status.success() => true,
@@ -116,7 +125,7 @@ pub fn pix_fmt(bd: u32) -> &'static str {
 /// Returns None (with a message) when ffmpeg or the encoder is unavailable.
 pub fn ensure(f: &Fixture) -> Option<(PathBuf, PathBuf)> {
     let ff = waltcut_testkit::ffmpeg_or_skip(f.name)?;
-    let dir = fixtures_dir();
+    let dir = fixture_dir_for(f);
     let hevc = dir.join(format!("{}.hevc", f.name));
     let yuv = dir.join(format!("{}.yuv", f.name));
     if !hevc.exists() {

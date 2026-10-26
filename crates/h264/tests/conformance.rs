@@ -142,8 +142,8 @@ fn coverage_report() {
 #[test]
 #[ignore]
 fn generate_fixtures() {
-    let dir = common::fixtures_dir();
     for f in common::FIXTURES {
+        let dir = common::fixture_dir_for(f);
         let outs = [dir.join(format!("{}.h264", f.name)), dir.join(format!("{}.yuv", f.name))];
         waltcut_testkit::fixtures::generate_and_report(&format!("h264/{}", f.name), &outs, || common::ensure(f));
     }
@@ -188,4 +188,20 @@ fn concurrent_fixture_publication_is_safe() {
     drop(results);
     std::fs::remove_file(paths.0).unwrap();
     std::fs::remove_file(paths.1).unwrap();
+}
+
+/// Regression (#106): cached fixtures were keyed by name only, so a changed definition kept
+/// serving the old file. Every field that shapes the stream must change the cache folder.
+#[test]
+fn a_fixture_is_cached_per_definition() {
+    let base = common::fixture(common::FIXTURES[0].name);
+    let same = common::fixture_dir_for(base);
+    assert_eq!(same, common::fixture_dir_for(base));
+    let resized = common::Fixture { width: base.width + 16, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&resized), "another size must not reuse the cached stream");
+    let reframed = common::Fixture { frames: base.frames + 1, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&reframed));
+    let args: &'static [&'static str] = &["-g", "1"];
+    let changed = common::Fixture { args, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&changed));
 }

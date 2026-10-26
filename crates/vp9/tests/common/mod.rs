@@ -175,6 +175,24 @@ pub fn fixtures_dir() -> PathBuf {
     d
 }
 
+/// Where `f`'s stream and reference decode are cached: a folder keyed on everything that shapes
+/// them, so a changed fixture definition regenerates instead of reusing a stale file (#106).
+pub fn fixture_dir_for(f: &Fixture) -> PathBuf {
+    let recipe = format!("{} {} {}x{} {} {} {} {:?}", f.name, f.source, f.width, f.height, f.frames, f.filter, f.pix_fmt, f.args);
+    keyed_dir(&recipe)
+}
+
+/// A fixtures folder keyed on `recipe`.
+pub fn keyed_dir(recipe: &str) -> PathBuf {
+    use std::hash::{Hash, Hasher};
+    // same scheme as waltcut_testkit::fixtures::recipe_dir (this crate does not depend on testkit)
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    recipe.hash(&mut hash);
+    let d = fixtures_dir().join(format!("recipe-{:016x}", hash.finish()));
+    std::fs::create_dir_all(&d).expect("create fixtures dir");
+    d
+}
+
 /// Unique suffix for temporary files: tests run on several threads of one process and may
 /// generate the same fixture concurrently.
 pub fn unique() -> String {
@@ -231,7 +249,7 @@ pub fn ensure(f: &Fixture) -> Option<(PathBuf, PathBuf)> {
         eprintln!("SKIP {}: ffmpeg not found", f.name);
         return None;
     };
-    let dir = fixtures_dir();
+    let dir = fixture_dir_for(f);
     let ivf = dir.join(format!("{}.ivf", f.name));
     let yuv = dir.join(format!("{}.yuv", f.name));
     if !ivf.exists() {

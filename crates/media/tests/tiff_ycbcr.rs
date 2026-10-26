@@ -133,13 +133,15 @@ fn damaged_ycbcr_tiffs_fail_without_panicking() {
 #[test]
 fn ffmpeg_ycbcr_tiffs_match_ffmpeg_decode() {
     let Some(ff) = waltcut_testkit::oracle::ffmpeg_or_skip("YCbCr TIFF oracle") else { return };
-    let dir = waltcut_testkit::fixtures::fixtures_dir("media/tiff_ycbcr");
+    // cached in a folder keyed on the generator arguments, so changing them regenerates (#106)
+    const SOURCE: &str = "gradients=size=95x63:seed=7:c0=0x204060:c1=0xd0a080";
+    let dir = waltcut_testkit::fixtures::recipe_fixtures_dir("media/tiff_ycbcr", SOURCE);
     for pix_fmt in ["yuv420p", "yuv422p", "yuv444p"] {
         let tiff = dir.join(format!("gradient_fixed_{pix_fmt}.tiff"));
         let made = waltcut_testkit::fixtures::generate(&tiff, |tmp| {
             std::process::Command::new(&ff)
                 // Default gradient colors stay random even with a fixed seed.
-                .args(["-y", "-v", "error", "-f", "lavfi", "-i", "gradients=size=95x63:seed=7:c0=0x204060:c1=0xd0a080", "-frames:v", "1", "-pix_fmt", pix_fmt])
+                .args(["-y", "-v", "error", "-f", "lavfi", "-i", SOURCE, "-frames:v", "1", "-pix_fmt", pix_fmt])
                 .arg(tmp)
                 .status()
                 .is_ok_and(|s| s.success())

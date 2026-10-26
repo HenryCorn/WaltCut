@@ -223,3 +223,13 @@ fn generate_fixtures() {
         waltcut_testkit::fixtures::generate_and_report(&format!("mpeg2v/{}", s.name), &[path(s)], || make(&ff, s));
     }
 }
+
+/// Regression (#106): a changed spec must not reuse the cached stream of the old one.
+#[test]
+fn a_spec_is_cached_per_definition() {
+    let other = Spec { frames: HD1080I.frames + 1, ..HD1080I };
+    assert_eq!(path(&HD1080I), path(&HD1080I));
+    assert_ne!(path(&HD1080I), path(&other), "another frame count must not reuse the cached stream");
+    let other = Spec { lavfi: "testsrc2=size=64x64:rate=25", ..HD1080I };
+    assert_ne!(path(&HD1080I), path(&other));
+}
