@@ -286,3 +286,142 @@ fn the_controls_are_automatable_and_the_menu_lists_the_command() {
     let items = d.call("ui.menu.list", json!({}))["result"].clone();
     assert!(items.as_array().unwrap().iter().any(|i| i["id"] == "drawing.smoothing" && i["enabled"] == true));
 }
+
+// ---- rope (#166) ----
+
+#[test]
+fn rope_trails_the_pen_on_a_string_and_ends_exactly_where_the_pen_lifted() {
+    let mut d = Driver::new();
+    let c = d.canvas();
+    let path = jittery(c);
+    d.stroke(&path);
+    let r = d.command("drawing.smoothing", json!({"mode": "rope", "length": 30})).unwrap();
+    assert_eq!((r["mode"].clone(), r["length"].clone(), r["active"].clone()), (json!("rope"), json!(30.0), json!(true)));
+    d.stroke(&path);
+    let strokes = d.strokes();
+    assert_eq!(strokes.len(), 2);
+    let (off, rope) = (&strokes[0], &strokes[1]);
+    assert_eq!(rope.first(), off.first(), "starts where the pen came down");
+    assert_eq!(rope.last(), off.last(), "ends exactly where the pen lifted");
+    assert!(rope.len() < off.len(), "a taut-then-slack string stores fewer points: {} vs {}", rope.len(), off.len());
+    // the ±2.5 point zigzag is absorbed by the string
+    assert!(wobble(rope) < wobble(off) * 0.5, "rope {} vs raw {}", wobble(rope), wobble(off));
+    // no stored point is farther from the pen's path end than the string plus the path itself allows: every step is short
+    let step = |p: &[[f32; 3]], i: usize| (p[i][0] - p[i - 1][0]).hypot(p[i][1] - p[i - 1][1]);
+    let n = rope.len();
+    let normal = (1..off.len()).map(|i| step(off, i)).fold(0.0f32, f32::max);
+    assert!((1..n).all(|i| step(rope, i) <= normal * 1.5 + 4.0), "no long jump in the rope stroke");
+}
+
+#[test]
+fn rope_is_a_view_setting_and_bad_parameters_are_refused_whole() {
+    let mut d = Driver::new();
+    let before = d.untouched();
+    d.command("drawing.smoothing", json!({"mode": "rope", "length": 12.5, "pressure": 0.25})).unwrap();
+    assert_eq!(d.untouched(), before, "no undo step, revision or project change");
+    let state = d.inspect()["ui"]["brush"]["smoothing"].clone();
+    assert_eq!((state["mode"].clone(), state["length"].clone()), (json!("Rope"), json!(12.5)));
+    // a partial update keeps the rest
+    let r = d.command("drawing.smoothing", json!({"length": 40})).unwrap();
+    assert_eq!((r["mode"].clone(), r["pressure"].clone(), r["length"].clone()), (json!("rope"), json!(0.25), json!(40.0)));
+    let before = d.inspect()["ui"]["brush"]["smoothing"].clone();
+    for bad in [
+        json!({"length": -1}),
+        json!({"length": 200.5}),
+        json!({"length": 1e30}),
+        json!({"length": "long"}),
+        json!({"length": [3]}),
+        json!({"mode": "rope2"}),
+        json!({"mode": "off", "length": 9999}),
+        json!({"mode": "rope", "strength": 2}),
+    ] {
+        assert!(d.command("drawing.smoothing", bad.clone()).is_err(), "{bad}");
+        assert_eq!(d.inspect()["ui"]["brush"]["smoothing"], before, "{bad} changed something");
+    }
+    // hand-edited state: NaN, negative and huge lengths are clamped, the stroke is finite
+    for len in [f32::NAN, -4.0, f32::INFINITY, 1e30] {
+        d.harness.state_mut().ui.brush.smoothing.length = len;
+        d.frames(2);
+        let c = d.canvas();
+        d.stroke(&jittery(c));
+    }
+    assert!(d.strokes().iter().flatten().all(|p| p.iter().all(|v| v.is_finite())));
+    // old saved interface state (no `length`) still loads
+    let old: serde_json::Value = json!({"mode": "Smooth", "strength": 0.3, "pressure": 0.1});
+    let s: waltcut_ui_egui::panels::drawing_smooth::Smoothing = serde_json::from_value(old).unwrap();
+    assert_eq!(s.length, waltcut_ui_egui::panels::drawing_smooth::DEFAULT_ROPE_LENGTH);
+}
+
+#[test]
+fn cancelling_a_rope_stroke_commits_nothing_and_a_tap_is_one_point() {
+    let mut d = Driver::new();
+    d.command("drawing.smoothing", json!({"mode": "rope", "length": 40})).unwrap();
+    let c = d.canvas();
+    let path = jittery(c);
+    d.event(egui::Event::PointerMoved(path[0]));
+    d.event(button(path[0], true));
+    for p in &path[1..20] {
+        d.event(egui::Event::PointerMoved(*p));
+    }
+    d.event(key(egui::Key::Escape, true));
+    d.event(key(egui::Key::Escape, false));
+    d.event(egui::Event::PointerMoved(path[30]));
+    d.event(button(path[30], false));
+    d.frames(3);
+    assert_eq!(d.strokes().len(), 0, "Escape drops the stroke");
+    d.event(egui::Event::PointerMoved(path[0]));
+    d.event(button(path[0], true));
+    d.event(egui::Event::PointerMoved(path[5]));
+    d.event(egui::Event::WindowFocused(false));
+    d.event(button(path[5], false));
+    d.frames(3);
+    assert_eq!(d.strokes().len(), 0, "focus loss drops the stroke");
+    d.event(egui::Event::WindowFocused(true));
+    d.stroke(&[path[0], path[0]]);
+    let strokes = d.strokes();
+    assert_eq!((strokes.len(), strokes[0].len()), (1, 1), "a tap keeps its one point");
+}
+
+#[test]
+fn batching_does_not_change_a_rope_stroke() {
+    let mut a = Driver::new();
+    let mut b = Driver::new();
+    for d in [&mut a, &mut b] {
+        d.command("drawing.smoothing", json!({"mode": "rope", "length": 25, "pressure": 0.4})).unwrap();
+    }
+    let path = jittery(a.canvas());
+    a.stroke(&path);
+    b.event(egui::Event::PointerMoved(path[0]));
+    b.event(button(path[0], true));
+    for p in &path[1..path.len() - 1] {
+        b.harness.input_mut().events.push(egui::Event::PointerMoved(*p));
+    }
+    b.harness.input_mut().events.push(egui::Event::PointerMoved(path[path.len() - 1]));
+    b.harness.input_mut().events.push(button(path[path.len() - 1], false));
+    b.frames(4);
+    assert_eq!(a.strokes(), b.strokes());
+}
+
+#[test]
+fn the_rope_controls_are_automatable() {
+    let mut d = Driver::new();
+    d.frames(2);
+    let ids = |d: &mut Driver| -> Vec<String> {
+        d.call("ui.elements", json!({"prefix": "program.brush."}))["result"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_string()).collect()
+    };
+    d.call("ui.click", json!({"id": "program.brush.feel.menu"}));
+    d.frames(3);
+    let found = ids(&mut d);
+    for id in ["rope", "rope.length", "smooth", "smooth.pressure"] {
+        assert!(found.contains(&format!("program.brush.{id}")), "{id}: {found:?}");
+    }
+    d.call("ui.click", json!({"id": "program.brush.rope"}));
+    d.frames(3);
+    assert_eq!(d.inspect()["ui"]["brush"]["smoothing"]["mode"], json!("Rope"));
+    // exclusive with Smooth (the menu closed after the click)
+    d.call("ui.click", json!({"id": "program.brush.feel.menu"}));
+    d.frames(3);
+    d.call("ui.click", json!({"id": "program.brush.smooth"}));
+    d.frames(3);
+    assert_eq!(d.inspect()["ui"]["brush"]["smoothing"]["mode"], json!("Smooth"));
+}

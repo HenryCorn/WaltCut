@@ -532,7 +532,8 @@ used to position or fade a drawing.
   the pen) and the status bar says so. The pen queue holds 4 096 samples between frames; if it
   overflows the oldest moves are dropped (never the stroke's first and last samples) and the loss
   is counted.
-- **Smoothing** (`drawing.smoothing {mode?, strength?, pressure?}`, **Feel ▸ Smooth strokes** in the
+- **Smoothing** (`drawing.smoothing {mode?, strength?, pressure?, length?}`, **Feel ▸ Smooth strokes** and
+  **Feel ▸ Rope (pulled string)** in the
   Brush options bar, Graphics and Titles ▸ Drawing ▸ Stroke Smoothing). **Off** (the default) stores the
   captured samples exactly as before. **Smooth** passes each kept sample through an adaptive moving
   average, one at a time and in order (so the result does not depend on how samples were batched
@@ -552,10 +553,30 @@ used to position or fade a drawing.
     point. **Escape** and focus loss drop the stroke before anything is committed, with or without
     smoothing. A mouse is smoothed the same way. The setting is a view of how the *next* strokes
     are made: it adds no undo step, changes no stored stroke and is saved with the interface state.
-  - Not in this version: a trailing (rope) stabilizer, and smoothing already drawn strokes. Bad
-    values (a mode other than `off` / `smooth`, a strength outside 0–1, unknown parameters) are
-    refused whole. The filter costs 8 ns per sample on the development machine (measured); the
-    delay between pen and screen was not measured (no camera rig), only the lag above.
+  - **Rope** (#166, `mode: "rope"`, `length` 0–200, default 24) is a third mode beside Off and Smooth:
+    the stored point is the end of a string of fixed length that the pen pulls. While the pen stays
+    within reach of the string the stored point does not move (a wobble inside the string draws
+    nothing and stores no extra points); beyond it the point is dragged along the line towards the
+    pen until the string is taut again, so it trails the pen by exactly the length on a long pull and
+    rounds a corner by cutting it. The length is in canvas pixels at 100% view and is divided by the
+    view's screen-points-per-canvas-pixel when the stroke starts, so the string keeps the same size
+    under the pen whatever the zoom (fixed for that stroke). Like Smooth it works one kept sample at a
+    time (the result does not depend on how samples are batched into frames), Escape and focus loss
+    drop the stroke, a tap stays one point, and **pen-up** glides the point in a straight line to the
+    exact pen-up position (equal steps of about 4 canvas pixels, at most 32 points), the last stored
+    point being the pen-up position itself. *Pressure and width:* each stored point carries the pen's
+    own pressure at that sample, so the width follows the hand while the position lags; the
+    **Pressure** slider still smooths it, and the pressure curve (#56) applies to the stored pressure
+    afterwards exactly as in the other modes. Rope is a view setting like the rest: no stored-format
+    change, saved with the interface state (older saved states load with the default length). The
+    Feel menu shows Smooth and Rope as exclusive checkboxes (`program.brush.smooth`,
+    `program.brush.rope`) with `program.brush.rope.length` and `program.brush.smooth.pressure`.
+    The rope costs about 40 ns per sample on the development machine (measured by a unit test, the
+    moving average 20 ns in the same run).
+  - Not in this version: smoothing already drawn strokes. Bad values (a mode other than `off` /
+    `smooth` / `rope`, a strength outside 0–1, a length outside 0–200, unknown parameters) are
+    refused whole. The Smooth filter costs 8 ns per sample on the development machine (measured);
+    the delay between pen and screen was not measured (no camera rig), only the lag above.
 - **What you see is what is drawn.** The live stroke, the stroke between pen-up and the arrival of
   the new frame, and the onion skins are rasterised by the same CPU code as the Program monitor
   and export (`waltcut_render::drawing`) with the same placement, so Pen, Pencil, Marker and

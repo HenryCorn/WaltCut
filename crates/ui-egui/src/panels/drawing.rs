@@ -65,7 +65,7 @@ pub fn params_doc(id: &str) -> Option<&'static str> {
         ),
         "drawing.pinPose" => Some(r#"{}  pin the cel shown now for onion-skin comparison; again to unpin it"#),
         "drawing.smoothing" => Some(
-            r#"{"mode":"off"|"smooth"?,"strength":0-1?,"pressure":0-1?}  set stroke smoothing for strokes drawn from now on (position strength and, apart, pressure strength); with no parameter, report it. Off stores the pen's samples as they came; a stroke always ends exactly where the pen lifts"#,
+            r#"{"mode":"off"|"smooth"|"rope"?,"strength":0-1?,"pressure":0-1?,"length":0-200?}  set stroke smoothing for strokes drawn from now on (smooth: position strength; rope: pulled-string length in canvas px at 100% view; pressure strength apart); with no parameter, report it. Off stores the pen's samples as they came; a stroke always ends exactly where the pen lifts"#,
         ),
         "drawing.eraseTemporarily" => Some(
             r#"{"active":bool?}  true (default) erases until false, until the window loses focus or another tool is chosen; bound to a key it erases while the key is held"#,
@@ -192,7 +192,7 @@ fn route_onion(app: &mut WaltCutApp, id: &str, params: &Value) -> Result<Value, 
 }
 
 fn smoothing_state(s: &super::drawing_smooth::Smoothing) -> Value {
-    json!({"mode": s.mode.param(), "strength": s.position(), "pressure": s.pressure(), "active": s.is_active()})
+    json!({"mode": s.mode.param(), "strength": s.position(), "pressure": s.pressure(), "length": s.rope_length(), "active": s.is_active()})
 }
 
 /// `drawing.smoothing`. Every parameter is checked before any is applied.
@@ -204,16 +204,17 @@ fn route_smoothing(app: &mut WaltCutApp, params: &Value) -> Result<Value, String
         _ => return Err("parameters must be an object".into()),
     };
     if let Some(o) = obj
-        && let Some(k) = o.keys().find(|k| !["mode", "strength", "pressure"].contains(&k.as_str()))
+        && let Some(k) = o.keys().find(|k| !["mode", "strength", "pressure", "length"].contains(&k.as_str()))
     {
-        return Err(format!("unknown parameter `{k}`; expected: mode, strength, pressure"));
+        return Err(format!("unknown parameter `{k}`; expected: mode, strength, pressure, length"));
     }
     let get = |k: &str| obj.and_then(|o| o.get(k)).filter(|v| !v.is_null());
     let mode = match get("mode").map(|v| v.as_str()) {
         None => None,
         Some(Some("off")) => Some(SmoothMode::Off),
         Some(Some("smooth")) => Some(SmoothMode::Smooth),
-        Some(_) => return Err("`mode` must be \"off\" or \"smooth\"".into()),
+        Some(Some("rope")) => Some(SmoothMode::Rope),
+        Some(_) => return Err("`mode` must be \"off\", \"smooth\" or \"rope\"".into()),
     };
     let unit = |k: &str| match get(k) {
         None => Ok(None),
@@ -223,10 +224,18 @@ fn route_smoothing(app: &mut WaltCutApp, params: &Value) -> Result<Value, String
         },
     };
     let (strength, pressure) = (unit("strength")?, unit("pressure")?);
+    let length = match get("length") {
+        None => None,
+        Some(v) => match v.as_f64() {
+            Some(n) if (0.0..=super::drawing_smooth::MAX_ROPE_LENGTH as f64).contains(&n) => Some(n as f32),
+            _ => return Err(format!("`length` must be a number from 0 to {}", super::drawing_smooth::MAX_ROPE_LENGTH)),
+        },
+    };
     let st = &mut app.ui.brush.smoothing;
     st.mode = mode.unwrap_or(st.mode);
     st.strength = strength.unwrap_or(st.strength);
     st.pressure = pressure.unwrap_or(st.pressure);
+    st.length = length.unwrap_or(st.length);
     Ok(smoothing_state(st))
 }
 
@@ -241,14 +250,28 @@ fn smoothing_menu(ui: &mut egui::Ui, b: &mut BrushSettings, auto: &mut crate::au
         let mut on = b.smoothing.mode == SmoothMode::Smooth;
         let r = ui.checkbox(&mut on, "Smooth strokes");
         auto.add("program.brush.smooth", r.rect, "stroke smoothing");
-        b.smoothing.mode = if on { SmoothMode::Smooth } else { SmoothMode::Off };
-        ui.add_enabled_ui(on, |ui| {
+        if r.changed() {
+            b.smoothing.mode = if on { SmoothMode::Smooth } else { SmoothMode::Off };
+        }
+        ui.add_enabled_ui(b.smoothing.mode == SmoothMode::Smooth, |ui| {
             let r = ui.add(egui::Slider::new(&mut b.smoothing.strength, 0.0..=1.0).text("Position"));
             auto.add("program.brush.smooth.strength", r.rect, "position smoothing");
+        });
+        let mut rope = b.smoothing.mode == SmoothMode::Rope;
+        let r = ui.checkbox(&mut rope, "Rope (pulled string)");
+        auto.add("program.brush.rope", r.rect, "pulled-string stabilizer");
+        if r.changed() {
+            b.smoothing.mode = if rope { SmoothMode::Rope } else { SmoothMode::Off };
+        }
+        ui.add_enabled_ui(b.smoothing.mode == SmoothMode::Rope, |ui| {
+            let r = ui.add(egui::Slider::new(&mut b.smoothing.length, 0.0..=super::drawing_smooth::MAX_ROPE_LENGTH).text("String length"));
+            auto.add("program.brush.rope.length", r.rect, "rope length in canvas pixels");
+        });
+        ui.add_enabled_ui(b.smoothing.mode != SmoothMode::Off, |ui| {
             let r = ui.add(egui::Slider::new(&mut b.smoothing.pressure, 0.0..=1.0).text("Pressure"));
             auto.add("program.brush.smooth.pressure", r.rect, "pressure smoothing");
         });
-        ui.label(egui::RichText::new("The line trails the pen a little while smoothing is on.").small());
+        ui.label(egui::RichText::new("The line trails the pen a little while smoothing or the rope is on.").small());
         super::pressure_curve::section(ui, b, auto);
     });
     auto.add("program.brush.feel.menu", r.response.rect, "pen feel: smoothing and pressure response");
@@ -943,7 +966,7 @@ pub fn monitor_overlay(app: &mut WaltCutApp, ui: &mut egui::Ui, layout_pic: Rect
         if begin_wanted && !cancelled && start.is_some_and(|p| !bar.contains(p) && layout_pic.contains(turn.unshow(layout_pic.center(), p))) {
             let mut l = Live {
                 clip: clip.0,
-                stroke: StrokeBuilder::with_smoothing(&app.ui.brush.smoothing),
+                stroke: StrokeBuilder::with_smoothing(&app.ui.brush.smoothing, map.scale),
                 eraser: secondary || app.ui.brush.erase_held != EraseHold::Off,
             };
             let mut samples = std::mem::take(&mut pending);
