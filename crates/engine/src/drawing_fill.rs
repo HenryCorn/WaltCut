@@ -252,11 +252,13 @@ pub(crate) fn fill_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bool) -
             Some(i) if !new_cel => i,
             _ => d.ensure_cel(frame, copy).map_err(|e| bad(ID, e))?,
         };
-        let cel = d.cels.get_mut(i).ok_or_else(|| bad(ID, "no such cel"))?;
+        let cel = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
         if cel.strokes.len() >= MAX_CEL_STROKES {
             return Err(bad(ID, format!("a cel may hold at most {MAX_CEL_STROKES} strokes")));
         }
-        cel.strokes_mut().push(Stroke::fill_op(color, fill));
+        // a linked cel's peers get the fill too (it is stored once)
+        d.edit_strokes(i, |v| v.push(Stroke::fill_op(color, fill))).ok_or_else(|| bad(ID, "no such cel"))?;
+        let cel = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
         Ok((cel.frame, cel.strokes.len() - 1))
     })?;
     Ok(report(clip, cel_frame, index, color, &shown, true))
@@ -336,11 +338,13 @@ pub(crate) fn fill_edit_with(s: &mut Session, p: &Value, cancel: &dyn Fn() -> bo
     }
     let (cel_frame, shown) = (cel.frame, fill.clone());
     edit_drawing(s, ID, "Edit Fill", item, |d| {
-        let cel = d.cels.get_mut(ci).ok_or_else(|| bad(ID, "no such cel"))?;
-        let slot = cel.strokes_mut().get_mut(index).ok_or_else(|| bad(ID, "no such stroke"))?;
-        slot.color = color;
-        slot.fill = Some(fill);
-        Ok(())
+        d.edit_strokes(ci, |v| {
+            let slot = v.get_mut(index).ok_or_else(|| bad(ID, "no such stroke"))?;
+            slot.color = color;
+            slot.fill = Some(fill);
+            Ok(())
+        })
+        .ok_or_else(|| bad(ID, "no such cel"))?
     })?;
     Ok(report(clip, cel_frame, index, color, &shown, true))
 }
@@ -363,13 +367,14 @@ fn fill_remove(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let cel_frame = cel.frame;
     edit_drawing(s, ID, "Remove Fill", item, |d| {
-        let cel = d.cels.get_mut(ci).ok_or_else(|| bad(ID, "no such cel"))?;
-        let strokes = cel.strokes_mut();
-        if index >= strokes.len() {
-            return Err(bad(ID, "no such stroke"));
-        }
-        strokes.remove(index);
-        Ok(())
+        d.edit_strokes(ci, |strokes| {
+            if index >= strokes.len() {
+                return Err(bad(ID, "no such stroke"));
+            }
+            strokes.remove(index);
+            Ok(())
+        })
+        .ok_or_else(|| bad(ID, "no such cel"))?
     })?;
     Ok(json!({"clip": clip.0, "cel": cel_frame, "removed": index}))
 }

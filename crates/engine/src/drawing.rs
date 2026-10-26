@@ -77,7 +77,12 @@ pub(crate) fn target(s: &Session, cmd: &str, p: &Value) -> Result<(ClipId, ItemI
 pub(crate) fn edit_drawing<R>(s: &mut Session, cmd: &str, label: &str, id: ItemId, f: impl FnOnce(&mut Drawing) -> Result<R>) -> Result<R> {
     s.edit(label, |pr, _| {
         let d = pr.item_mut(id).and_then(|i| i.as_drawing_mut()).ok_or_else(|| bad(cmd, "not a drawing"))?;
-        f(d)
+        let r = f(d)?;
+        // linked exposures (#67) stay one artwork: a group left alone is dissolved, and an edit that
+        // changed one member without its peers is refused (the whole edit is rolled back)
+        d.normalize_links();
+        d.check_links().map_err(|e| bad(cmd, e))?;
+        Ok(r)
     })
 }
 
@@ -405,20 +410,22 @@ fn add_stroke(s: &mut Session, p: &Value) -> Result<Value> {
     let stroke = parse_stroke(ID, p.get("stroke").unwrap_or(p))?;
     let (new_cel, copy) = cel_mode(ID, p)?;
     let label = if stroke.brush == Brush::Eraser { "Erase" } else { "Draw Stroke" };
-    let (cel_frame, n) = edit_drawing(s, ID, label, id, |d| {
+    let (cel_frame, n, linked) = edit_drawing(s, ID, label, id, |d| {
         // before the first cel there is nothing shown: the stroke starts one here
         let i = match d.cel_index_at(frame) {
             Some(i) if !new_cel => i,
             _ => d.ensure_cel(frame, copy).map_err(|e| bad(ID, e))?,
         };
-        let cel = d.cels.get_mut(i).ok_or_else(|| bad(ID, "no such cel"))?;
+        let cel = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
         if cel.strokes.len() >= drawing::MAX_CEL_STROKES {
             return Err(bad(ID, format!("a cel may hold at most {} strokes", drawing::MAX_CEL_STROKES)));
         }
-        cel.strokes_mut().push(stroke);
-        Ok((cel.frame, cel.strokes.len()))
+        // a linked cel's peers get the stroke too
+        d.edit_strokes(i, |v| v.push(stroke)).ok_or_else(|| bad(ID, "no such cel"))?;
+        let cel = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
+        Ok((cel.frame, cel.strokes.len(), d.exposures_sharing(i)))
     })?;
-    Ok(json!({"clip": clip.0, "cel": cel_frame, "strokes": n}))
+    Ok(json!({"clip": clip.0, "cel": cel_frame, "strokes": n, "linked": linked}))
 }
 
 fn set_strokes(s: &mut Session, p: &Value) -> Result<Value> {
@@ -430,14 +437,12 @@ fn set_strokes(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let strokes = list.iter().map(|v| parse_stroke(ID, v)).collect::<Result<Vec<_>>>()?;
     let n = strokes.len();
-    edit_drawing(s, ID, "Set Drawing", id, |d| {
+    let linked = edit_drawing(s, ID, "Set Drawing", id, |d| {
         let i = d.ensure_cel(frame, false).map_err(|e| bad(ID, e))?;
-        if let Some(c) = d.cels.get_mut(i) {
-            c.strokes = strokes.into();
-        }
-        Ok(())
+        d.edit_strokes(i, |v| *v = strokes);
+        Ok(d.exposures_sharing(i))
     })?;
-    Ok(json!({"clip": clip.0, "cel": frame, "strokes": n}))
+    Ok(json!({"clip": clip.0, "cel": frame, "strokes": n, "linked": linked}))
 }
 
 fn new_cel(s: &mut Session, p: &Value) -> Result<Value> {
@@ -456,13 +461,13 @@ fn new_cel(s: &mut Session, p: &Value) -> Result<Value> {
 fn clear_cel(s: &mut Session, p: &Value) -> Result<Value> {
     const ID: &str = "drawing.clearCel";
     let (clip, id, frame) = target(s, ID, p)?;
-    let cel = edit_drawing(s, ID, "Clear Cel", id, |d| {
+    let (cel, linked) = edit_drawing(s, ID, "Clear Cel", id, |d| {
         let i = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown here"))?;
-        let c = d.cels.get_mut(i).ok_or_else(|| bad(ID, "no such cel"))?;
-        c.strokes_mut().clear();
-        Ok(c.frame)
+        d.edit_strokes(i, Vec::clear).ok_or_else(|| bad(ID, "no such cel"))?;
+        let c = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
+        Ok((c.frame, d.exposures_sharing(i)))
     })?;
-    Ok(json!({"clip": clip.0, "cel": cel}))
+    Ok(json!({"clip": clip.0, "cel": cel, "linked": linked}))
 }
 
 fn delete_cel(s: &mut Session, p: &Value) -> Result<Value> {
@@ -470,9 +475,71 @@ fn delete_cel(s: &mut Session, p: &Value) -> Result<Value> {
     let (clip, id, frame) = target(s, ID, p)?;
     let cel = edit_drawing(s, ID, "Delete Cel", id, |d| {
         let i = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown here"))?;
-        Ok(d.cels.remove(i).frame)
+        d.remove_cel(i).map(|c| c.frame).ok_or_else(|| bad(ID, "no such cel"))
     })?;
     Ok(json!({"clip": clip.0, "deleted": cel}))
+}
+
+/// The drawing's track must not be locked: linking changes what a locked exposure lane shows.
+fn unlocked_clip(s: &Session, cmd: &str, clip: ClipId) -> Result<()> {
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (track, _) = seq.find_item(clip).ok_or_else(|| bad(cmd, "no such clip"))?;
+    if seq.track(track).is_none_or(|t| t.locked) {
+        return Err(bad(cmd, "the drawing is on a locked track"));
+    }
+    Ok(())
+}
+
+/// `drawing.linkCel {from?, frame?}` (#67): start an exposure on `frame` that *is* the artwork of
+/// the cel starting on `from` (default: the cel shown on `frame`). Editing either changes both;
+/// `drawing.newCel {copy: true}` is the independent copy.
+fn link_cel(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "drawing.linkCel";
+    let (clip, id, frame) = target(s, ID, p)?;
+    unlocked_clip(s, ID, clip)?;
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
+    let (first, last) = drawing_frame_bounds(s, ID, clip, d)?;
+    if frame < first || frame > last {
+        return Err(bad(ID, format!("the new exposure must start within the drawing clip's visible range {first}..={last}")));
+    }
+    let from = match p.get("from") {
+        None | Some(Value::Null) => d.cel_at(frame).map(|c| c.frame).ok_or_else(|| bad(ID, "no cel is shown here to link to: give `from`"))?,
+        Some(v) => v.as_i64().ok_or_else(|| bad(ID, "`from` must be the start frame of a cel"))?,
+    };
+    if d.cel_on(from).is_none() {
+        return Err(bad(ID, format!("no cel starts on frame {from}")));
+    }
+    if d.cel_on(frame).is_some() {
+        return Err(bad(ID, format!("frame {frame} already starts a cel: delete it first, or pick a frame without one")));
+    }
+    let (link, linked) = edit_drawing(s, ID, "Link Cel", id, |d| {
+        let link = d.link_cel(from, frame).map_err(|e| bad(ID, e))?;
+        let i = d.cel_on(frame).ok_or_else(|| bad(ID, "no such cel"))?;
+        Ok((link, d.exposures_sharing(i)))
+    })?;
+    Ok(json!({"clip": clip.0, "cel": frame, "from": from, "link": link, "linked": linked}))
+}
+
+/// `drawing.makeIndependent {frame?}` (#67): the cel shown on `frame` leaves its link group and
+/// keeps its strokes. The others stay linked (a group left with one is dissolved).
+fn make_independent(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "drawing.makeIndependent";
+    let (clip, id, frame) = target(s, ID, p)?;
+    unlocked_clip(s, ID, clip)?;
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
+    let i = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown here"))?;
+    if d.cels.get(i).is_none_or(|c| c.link.is_none()) {
+        return Err(bad(ID, "this cel is not linked"));
+    }
+    let (cel, remaining) = edit_drawing(s, ID, "Make Cel Independent", id, |d| {
+        let link = d.cels.get(i).and_then(|c| c.link);
+        d.make_independent(i).map_err(|e| bad(ID, e))?;
+        let cel = d.cels.get(i).map(|c| c.frame).ok_or_else(|| bad(ID, "no such cel"))?;
+        Ok((cel, link.map_or(0, |l| d.link_members(l).count())))
+    })?;
+    Ok(json!({"clip": clip.0, "cel": cel, "remaining": remaining}))
 }
 
 /// Fill the frames between the cel shown and the next one with in-betweens every `step` frames.
@@ -493,7 +560,7 @@ fn tween_cels(s: &mut Session, p: &Value) -> Result<Value> {
             let strokes = drawing::tween(&a, &b, t);
             let k = d.ensure_cel(f, false).map_err(|e| bad(ID, e))?;
             if let Some(c) = d.cels.get_mut(k) {
-                *c = Cel { frame: f, strokes: strokes.into() };
+                *c = Cel { frame: f, strokes: strokes.into(), link: None };
             }
             made.push(f);
             f = f.saturating_add(step);
@@ -512,20 +579,40 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let (_, d) = drawing_of(s, seq, clip).ok_or_else(|| bad(ID, "not a drawing clip"))?;
     let full = bool_p(p, "strokes").unwrap_or(false);
+    // `link` is present only on a linked cel, so an ordinary cel is reported exactly as it always was
+    let with_link = |mut v: Value, link: Option<u32>| {
+        if let (Some(l), Some(o)) = (link, v.as_object_mut()) {
+            o.insert("link".into(), json!(l));
+        }
+        v
+    };
     let cels: Vec<Value> = d
         .cels
         .iter()
         .map(|c| {
             if full {
-                json!({"frame": c.frame, "strokes": c.strokes.iter().map(crate::drawing_fill::stroke_json).collect::<Vec<_>>()})
+                with_link(json!({"frame": c.frame, "strokes": c.strokes.iter().map(crate::drawing_fill::stroke_json).collect::<Vec<_>>()}), c.link)
             } else {
-                json!({"frame": c.frame, "strokes": c.strokes.len()})
+                with_link(json!({"frame": c.frame, "strokes": c.strokes.len()}), c.link)
             }
         })
         .collect();
     let (_, last) = drawing_frame_bounds(s, ID, clip, d)?;
     let clip_end = last.checked_add(1).ok_or_else(|| bad(ID, "drawing clip end is out of range"))?;
-    let exposures: Vec<Value> = d.cels.iter().map(|c| json!({"frame": c.frame, "endFrame": d.exposure_end(c.frame, clip_end)})).collect();
+    let exposures: Vec<Value> = d
+        .cels
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let mut e = json!({"frame": c.frame, "endFrame": d.exposure_end(c.frame, clip_end)});
+            if let (Some(link), Some(o)) = (c.link, e.as_object_mut()) {
+                // how many exposures share the artwork, only for a linked one
+                o.insert("link".into(), json!(link));
+                o.insert("linked".into(), json!(d.exposures_sharing(i)));
+            }
+            e
+        })
+        .collect();
     Ok(json!({
         "clip": clip.0,
         "width": d.width,
@@ -556,6 +643,22 @@ pub fn commands() -> Vec<CommandSpec> {
         spec("drawing.addStroke", "Draw Stroke", &[], STROKE, has_drawing, add_stroke),
         spec("drawing.setStrokes", "Set Drawing", &[], r#"{"clip":id?,"frame":int?,"strokes":[stroke,...]}"#, has_drawing, set_strokes),
         spec("drawing.newCel", "New Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int?,"copy":bool?}"#, has_drawing, new_cel),
+        spec(
+            "drawing.linkCel",
+            "Link Cel",
+            &["Graphics and Titles", "Drawing"],
+            r#"{"clip":id?,"frame":int?,"from":int?}  start an exposure on `frame` (default the playhead) that shares the artwork of the cel starting on `from` (default the cel shown there): editing one edits all; one undo step"#,
+            has_drawing,
+            link_cel,
+        ),
+        spec(
+            "drawing.makeIndependent",
+            "Make Cel Independent",
+            &["Graphics and Titles", "Drawing"],
+            r#"{"clip":id?,"frame":int?}  the cel shown on `frame` leaves its linked group and keeps its strokes; the others stay linked; one undo step"#,
+            has_drawing,
+            make_independent,
+        ),
         spec("drawing.retimeCel", "Retime Cel", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"from":int,"to":int}"#, has_drawing, retime_cel),
         spec("drawing.setHold", "Set Cel Hold", &["Graphics and Titles", "Drawing"], r#"{"clip":id?,"frame":int,"endFrame":int}"#, has_drawing, set_hold),
         spec(

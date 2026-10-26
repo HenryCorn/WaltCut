@@ -755,9 +755,10 @@ fn options_bar(app: &mut WaltCutApp, ui: &mut egui::Ui, pic: Rect, has_target: b
                 if ui.button("New Cel").clicked() {
                     run(app, "drawing.newCel", json!({}));
                 }
-                if ui.button("Duplicate").on_hover_text("Start a cel on this frame as a copy of the one held").clicked() {
+                if ui.button("Duplicate").on_hover_text("Start a cel on this frame as an independent copy of the one held").clicked() {
                     run(app, "drawing.newCel", json!({"copy": true}));
                 }
+                super::cel_link::controls(app, ui);
                 if ui.button("Clear").clicked() {
                     run(app, "drawing.clearCel", json!({}));
                 }

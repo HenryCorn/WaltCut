@@ -1029,6 +1029,11 @@ fn draw_drawing_exposures(app: &mut WaltCutApp, p: &egui::Painter, body: Rect, i
             None if cel.strokes.is_empty() => format!("Blank exposure from frame {} to clip end", cel.frame),
             None => format!("Cel exposure from frame {} to clip end", cel.frame),
         };
+        let shared = drawing.exposures_sharing(i);
+        let label = super::cel_link::lane_label(&label, cel.link, shared);
+        if let (Some(link), true) = (cel.link, shared > 1) {
+            super::cel_link::paint_badge(p, exposure, link);
+        }
         app.auto.add(&format!("timeline.cel.{}.{}", it.id.0, cel.frame), exposure, &label);
         let (start_handle, end_handle) = cel_handles(body, lane, retime_x, hold_x, reverse);
         app.auto.add(&format!("timeline.cel.{}.{}.start", it.id.0, cel.frame), start_handle.intersect(body), "Retime cel start");
@@ -2259,6 +2264,9 @@ fn cel_menu(app: &mut WaltCutApp, ctx: &egui::Context, ui: &mut egui::Ui) {
             }
             ui.close();
         }
+    }
+    if super::cel_link::menu_items(app, ui) {
+        ui.close();
     }
 }
 

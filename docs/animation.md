@@ -12,7 +12,8 @@ hold a pose for several frames or place a new cel on every frame.
    offers **Pen**, **Pencil**, **Marker**, and **Eraser**, a colour and size, pressure input, cel
    mode, and onion-skin controls.
 3. Move the playhead to another drawing frame. Choose **New Cel** for a blank pose or **Duplicate**
-   to copy the held pose, then draw the changes. With **Draw on held cel**, strokes instead extend
+   to copy the held pose, then draw the changes (the copy is independent; **Link** instead starts an
+   exposure that shares another cel's artwork, see [Reuse a cel](#reuse-a-cel-hold-duplicate-or-link-67)). With **Draw on held cel**, strokes instead extend
    the cel already visible on that frame. A cel holds from its start frame up to (but not including)
    the next cel start. The Timeline shows these exposures in the drawing clip; drag a start marker
    to retime its pose, or drag an exposure end to adjust the hold. Empty cels are explicit blank
@@ -325,6 +326,108 @@ Options bar (Fill mode): **Reference** (This drawing or any other drawing clip o
 `program.brush.fill.preview`, `program.brush.fill.apply`, `program.brush.fill.cancel`;
 `drawing.fillMode` also takes `gap`, `grow`, `reference` and `preview`, and `ui.inspect` reports
 `ui.brush.fill_gap`, `fill_grow`, `fill_reference`, `fill_preview` and `fill_pending`.
+
+## Reuse a cel: hold, duplicate or link (#67)
+
+Three operations put the same picture on more than one exposure, and they are different on purpose:
+
+| Operation | Command | The new exposure is | Editing one later |
+|---|---|---|---|
+| **Hold** | `drawing.setHold`, dragging an exposure end | the same exposure, longer (one cel, one start) | there is only one cel |
+| **Duplicate** | `drawing.newCel {copy: true}`, **Duplicate** | a new cel that starts as a copy of the one shown | changes only that cel (a copy never stays tied to its source, even when the source is linked) |
+| **Link** | `drawing.linkCel {from?, frame?}`, **Link** | a new exposure that *is* the artwork of an existing cel | changes every linked exposure |
+
+**Make independent** (`drawing.makeIndependent`) turns one linked exposure back into a cel of its own
+that keeps what it showed.
+
+### Decision: one stored content, many exposure references (#67)
+
+*Options compared.*
+
+* **(a) Shared content id.** The drawing stores the artwork of a linked group once under a link id;
+  every exposure of the group carries that id. Identity is explicit and survives retiming, saving and
+  loading. An edit changes the one stored list, so peers cannot disagree.
+* **(b) Copies kept in sync by the engine.** Every exposure keeps its own strokes and each edit
+  command copies the result to the cels it knows to be related. Nothing changes for readers, but the
+  file would hold the artwork once per exposure (a fill's mask many times over), "related" would need
+  an id anyway, and any editing path that forgets to propagate (a new command, a script, a bug)
+  leaves peers silently different, with no way to tell which one is right when the project is
+  loaded.
+* **(c) A cel that points at another cel by frame.** Rejected: retiming, deleting or reordering the
+  target would change what the pointer means, and chains and cycles would be representable (a cel
+  that points at a cel that points back).
+
+**Chosen: (a) on disk, with the content materialised in memory.** Link ids are small integers that
+mean nothing outside their drawing. In memory a linked cel still has its `strokes`
+(`Arc<Vec<Stroke>>`) and every member of a group holds *the same allocation*, so the renderer, the
+onion skin, tween, lasso, fills and the cel raster cache keep reading `cel.strokes` and need no
+change. The invariant is that the members of a group are pointer-equal; one function,
+`Drawing::edit_strokes`, changes a cel's strokes and re-points the peers, and the engine checks the
+invariant after every drawing edit, so a path that forgets it is refused whole (and rolled back)
+instead of leaving peers different.
+
+* **Identity.** `Cel.link: Option<u32>`, never 0. A group has at least two members: the last member
+  to leave (make independent, delete, a cel that is replaced) is unlinked too, so the lane never
+  shows a link that links nothing. A new group takes the next id above the largest in the drawing.
+* **Serialisation** (schema v20, [project-files.md](project-files.md#linked-cels)). A linked cel is
+  stored as `{"frame": 8, "link": 3}` and the artwork once, in the drawing's `links` list
+  (`{"id": 3, "strokes": [...]}`). A drawing with no links is stored exactly as before. Loading
+  gives every member the one allocation, so a saved and reopened project is linked exactly as it
+  was and nothing is aliased that was not linked: two cels that merely look alike are two stored
+  lists. A cel with `link` that also holds strokes, a `link` with no entry in `links`, an entry
+  used by fewer than two cels, an entry nobody uses, id 0, a repeated id, and more than
+  more than `MAX_LINK_GROUPS` (10 000) entries or `MAX_CEL_STROKES` strokes in one are refused with
+  a message that names the cel's frame or the link id (the whole file is not opened; nothing is
+  repaired silently). Cycles cannot be written: stored content never
+  names a cel or another content.
+* **Propagation.** Everything that changes a cel's paint goes through `edit_strokes`: a stroke or
+  an eraser (`drawing.addStroke`, `drawing.setStrokes`), `drawing.clearCel`, a fill, a fill edit or
+  removal, and the lasso transform (`drawing.transformStrokes`). The command result says how many
+  exposures changed (`linked`). A fill is a stored result, so it is shared like a stroke; a
+  reference fill records the reference clip it was found in, and redoing it (`drawing.fillEdit`)
+  searches the reference at the playhead you redo it from and gives the new region to every peer.
+  The fill budgets count a linked group's fills once.
+* **Retiming** moves an exposure and keeps its link. **In-betweens** are new unlinked cels
+  (a straight interpolation between two cels that are linked to each other is a held pose).
+* **Make independent** keeps the cel's strokes and removes only the link; the other exposures keep
+  theirs. **Delete Cel** removes one exposure; the content survives on the others, and a group left
+  with one is unlinked. Both, like every edit, are one undo step; undo and redo restore the
+  snapshot, links included.
+* **Cel raster cache (#71).** The key is the allocation of the strokes, which every peer shares, so
+  linked exposures share one cache entry per placement. An edit gives the group a new allocation,
+  so every peer misses once and none can show old pixels.
+* **Locks.** `drawing.linkCel` and `drawing.makeIndependent` refuse a drawing on a locked track, as
+  retiming does. Linking never changes paint, so it is not an edit of the artwork.
+* **Bounds.** At most `MAX_CELS` cels and `MAX_LINK_GROUPS` groups per drawing; link ids and frames
+  come from the file or the command and are range-checked (a new group needs an unused id, so a
+  drawing that already uses id 4 294 967 295 refuses another group, and a frame that starts a cel,
+  is negative or lies outside the clip is refused); no operation walks more than the cels of one
+  drawing a constant number of times.
+
+### Using it
+
+* **Link** (Brush options bar) starts an exposure on the frame under the playhead that is the
+  artwork of the exposure you picked in the lane (click it; with none picked, the cel shown). It is
+  disabled on a frame where a cel already starts. Right-clicking a picked exposure offers **Link at
+  Playhead** and **Make Independent** too. Commands: `drawing.linkCel {clip?, from?, frame?}`
+  (`frame` defaults to the playhead, `from` to the cel shown there; it refuses a frame that starts a
+  cel, a `from` that is not a cel start, a locked track and a frame outside the clip) and
+  `drawing.makeIndependent {clip?, frame?}` (the cel shown on `frame`; it refuses an unlinked cel).
+  Both are in Graphics and Titles ▸ Drawing, journaled, one undo step, without default shortcuts.
+* **What shows.** Every exposure of a group has a stripe in the group's colour and a chain mark in
+  the lane; its automation entry (`timeline.cel.<clip>.<frame>`) says how many exposures share it.
+  While the cel shown is linked, the options bar says **Linked ×N** (`program.brush.linked`; the
+  tooltip lists the frames) and offers **Make Independent** (`program.brush.makeIndependent`);
+  **Link** is `program.brush.link`, the menu entries are `timeline.celMenu.link` and
+  `timeline.celMenu.independent`. A duplicate is never marked.
+* **What an edit reaches.** A stroke, an eraser, **Clear**, a fill, its recolour or removal and a
+  lasso transform on a linked exposure are applied to every exposure of the group and their command
+  results report `linked` (the number of exposures that changed). `drawing.inspect` adds `link` to a
+  linked cel and `link` and `linked` (how many exposures share it) to its exposure; an ordinary cel
+  is reported as before. To change only this exposure, make it
+  independent first, or use **Duplicate**.
+* **Not changed by it.** Retiming and holds move exposures and keep their links; **In-between** makes
+  new, unlinked cels; export, preview and onion skins draw a linked exposure like any other cel.
 
 ## Reference images
 

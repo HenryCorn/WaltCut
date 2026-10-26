@@ -6,7 +6,7 @@
 
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
-onion skin; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
+onion skin; linked exposures; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
 curves; region fill, also from another clip with gap closing and edge growth; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
@@ -393,6 +393,55 @@ shot("08g-light-table-reset")
 cmd("edit.undo", {})
 check(cmd("drawing.inspect", {"clip": drawing})["cels"][0]["strokes"] == strokes_before, "one undo takes the stroke away; the shift had no undo step")
 cmd("drawing.onionSkin", {"before": 1, "after": 1, "pin": None})
+
+print("== linked exposures: link, edit one, an independent duplicate, make independent, delete, undo")
+call("ui.set", {"tool": "Brush"}, quiet=True)
+original = [c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]]
+undo_steps = 0
+cmd("drawing.addStroke", {"clip": drawing, "frame": 20, "cel": "new", "stroke": {"brush": "Pen", "color": "#1d3557", "size": 6.0, "points": arc(160, 90, 30)}})
+first = cmd("drawing.linkCel", {"clip": drawing, "from": 20, "frame": 28})
+second = cmd("drawing.linkCel", {"clip": drawing, "from": 20, "frame": 36})
+check(first["linked"] == 2 and second["linked"] == 3 and first["link"] == second["link"], f"two links join one group ({first}, {second})")
+cmd("drawing.newCel", {"clip": drawing, "frame": 44, "copy": True})
+undo_steps += 4
+exposures = {e["frame"]: (e.get("link"), e.get("linked", 1)) for e in cmd("drawing.inspect", {"clip": drawing})["exposures"]}
+check(exposures[20][1] == exposures[28][1] == exposures[36][1] == 3 and exposures[44] == (None, 1), f"three exposures share one artwork and the duplicate is independent ({exposures})")
+cmd("playhead.set", {"frame": 28})
+time.sleep(0.8)
+call("ui.inspect")
+labels = {e["id"]: e["label"] for e in call("ui.elements", {"prefix": "timeline.cel"})["result"]}
+check("linked: 3 exposures" in labels[f"timeline.cel.{drawing}.28"] and "linked" not in labels[f"timeline.cel.{drawing}.44"], "the lane marks the linked exposures and not the duplicate")
+bar = {e["id"]: e for e in call("ui.elements", {"prefix": "program.brush"})["result"]}
+check("program.brush.linked" in bar and "3 exposures" in bar["program.brush.linked"]["label"] and "program.brush.makeIndependent" in bar, "the options bar states the scope of an edit")
+shot("08l-linked-exposures")
+cmd("playhead.set", {"frame": 44})
+before_44 = still("linked-44-before.png")
+cmd("playhead.set", {"frame": 20})
+before_20 = still("linked-20-before.png")
+edit = cmd("drawing.addStroke", {"clip": drawing, "frame": 36, "stroke": {"brush": "Pen", "color": "#e63946", "size": 8.0, "points": [[120, 150, 0.8], [200, 150, 0.8]]}})
+undo_steps += 1
+counts = {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]}
+check(edit["linked"] == 3 and counts[20] == counts[28] == counts[36] == 2 and counts[44] == 1, f"a stroke on one exposure reaches all three and not the duplicate ({counts})")
+cmd("playhead.set", {"frame": 20})
+check(still("linked-20-after.png") != before_20, "the exported still at another linked exposure shows the stroke")
+cmd("playhead.set", {"frame": 44})
+check(still("linked-44-after.png") == before_44, "the duplicate's still is unchanged")
+detached = cmd("drawing.makeIndependent", {"clip": drawing, "frame": 28})
+undo_steps += 1
+check(detached["remaining"] == 2, f"make independent leaves two linked ({detached})")
+cmd("drawing.addStroke", {"clip": drawing, "frame": 28, "stroke": {"brush": "Pen", "color": "#2a9d8f", "size": 8.0, "points": [[120, 20, 0.8], [200, 20, 0.8]]}})
+undo_steps += 1
+counts = {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]}
+check(counts[28] == 3 and counts[20] == counts[36] == 2, f"the detached exposure no longer follows the group ({counts})")
+cmd("drawing.deleteCel", {"clip": drawing, "frame": 36})
+undo_steps += 1
+left = {c["frame"]: c["strokes"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]}
+check(36 not in left and left[20] == 2, "deleting one exposure keeps the artwork on the others")
+for _ in range(undo_steps):
+    cmd("edit.undo", {})
+check([c["frame"] for c in cmd("drawing.inspect", {"clip": drawing})["cels"]] == original, "undo restores every cel")
+refused = call("engine.execute", {"command": "drawing.linkCel", "params": {"clip": drawing, "from": 3, "frame": 30}}, quiet=True)
+check(not refused.get("ok") and "no cel starts" in refused.get("error", ""), "linking from a frame with no cel is refused")
 
 print("== preview and frame-step")
 cmd("playhead.set", {"frame": 0})

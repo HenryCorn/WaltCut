@@ -3,7 +3,7 @@
 //! A project file is UTF-8 JSON with an explicit schema version:
 //!
 //! ```json
-//! { "format": "waltcut.project", "schema_version": 19, "generator": "WaltCut 0.1.0", "project": { … } }
+//! { "format": "waltcut.project", "schema_version": 20, "generator": "WaltCut 0.1.0", "project": { … } }
 //! ```
 //!
 //! - **One schema, no migrations.** [`SCHEMA_VERSION`] is the only version this build reads and
@@ -34,6 +34,11 @@
 //!   seed, tolerance and the region as a bounded run-length mask), written only for a fill. The bump
 //!   keeps a build that does not know the variant from opening such a file; a v18 file is refused
 //!   like any earlier one.
+//! - **v20**: a drawing's cels may be linked (#67): a linked cel is stored as `{frame, link}` with no
+//!   `strokes`, and the artwork once in the drawing's `links` (`{id, strokes}`), written only when a
+//!   drawing has links. Inconsistent link data (a dangling or lonely link, a linked cel that also
+//!   holds strokes, an id of 0 or a repeated one, over the size limits) is refused, not repaired. A
+//!   v19 file is refused like any earlier one.
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
@@ -55,7 +60,7 @@ pub const FORMAT_ID: &str = "waltcut.project";
 pub const LEGACY_FORMAT_ID: &str = "filmcraft.project";
 
 /// The schema version this build writes and reads. Nothing else is readable.
-pub const SCHEMA_VERSION: u32 = 19;
+pub const SCHEMA_VERSION: u32 = 20;
 
 /// The last build that opens projects written before the reduction.
 pub const LEGACY_RELEASE: &str = "v0.0.1-legacy";
@@ -317,7 +322,7 @@ mod tests {
 
     #[test]
     fn schema_version_is_the_reduction_baseline() {
-        assert_eq!(SCHEMA_VERSION, 19);
+        assert_eq!(SCHEMA_VERSION, 20);
         assert!(FormatError::TooOld { found: 15, supported: SCHEMA_VERSION }.to_string().contains(LEGACY_RELEASE));
     }
 
@@ -498,10 +503,10 @@ mod tests {
             b"{}",
             b"\xff\xfe",
             br#"{"schema_version":"19"}"#,
-            br#"{"schema_version":19}"#,
+            br#"{"schema_version":20}"#,
             br#"{"schema_version":-1}"#,
             br#"{"schema_version":99999999999}"#,
-            br#"{"format":"filmcraft.project","schema_version":19,"project":7}"#,
+            br#"{"format":"filmcraft.project","schema_version":20,"project":7}"#,
         ] {
             assert!(decode(junk).is_err(), "{}", String::from_utf8_lossy(junk));
         }
@@ -578,8 +583,8 @@ mod tests {
         assert_eq!(peek_schema(b"{\"schema_version\"\n :\t7 }"), Some(7));
         assert_eq!(peek_schema(br#"{"items":{},"root":{}}"#), Some(1));
         // behind the first 4 KiB: found by a full parse
-        let late = format!(r#"{{"padding":"{}","schema_version":19}}"#, "x".repeat(PEEK_BYTES * 2));
-        assert_eq!(peek_schema(late.as_bytes()), Some(19));
+        let late = format!(r#"{{"padding":"{}","schema_version":20}}"#, "x".repeat(PEEK_BYTES * 2));
+        assert_eq!(peek_schema(late.as_bytes()), Some(20));
         for junk in [&b""[..], b"{", b"[1]", br#"{"schema_version":"x"}"#, br#"{"schema_version":99999999999}"#] {
             assert_eq!(peek_schema(junk), None, "{}", String::from_utf8_lossy(junk));
         }

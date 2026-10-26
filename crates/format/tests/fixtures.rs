@@ -10,12 +10,12 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// The golden file: a project written by this schema, with media, a sequence, markers and effects.
 fn golden() -> Project {
-    decode(&fixture("v19-edit.waltcut")).unwrap().project
+    decode(&fixture("v20-edit.waltcut")).unwrap().project
 }
 
 #[test]
 fn golden_project_opens_and_round_trips_without_loss() {
-    let bytes = fixture("v19-edit.waltcut");
+    let bytes = fixture("v20-edit.waltcut");
     let l = decode(&bytes).unwrap();
     assert_eq!(l.schema_version, SCHEMA_VERSION);
     let p = &l.project;
@@ -39,6 +39,10 @@ fn golden_project_opens_and_round_trips_without_loss() {
     assert_eq!((fill.seed, fill.tolerance, fill.rect), ([10, 8], 32, [3, 2, 26, 14]));
     fill.validate(d.width, d.height).unwrap();
     assert_eq!(fill.filled_pixels(), 20 * 8);
+    // the linked exposures of that drawing: frames 0 and 12 are one stored artwork, 6 is its own blank cel
+    assert_eq!(d.cels.iter().map(|c| (c.frame, c.link)).collect::<Vec<_>>(), vec![(0, Some(1)), (6, None), (12, Some(1))]);
+    assert!(std::sync::Arc::ptr_eq(&d.cels[0].strokes, &d.cels[2].strokes) && d.cels[1].strokes.is_empty());
+    d.check_links().unwrap();
     // saved again it is the same document: nothing added, nothing lost (the writer's name aside)
     let again = encode(p, true);
     let (old, new): (serde_json::Value, serde_json::Value) = (serde_json::from_slice(&bytes).unwrap(), serde_json::from_slice(&again).unwrap());
@@ -50,7 +54,7 @@ fn golden_project_opens_and_round_trips_without_loss() {
 
 #[test]
 fn removed_audio_processing_data_is_refused_instead_of_silently_ignored() {
-    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v19-edit.waltcut")).unwrap();
+    let baseline: serde_json::Value = serde_json::from_slice(&fixture("v20-edit.waltcut")).unwrap();
     for (path, value) in [
         ("/project/items/21/kind/Sequence/audio_tracks/0/transitions", serde_json::json!([])),
         ("/project/settings/default_audio_transition_duration", serde_json::json!(254_016_000_000i64)),
@@ -96,6 +100,163 @@ fn pre_reduction_project_is_refused_and_left_untouched() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// v19 was the last schema before cels could be linked: it is refused like any earlier one.
+#[test]
+fn the_schema_before_linked_cels_is_refused_with_the_legacy_release() {
+    let e = decode(&fixture("v19-edit.waltcut")).unwrap_err();
+    assert!(matches!(e, FormatError::TooOld { found: 19, supported } if supported == SCHEMA_VERSION), "{e}");
+    assert!(e.to_string().contains(LEGACY_RELEASE));
+}
+
+/// The golden drawing's JSON with its `Drawing` object edited by `f`, decoded.
+fn decode_with_drawing(f: impl FnOnce(&mut serde_json::Value)) -> Result<Project, FormatError> {
+    let mut doc: serde_json::Value = serde_json::from_slice(&fixture("v20-edit.waltcut")).unwrap();
+    f(doc.pointer_mut("/project/items/48/kind/Drawing").unwrap());
+    decode(&serde_json::to_vec(&doc).unwrap()).map(|l| l.project)
+}
+
+/// Inconsistent link data is refused with a message, never repaired or half-loaded.
+#[test]
+fn malformed_link_data_is_refused_explicitly() {
+    use serde_json::json;
+    let art = || json!([{"brush": "Pen", "color": [0.0, 0.0, 0.0, 1.0], "size": 2.0, "points": [{"x": 4.0, "y": 3.0, "p": 1.0}]}]);
+    type Edit = Box<dyn Fn(&mut serde_json::Value)>;
+    let cases: Vec<(&str, Edit, &str)> = vec![
+        ("a linked cel that also holds strokes", Box::new(|d| d["cels"][0]["strokes"] = json!([])), "own strokes"),
+        ("a dangling link", Box::new(|d| d["cels"][1] = json!({"frame": 6, "link": 9})), "does not store"),
+        ("a link used by one cel", Box::new(|d| d["cels"][2] = json!({"frame": 12, "strokes": []})), "at least two"),
+        ("a stored link nobody uses", Box::new(|d| d["links"].as_array_mut().unwrap().push(json!({"id": 5, "strokes": []}))), "at least two"),
+        (
+            "link id 0",
+            Box::new(|d| {
+                d["links"][0]["id"] = json!(0);
+                d["cels"][0]["link"] = json!(0);
+                d["cels"][2]["link"] = json!(0);
+            }),
+            "at least 1",
+        ),
+        (
+            "a repeated id",
+            Box::new(|d| {
+                let l = d["links"][0].clone();
+                d["links"].as_array_mut().unwrap().push(l);
+            }),
+            "stored twice",
+        ),
+        ("an id past u32", Box::new(|d| d["cels"][0]["link"] = json!(4_294_967_296u64)), ""),
+        ("a negative id", Box::new(|d| d["cels"][0]["link"] = json!(-1)), ""),
+        ("a string id", Box::new(|d| d["cels"][0]["link"] = json!("1")), ""),
+        ("links that are not a list", Box::new(|d| d["links"] = json!({})), ""),
+        (
+            "too many strokes in one link",
+            Box::new(move |d| {
+                let stroke = art()[0].clone();
+                d["links"][0]["strokes"] = json!(vec![stroke; 5001]);
+            }),
+            "at most 5000",
+        ),
+        (
+            "too many groups",
+            Box::new(|d| {
+                let links: Vec<_> = (1..=10_001).map(|i| json!({"id": i, "strokes": []})).collect();
+                d["links"] = json!(links);
+            }),
+            "at most 10000",
+        ),
+    ];
+    for (what, edit, message) in cases {
+        let e = decode_with_drawing(edit).err().unwrap_or_else(|| panic!("accepted {what}"));
+        assert!(e.to_string().contains(message), "{what}: {e}");
+    }
+    // a link written with an unknown key is the usual unknown-field refusal
+    let e = decode_with_drawing(|d| d["links"][0]["colour"] = serde_json::json!("red")).err().unwrap();
+    assert!(matches!(e, FormatError::UnknownField(_)), "{e}");
+}
+
+/// Linked cels survive a save and a load as one stored artwork; plain drawings have no link keys;
+/// a copy that looks the same is not linked after a round trip.
+#[test]
+fn linked_cels_round_trip_and_plain_drawings_are_unchanged() {
+    use waltcut_project::drawing::{Brush, Drawing, Stroke, StrokePoint};
+    use waltcut_project::{ItemKind, Label};
+    let pen = || Stroke {
+        brush: Brush::Pen,
+        color: [0.0, 0.0, 0.0, 1.0],
+        size: 2.0,
+        points: vec![StrokePoint { x: 1.0, y: 2.0, p: 1.0 }],
+        response: None,
+        fill: None,
+    };
+    let mut d = Drawing::new(16, 16, waltcut_time::FrameRate::FPS_24);
+    for f in [0, 4, 8, 12] {
+        d.ensure_cel(f, false).unwrap();
+    }
+    d.edit_strokes(0, |v| v.push(pen())).unwrap();
+    d.edit_strokes(1, |v| v.push(pen())).unwrap();
+    let mut bare = Project::new("bare");
+    bare.add_item("plain", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
+    let written = String::from_utf8_lossy(&encode(&bare, true)).into_owned();
+    assert!(!written.contains("\"link"), "no link key without a link");
+    d.link_cel(0, 16).unwrap();
+    d.link_cel(0, 20).unwrap();
+    d.check_links().unwrap();
+    let mut p = Project::new("linked");
+    let id = p.add_item("linked", Label::Iris, ItemKind::Drawing(d.clone().into()), None);
+    let bytes = encode(&p, true);
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    assert_eq!(text.matches("\"links\"").count(), 1);
+    assert_eq!(text.matches("\"points\"").count(), 2, "the linked artwork once, and the equal-looking cel's own");
+    let back = decode(&bytes).unwrap().project;
+    let b = back.item(id).and_then(|i| i.as_drawing()).unwrap();
+    assert_eq!(b, &d);
+    b.check_links().unwrap();
+    assert!(std::sync::Arc::ptr_eq(&b.cels[0].strokes, &b.cels[4].strokes) && std::sync::Arc::ptr_eq(&b.cels[4].strokes, &b.cels[5].strokes));
+    assert!(!std::sync::Arc::ptr_eq(&b.cels[0].strokes, &b.cels[1].strokes), "equal strokes, no link: not aliased");
+    assert_eq!(encode(&back, true), bytes, "stable on repeated saves");
+}
+
+/// Truncation and byte flips in a document with linked cels either decode to a consistent drawing
+/// or fail with an error; none panics, and whatever decodes is internally consistent.
+#[test]
+fn damaged_link_documents_never_panic_and_never_load_inconsistent() {
+    let bytes = fixture("v20-edit.waltcut");
+    let text = String::from_utf8(bytes.clone()).unwrap();
+    let anchor = text.find("\"links\"").unwrap();
+    let check = |doc: &[u8]| {
+        let r = std::panic::catch_unwind(|| decode(doc));
+        let r = r.expect("decode must not panic");
+        if let Ok(l) = r {
+            for item in l.project.items.values() {
+                if let Some(d) = item.as_drawing() {
+                    d.check_links().unwrap();
+                }
+            }
+        }
+    };
+    let mut cuts = 0;
+    for n in (0..bytes.len()).step_by(997).chain(anchor.saturating_sub(40)..(anchor + 400).min(bytes.len())) {
+        check(&bytes[..n]);
+        cuts += 1;
+    }
+    let mut flips = 0;
+    for i in (anchor.saturating_sub(600)..(anchor + 600).min(bytes.len())).chain((0..bytes.len()).step_by(401)) {
+        for mask in [0x01u8, 0x20, 0x80, 0xff] {
+            let mut doc = bytes.clone();
+            if let Some(b) = doc.get_mut(i) {
+                *b ^= mask;
+            }
+            check(&doc);
+            flips += 1;
+        }
+    }
+    assert!(cuts > 100 && flips > 1000, "{cuts} cuts, {flips} flips");
+    // the digits of an id replaced by every kind of number
+    for repl in ["0", "2", "-3", "1e999", "4294967295", "4294967296", "null", "true", "[]", "{}", "1.5"] {
+        let mut doc = text.clone();
+        doc = doc.replacen("\"link\": 1", &format!("\"link\": {repl}"), 1);
+        check(doc.as_bytes());
+    }
+}
 /// v18 was the last schema before a cel could hold a fill: it is refused like any earlier one.
 #[test]
 fn the_schema_before_fills_is_refused_with_the_legacy_release() {

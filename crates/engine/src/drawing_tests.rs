@@ -465,8 +465,12 @@ fn the_project_file_format_of_cels_is_unchanged() {
     let back: waltcut_project::drawing::Drawing = serde_json::from_value(v).unwrap();
     assert_eq!(back, d);
     // an old file without `strokes` still loads
-    let old: waltcut_project::drawing::Cel = serde_json::from_value(json!({"frame": 5})).unwrap();
-    assert!(old.strokes.is_empty());
+    let old: waltcut_project::drawing::Drawing =
+        serde_json::from_value(json!({"width": 8, "height": 8, "rate": {"num": 24, "den": 1}, "cels": [{"frame": 5}]})).unwrap();
+    assert!(old.cels[0].strokes.is_empty() && old.cels[0].link.is_none());
+    // no cel is linked, so no `link` or `links` key is written
+    let text = serde_json::to_string(&d).unwrap();
+    assert!(!text.contains("link"), "{text}");
 }
 
 fn stored_response(s: &Session) -> Vec<Option<waltcut_project::drawing::PressureResponse>> {

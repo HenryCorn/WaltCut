@@ -6,6 +6,11 @@
 //! so a held pose costs nothing. A cel is a list of [`Stroke`]s in paint order (first = back), each
 //! a polyline of pressure samples from a mouse or drawing tablet.
 //!
+//! A cel can be **linked** to others (#67): the exposures of a link group show one stored artwork,
+//! every member holding the same `Arc` of strokes, and [`Drawing::edit_strokes`] is how an edit of
+//! one reaches the rest. A hold (one cel, longer) and a duplicate (an independent copy) are not
+//! links. On disk the artwork of a group is written once (`docs/project-files.md`, "Linked cels").
+//!
 //! A drawing clip places the drawing on a video track like any other source, so Motion, Opacity,
 //! blend modes and their keyframes apply. Strokes are plain data: the renderer
 //! rasterises them (`waltcut_render::drawing`) and the UI paints its own live preview.
@@ -299,16 +304,27 @@ impl Stroke {
     }
 }
 
+/// A link group's id (#67): small, never 0, and meaningful only inside its drawing.
+pub type LinkId = u32;
+
 /// A drawing shown from `frame` until the next cel starts.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+///
+/// Stored by [`Drawing`]'s own (de)serialisation, not derived: a linked cel is written without its
+/// strokes and its artwork once in the drawing's `links` list.
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Cel {
     /// First drawing frame (0 = the drawing's start) this cel is shown on.
     pub frame: i64,
     /// Shared, copy-on-write: a clone of the cel, of the drawing, or an undo snapshot holds the
     /// same strokes until one of them is edited ([`Cel::strokes_mut`]), so adding a stroke copies
     /// the strokes of that one cel, not of the whole drawing.
-    #[serde(default)]
+    ///
+    /// The members of a link group hold *the same allocation* (see [`Cel::link`]).
     pub strokes: std::sync::Arc<Vec<Stroke>>,
+    /// The link group this exposure belongs to (#67): every exposure with the same id is the same
+    /// artwork, and an edit of one is an edit of all of them ([`Drawing::edit_strokes`]). `None`
+    /// for an ordinary cel, which a duplicate also is. A group has at least two members.
+    pub link: Option<LinkId>,
 }
 
 impl Cel {
@@ -318,6 +334,9 @@ impl Cel {
     }
 
     /// The strokes for editing: copies them first when another clone of the cel still shares them.
+    ///
+    /// This changes this cel only. For a cel that may be linked use [`Drawing::edit_strokes`],
+    /// which gives the result to the other members of its group.
     pub fn strokes_mut(&mut self) -> &mut Vec<Stroke> {
         std::sync::Arc::make_mut(&mut self.strokes)
     }
@@ -344,19 +363,295 @@ pub struct Ghost {
     pub index: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// The most link groups one drawing may hold (a group has at least two cels).
+pub const MAX_LINK_GROUPS: usize = MAX_CELS / 2;
+
+/// Stored with [`Drawing`]'s own serialisation (see [`Cel`] and `docs/project-files.md`).
+#[derive(Clone, Debug, PartialEq)]
 pub struct Drawing {
     pub width: u32,
     pub height: u32,
     pub rate: FrameRate,
     /// Sorted by `frame`, no two on the same frame.
-    #[serde(default)]
     pub cels: Vec<Cel>,
+}
+
+#[derive(Serialize)]
+struct CelOut<'a> {
+    frame: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strokes: Option<&'a std::sync::Arc<Vec<Stroke>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    link: Option<LinkId>,
+}
+
+#[derive(Serialize)]
+struct LinkOut<'a> {
+    id: LinkId,
+    strokes: &'a std::sync::Arc<Vec<Stroke>>,
+}
+
+#[derive(Serialize)]
+struct DrawingOut<'a> {
+    width: u32,
+    height: u32,
+    rate: FrameRate,
+    cels: Vec<CelOut<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    links: Vec<LinkOut<'a>>,
+}
+
+#[derive(Deserialize)]
+struct CelIn {
+    frame: i64,
+    #[serde(default)]
+    strokes: Option<std::sync::Arc<Vec<Stroke>>>,
+    #[serde(default)]
+    link: Option<LinkId>,
+}
+
+#[derive(Deserialize)]
+struct LinkIn {
+    id: LinkId,
+    strokes: std::sync::Arc<Vec<Stroke>>,
+}
+
+#[derive(Deserialize)]
+struct DrawingIn {
+    width: u32,
+    height: u32,
+    rate: FrameRate,
+    #[serde(default)]
+    cels: Vec<CelIn>,
+    #[serde(default)]
+    links: Vec<LinkIn>,
+}
+
+impl Serialize for Drawing {
+    fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error;
+        // a group is written once, from its first member; a member that is not the same list would
+        // be lost, so that is an error rather than a save that drops work
+        let mut uses: std::collections::BTreeMap<LinkId, usize> = std::collections::BTreeMap::new();
+        for id in self.cels.iter().filter_map(|c| c.link) {
+            *uses.entry(id).or_default() += 1;
+        }
+        let mut links: std::collections::BTreeMap<LinkId, &std::sync::Arc<Vec<Stroke>>> = std::collections::BTreeMap::new();
+        let mut cels = Vec::with_capacity(self.cels.len());
+        for c in &self.cels {
+            match c.link.filter(|id| *id != 0 && uses.get(id).is_some_and(|n| *n >= 2)) {
+                Some(id) => {
+                    match links.get(&id) {
+                        None => {
+                            links.insert(id, &c.strokes);
+                        }
+                        Some(first) if std::sync::Arc::ptr_eq(first, &c.strokes) => {}
+                        Some(_) => {
+                            return Err(S::Error::custom(format!("the cel on frame {} is linked ({id}) but no longer shows its group's artwork", c.frame)));
+                        }
+                    }
+                    cels.push(CelOut { frame: c.frame, strokes: None, link: Some(id) });
+                }
+                None => cels.push(CelOut { frame: c.frame, strokes: Some(&c.strokes), link: None }),
+            }
+        }
+        let links = links.into_iter().map(|(id, strokes)| LinkOut { id, strokes }).collect();
+        DrawingOut { width: self.width, height: self.height, rate: self.rate, cels, links }.serialize(ser)
+    }
+}
+
+impl<'de> Deserialize<'de> for Drawing {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let w = DrawingIn::deserialize(de)?;
+        Drawing::from_stored(w).map_err(serde::de::Error::custom)
+    }
 }
 
 impl Drawing {
     pub fn new(width: u32, height: u32, rate: FrameRate) -> Self {
         Self { width, height, rate, cels: Vec::new() }
+    }
+
+    /// Build a drawing from its stored form, refusing link data that does not make sense (see
+    /// `docs/project-files.md`, "Linked cels"): nothing is repaired silently.
+    fn from_stored(w: DrawingIn) -> Result<Drawing, String> {
+        if w.links.len() > MAX_LINK_GROUPS {
+            return Err(format!("a drawing may hold at most {MAX_LINK_GROUPS} linked cel groups, not {}", w.links.len()));
+        }
+        let mut contents: std::collections::BTreeMap<LinkId, (std::sync::Arc<Vec<Stroke>>, usize)> = std::collections::BTreeMap::new();
+        for l in w.links {
+            if l.id == 0 {
+                return Err("a link id is at least 1".into());
+            }
+            if l.strokes.len() > MAX_CEL_STROKES {
+                return Err(format!("linked cels {} hold {} strokes and a cel holds at most {MAX_CEL_STROKES}", l.id, l.strokes.len()));
+            }
+            if contents.insert(l.id, (l.strokes, 0)).is_some() {
+                return Err(format!("link {} is stored twice", l.id));
+            }
+        }
+        let mut cels = Vec::with_capacity(w.cels.len());
+        for c in w.cels {
+            match (c.link, c.strokes) {
+                (Some(id), None) => {
+                    let (strokes, uses) =
+                        contents.get_mut(&id).ok_or_else(|| format!("the cel on frame {} links to {id}, which the drawing does not store", c.frame))?;
+                    *uses += 1;
+                    cels.push(Cel { frame: c.frame, strokes: strokes.clone(), link: Some(id) });
+                }
+                (Some(id), Some(_)) => {
+                    return Err(format!("the cel on frame {} is linked ({id}) and also holds its own strokes", c.frame));
+                }
+                (None, strokes) => cels.push(Cel { frame: c.frame, strokes: strokes.unwrap_or_default(), link: None }),
+            }
+        }
+        if let Some((id, (_, uses))) = contents.iter().find(|(_, (_, uses))| *uses < 2) {
+            return Err(format!("link {id} is used by {uses} cel(s); a link joins at least two"));
+        }
+        Ok(Drawing { width: w.width, height: w.height, rate: w.rate, cels })
+    }
+
+    /// The indices of the cels of link group `link`, in frame order.
+    pub fn link_members(&self, link: LinkId) -> impl Iterator<Item = usize> + '_ {
+        self.cels.iter().enumerate().filter(move |(_, c)| c.link == Some(link)).map(|(i, _)| i)
+    }
+
+    /// How many exposures show the artwork of the cel at `index`: its group's size, or 1.
+    pub fn exposures_sharing(&self, index: usize) -> usize {
+        match self.cels.get(index).and_then(|c| c.link) {
+            Some(l) => self.link_members(l).count(),
+            None => 1,
+        }
+    }
+
+    /// Whether the cel at `index` is a later member of its group: its strokes are stored (and its
+    /// fills budgeted) with the first member.
+    fn is_follower(&self, index: usize) -> bool {
+        let Some(l) = self.cels.get(index).and_then(|c| c.link) else { return false };
+        self.link_members(l).next().is_some_and(|first| first != index)
+    }
+
+    /// Point every member of each group at its first member's strokes.
+    fn resync_links(&mut self) {
+        let mut first: std::collections::BTreeMap<LinkId, std::sync::Arc<Vec<Stroke>>> = std::collections::BTreeMap::new();
+        for c in &mut self.cels {
+            if let Some(l) = c.link {
+                c.strokes = first.entry(l).or_insert_with(|| c.strokes.clone()).clone();
+            }
+        }
+    }
+
+    /// Change the strokes of the cel at `index` and give the result to the other members of its
+    /// group: the one way to edit a cel's paint that keeps linked exposures the same artwork (#67).
+    /// `None` when there is no such cel.
+    pub fn edit_strokes<R>(&mut self, index: usize, f: impl FnOnce(&mut Vec<Stroke>) -> R) -> Option<R> {
+        let link = self.cels.get(index)?.link;
+        let r = f(self.cels.get_mut(index)?.strokes_mut());
+        if let Some(l) = link {
+            let shared = self.cels.get(index)?.strokes.clone();
+            for c in self.cels.iter_mut().filter(|c| c.link == Some(l)) {
+                c.strokes = shared.clone();
+            }
+        }
+        Some(r)
+    }
+
+    /// The id a new link group gets: one above the largest in the drawing.
+    fn next_link_id(&self) -> Result<LinkId, String> {
+        self.cels.iter().filter_map(|c| c.link).max().unwrap_or(0).checked_add(1).ok_or_else(|| "too many linked cels".to_string())
+    }
+
+    /// Start a cel on frame `to` that is *linked* to the cel starting on `from` (#67): it shows the
+    /// same artwork, and an edit of either changes both. The source joins (or starts) the group.
+    /// Returns the group's id. Nothing changes on an error.
+    pub fn link_cel(&mut self, from: i64, to: i64) -> Result<LinkId, String> {
+        let src = self.cel_on(from).ok_or_else(|| format!("no cel starts on frame {from}"))?;
+        if to < 0 {
+            return Err("cel frame must not be negative".into());
+        }
+        if self.cel_on(to).is_some() {
+            return Err(format!("frame {to} already starts a cel"));
+        }
+        if self.cels.len() >= MAX_CELS {
+            return Err(format!("a drawing may hold at most {MAX_CELS} cels"));
+        }
+        let existing = self.cels.get(src).and_then(|c| c.link);
+        let id = match existing {
+            Some(id) => id,
+            None => {
+                if self.cels.iter().filter_map(|c| c.link).collect::<std::collections::BTreeSet<_>>().len() >= MAX_LINK_GROUPS {
+                    return Err(format!("a drawing may hold at most {MAX_LINK_GROUPS} linked groups"));
+                }
+                self.next_link_id()?
+            }
+        };
+        let strokes = self.cels.get(src).map(|c| c.strokes.clone()).ok_or("no such cel")?;
+        if let Some(c) = self.cels.get_mut(src) {
+            c.link = Some(id);
+        }
+        let i = self.cels.partition_point(|c| c.frame < to);
+        self.cels.insert(i, Cel { frame: to, strokes, link: Some(id) });
+        Ok(id)
+    }
+
+    /// Make the cel at `index` independent: it keeps its strokes and leaves its group (#67). A
+    /// group left with one cel is dissolved. Fails when the cel is not linked.
+    pub fn make_independent(&mut self, index: usize) -> Result<(), String> {
+        let c = self.cels.get_mut(index).ok_or("no such cel")?;
+        if c.link.take().is_none() {
+            return Err("this cel is not linked".into());
+        }
+        self.normalize_links();
+        Ok(())
+    }
+
+    /// Remove the cel at `index`; a link group it leaves with one cel is dissolved.
+    pub fn remove_cel(&mut self, index: usize) -> Option<Cel> {
+        if index >= self.cels.len() {
+            return None;
+        }
+        let c = self.cels.remove(index);
+        self.normalize_links();
+        Some(c)
+    }
+
+    /// Unlink every cel that is alone in its group (and a link id of 0, which is none).
+    pub fn normalize_links(&mut self) {
+        let mut uses: std::collections::BTreeMap<LinkId, usize> = std::collections::BTreeMap::new();
+        for c in &mut self.cels {
+            if c.link == Some(0) {
+                c.link = None;
+            }
+            if let Some(l) = c.link {
+                *uses.entry(l).or_default() += 1;
+            }
+        }
+        for c in &mut self.cels {
+            if c.link.is_some_and(|l| uses.get(&l).is_none_or(|n| *n < 2)) {
+                c.link = None;
+            }
+        }
+    }
+
+    /// Check the link invariants: ids are at least 1, a group has at least two cels, and all of its
+    /// cels hold the same allocation of strokes. The engine runs it after every edit.
+    pub fn check_links(&self) -> Result<(), String> {
+        let mut first: std::collections::BTreeMap<LinkId, (&std::sync::Arc<Vec<Stroke>>, usize)> = std::collections::BTreeMap::new();
+        for c in &self.cels {
+            let Some(l) = c.link else { continue };
+            if l == 0 {
+                return Err("a link id is at least 1".into());
+            }
+            let e = first.entry(l).or_insert((&c.strokes, 0));
+            if !std::sync::Arc::ptr_eq(e.0, &c.strokes) {
+                return Err(format!("the cel on frame {} is linked ({l}) but does not show its group's artwork", c.frame));
+            }
+            e.1 += 1;
+        }
+        match first.iter().find(|(_, (_, n))| *n < 2) {
+            Some((l, _)) => Err(format!("link {l} joins fewer than two cels")),
+            None => Ok(()),
+        }
     }
 
     /// The drawing frame shown at drawing time `t`.
@@ -466,7 +761,7 @@ impl Drawing {
         }
         let strokes = if copy_held { self.cel_at(f).map(|c| c.strokes.clone()).unwrap_or_default() } else { Default::default() };
         let i = self.cels.partition_point(|c| c.frame < f);
-        self.cels.insert(i, Cel { frame: f, strokes });
+        self.cels.insert(i, Cel { frame: f, strokes, link: None });
         Ok(i)
     }
 
@@ -535,9 +830,10 @@ impl Drawing {
         out
     }
 
-    /// How many fill runs all the cels hold.
+    /// How many fill runs all the cels hold. A linked group's fills are stored once, so they count
+    /// once.
     pub fn fill_runs(&self) -> usize {
-        self.cels.iter().map(Cel::fill_runs).sum()
+        self.cels.iter().enumerate().filter(|(i, _)| !self.is_follower(*i)).map(|(_, c)| c.fill_runs()).sum()
     }
 
     /// Drop the fills that are not usable on this canvas, or that would pass a cel's or the
@@ -546,8 +842,10 @@ impl Drawing {
     pub fn repair_fills(&mut self) -> usize {
         let (w, h) = (self.width, self.height);
         let (mut dropped, mut drawing_runs) = (0usize, 0usize);
-        for c in &mut self.cels {
-            if !c.strokes.iter().any(|s| s.brush == Brush::Fill || s.fill.is_some()) {
+        // a linked group is repaired once, through its first member, and the others follow it
+        let followers: Vec<bool> = (0..self.cels.len()).map(|i| self.is_follower(i)).collect();
+        for (c, follower) in self.cels.iter_mut().zip(followers) {
+            if follower || !c.strokes.iter().any(|s| s.brush == Brush::Fill || s.fill.is_some()) {
                 continue;
             }
             let mut cel_runs = 0usize;
@@ -575,6 +873,7 @@ impl Drawing {
                 k
             });
         }
+        self.resync_links();
         dropped
     }
 
@@ -584,9 +883,14 @@ impl Drawing {
         self.cels.truncate(MAX_CELS);
         self.cels.sort_by_key(|c| c.frame);
         self.cels.dedup_by_key(|c| c.frame);
+        self.normalize_links();
         self.repair_fills();
         let (w, h) = (self.width, self.height);
-        for c in &mut self.cels {
+        let followers: Vec<bool> = (0..self.cels.len()).map(|i| self.is_follower(i)).collect();
+        for (c, follower) in self.cels.iter_mut().zip(followers) {
+            if follower {
+                continue;
+            }
             let strokes = c.strokes_mut();
             strokes.truncate(MAX_CEL_STROKES);
             *strokes = std::mem::take(strokes)
@@ -603,6 +907,7 @@ impl Drawing {
                 })
                 .collect();
         }
+        self.resync_links();
     }
 }
 
@@ -903,15 +1208,19 @@ mod tests {
     #[test]
     fn sanitize_restores_order_and_uniqueness() {
         let mut d = Drawing::new(10, 10, FrameRate::new(24, 1));
-        d.cels = vec![Cel { frame: 5, strokes: vec![].into() }, Cel { frame: 1, strokes: vec![].into() }, Cel { frame: 5, strokes: vec![].into() }];
+        d.cels = vec![
+            Cel { frame: 5, strokes: vec![].into(), link: None },
+            Cel { frame: 1, strokes: vec![].into(), link: None },
+            Cel { frame: 5, strokes: vec![].into(), link: None },
+        ];
         d.sanitize();
         assert_eq!(d.cels.iter().map(|c| c.frame).collect::<Vec<_>>(), vec![1, 5]);
     }
 
     #[test]
     fn tween_halfway_between_two_lines() {
-        let a = Cel { frame: 0, strokes: vec![line(0.0, 10.0, 3)].into() };
-        let b = Cel { frame: 4, strokes: vec![line(20.0, 30.0, 7)].into() };
+        let a = Cel { frame: 0, strokes: vec![line(0.0, 10.0, 3)].into(), link: None };
+        let b = Cel { frame: 4, strokes: vec![line(20.0, 30.0, 7)].into(), link: None };
         let mid = tween(&a, &b, 0.5);
         assert_eq!(mid.len(), 1);
         let pts = &mid[0].points;
@@ -920,7 +1229,7 @@ mod tests {
         assert!((pts[6].x - 20.0).abs() < 1e-4);
         // degenerate input never panics
         assert!(tween(&Cel::default(), &Cel::default(), f32::NAN).is_empty());
-        let dot = Cel { frame: 0, strokes: vec![line(5.0, 5.0, 1)].into() };
+        let dot = Cel { frame: 0, strokes: vec![line(5.0, 5.0, 1)].into(), link: None };
         assert_eq!(tween(&dot, &b, 0.25).len(), 1);
     }
 }
@@ -1100,14 +1409,14 @@ mod fill_tests {
         let mut d = Drawing::new(64, 64, FrameRate::new(24, 1));
         let outside = fill_stroke([60, 60, 8, 8]);
         let ok = fill_stroke([0, 0, 8, 8]);
-        d.cels = vec![Cel { frame: 0, strokes: vec![pen(), outside, ok.clone(), pen()].into() }];
+        d.cels = vec![Cel { frame: 0, strokes: vec![pen(), outside, ok.clone(), pen()].into(), link: None }];
         d.sanitize();
         assert_eq!(d.cels[0].strokes.len(), 3, "the fill outside the canvas is dropped, the rest is kept in order");
         assert_eq!(d.cels[0].strokes[1], ok);
         // too large a canvas holds no fills
         let mut big = Drawing::new(8192, 8192, FrameRate::new(24, 1));
         assert!(u64::from(big.width) * u64::from(big.height) > MAX_FILL_PIXELS);
-        big.cels = vec![Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 8, 8]), pen()].into() }];
+        big.cels = vec![Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 8, 8]), pen()].into(), link: None }];
         big.sanitize();
         assert_eq!(big.cels[0].strokes.len(), 1);
         // a cel's run budget
@@ -1116,7 +1425,7 @@ mod fill_tests {
             Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, n as u32, 1], runs, gap: 0, grow: 0, reference: None })
         };
         let mut e = Drawing::new(MAX_CEL_FILL_RUNS as u32, 1, FrameRate::new(24, 1));
-        e.cels = vec![Cel { frame: 0, strokes: (0..5).map(|_| many(60_000)).collect::<Vec<_>>().into() }];
+        e.cels = vec![Cel { frame: 0, strokes: (0..5).map(|_| many(60_000)).collect::<Vec<_>>().into(), link: None }];
         e.sanitize();
         assert_eq!(e.cels[0].strokes.len(), 4, "the fifth 60 000-run fill passes the cel's 262 144-run budget");
         assert_eq!(e.fill_runs(), 240_000);
@@ -1124,10 +1433,160 @@ mod fill_tests {
 
     #[test]
     fn an_in_between_never_morphs_a_fill() {
-        let a = Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 4, 4])].into() };
-        let b = Cel { frame: 4, strokes: vec![pen()].into() };
+        let a = Cel { frame: 0, strokes: vec![fill_stroke([0, 0, 4, 4])].into(), link: None };
+        let b = Cel { frame: 4, strokes: vec![pen()].into(), link: None };
         assert!(tween(&a, &b, 0.25)[0].is_fill());
         assert!(!tween(&a, &b, 0.75)[0].is_fill());
         assert!(tween(&b, &a, 0.75)[0].is_fill());
+    }
+}
+
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+
+    fn line(x0: f32, x1: f32, n: usize) -> Stroke {
+        let points = (0..n).map(|i| StrokePoint { x: x0 + (x1 - x0) * i as f32 / (n - 1).max(1) as f32, y: 10.0, p: 1.0 }).collect();
+        Stroke { brush: Brush::Pen, color: [1.0, 0.0, 0.0, 1.0], size: 4.0, points, response: None, fill: None }
+    }
+
+    fn cel_of(d: &mut Drawing, frame: i64, strokes: &[Stroke]) {
+        let i = d.ensure_cel(frame, false).unwrap();
+        d.cels[i].strokes_mut().extend_from_slice(strokes);
+    }
+
+    fn fill_stroke(rect: [u32; 4]) -> Stroke {
+        let cells = vec![1u8; (rect[2] * rect[3]) as usize];
+        Stroke::fill_op([1.0, 0.0, 0.0, 1.0], Fill::encode([rect[0], rect[1]], 32, rect, &cells).unwrap())
+    }
+
+    fn pen() -> Stroke {
+        line(1.0, 1.0, 1)
+    }
+
+    fn linked_drawing() -> Drawing {
+        let mut d = Drawing::new(32, 32, FrameRate::FPS_24);
+        cel_of(&mut d, 0, &[line(0.0, 10.0, 3)]);
+        cel_of(&mut d, 4, &[line(0.0, 20.0, 3)]);
+        d.link_cel(0, 8).unwrap();
+        d.link_cel(0, 12).unwrap();
+        d
+    }
+
+    #[test]
+    fn linking_shares_one_allocation_and_edit_strokes_reaches_every_peer() {
+        let mut d = linked_drawing();
+        d.check_links().unwrap();
+        assert_eq!(d.cels.iter().map(|c| c.link).collect::<Vec<_>>(), vec![Some(1), None, Some(1), Some(1)]);
+        assert_eq!(d.exposures_sharing(0), 3);
+        assert_eq!(d.exposures_sharing(1), 1);
+        assert!(std::sync::Arc::ptr_eq(&d.cels[0].strokes, &d.cels[3].strokes));
+        d.edit_strokes(2, |v| v.push(line(0.0, 30.0, 2))).unwrap();
+        d.check_links().unwrap();
+        assert_eq!(d.cels.iter().map(|c| c.strokes.len()).collect::<Vec<_>>(), vec![2, 1, 2, 2]);
+        assert!(d.edit_strokes(9, |_| ()).is_none());
+        // a path that edits one member only is caught
+        d.cels[0].strokes_mut().clear();
+        assert!(d.check_links().unwrap_err().contains("does not show"));
+    }
+
+    #[test]
+    fn make_independent_and_remove_dissolve_a_group_left_with_one() {
+        let mut d = linked_drawing();
+        d.make_independent(1).unwrap_err();
+        d.make_independent(3).unwrap();
+        assert_eq!((d.cels[3].link, d.cels[0].link, d.cels[2].link), (None, Some(1), Some(1)));
+        assert_eq!(d.cels[3].strokes.len(), 1, "it keeps its strokes");
+        d.remove_cel(2).unwrap();
+        assert!(d.cels.iter().all(|c| c.link.is_none()), "one cel left is not linked to anything");
+        d.check_links().unwrap();
+        assert!(d.remove_cel(99).is_none());
+        assert!(d.make_independent(99).is_err());
+    }
+
+    #[test]
+    fn link_cel_refuses_bad_frames_and_a_full_drawing_and_changes_nothing() {
+        let mut d = linked_drawing();
+        let before = d.clone();
+        for (from, to) in [(1, 20), (0, 0), (0, 4), (0, -1), (i64::MIN, 3), (4, 8)] {
+            assert!(d.link_cel(from, to).is_err(), "{from} {to}");
+            assert_eq!(d, before);
+        }
+        let mut full = Drawing::new(8, 8, FrameRate::FPS_24);
+        full.cels = (0..MAX_CELS as i64).map(|f| Cel { frame: f, strokes: Default::default(), link: None }).collect();
+        let n = full.cels.len();
+        assert!(full.link_cel(0, MAX_CELS as i64 + 5).unwrap_err().contains("at most"));
+        assert_eq!((full.cels.len(), full.cels[0].link), (n, None));
+        // ids come from the drawing: the next group is one above the largest
+        let mut e = linked_drawing();
+        e.link_cel(4, 20).unwrap();
+        assert_eq!(e.cels[1].link, Some(2));
+        // joining a group never needs a new id, so the largest id is fine; a new group past it is refused
+        let mut g = linked_drawing();
+        for i in [0, 2, 3] {
+            g.cels[i].link = Some(u32::MAX);
+        }
+        g.link_cel(0, 30).unwrap();
+        assert_eq!(g.cels.last().map(|c| c.link), Some(Some(u32::MAX)));
+        let before = g.clone();
+        assert!(g.link_cel(4, 40).unwrap_err().contains("too many"));
+        assert_eq!(g, before);
+    }
+
+    #[test]
+    fn a_linked_drawing_stores_its_artwork_once_and_reads_back_linked() {
+        let d = linked_drawing();
+        let v = serde_json::to_value(&d).unwrap();
+        assert_eq!(v["links"].as_array().map(Vec::len), Some(1));
+        assert!(v["cels"][0].get("strokes").is_none() && v["cels"][0]["link"] == 1);
+        assert!(v["cels"][1].get("link").is_none() && v["cels"][1]["strokes"].is_array());
+        let back: Drawing = serde_json::from_value(v).unwrap();
+        assert_eq!(back, d);
+        back.check_links().unwrap();
+        assert!(std::sync::Arc::ptr_eq(&back.cels[0].strokes, &back.cels[2].strokes));
+        // a drawing with no links has no `links` key
+        let mut plain = d.clone();
+        for i in [2usize, 3] {
+            plain.cels[i].link = None;
+        }
+        plain.cels[0].link = None;
+        let text = serde_json::to_string(&plain).unwrap();
+        assert!(!text.contains("link"));
+        // serialising diverged peers is an error, never a save that drops one
+        let mut bad = d.clone();
+        bad.cels[0].strokes_mut().clear();
+        assert!(serde_json::to_string(&bad).is_err());
+        // a group of one in memory is written as an ordinary cel
+        let mut lone = d.clone();
+        lone.cels[2].link = None;
+        lone.cels[3].link = None;
+        let back: Drawing = serde_json::from_str(&serde_json::to_string(&lone).unwrap()).unwrap();
+        assert!(back.cels.iter().all(|c| c.link.is_none()) && back.cels[0].strokes.len() == 1);
+    }
+
+    #[test]
+    fn fills_in_a_linked_group_are_counted_and_repaired_once() {
+        let mut d = Drawing::new(8, 8, FrameRate::FPS_24);
+        let mut fill = fill_stroke([0, 0, 8, 8]);
+        fill.fill = Some(std::sync::Arc::new(Fill::encode([1, 1], 0, [0, 0, 8, 8], &[1u8; 64]).unwrap()));
+        let runs = fill.fill.as_ref().map_or(0, |f| f.runs.len());
+        cel_of(&mut d, 0, &[fill, pen()]);
+        d.link_cel(0, 4).unwrap();
+        d.link_cel(0, 8).unwrap();
+        assert_eq!(d.fill_runs(), runs, "one stored fill, however many exposures show it");
+        assert_eq!(d.repair_fills(), 0);
+        d.check_links().unwrap();
+        // a bad fill in the group is dropped once, from every exposure
+        d.cels[0].strokes_mut();
+        let mut bad = d.clone();
+        let strokes = std::sync::Arc::make_mut(&mut bad.cels[0].strokes);
+        strokes
+            .push(Stroke::fill_op([1.0; 4], Fill { seed: [0, 0], tolerance: 0, rect: [0, 0, 99, 99], runs: vec![[1, 1]], gap: 0, grow: 0, reference: None }));
+        bad.resync_links();
+        assert_eq!(bad.repair_fills(), 1);
+        bad.check_links().unwrap();
+        assert!(bad.cels.iter().all(|c| c.strokes.len() == 2));
+        bad.sanitize();
+        bad.check_links().unwrap();
     }
 }
