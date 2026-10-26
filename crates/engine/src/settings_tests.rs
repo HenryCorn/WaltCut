@@ -458,8 +458,13 @@ fn graphics_text_uses_the_text_settings() {
     assert_eq!(l.params["font"].value, ParamValue::Text("JetBrains Mono".into()));
 }
 
+/// Tests that change the process-wide hardware-decoding switch take this lock, so they do not
+/// overwrite each other (#164).
+static HW_SWITCH: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn hardware_decoding_setting_drives_the_decoder_switch() {
+    let _switch = HW_SWITCH.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut s = Session::default();
     assert_eq!(s.prefs.playback.hardware_decoding, "auto", "Auto by default");
     set(&mut s, "playback.hardwareDecoding", json!("off"));
@@ -468,6 +473,36 @@ fn hardware_decoding_setting_drives_the_decoder_switch() {
     set(&mut s, "playback.hardwareDecoding", json!("auto"));
     assert!(waltcut_codecs::hw::hardware_decoding());
     assert!(settings::field("playback.hardwareDecoding").is_some_and(|f| f.wired && matches!(f.kind, Kind::Choice(_))));
+}
+
+/// Regression (#164): saving any other preference rewrote the process-wide decoder switch from
+/// the saved value, so a session saving an unrelated key (here, in another thread, as other
+/// tests and a running app do) flipped a switch someone else had just set to Off.
+#[test]
+fn saving_an_unrelated_preference_leaves_the_decoder_switch_alone() {
+    let _switch = HW_SWITCH.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let saves = AtomicUsize::new(0);
+    let mut flipped = 0;
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let mut other = Session::default();
+            for i in 0..2_000 {
+                set(&mut other, "timeline.dropImportToTimeline", json!(i % 2 == 0));
+                saves.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        waltcut_codecs::hw::set_hardware_decoding(false);
+        // watch the switch for as long as the other session keeps saving
+        while saves.load(Ordering::Relaxed) < 2_000 {
+            if waltcut_codecs::hw::hardware_decoding() {
+                flipped += 1;
+                waltcut_codecs::hw::set_hardware_decoding(false);
+            }
+        }
+    });
+    waltcut_codecs::hw::set_hardware_decoding(true);
+    assert_eq!(flipped, 0, "the switch was rewritten by unrelated preference saves");
 }
 
 /// Settings ▸ Timeline ▸ "Place files dropped onto the Timeline directly on the Timeline": on by default.
