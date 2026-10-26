@@ -1075,6 +1075,8 @@ mod drawing_cache_tests;
 #[cfg(test)]
 mod drawing_fill_tests;
 #[cfg(test)]
+mod drawing_link_tests;
+#[cfg(test)]
 mod drawing_tests;
 #[cfg(test)]
 mod explicit_targets_tests;

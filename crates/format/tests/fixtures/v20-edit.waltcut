@@ -1,0 +1,565 @@
+{
+  "format": "waltcut.project",
+  "schema_version": 20,
+  "generator": "WaltCut 0.1.0",
+  "project": {
+    "name": "Legacy Edit",
+    "settings": {
+      "renderer": "WaltCut GPU Acceleration (wgpu)",
+      "video_display": "Timecode",
+      "audio_display_samples": true,
+      "default_still_duration": 1270080000000,
+      "title_safe": [
+        20.0,
+        20.0
+      ],
+      "action_safe": [
+        10.0,
+        10.0
+      ],
+      "capture_format": "DV",
+      "scratch": {
+        "captured": null,
+        "videoPreviews": null,
+        "audioPreviews": null,
+        "autoSave": null
+      }
+    },
+    "root": {
+      "id": 0,
+      "name": "Legacy Edit",
+      "children": [
+        {
+          "Bin": {
+            "id": 1,
+            "name": "Footage",
+            "children": [
+              {
+                "Item": 5
+              }
+            ]
+          }
+        },
+        {
+          "Item": 21
+        },
+        {
+          "Item": 48
+        }
+      ]
+    },
+    "items": {
+      "5": {
+        "id": 5,
+        "name": "Ocean_Sunset.mp4",
+        "label": "Iris",
+        "kind": {
+          "Media": {
+            "media": {
+              "Generator": {
+                "Demo": "OceanSunset"
+              }
+            },
+            "info": {
+              "name": "Ocean_Sunset.mp4",
+              "kind": "Movie",
+              "duration": 4572288000000,
+              "video": {
+                "width": 1920,
+                "height": 1080,
+                "frame_rate": {
+                  "num": 24000,
+                  "den": 1001
+                },
+                "par": [
+                  1,
+                  1
+                ],
+                "codec": "H.264 (synthetic)",
+                "pixel_format": "RGBA 8-bit",
+                "color": {
+                  "matrix": "Bt709",
+                  "transfer": "Srgb",
+                  "primaries": "Bt709",
+                  "range": "Full"
+                },
+                "has_alpha": false,
+                "bitrate": null
+              },
+              "audio_streams": [
+                {
+                  "sample_rate": 48000,
+                  "channels": 2,
+                  "codec": "PCM (synthetic)",
+                  "bits_per_sample": 32
+                }
+              ],
+              "container": "Synthetic MPEG-4",
+              "start_timecode": null,
+              "file_size": null
+            },
+            "interpret": {
+              "frame_rate": null,
+              "par": null,
+              "ignore_alpha": false,
+              "invert_alpha": false
+            },
+            "mark_in": null,
+            "mark_out": null,
+            "markers": [],
+            "offline": false
+          }
+        },
+        "metadata": {},
+        "created": 0
+      },
+      "21": {
+        "id": 21,
+        "name": "Assembly",
+        "label": "Forest",
+        "kind": {
+          "Sequence": {
+            "settings": {
+              "width": 1920,
+              "height": 1080,
+              "frame_rate": {
+                "num": 24000,
+                "den": 1001
+              },
+              "par": [
+                1,
+                1
+              ],
+              "sample_rate": 48000,
+              "drop_frame": false,
+              "preset": "HD 1080p 23.976",
+              "preview_codec": "ProRes 422",
+              "max_bit_depth": false,
+              "max_render_quality": false,
+              "working_space": "Rec. 709",
+              "color": {
+                "working": "Rec709",
+                "wide_gamut": false,
+                "auto_tone_map": true
+              }
+            },
+            "video_tracks": [
+              {
+                "id": 15,
+                "kind": "Video",
+                "name": "Video 1",
+                "items": [
+                  {
+                    "id": 29,
+                    "item": 5,
+                    "name": "Ocean_Sunset.mp4",
+                    "label": "Iris",
+                    "start": 0,
+                    "duration": 1260755496000,
+                    "source_in": 243675432000,
+                    "speed": 1.0,
+                    "reverse": false,
+                    "enabled": true,
+                    "link": null,
+                    "group": null,
+                    "effects": [
+                      {
+                        "effect": "motion",
+                        "enabled": true,
+                        "params": {
+                          "anchor": {
+                            "value": {
+                              "Vec2": {
+                                "x": 960.0,
+                                "y": 540.0
+                              }
+                            }
+                          },
+                          "anti_flicker": {
+                            "value": {
+                              "Float": 0.0
+                            }
+                          },
+                          "position": {
+                            "value": {
+                              "Vec2": {
+                                "x": 960.0,
+                                "y": 540.0
+                              }
+                            }
+                          },
+                          "rotation": {
+                            "value": {
+                              "Float": 0.0
+                            }
+                          },
+                          "scale": {
+                            "value": {
+                              "Float": 100.0
+                            }
+                          },
+                          "scale_width": {
+                            "value": {
+                              "Float": 100.0
+                            }
+                          },
+                          "uniform_scale": {
+                            "value": {
+                              "Bool": true
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "effect": "opacity",
+                        "enabled": true,
+                        "params": {
+                          "blend": {
+                            "value": {
+                              "Choice": 0
+                            }
+                          },
+                          "opacity": {
+                            "value": {
+                              "Float": 100.0
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "markers": [],
+                    "gain_db": 0.0,
+                    "frame_hold": null,
+                    "scale_to_frame": false
+                  }
+                ],
+                "locked": false,
+                "sync_lock": true,
+                "enabled": true,
+                "muted": false,
+                "channels": "Stereo"
+              }
+            ],
+            "audio_tracks": [
+              {
+                "id": 18,
+                "kind": "Audio",
+                "name": "Audio 1",
+                "items": [
+                  {
+                    "id": 30,
+                    "item": 5,
+                    "name": "Ocean_Sunset.mp4",
+                    "label": "Iris",
+                    "start": 0,
+                    "duration": 1260755496000,
+                    "source_in": 243675432000,
+                    "speed": 1.0,
+                    "reverse": false,
+                    "enabled": true,
+                    "link": null,
+                    "group": null,
+                    "effects": [
+                      {
+                        "effect": "volume",
+                        "enabled": true,
+                        "params": {
+                          "bypass": {
+                            "value": {
+                              "Bool": false
+                            }
+                          },
+                          "level": {
+                            "value": {
+                              "Float": -8.0
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "markers": [],
+                    "gain_db": 0.0,
+                    "frame_hold": null,
+                    "scale_to_frame": false
+                  }
+                ],
+                "locked": false,
+                "sync_lock": true,
+                "enabled": true,
+                "muted": false,
+                "channels": "Stereo"
+              }
+            ],
+            "markers": [
+              {
+                "id": 800000,
+                "start": 0,
+                "duration": 0,
+                "name": "Open",
+                "comment": "",
+                "kind": "Comment",
+                "color": "Green"
+              }
+            ],
+            "mark_in": null,
+            "mark_out": null,
+            "work_area": null,
+            "start_timecode": 0
+          }
+        },
+        "metadata": {},
+        "created": 0
+      },
+      "48": {
+        "id": 48,
+        "name": "Coloured cel",
+        "label": "Iris",
+        "kind": {
+          "Drawing": {
+            "width": 32,
+            "height": 18,
+            "rate": {
+              "num": 24,
+              "den": 1
+            },
+            "cels": [
+              {
+                "frame": 0,
+                "link": 1
+              },
+              {
+                "frame": 6,
+                "strokes": []
+              },
+              {
+                "frame": 12,
+                "link": 1
+              }
+            ],
+            "links": [
+              {
+                "id": 1,
+                "strokes": [
+                  {
+                    "brush": "Pen",
+                    "color": [
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "size": 2.0,
+                    "points": [
+                      {
+                        "x": 4.0,
+                        "y": 3.0,
+                        "p": 1.0
+                      },
+                      {
+                        "x": 27.0,
+                        "y": 3.0,
+                        "p": 1.0
+                      },
+                      {
+                        "x": 27.0,
+                        "y": 14.0,
+                        "p": 1.0
+                      },
+                      {
+                        "x": 4.0,
+                        "y": 14.0,
+                        "p": 1.0
+                      },
+                      {
+                        "x": 4.0,
+                        "y": 3.0,
+                        "p": 1.0
+                      }
+                    ]
+                  },
+                  {
+                    "brush": "Fill",
+                    "color": [
+                      0.9,
+                      0.2,
+                      0.1,
+                      1.0
+                    ],
+                    "size": 1.0,
+                    "points": [],
+                    "fill": {
+                      "seed": [
+                        10,
+                        8
+                      ],
+                      "tolerance": 32,
+                      "rect": [
+                        3,
+                        2,
+                        26,
+                        14
+                      ],
+                      "runs": [
+                        [
+                          0,
+                          54
+                        ],
+                        [
+                          2,
+                          22
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          1,
+                          20
+                        ],
+                        [
+                          2,
+                          1
+                        ],
+                        [
+                          0,
+                          4
+                        ],
+                        [
+                          2,
+                          22
+                        ],
+                        [
+                          0,
+                          54
+                        ]
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "metadata": {},
+        "created": 48
+      }
+    },
+    "next_id": 49
+  }
+}

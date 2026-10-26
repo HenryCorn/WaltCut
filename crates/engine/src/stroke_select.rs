@@ -118,12 +118,13 @@ fn transform_strokes(s: &mut Session, p: &Value) -> Result<Value> {
     }
     edit_drawing(s, ID, "Transform Strokes", item, |d| {
         let i = d.cel_index_at(frame).ok_or_else(|| bad(ID, "no cel is shown on this frame"))?;
-        let cel = d.cels.get_mut(i).ok_or_else(|| bad(ID, "no such cel"))?;
+        let cel = d.cels.get(i).ok_or_else(|| bad(ID, "no such cel"))?;
         // the cel changed since it was read only if another edit slipped in: both ran on this thread
         if cel.frame != cel_frame || cel.strokes.len() != moved.len() {
             return Err(bad(ID, "the cel changed"));
         }
-        *cel.strokes_mut() = moved;
+        // a linked cel's peers move with it
+        d.edit_strokes(i, |v| *v = moved).ok_or_else(|| bad(ID, "no such cel"))?;
         Ok(())
     })?;
     Ok(report)

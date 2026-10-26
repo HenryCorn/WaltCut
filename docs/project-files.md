@@ -8,7 +8,7 @@ writing them is `crates/format` (`waltcut-format`); the engine's `file.*` comman
 ```json
 {
   "format": "filmcraft.project",
-  "schema_version": 19,
+  "schema_version": 20,
   "generator": "WaltCut 0.1.0",
   "project": { "name": "…", "settings": { … }, "root": { … }, "items": { … }, "next_id": 48 },
   "view": { "open_sequences": [21, 50], "active_sequence": 50, "sequences": { "21": { "pps": 40.0, "scroll": 0.0, … } } }
@@ -44,7 +44,7 @@ rather than dropping it on the next save. Schema v17 did bump for the first such
 `guide: true` (a reference clip left out of delivery renders, see
 [animation.md](animation.md#guide-clips)), so that an older build says "newer schema" instead. Schema v18 did the same for a drawing
 stroke's `response`, the pressure curves it was drawn with (written only when set, see
-[animation.md](animation.md#pressure-response-curves)), and v19 for the fill operation below.
+[animation.md](animation.md#pressure-response-curves)), v19 for the fill operation below and v20 for linked cels.
 
 ### Fill operations
 
@@ -80,9 +80,34 @@ variant: an older build would refuse the unknown `Fill` brush rather than draw t
 - A cel without fills is stored exactly as before (the `fill` key is written only on a fill).
   `crates/format/tests/fixtures/v19-edit.waltcut` holds a drawing with a fill.
 
+### Linked cels
+
+A cel can be *linked* to others (#67, see [animation.md](animation.md#reuse-a-cel-hold-duplicate-or-link-67)):
+several exposures that show one stored artwork. The bump to schema v20 is for these two fields: an
+older build would refuse the unknown keys rather than drop the link on its next save.
+
+```json
+{"width": 1920, "height": 1080, "rate": {"num": 24, "den": 1},
+ "cels": [{"frame": 0, "link": 1}, {"frame": 4, "strokes": [ … ]}, {"frame": 8, "link": 1}],
+ "links": [{"id": 1, "strokes": [ … ]}]}
+```
+
+- A linked cel has `link` (an id from 1) and **no** `strokes`; its artwork is the `strokes` of the
+  `links` entry with that id, written once. An unlinked cel is stored as it always was, and a
+  drawing with no links has no `links` key, so its bytes are unchanged.
+- Loading gives every member of a group the same in-memory list; saving writes it once. Nothing else
+  is shared: two cels with equal strokes but no link are two lists after a round trip.
+- **Rejected, not repaired:** a cel with both `link` and `strokes`; a `link` with no entry in
+  `links`; an entry used by fewer than two cels (including none); `id` 0 or a repeated `id`; more
+  than 20 000 entries, or more than 5 000 strokes in one. The file does not open and the error names
+  the drawing. A link cannot refer to a cel or to another link, so cycles cannot be written.
+- Fill budgets (runs per cel and per drawing) count a linked group's fills once, as they are
+  stored once.
+- `crates/format/tests/fixtures/v20-edit.waltcut` holds a drawing with a linked group.
+
 ### One schema, no migrations
 
-The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 19 (16 was the
+The animation-only reduction (epic #14) is a **breaking change**. `SCHEMA_VERSION` is 20 (16 was the
 baseline of the reduced app), and there is no migration code: a project written before it does not
 open. Versions 1–15 are the WaltCut and first WaltCut builds, up to the
 [`v0.0.1-legacy`](https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy) release.
@@ -90,7 +115,7 @@ open. Versions 1–15 are the WaltCut and first WaltCut builds, up to the
 Opening an older file returns one error and does nothing else:
 
 > this project was created by an earlier FilmCraft or WaltCut build (project schema v15); this
-> build only opens schema v19. Open it with the v0.0.1-legacy release
+> build only opens schema v20. Open it with the v0.0.1-legacy release
 > (https://github.com/HenryCorn/WaltCut/releases/tag/v0.0.1-legacy). The file has not been changed.
 
 - **Never modified.** Reading a project never writes: the file, its `Auto-Save` siblings and its
@@ -106,7 +131,7 @@ Opening an older file returns one error and does nothing else:
   (`crates/format`, `tests::hostile_documents_return_errors` and the fixtures tests).
 
 To change the schema from here: bump `SCHEMA_VERSION`, add a fixture of the new shape under
-`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v19-edit.waltcut`) passing.
+`crates/format/tests/fixtures/`, and keep the golden round-trip test (`v20-edit.waltcut`) passing.
 A change that older builds would load but then silently drop on save needs the bump too. Whether
 to write a migration for a later schema is decided when that happens; none exists today.
 
@@ -114,8 +139,8 @@ to write a migration for a later schema is decided when that happens; none exist
 
 A file with a `schema_version` newer than the build supports is **refused**, not half-read:
 
-> this project was saved by a newer version of WaltCut (project schema v20); this build reads up to
-> v19. Update WaltCut to open it.
+> this project was saved by a newer version of WaltCut (project schema v21); this build reads up to
+> v20. Update WaltCut to open it.
 
 Reading it partially and saving it back would silently drop whatever the newer version added.
 

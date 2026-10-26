@@ -3,6 +3,7 @@
 
 pub mod ai;
 pub mod canvas_view;
+pub mod cel_link;
 pub mod clip_dialogs;
 pub mod color_dialogs;
 pub mod dialogs;

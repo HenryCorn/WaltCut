@@ -83,6 +83,7 @@ pub fn gen_drawing(wl: &Workload, w: u32, h: u32, rate: waltcut_time::FrameRate)
         .map(|c| Cel {
             frame: c * wl.hold,
             strokes: (0..wl.strokes).map(|i| gen_stroke(&mut rng, w as f32, h as f32, wl.points, i)).collect::<Vec<_>>().into(),
+            link: None,
         })
         .collect();
     d
