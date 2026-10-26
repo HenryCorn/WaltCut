@@ -1351,6 +1351,15 @@ impl crate::autosave::Preferences {
         waltcut_codecs::hw::set_hardware_decoding(self.playback.hardware_decoding != "off");
     }
 
+    /// [`Self::apply_hardware_decoding`], but only when this preference differs from `before`.
+    /// The switch is process-wide: saving some other preference must not rewrite it (it would
+    /// undo a `--hw off` flag or another session's choice).
+    pub fn apply_hardware_decoding_if_changed(&self, before: &Self) {
+        if self.playback.hardware_decoding != before.playback.hardware_decoding {
+            self.apply_hardware_decoding();
+        }
+    }
+
     /// Values of one category as a JSON object.
     pub fn category_value(&self, id: &str) -> Option<Value> {
         self.to_value().get(id).cloned()
