@@ -12,7 +12,7 @@
 //! Desktop only: the web build has no threads and keeps mixing in its callback.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 /// How far ahead of the device the mixer keeps the ring (s). Edits made while playing are heard
@@ -108,6 +108,47 @@ impl Ring {
         self.read.store(r + (n * ch) as u64, Ordering::Release);
         n
     }
+
+    /// Consumer: drop up to `frames` whole frames of `ch` channels without playing them; returns
+    /// the frames dropped.
+    fn discard(&self, frames: usize, ch: usize) -> usize {
+        let ch = ch.max(1);
+        let r = self.read.load(Ordering::Relaxed);
+        let avail = self.write.load(Ordering::Acquire).saturating_sub(r) as usize / ch;
+        let n = frames.min(avail);
+        self.read.store(r + (n * ch) as u64, Ordering::Release);
+        n
+    }
+}
+
+/// One tag per mixed block, in block order: the device frame (counted from `start`) its first
+/// frame was mixed for. Single producer (the mixer), single consumer (the callback).
+struct Tags {
+    slots: Vec<AtomicI64>,
+    write: AtomicU64,
+}
+
+impl Tags {
+    fn new(blocks: usize) -> Self {
+        Self { slots: (0..blocks.max(1)).map(|_| AtomicI64::new(0)).collect(), write: AtomicU64::new(0) }
+    }
+
+    /// Producer: publish the tag of the next block. Must precede pushing that block's samples.
+    fn push(&self, tag: i64) {
+        let w = self.write.load(Ordering::Relaxed);
+        if let Some(s) = self.slots.get((w % self.slots.len() as u64) as usize) {
+            s.store(tag, Ordering::Relaxed);
+        }
+        self.write.store(w + 1, Ordering::Release);
+    }
+
+    /// Consumer: the tag of block number `index` (counting from 0), if published.
+    fn get(&self, index: u64) -> Option<i64> {
+        if index >= self.write.load(Ordering::Acquire) {
+            return None;
+        }
+        self.slots.get((index % self.slots.len() as u64) as usize).map(|s| s.load(Ordering::Relaxed))
+    }
 }
 
 /// Stops the mixing thread when the device callback that owns it is dropped (stream stopped).
@@ -131,30 +172,32 @@ where
     let ch = channels.clamp(1, MAX_CHANNELS);
     let lead = ((sample_rate as f64 * LEAD_S) as usize).max(BLOCK_FRAMES * 2);
     let ring = Arc::new(Ring::new(lead * ch));
+    // the ring holds at most `lead / BLOCK_FRAMES` blocks (plus a part-played head): room for their tags
+    let tags = Arc::new(Tags::new(lead / BLOCK_FRAMES + 4));
+    // Net timeline shift the callback has made: frames it played as silence minus stale frames it
+    // dropped. The mixer adds it to a block's nominal start, so a block lands on the right device
+    // frame unless an underrun slipped in after the mixer read this.
+    let slip = Arc::new(AtomicI64::new(0));
     let mut block = vec![0.0; BLOCK_FRAMES * ch];
     mix(start, &mut block, ch);
+    tags.push(start);
     ring.push(&block);
-    // Frames the callback played as silence that the mixer has not skipped yet.
-    let skip = Arc::new(AtomicU64::new(0));
     let stop = Arc::new(AtomicBool::new(false));
     {
-        let (ring, skip, stop) = (ring.clone(), skip.clone(), stop.clone());
+        let (ring, tags, slip, stop) = (ring.clone(), tags.clone(), slip.clone(), stop.clone());
         let body = move || {
-            let mut cursor = start + BLOCK_FRAMES as i64;
+            let mut pushed = BLOCK_FRAMES as i64;
             while !stop.load(Ordering::Acquire) {
                 if ring.len() + block.len() > lead * ch {
                     std::thread::sleep(Duration::from_millis(2));
                     continue;
                 }
-                cursor += skip.swap(0, Ordering::AcqRel) as i64;
+                let cursor = start.saturating_add(pushed).saturating_add(slip.load(Ordering::Acquire));
                 block.fill(0.0);
                 mix(cursor, &mut block, ch);
-                cursor += BLOCK_FRAMES as i64;
-                // silence played while this block was mixing: its first frames are already late
-                let late = skip.swap(0, Ordering::AcqRel) as usize;
-                let drop = late.min(BLOCK_FRAMES);
-                cursor += (late - drop) as i64;
-                ring.push(block.get(drop * ch..).unwrap_or_default());
+                pushed = pushed.saturating_add(BLOCK_FRAMES as i64);
+                tags.push(cursor);
+                ring.push(&block);
             }
         };
         let spawned = std::thread::Builder::new().name("waltcut-audio-mix".into()).spawn(move || {
@@ -168,22 +211,75 @@ where
     }
     let guard = StopOnDrop(stop);
     let mut primed = false;
+    // The callback is the authority on where a frame plays: it knows the device frame it is about
+    // to output (`pos`, from `start`), and the tag says which frame a block was mixed for.
+    // A block that is late (an underrun slipped in after the mixer chose its start) loses its first
+    // frames; one that is early (the mixer counted silence the callback then also dropped) is
+    // preceded by silence. Either way every frame that plays is the one due at that moment.
+    let (mut pos, mut silent, mut dropped) = (0_i64, 0_i64, 0_i64);
+    // The block being played: frames left in it, stale frames still to drop from its front, silence
+    // still owed before its first frame, and how many blocks have been started.
+    let (mut head_left, mut stale_left, mut early_left, mut started) = (0_usize, 0_usize, 0_usize, 0_u64);
     Box::new(move |buf: &mut [f32], dev_ch: usize| {
         let _keep = &guard;
         stats.callbacks.fetch_add(1, Ordering::Relaxed);
         // a device wider or narrower than the mix (it changed since `channels` was read) still
         // plays the channels both have
         let dev_ch = dev_ch.max(1);
-        let have = ring.pop(buf, dev_ch, ch);
+        let n = buf.len() / dev_ch;
+        let mut have = 0;
+        while have < n {
+            if head_left == 0 {
+                if ring.len() < ch {
+                    break;
+                }
+                let due = start.saturating_add(pos).saturating_add(have as i64);
+                let tag = tags.get(started).unwrap_or(due);
+                started += 1;
+                head_left = BLOCK_FRAMES;
+                let diff = due.saturating_sub(tag);
+                stale_left = (diff.max(0) as usize).min(BLOCK_FRAMES);
+                early_left = (diff.saturating_neg().max(0) as usize).min(lead);
+            }
+            if early_left > 0 {
+                let k = early_left.min(n - have);
+                if let Some(dst) = buf.get_mut(have * dev_ch..(have + k) * dev_ch) {
+                    dst.fill(0.0);
+                }
+                have += k;
+                early_left -= k;
+                silent += k as i64;
+                continue;
+            }
+            if stale_left > 0 {
+                let gone = ring.discard(stale_left.min(head_left), ch);
+                stale_left -= gone;
+                head_left -= gone;
+                dropped += gone as i64;
+                if gone == 0 {
+                    break;
+                }
+                continue;
+            }
+            let take = head_left.min(n - have);
+            let Some(dst) = buf.get_mut(have * dev_ch..(have + take) * dev_ch) else { break };
+            let got = ring.pop(dst, dev_ch, ch);
+            have += got;
+            head_left -= got;
+            if got < take {
+                break;
+            }
+        }
         if let Some(rest) = buf.get_mut(have * dev_ch..) {
             rest.fill(0.0);
         }
-        let n = buf.len() / dev_ch;
         if have < n {
             stats.underruns.fetch_add(1, Ordering::Relaxed);
             stats.missing_frames.fetch_add((n - have) as u64, Ordering::Relaxed);
-            skip.fetch_add((n - have) as u64, Ordering::AcqRel);
+            silent += (n - have) as i64;
         }
+        pos = pos.saturating_add(n as i64);
+        slip.store(silent.saturating_sub(dropped), Ordering::Release);
         let left = ring.len();
         primed |= left + 2 * BLOCK_FRAMES * ch > lead * ch;
         if primed {
