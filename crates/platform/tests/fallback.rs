@@ -212,3 +212,13 @@ fn a_sample_software_rejects_during_the_replay_loses_no_pictures() {
     }
     assert_eq!(checked, FIXTURES.len(), "every fixture has a damaged-sample case");
 }
+
+/// Regression (#106): fixtures were cached by name only, so changing a generator's arguments
+/// kept serving the old file.
+#[test]
+fn a_fixture_is_cached_per_generator_arguments() {
+    let small = fixture_path("x.mp4", &["-s", "160x120"]);
+    assert_eq!(small, fixture_path("x.mp4", &["-s", "160x120"]));
+    assert_ne!(small, fixture_path("x.mp4", &["-s", "320x240"]), "other arguments must not reuse the cached file");
+    assert_eq!(small.file_name().and_then(|n| n.to_str()), Some("x.mp4"));
+}

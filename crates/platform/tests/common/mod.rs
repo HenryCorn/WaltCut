@@ -78,9 +78,15 @@ pub fn dir() -> PathBuf {
     waltcut_testkit::fixtures_dir("platform")
 }
 
-/// Generate `name` with `ffmpeg -y -v error <args> <out>` (cached).
+/// Where `name` generated with `args` is cached: a folder keyed on the arguments, so changing
+/// them regenerates the file instead of reusing a stale one (#106).
+pub fn fixture_path(name: &str, args: &[&str]) -> PathBuf {
+    waltcut_testkit::fixtures::recipe_dir("platform", &format!("{name} {args:?}")).join(name)
+}
+
+/// Generate `name` with `ffmpeg -y -v error <args> <out>` (cached by name and arguments).
 pub fn fixture(ff: &Path, name: &str, args: &[&str]) -> Option<PathBuf> {
-    let out = dir().join(name);
+    let out = fixture_path(name, args);
     waltcut_testkit::fixtures::generate(&out, |tmp| {
         let st = Command::new(ff).args(["-y", "-v", "error"]).args(args).arg(tmp).stdin(Stdio::null()).status();
         match st {

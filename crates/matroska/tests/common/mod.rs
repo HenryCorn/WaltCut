@@ -12,7 +12,8 @@ pub fn tools() -> Option<(PathBuf, PathBuf)> {
 }
 
 pub fn fixture_dir() -> PathBuf {
-    waltcut_testkit::fixtures_dir("matroska")
+    // keyed on this file: it holds every ffmpeg argument list (#106)
+    waltcut_testkit::fixtures::recipe_fixtures_dir("matroska", include_str!("mod.rs"))
 }
 
 const V: &[&str] = &["-f", "lavfi", "-i", "testsrc2=size=160x120:rate=25"];

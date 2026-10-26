@@ -26,7 +26,8 @@ pub fn ffprobe() -> Option<PathBuf> {
 }
 
 pub fn fixture_dir() -> PathBuf {
-    waltcut_testkit::fixtures_dir("isobmff")
+    // keyed on this file: it holds every ffmpeg argument list (#106)
+    waltcut_testkit::fixtures::recipe_fixtures_dir("isobmff", include_str!("mod.rs"))
 }
 
 pub fn out_dir() -> PathBuf {

@@ -8,7 +8,8 @@ use std::process::{Command, Stdio};
 use waltcut_mpeg2v::{ChromaFormat, Decoder, Picture};
 
 pub fn fixture_dir() -> PathBuf {
-    waltcut_testkit::fixtures_dir("mpeg2v")
+    // keyed on this file: it holds every ffmpeg argument list (#106)
+    waltcut_testkit::fixtures::recipe_fixtures_dir("mpeg2v", include_str!("mod.rs"))
 }
 
 /// An elementary-stream fixture: a lavfi source encoded by ffmpeg's MPEG-1/2 video encoder.
