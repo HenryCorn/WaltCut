@@ -6,7 +6,7 @@
 
 Steps: new project; import footage, an image sequence and audio; arrange on the timeline (trim,
 split); draw with pen, pencil, marker and eraser; new, duplicate and held cels, in-between and
-onion skin; linked exposures; lasso, reference and guide clips; the drawing view; stroke smoothing; pressure
+onion skin; linked exposures; lasso, reference and guide clips; the drawing view; stroke smoothing and the rope stabilizer; pressure
 curves; region fill, also from another clip with gap closing and edge growth; the light table's pose shift; preview and frame-step; export an H.264 MP4, a ProRes 4444 MOV and a PNG
 sequence and check them with ffprobe. Screenshots of each stage go to <out>/shots. Needs ffmpeg
 and ffprobe.
@@ -265,6 +265,19 @@ cmd("drawing.smoothing", {"mode": "off"})
 check(call("ui.inspect")["result"]["ui"]["brush"]["smoothing"]["mode"] == "Off", "smoothing is off again")
 cmd("edit.undo", {})
 check(strokes_at() == before, "one undo takes the stroke away; the setting had no undo step")
+
+print("== rope stabilizer: a stroke on a pulled string, a bad length refused, back off, undo")
+r = cmd("drawing.smoothing", {"mode": "rope", "length": 40})
+check(r["mode"] == "rope" and r["length"] == 40.0, f"rope is on ({r})")
+bad = call("engine.execute", {"command": "drawing.smoothing", "params": {"length": 1e9}}, quiet=True)
+check(not bad.get("ok") and cmd("drawing.smoothing", {})["length"] == 40.0, "a huge rope length is refused whole")
+call("ui.drag", {"from": {"x": x + w * 0.2, "y": y + h * 0.7}, "to": {"x": x + w * 0.7, "y": y + h * 0.75}, "steps": 40})
+time.sleep(0.4)
+check(strokes_at() == before + 1, "a rope stroke was drawn")
+shot("08h2-rope")
+cmd("drawing.smoothing", {"mode": "off"})
+cmd("edit.undo", {})
+check(strokes_at() == before, "one undo takes the rope stroke away")
 
 print("== pressure curves: presets, a custom width curve, a refused curve, reset")
 check(cmd("drawing.pressureCurve", {})["default"] is True, "the brush starts with its own pressure response")

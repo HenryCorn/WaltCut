@@ -137,8 +137,9 @@ fn clean_pressure(p: f32) -> f32 {
 
 impl StrokeBuilder {
     /// A builder for a stroke started with these smoothing settings (Off stores samples as captured).
-    pub fn with_smoothing(settings: &super::drawing_smooth::Smoothing) -> Self {
-        Self { smoother: super::drawing_smooth::Smoother::new(settings), ..Self::default() }
+    /// `scale` is screen points per canvas pixel (the rope's length follows the zoom).
+    pub fn with_smoothing(settings: &super::drawing_smooth::Smoothing, scale: f32) -> Self {
+        Self { smoother: super::drawing_smooth::Smoother::scaled(settings, scale), ..Self::default() }
     }
 
     /// Offer a sample (`canvas` is its canvas position). Returns whether it was kept.
@@ -158,6 +159,11 @@ impl StrokeBuilder {
             Some(f) => f.step([canvas.0, canvas.1, p]),
             None => [canvas.0, canvas.1, p],
         };
+        if self.smoother.is_some() && self.points.last() == Some(&point) {
+            // a rope the pen has not pulled: nothing new to store
+            self.last = Some((s.pos, p));
+            return true;
+        }
         self.store(s, point, p);
         true
     }
