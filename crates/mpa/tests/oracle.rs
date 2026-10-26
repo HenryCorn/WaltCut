@@ -185,8 +185,14 @@ fn tool(name: &str) -> Option<PathBuf> {
     waltcut_testkit::oracle::find_tool(name)
 }
 
+/// Cached in a folder keyed on the whole recipe, so a changed definition regenerates (#106).
+fn encoded_path(s: &Encoded) -> PathBuf {
+    let recipe = format!("{} {} {} {:?} {}", s.name, s.input, s.rate, s.enc, s.twolame);
+    waltcut_testkit::fixtures::recipe_dir("mpa", &recipe).join(format!("{}.mp2", s.name))
+}
+
 fn make_encoded(ff: &Path, s: &Encoded) -> Option<PathBuf> {
-    let out = waltcut_testkit::fixtures_dir("mpa").join(format!("{}.mp2", s.name));
+    let out = encoded_path(s);
     if s.twolame {
         let twolame = tool("twolame")?;
         return waltcut_testkit::fixtures::generate(&out, |tmp| {
@@ -510,7 +516,9 @@ const SYNTHETIC: &[(&str, u8, bool, u8, u8, u8, u8)] = &[
 fn synthetic_streams_match_ffmpeg() {
     let ff = waltcut_testkit::require_ffmpeg!();
     for (k, &(name, layer, lsf, br, sr, mode, ext)) in SYNTHETIC.iter().enumerate() {
-        let out = waltcut_testkit::fixtures_dir("mpa").join(format!("{name}.mp{layer}"));
+        // keyed on this file too: the stream generator (header, Rng, random_layer*) lives here
+        let recipe = format!("{} {name} {layer} {lsf} {br} {sr} {mode} {ext} {k}", include_str!("oracle.rs"));
+        let out = waltcut_testkit::fixtures::recipe_dir("mpa", &recipe).join(format!("{name}.mp{layer}"));
         let f = waltcut_testkit::fixtures::generate(&out, |tmp| {
             let mut rng = Rng(0x9E37_79B9 ^ k as u32);
             let h = header(lsf, layer, br, sr, mode, ext);
@@ -566,7 +574,7 @@ fn damaged_frames_never_panic() {
 fn generate_fixtures() {
     let Some(ff) = waltcut_testkit::ffmpeg_or_skip("mpa fixtures") else { return };
     for s in ENCODED {
-        let out = waltcut_testkit::fixtures_dir("mpa").join(format!("{}.mp2", s.name));
+        let out = encoded_path(s);
         waltcut_testkit::fixtures::generate_and_report(&format!("mpa/{}", s.name), &[out], || make_encoded(&ff, s));
     }
 }

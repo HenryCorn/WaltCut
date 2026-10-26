@@ -147,7 +147,18 @@ fn color_metadata_is_reported() {
 fn generate_fixtures() {
     let Some(ff) = ffmpeg() else { return };
     for spec in specs() {
-        let out = [fixture_dir().join(format!("{}.mov", spec.name))];
+        let out = [spec_path(&spec)];
         waltcut_testkit::fixtures::generate_and_report(&format!("prores/{}", spec.name), &out, || Some(make(&ff, &spec)));
     }
+}
+
+/// Regression (#106): a changed spec must not reuse the cached MOV of the old one.
+#[test]
+fn a_spec_is_cached_per_definition() {
+    let a = Spec::new("x", "testsrc2=s=64x64:r=25", 2, &["-c:v", "prores_ks"]);
+    let same = Spec::new("x", "testsrc2=s=64x64:r=25", 2, &["-c:v", "prores_ks"]);
+    assert_eq!(spec_path(&a), spec_path(&same));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=32x32:r=25", 2, &["-c:v", "prores_ks"])));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 3, &["-c:v", "prores_ks"])));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 2, &["-c:v", "prores_ks", "-profile:v", "3"])));
 }

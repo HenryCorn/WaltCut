@@ -66,8 +66,16 @@ impl Spec {
     }
 }
 
+/// Where the IVF for `spec` is cached: a folder keyed on everything that shapes it, so a changed
+/// spec regenerates instead of reusing a stale file (#106). (Downloaded conformance vectors stay in
+/// `aom-test-data`, keyed by their file name: the upstream bucket publishes immutable files.)
+pub fn spec_path(spec: &Spec) -> PathBuf {
+    let recipe = format!("{} {} {} {} {} {:?}", spec.name, spec.encoder, spec.lavfi, spec.frames, spec.pix_fmt, spec.enc);
+    waltcut_testkit::fixtures::recipe_fixtures_dir("av1", &recipe).join(format!("{}.ivf", spec.name))
+}
+
 pub fn make(ff: &Path, spec: &Spec) -> PathBuf {
-    let path = fixture_dir().join(format!("{}.ivf", spec.name));
+    let path = spec_path(spec);
     if !path.exists() {
         let tmp = waltcut_testkit::temp_path(&path);
         let frames = spec.frames.to_string();

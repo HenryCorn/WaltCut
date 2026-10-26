@@ -9,7 +9,8 @@ use waltcut_avi::{IndexSource, OpenOptions, StreamKind, open, open_with};
 
 fn fixture(name: &str, args: &[&str]) -> Option<PathBuf> {
     let ffmpeg = waltcut_testkit::ffmpeg_or_skip("avi oracle")?;
-    let out = waltcut_testkit::fixtures_dir("avi").join(name);
+    // cached in a folder keyed on the ffmpeg arguments, so changed arguments regenerate (#106)
+    let out = waltcut_testkit::fixtures::recipe_dir("avi", &format!("{name} {args:?}")).join(name);
     waltcut_testkit::fixtures::generate(&out, |tmp: &Path| {
         let mut c = Command::new(&ffmpeg);
         c.args(["-v", "error", "-y"]).args(args).args(["-f", "avi"]).arg(tmp);

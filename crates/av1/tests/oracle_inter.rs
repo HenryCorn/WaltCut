@@ -117,3 +117,13 @@ fn inter_chroma_444_422() {
         check_bit_exact(&ff, &s);
     }
 }
+
+/// Regression (#106): a changed spec must not reuse the cached IVF of the old one.
+#[test]
+fn a_spec_is_cached_per_definition() {
+    let a = Spec::new("x", "testsrc2=s=64x64:r=25", 2, "yuv420p", &["-g", "10"]);
+    assert_eq!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 2, "yuv420p", &["-g", "10"])));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 3, "yuv420p", &["-g", "10"])));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 2, "yuv420p", &["-g", "20"])));
+    assert_ne!(spec_path(&a), spec_path(&Spec::new("x", "testsrc2=s=64x64:r=25", 2, "yuv420p", &["-g", "10"]).encoder("libaom-av1")));
+}

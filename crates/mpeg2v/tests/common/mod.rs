@@ -8,8 +8,7 @@ use std::process::{Command, Stdio};
 use waltcut_mpeg2v::{ChromaFormat, Decoder, Picture};
 
 pub fn fixture_dir() -> PathBuf {
-    // keyed on this file: it holds every ffmpeg argument list (#106)
-    waltcut_testkit::fixtures::recipe_fixtures_dir("mpeg2v", include_str!("mod.rs"))
+    waltcut_testkit::fixtures_dir("mpeg2v")
 }
 
 /// An elementary-stream fixture: a lavfi source encoded by ffmpeg's MPEG-1/2 video encoder.
@@ -31,8 +30,10 @@ pub const HD1080I: Spec = Spec {
     pix_fmt: "yuv420p",
 };
 
+/// Cached in a folder keyed on the whole spec, so a changed argument list regenerates (#106).
 pub fn path(spec: &Spec) -> PathBuf {
-    fixture_dir().join(format!("{}.{}", spec.name, if spec.enc.contains(&"mpeg1video") { "m1v" } else { "m2v" }))
+    let recipe = format!("{} {} {} {:?} {}", spec.name, spec.lavfi, spec.frames, spec.enc, spec.pix_fmt);
+    waltcut_testkit::fixtures::recipe_dir("mpeg2v", &recipe).join(format!("{}.{}", spec.name, if spec.enc.contains(&"mpeg1video") { "m1v" } else { "m2v" }))
 }
 
 /// Generate (or reuse) the fixture.

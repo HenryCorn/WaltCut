@@ -191,3 +191,19 @@ fn keyframes_and_reset() {
         }
     }
 }
+
+/// Regression (#106): cached fixtures were keyed by name only, so a changed definition kept
+/// serving the old file. Every field that shapes the stream must change the cache folder.
+#[test]
+fn a_fixture_is_cached_per_definition() {
+    let base = common::fixture(common::FIXTURES[0].name);
+    let same = common::fixture_dir_for(base);
+    assert_eq!(same, common::fixture_dir_for(base));
+    let resized = common::Fixture { width: base.width + 16, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&resized), "another size must not reuse the cached stream");
+    let reframed = common::Fixture { frames: base.frames + 1, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&reframed));
+    let args: &'static [&'static str] = &["-g", "1"];
+    let changed = common::Fixture { args, ..*base };
+    assert_ne!(same, common::fixture_dir_for(&changed));
+}

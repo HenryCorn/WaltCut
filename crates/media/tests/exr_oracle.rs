@@ -13,8 +13,11 @@ use waltcut_time::{FrameRate, Tick};
 const W: usize = 95; // odd, so nothing lines up by accident
 const H: usize = 63;
 
+/// Cached stills live in a folder keyed on the picture filters (size, alpha), so a changed
+/// generator regenerates them (#106).
 fn dir() -> PathBuf {
-    waltcut_testkit::fixtures::fixtures_dir("media/exr")
+    let recipe = format!("{} {} testsrc2=size=96x64 seq 3 zip16 half", filter(false), filter(true));
+    waltcut_testkit::fixtures::recipe_fixtures_dir("media/exr", &recipe)
 }
 
 /// The filter making a 95×63 picture, translucent when `alpha`.

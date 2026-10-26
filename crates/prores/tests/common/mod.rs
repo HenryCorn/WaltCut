@@ -12,8 +12,7 @@ pub fn ffmpeg() -> Option<PathBuf> {
 }
 
 pub fn fixture_dir() -> PathBuf {
-    // keyed on this file: it holds every ffmpeg argument list (#106)
-    waltcut_testkit::fixtures::recipe_fixtures_dir("prores", include_str!("mod.rs"))
+    waltcut_testkit::fixtures_dir("prores")
 }
 
 fn run(ff: &Path, args: &[&str]) {
@@ -37,9 +36,16 @@ impl Spec {
     }
 }
 
+/// Where the fixture MOV for `spec` is cached: a folder keyed on everything that shapes it, so a
+/// changed spec regenerates instead of reusing a stale file (#106).
+pub fn spec_path(spec: &Spec) -> PathBuf {
+    let recipe = format!("{} {} {} {:?}", spec.name, spec.lavfi, spec.frames, spec.enc);
+    waltcut_testkit::fixtures::recipe_fixtures_dir("prores", &recipe).join(format!("{}.mov", spec.name))
+}
+
 /// Generate (or reuse) the fixture MOV.
 pub fn make(ff: &Path, spec: &Spec) -> PathBuf {
-    let path = fixture_dir().join(format!("{}.mov", spec.name));
+    let path = spec_path(spec);
     if !path.exists() {
         let tmp = waltcut_testkit::temp_path(&path);
         let frames = spec.frames.to_string();
@@ -248,14 +254,16 @@ pub fn ffmpeg_decode(ff: &Path, mov: &Path, pix_fmt: &str) -> (Vec<u16>, String)
 
 /// Render a lavfi source to raw 10-bit planar frames with ffmpeg and load them as [`Frame`]s.
 pub fn source_frames(ff: &Path, name: &str, lavfi: &str, frames: u32, w: u32, h: u32, chroma: ChromaFormat, alpha: bool) -> Vec<Frame> {
-    let path = fixture_dir().join(format!("{name}.raw"));
+    let recipe = format!("{name} {lavfi} {frames} {w}x{h} {chroma:?} {alpha}");
+    let dir = waltcut_testkit::fixtures::recipe_fixtures_dir("prores", &recipe);
+    let path = dir.join(format!("{name}.raw"));
     if !path.exists() {
         let pix = match (chroma, alpha) {
             (ChromaFormat::Yuv422, _) => "yuv422p10le",
             (ChromaFormat::Yuv444, false) => "yuv444p10le",
             (ChromaFormat::Yuv444, true) => "yuva444p10le",
         };
-        let tmp = fixture_dir().join(format!("{name}.tmp.raw"));
+        let tmp = waltcut_testkit::temp_path(&path);
         let f = frames.to_string();
         run(ff, &["-f", "lavfi", "-i", lavfi, "-frames:v", &f, "-f", "rawvideo", "-pix_fmt", pix, tmp.to_str().unwrap()]);
         std::fs::rename(&tmp, &path).unwrap();

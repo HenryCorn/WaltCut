@@ -229,7 +229,7 @@ fn reference(ivf: &Path, pix_fmt: &str) -> Vec<u8> {
 
 fn encode(name: &str, w: u32, h: u32, frames: u32, extra: &[&str]) -> Option<Vec<Vec<u8>>> {
     let ff = common::ffmpeg()?;
-    let path = common::fixtures_dir().join(format!("{name}.ivf"));
+    let path = common::keyed_dir(&format!("{name} {w}x{h} {frames} {extra:?}")).join(format!("{name}.ivf"));
     if !path.exists() {
         let mut c = std::process::Command::new(ff);
         c.args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i"]);
