@@ -923,25 +923,7 @@ pub fn tween(a: &Cel, b: &Cel, t: f32) -> Vec<Stroke> {
         match (a.strokes.get(i), b.strokes.get(i)) {
             // a fill is never morphed: the nearer cel's operation stands in
             (Some(sa), Some(sb)) if sa.is_fill() || sb.is_fill() => out.push(if t < 0.5 { sa.clone() } else { sb.clone() }),
-            (Some(sa), Some(sb)) => {
-                let k = sa.points.len().max(sb.points.len()).clamp(2, 512);
-                let pa = resample(&sa.points, k);
-                let pb = resample(&sb.points, k);
-                let lerp = |x: f32, y: f32| x + (y - x) * t;
-                let points = pa.iter().zip(&pb).map(|(p, q)| StrokePoint { x: lerp(p.x, q.x), y: lerp(p.y, q.y), p: lerp(p.p, q.p) }).collect();
-                let mut color = sa.color;
-                for (c, d) in color.iter_mut().zip(sb.color) {
-                    *c = lerp(*c, d);
-                }
-                out.push(Stroke {
-                    brush: if t < 0.5 { sa.brush } else { sb.brush },
-                    color,
-                    size: lerp(sa.size, sb.size),
-                    points,
-                    response: if t < 0.5 { sa.response.clone() } else { sb.response.clone() },
-                    fill: None,
-                });
-            }
+            (Some(sa), Some(sb)) => out.push(morph_stroke(sa, sb, false, t)),
             (Some(s), None) if t < 0.5 => out.push(s.clone()),
             (None, Some(s)) if t >= 0.5 => out.push(s.clone()),
             _ => {}
@@ -950,8 +932,36 @@ pub fn tween(a: &Cel, b: &Cel, t: f32) -> Vec<Stroke> {
     out
 }
 
+/// Stroke `a` morphed into stroke `b` at `t` (0..1, clamped): both are resampled to the same number
+/// of points (at most 512) by arc length and the points, pressure, colour and size are blended;
+/// the brush and pressure response are the nearer stroke's. `reverse` runs `b` backwards. Neither
+/// stroke may be a fill (a fill is never morphed).
+pub(crate) fn morph_stroke(sa: &Stroke, sb: &Stroke, reverse: bool, t: f32) -> Stroke {
+    let t = if t.is_finite() { t.clamp(0.0, 1.0) } else { 0.0 };
+    let k = sa.points.len().max(sb.points.len()).clamp(2, 512);
+    let pa = resample(&sa.points, k);
+    let mut pb = resample(&sb.points, k);
+    if reverse {
+        pb.reverse();
+    }
+    let lerp = |x: f32, y: f32| x + (y - x) * t;
+    let points = pa.iter().zip(&pb).map(|(p, q)| StrokePoint { x: lerp(p.x, q.x), y: lerp(p.y, q.y), p: lerp(p.p, q.p) }).collect();
+    let mut color = sa.color;
+    for (c, d) in color.iter_mut().zip(sb.color) {
+        *c = lerp(*c, d);
+    }
+    Stroke {
+        brush: if t < 0.5 { sa.brush } else { sb.brush },
+        color,
+        size: lerp(sa.size, sb.size),
+        points,
+        response: if t < 0.5 { sa.response.clone() } else { sb.response.clone() },
+        fill: None,
+    }
+}
+
 /// `points` resampled to `k` samples evenly spaced along its length.
-fn resample(points: &[StrokePoint], k: usize) -> Vec<StrokePoint> {
+pub(crate) fn resample(points: &[StrokePoint], k: usize) -> Vec<StrokePoint> {
     let Some(&first) = points.first() else { return Vec::new() };
     if points.len() == 1 || k < 2 {
         return vec![first; k.max(1)];

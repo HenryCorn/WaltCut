@@ -16,6 +16,7 @@ pub mod effect;
 pub mod find;
 pub mod graphic;
 pub mod graphic_design;
+pub mod inbetween;
 pub mod keyframe;
 
 use std::collections::BTreeMap;

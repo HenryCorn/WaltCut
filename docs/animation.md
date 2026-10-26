@@ -123,7 +123,97 @@ hold a pose for several frames or place a new cel on every frame.
      `.reset`; while shifting or shifted `.badge`, `.done`, `.resetBadge`.
 8. To fill a gap between two cels, choose **In-between**. It interpolates matching strokes by
    resampling their points; adjust the spacing in the options bar (two frames by default). This is
-   a straight stroke interpolation, not a semantic or AI-generated pose.
+   a straight stroke interpolation, not a semantic or AI-generated pose. It pairs stroke *n* of
+   one cel with stroke *n* of the next and has no say in what is paired: to choose the pairs,
+   use [In-between assist](#in-between-assist-explicit-stroke-correspondence-72).
+
+## In-between assist: explicit stroke correspondence (#72)
+
+**In-between** above pairs strokes by their position in the two cels and switches an unpaired
+stroke halfway. That is a guess, and the in-between assist replaces the guess with a choice:
+*you* say which stroke of one cel becomes which stroke of another, WaltCut generates the cels
+between them from exactly that, and says what it could not do. It never finds a correspondence
+for you and never reports a confidence: there is no matching algorithm and no score. (The older
+**In-between** command and `drawing.tween` stay as they were.)
+
+**What a correspondence is.** A *pair* is `{from, to, reverse?}`: stroke number `from` of the
+start cel becomes stroke number `to` of the end cel, whole stroke to whole stroke. Numbers are
+positions in the cel's list at the moment of the call (the same positions `drawing.inspect
+{strokes: true}` lists, counted from 0); strokes have no other id, so a pair means what it says
+only for the cels as they are. The two cels are chosen by the frames they start on
+(`from` < `to`, default: the cel shown and the next one), not necessarily neighbours. Each stroke
+is in at most one pair. `reverse` runs the end stroke backwards: the drawing direction of a stroke
+is not looked at, so a line drawn right-to-left in one cel and left-to-right in the other is
+paired with `reverse: true`, or the in-between twists through itself.
+
+**What is reported, never decided silently.** Every call answers with the mapping it used
+(`pairs`, with each stroke's point count) and with:
+
+* `status`: `"ok"` or `"unsupported"`. Unsupported means nothing is generated, nothing is
+  stored, and `problems` says why: no pairs; a number outside the cel (with the cel's count);
+  a stroke named twice; a blank cel at either end; a pair of strokes with no points; an
+  **eraser** stroke in either cel (an eraser cuts what is under it in that cel, which does not
+  survive a morph, so a cel with erasers is refused rather than approximated); a pair that names
+  a **fill** (a fill is a stored result, #68, and is never morphed).
+* `otherDirectionIsCloser` on each pair: true when the pair as given joins the stroke ends further
+  apart than the opposite direction would. It is a measurement of the two ends, offered so a twisted
+  pair is visible; WaltCut never flips a pair itself.
+* `unmatched`: the strokes of either cel that are in no pair. They are **dropped** from the
+  generated cels by default; `unmatched: "nearest"` instead keeps them from the nearer cel (the
+  start cel's before the middle, the end cel's from the middle on, the old behaviour, now opt-in
+  and reported). Fills are never in a pair; they always follow the nearer cel, as they do for
+  **In-between**, and are listed under `fills`.
+* `skipped`: generated frames that were not made, with the reason (below).
+
+**Spacing and easing.** Frames are exact drawing frames: `step` (1 to 1 000, default 2) places
+one every `step` frames after the start cel, up to but not including the end cel; or `frames`
+lists them (each strictly between the two cels). The position of a frame is the integer ratio
+`(frame - start) / (end - start)`, passed through `easing`: `linear` (default), `easeIn`,
+`easeOut` or `easeInOut`. Point positions, pressure, colour and size are interpolated; the brush
+and pressure response are those of the nearer cel.
+
+**Preview and cancel change nothing.** `drawing.inbetweenPreview {…}` computes what would be made
+and keeps it in the session (never in the project or the history): no undo step, no changed
+marker, nothing saved or exported. `geometry: true` returns the generated strokes too. The
+options bar shows one generated frame at a time over the picture, tinted and not part of any
+export. `drawing.inbetweenCancel` (or Cancel, Escape in the window, another drawing clip, or
+any edit to either cel) throws it away and leaves nothing behind. A preview whose cels were edited
+since is dropped and refused by accept, so a stale pairing cannot be applied.
+
+**Accept writes ordinary cels.** `drawing.inbetweenAccept {frames?}` (the same mapping, or by
+default the preview's; `frames` accepts only some of the previewed frames) is one undo step. Each
+accepted frame becomes a new **unlinked** cel whose strokes are the generated ones; the two chosen
+cels are never touched, and neither is any other cel. A frame where a cel already starts is
+**skipped** and reported (`"cel starts here"`); a frame outside the drawing clip's visible range
+is skipped (`"outside the clip"`); a drawing on a locked track is refused, for preview and accept
+alike. If every frame is skipped nothing happens and the call is refused. The generated cels are
+exactly what the preview showed (same code path), and the UI runs the same commands as a script,
+so the same mapping gives the same cels.
+
+**Bounds.** At most 256 pairs, 256 generated frames per call (raise `step` or list `frames`), 512
+points per generated stroke, 2 000 000 generated points in total, and the drawing's usual limits
+on cels (20 000) and strokes per cel (5 000); a request over a bound is refused before anything is
+computed. Nothing here is stored in the project file (the mapping only generates cels, it is not
+kept), so there is no schema change.
+
+**In the options bar.** With the Brush tool, **Assist…** (`program.brush.inbetween.open`) opens the
+**In-between assist** window for the cel shown and the next one. **Add pair** adds a row (start
+stroke → end stroke, with **Reverse**); **Pair in order** fills the list with start stroke *n* →
+end stroke *n* as ordinary rows you can change, **Clear** empties it. Set the spacing, the easing
+and whether unpaired strokes are kept, then **Preview**: the first generated frame is drawn over
+the picture in magenta with a note saying it is not applied, ◀ ▶ step through the generated
+frames, and the lines under the buttons list exactly what the command reported (skipped frames,
+unpaired strokes, fills, a pair whose ends look swapped, or why the pairing is unsupported).
+**Accept N cels** makes them; **Cancel**, Escape, closing the window, another drawing clip or an
+edit to either cel drops the preview. Editing the rows after a preview disables Accept until you
+preview again. The window sends the same commands a script does, with explicit parameters, so
+the same pairing gives the same cels either way.
+
+Commands: `drawing.inbetweenPreview`, `drawing.inbetweenAccept`, `drawing.inbetweenCancel`, with
+no default shortcut. Automation ids: `program.brush.inbetween.open`, then `.add`, `.inOrder`,
+`.clear`, `.step`, `.easing`, `.unmatched`, `.preview`, `.accept`, `.cancel`, `.prev`, `.next`,
+`.status` and per row `.row.<n>.from`, `.to`, `.reverse`, `.remove`; `ui.inspect` reports the
+table and the last answer as `ui.brush.inbetween`.
 
 ## Lasso-select and transform strokes
 
@@ -704,7 +794,7 @@ consistent, but temporal consistency between generated frames is not guaranteed.
 ## Current scope
 
 Drawings support raster-rendered Pen, Pencil, Marker, and Eraser strokes, held or duplicated cels,
-onion skins, and straight in-between interpolation. This is a focused 2D drawing workflow, not a
+onion skins, straight in-between interpolation, and an in-between assist that joins strokes you pair explicitly. This is a focused 2D drawing workflow, not a
 full vector animation or rigging system.
 
 ## What WaltCut keeps
@@ -731,7 +821,7 @@ workflows' commands once the reduction is finished.
 | Import reference media | `file.import`, `file.importImageSequence`, `edit.pasteMedia` |
 | Organise media in bins | `file.newBin`, `project.moveToBin`, `project.renameBin` |
 | Arrange a simple timeline | `file.newSequence`, `sequence.addEdit` (split), `edit.duplicate`, `edit.clear`, `edit.rippleDelete`, `clip.link`, `clip.audioGain`, track mute |
-| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.smoothing`, `drawing.pressureCurve`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
+| Draw and manage cels | `drawing.new`, `drawing.newCel`, `drawing.retimeCel`, `drawing.setHold`, `drawing.retimeExposures`, `drawing.previousCel`, `drawing.nextCel`, `drawing.reviewPrevious`, `drawing.reviewNext`, `drawing.addStroke`, `drawing.clearCel`, `drawing.deleteCel`, `drawing.tween`, `drawing.inbetweenPreview`, `drawing.inbetweenAccept`, `drawing.inbetweenCancel`, `drawing.lassoSelect`, `drawing.transformStrokes`, `drawing.lassoMode`, `drawing.selectStrokes`, `drawing.selectionTransform`, `drawing.selectionApply`, `reference.place`, `reference.pasteImage`, `reference.set`, `reference.list`, `clip.setGuide`, `drawing.onionSkin`, `drawing.pinPose`, `drawing.smoothing`, `drawing.pressureCurve`, `drawing.lightTable`, `drawing.lightTableShift`, `drawing.lightTableReset`, the Drawing View commands `view.canvasRotate`, `view.canvasRotateRight`, `view.canvasRotateLeft`, `view.canvasMirror`, `view.canvasPan`, `view.canvasReset` |
 | AI Restyle | `ai.setup`, `ai.status`, `ai.restyle` |
 | Preview | `playback.toggle`, frame stepping, Program monitor zoom and resolution |
 | Export | `file.exportMedia`, `file.exportFrame`, `export.quick` |

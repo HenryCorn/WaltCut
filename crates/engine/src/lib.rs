@@ -20,6 +20,7 @@ pub mod demo;
 pub mod doc_path;
 pub mod drawing;
 pub mod drawing_fill;
+pub mod drawing_inbetween;
 mod export_output;
 pub mod export_tools;
 pub mod graphic_design;
@@ -365,6 +366,9 @@ pub struct Session {
     pub media_stamps: std::collections::HashMap<String, media_watch::Stamp>,
     /// The stamps being taken on a worker thread ([`Session::start_media_scan`]).
     pub media_scan: Option<media_watch::MediaScan>,
+    /// The in-between preview (#72): what accepting would make. Session state only, never in the
+    /// project or the history; dropped when either of its cels changes.
+    pub inbetween: Option<drawing_inbetween::Preview>,
 }
 
 /// A background job with shared progress.
@@ -431,6 +435,7 @@ impl Session {
             exec_depth: 0,
             media_stamps: Default::default(),
             media_scan: None,
+            inbetween: None,
         }
     }
 
@@ -896,6 +901,7 @@ impl Session {
 
     fn bump(&mut self) {
         self.revision += 1;
+        self.prune_inbetween();
         self.events.push(Event::ProjectChanged { revision: self.revision });
     }
 
@@ -1074,6 +1080,8 @@ mod color_tests;
 mod drawing_cache_tests;
 #[cfg(test)]
 mod drawing_fill_tests;
+#[cfg(test)]
+mod drawing_inbetween_tests;
 #[cfg(test)]
 mod drawing_link_tests;
 #[cfg(test)]

@@ -104,6 +104,9 @@ older build would refuse the unknown keys rather than drop the link on its next 
 - Fill budgets (runs per cel and per drawing) count a linked group's fills once, as they are
   stored once.
 - `crates/format/tests/fixtures/v20-edit.waltcut` holds a drawing with a linked group.
+- **In-between assist (#72) stores nothing.** The stroke pairing and its preview live in the session
+  only and are never written; accepting makes ordinary unlinked cels, which are stored like any
+  other (so the schema is unchanged and `v20-edit.waltcut` still covers them).
 
 ### One schema, no migrations
 
