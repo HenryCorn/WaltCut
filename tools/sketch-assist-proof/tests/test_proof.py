@@ -199,6 +199,14 @@ class Live(Base):
         self.assertEqual(entries[0]["inputs"][0]["sha256"], run.Loaded("sketch", self.sketch).sha256)
         self.assertEqual(self.ledger().spent(), Decimal("0.055"))
 
+    def test_status_202_while_running_keeps_polling(self):
+        # regression: a real run reported "failed" on fal's HTTP 202 (queued/running) and still got billed
+        with FakeFal(polls_before_done=2, in_progress_status=202) as fal:
+            code, out, err, prompts = self.invoke(self.run_args("--live", "--only", "kontext"), self.env(fal), ["y"])
+            self.assertEqual(code, 0, err + out)
+            self.assertEqual(self.ledger().entries()[0]["state"], "done")
+            self.assertTrue(any((self.work / "runs" / "r1").glob("01-kontext*.png")))
+
     def test_key_never_written_or_printed(self):
         with FakeFal(submit_status=500) as fal:
             code, out, err, _ = self.invoke(self.run_args("--live", "--only", "kontext"), self.env(fal), ["y"])
