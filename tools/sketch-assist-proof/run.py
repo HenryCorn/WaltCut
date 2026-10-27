@@ -664,7 +664,8 @@ def exec_call(call, args, io, ledger, run_dir, base_url, cap):
                 err = f"timed out after {args.timeout} s; cancel request answered {code}"
                 return finish("timeout", cancel_http=str(code))
             code, resp = http("GET", derive("status"), auth, timeout=max(5, min(60, remaining())))
-            if code != 200:
+            # fal answers 202 while a request is still queued or running; only other codes are failures
+            if code not in (200, 202):
                 err = f"status returned HTTP {code}"
                 return finish("failed")
             try:

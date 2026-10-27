@@ -20,11 +20,12 @@ def make_png(w, h, rgb=(200, 30, 30)):
 
 
 class FakeFal:
-    def __init__(self, polls_before_done=1, hang=False, submit_status=200):
+    def __init__(self, polls_before_done=1, hang=False, submit_status=200, in_progress_status=200):
         self.requests = []  # (method, path, headers dict, body bytes)
         self.polls_before_done = polls_before_done
         self.hang = hang
         self.submit_status = submit_status
+        self.in_progress_status = in_progress_status  # fal answers 202 while a request is queued or running
         self.cancelled = threading.Event()
         outer = self
 
@@ -59,7 +60,7 @@ class FakeFal:
                 if self.path.endswith("/status"):
                     n = sum(1 for r in outer.requests if r[0] == "GET" and r[1].endswith("/status"))
                     done = (not outer.hang) and n > outer.polls_before_done
-                    return self._send(200, {"status": "COMPLETED" if done else "IN_PROGRESS"})
+                    return self._send(200 if done else outer.in_progress_status, {"status": "COMPLETED" if done else "IN_PROGRESS"})
                 uri = "data:image/png;base64," + base64.b64encode(make_png(8, 8, (1, 2, 3))).decode()
                 self._send(200, {"images": [{"url": uri, "width": 8, "height": 8}], "seed": 1})
 
